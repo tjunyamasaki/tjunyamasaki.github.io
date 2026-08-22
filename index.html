@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lobby MVP</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <p id="config-error" class="banner banner-error hidden"></p>
+
+      <section id="view-home" class="card">
+        <h1>Lobby</h1>
+        <p class="lede">
+          Player 1 hosts. Others join with a room code. State lives on the host
+          and syncs over WebRTC.
+        </p>
+
+        <label class="field">
+          Nickname
+          <input id="nickname" type="text" maxlength="24" placeholder="Your name" autocomplete="nickname" />
+        </label>
+
+        <div class="actions">
+          <button id="btn-host" type="button">Host lobby</button>
+        </div>
+
+        <div class="join-row">
+          <label class="field grow">
+            Room code
+            <input id="join-code" type="text" maxlength="6" placeholder="ABC12" autocomplete="off" />
+          </label>
+          <button id="btn-join" type="button">Join</button>
+        </div>
+
+        <p id="home-status" class="status"></p>
+      </section>
+
+      <section id="view-lobby" class="card hidden">
+        <header class="lobby-head">
+          <div>
+            <p class="muted" id="role-label"></p>
+            <h2>Room <span id="room-code-display"></span></h2>
+          </div>
+          <button id="btn-leave" type="button" class="ghost">Leave</button>
+        </header>
+
+        <p id="lobby-status" class="status"></p>
+
+        <p class="counter-line">
+          Shared counter: <strong id="counter-value">0</strong>
+        </p>
+        <div class="actions">
+          <button id="btn-bump" type="button">Bump counter</button>
+          <button id="btn-ready" type="button">Toggle ready</button>
+        </div>
+
+        <h3>Players</h3>
+        <ul id="player-list" class="player-list"></ul>
+      </section>
+    </main>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

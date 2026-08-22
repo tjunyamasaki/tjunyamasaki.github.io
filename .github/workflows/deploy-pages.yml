@@ -38,10 +38,10 @@ jobs:
 
       - name: Stage site (no .git)
         run: |
-          mkdir -p _site/css _site/js
+          mkdir -p _site
           cp index.html _site/
-          cp css/style.css _site/css/
-          cp js/*.js _site/js/
+          cp -r css _site/css
+          cp -r js _site/js
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -63,9 +63,10 @@ export async function roomExists(code) {
   return snap.exists();
 }
 
-export async function registerGuest(code, guestId, name) {
+export async function registerGuest(code, guestId, name, playerId) {
   await set(roomRef(code, "guests", guestId), {
     name,
+    playerId: playerId || guestId,
     joinedAt: Date.now(),
   });
 }

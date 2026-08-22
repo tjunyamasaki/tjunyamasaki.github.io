@@ -36,11 +36,13 @@ export function createHost({
   const lobbyState = initialState || {
     counter: 0,
     players: {
-      [HOST_ID]: { name, ready: false, isHost: true },
+      [HOST_ID]: { name, ready: false, isHost: true, connected: true },
     },
   };
   if (lobbyState.players[HOST_ID]) {
     lobbyState.players[HOST_ID].name = name;
+    lobbyState.players[HOST_ID].connected = true;
+    lobbyState.players[HOST_ID].isHost = true;
   }
 
   let phase = initialSecret?.phase || "lobby";
@@ -75,16 +77,20 @@ export function createHost({
       deckCount: deck.length,
       hand: clone(hands[viewerId] || []),
       handCounts,
+      viewerId,
     };
   }
 
   function broadcast() {
     onState(snapshotFor(HOST_ID));
     persist();
-    for (const [guestId, session] of connections) {
-      if (session.channel?.readyState === "open") {
+    for (const session of connections.values()) {
+      if (session.channel?.readyState === "open" && session.playerId) {
         session.channel.send(
-          JSON.stringify({ type: "state", lobbyState: snapshotFor(guestId) })
+          JSON.stringify({
+            type: "state",
+            lobbyState: snapshotFor(session.playerId),
+          })
         );
       }
     }
@@ -122,9 +128,21 @@ export function createHost({
     if (totalCardsInHands() === 0) phase = "ended";
   }
 
+  function removeSeat(playerId) {
+    if (playerId === HOST_ID) return;
+    if (hands[playerId]) {
+      deck.push(...hands[playerId]);
+      delete hands[playerId];
+    }
+    delete lobbyState.players[playerId];
+    for (const [guestId, session] of [...connections]) {
+      if (session.playerId === playerId) closeGuestLink(guestId);
+    }
+  }
+
   function applyIntent(peerId, intent) {
     const player = lobbyState.players[peerId];
-    if (!player) return;
+    if (!player && intent.action !== "leaveSeat") return;
     if (intent.action === "ready" && phase === "lobby") {
       player.ready = !player.ready;
     } else if (intent.action === "bump" && phase === "lobby") {
@@ -133,15 +151,21 @@ export function createHost({
       startDeal();
     } else if (intent.action === "playCard") {
       playCard(peerId, intent.cardId);
+    } else if (intent.action === "leaveSeat" && peerId !== HOST_ID) {
+      removeSeat(peerId);
     }
     broadcast();
   }
 
-  function dropGuest(guestId) {
+  function closeGuestLink(guestId) {
     const session = connections.get(guestId);
     if (session) {
-      session.channel?.close();
-      session.pc.close();
+      try {
+        session.channel?.close();
+        session.pc.close();
+      } catch {
+        /* ignore */
+      }
       connections.delete(guestId);
     }
     const stop = guestUnsubs.get(guestId);
@@ -149,20 +173,57 @@ export function createHost({
       stop();
       guestUnsubs.delete(guestId);
     }
-    if (!tearingDown && lobbyState.players[guestId]) {
-      delete lobbyState.players[guestId];
-      if (hands[guestId]) {
-        deck.push(...hands[guestId]);
-        delete hands[guestId];
-      }
+  }
+
+  function onDisconnect(guestId) {
+    if (tearingDown) return;
+    const session = connections.get(guestId);
+    const playerId = session?.playerId;
+    closeGuestLink(guestId);
+    if (playerId && lobbyState.players[playerId]) {
+      lobbyState.players[playerId].connected = false;
       broadcast();
     }
+  }
+
+  function seatPlayer(playerId, playerName, guestId) {
+    if (!playerId) playerId = guestId;
+    const session = connections.get(guestId);
+    if (session) session.playerId = playerId;
+
+    for (const [otherId, other] of [...connections]) {
+      if (otherId !== guestId && other.playerId === playerId) {
+        closeGuestLink(otherId);
+      }
+    }
+
+    const existing = lobbyState.players[playerId];
+    if (existing) {
+      existing.name = playerName || existing.name;
+      existing.connected = true;
+      if (!hands[playerId]) hands[playerId] = [];
+      return true;
+    }
+
+    if (Object.keys(lobbyState.players).length >= MAX_PLAYERS) {
+      return false;
+    }
+    lobbyState.players[playerId] = {
+      name: playerName || "Guest",
+      ready: false,
+      isHost: false,
+      connected: true,
+    };
+    if (!hands[playerId]) hands[playerId] = [];
+    return true;
   }
 
   async function attachGuest(guestId, info) {
     if (connections.has(guestId) || info.offer || info.rejected) return;
 
-    if (connections.size + 1 >= MAX_PLAYERS) {
+    const incomingId = info.playerId || guestId;
+    const isReturn = Boolean(lobbyState.players[incomingId]);
+    if (!isReturn && Object.keys(lobbyState.players).length >= MAX_PLAYERS) {
       await rejectGuest(roomCode, guestId, "Lobby is full (15 players).");
       return;
     }
@@ -170,7 +231,7 @@ export function createHost({
     const pc = new RTCPeerConnection(ICE_CONFIG);
     const ice = createIceBuffer(pc);
     const channel = pc.createDataChannel("lobby");
-    connections.set(guestId, { pc, channel });
+    connections.set(guestId, { pc, channel, playerId: incomingId });
 
     const unsubs = [];
     unsubs.push(
@@ -202,26 +263,24 @@ export function createHost({
       if (tearingDown) return;
       const state = pc.connectionState;
       if (state === "disconnected" || state === "failed" || state === "closed") {
-        dropGuest(guestId);
+        onDisconnect(guestId);
       }
     };
 
     channel.onopen = () => {
-      const guestName = info.name || "Guest";
-      lobbyState.players[guestId] = {
-        name: guestName,
-        ready: false,
-        isHost: false,
-      };
-      if (!hands[guestId]) hands[guestId] = [];
-      sendTo(channel, { type: "state", lobbyState: snapshotFor(guestId) });
+      const ok = seatPlayer(incomingId, info.name || "Guest", guestId);
+      if (!ok) {
+        rejectGuest(roomCode, guestId, "Lobby is full (15 players).");
+        closeGuestLink(guestId);
+        return;
+      }
+      const playerId = connections.get(guestId)?.playerId || incomingId;
+      sendTo(channel, { type: "state", lobbyState: snapshotFor(playerId) });
       broadcast();
       setStatus("connected");
     };
 
-    channel.onclose = () => {
-      if (!tearingDown) dropGuest(guestId);
-    };
+    channel.onclose = () => onDisconnect(guestId);
 
     channel.onmessage = (event) => {
       let msg;
@@ -230,14 +289,13 @@ export function createHost({
       } catch {
         return;
       }
-      if (msg.type === "hello" && msg.name) {
-        if (lobbyState.players[guestId]) {
-          lobbyState.players[guestId].name = msg.name;
-          broadcast();
-        }
+      const playerId = connections.get(guestId)?.playerId || incomingId;
+      if (msg.type === "hello") {
+        seatPlayer(msg.playerId || playerId, msg.name || info.name, guestId);
+        broadcast();
       }
       if (msg.type === "intent") {
-        applyIntent(guestId, msg);
+        applyIntent(playerId, msg);
       }
     };
 
@@ -270,7 +328,7 @@ export function createHost({
     persist();
     unsubGuests();
     for (const id of [...connections.keys()]) {
-      dropGuest(id);
+      closeGuestLink(id);
     }
     if (roomCode) {
       try {

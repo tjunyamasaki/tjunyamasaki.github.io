@@ -12,8 +12,9 @@ import {
   createIceBuffer,
 } from "./signaling.js";
 
-export function createGuest({ name, onState, onStatus }) {
+export function createGuest({ name, playerId, onState, onStatus }) {
   const guestId = randomId();
+  const seatId = playerId || guestId;
   let pc;
   let channel;
   let roomCode = "";
@@ -68,7 +69,7 @@ export function createGuest({ name, onState, onStatus }) {
       channel = event.channel;
       channel.onopen = () => {
         setStatus("connected");
-        send({ type: "hello", name });
+        send({ type: "hello", name, playerId: seatId });
       };
       channel.onclose = () => hostGone();
       channel.onmessage = (ev) => {
@@ -113,7 +114,7 @@ export function createGuest({ name, onState, onStatus }) {
       })
     );
 
-    await registerGuest(roomCode, guestId, name);
+    await registerGuest(roomCode, guestId, name, seatId);
     return guestId;
   }
 
@@ -135,5 +136,5 @@ export function createGuest({ name, onState, onStatus }) {
     }
   }
 
-  return { join, stop, sendIntent, guestId };
+  return { join, stop, sendIntent, guestId, playerId: seatId };
 }

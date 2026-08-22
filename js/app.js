@@ -11,13 +11,14 @@ import {
   clearGuestSession,
   lobbyStateForResume,
   secretForResume,
+  getOrCreatePlayerId,
 } from "./persist.js";
 import { cardLabel } from "./cards.js";
 
 const els = {
   configError: document.getElementById("config-error"),
   viewHome: document.getElementById("view-home"),
-  viewLobby: document.getElementById("view-lobby"),
+  viewTable: document.getElementById("view-table"),
   nickname: document.getElementById("nickname"),
   joinCode: document.getElementById("join-code"),
   btnHost: document.getElementById("btn-host"),
@@ -34,13 +35,13 @@ const els = {
   roleLabel: document.getElementById("role-label"),
   roomCodeDisplay: document.getElementById("room-code-display"),
   counterValue: document.getElementById("counter-value"),
-  playerList: document.getElementById("player-list"),
   phaseLabel: document.getElementById("phase-label"),
-  deckCount: document.getElementById("deck-count"),
   lobbyTools: document.getElementById("lobby-tools"),
   tableCards: document.getElementById("table-cards"),
   handCards: document.getElementById("hand-cards"),
   handHint: document.getElementById("hand-hint"),
+  opponents: document.getElementById("opponents"),
+  deckPile: document.getElementById("deck-pile"),
 };
 
 let session = null;
@@ -49,6 +50,7 @@ let selfId = null;
 let currentRoom = "";
 let guestRetryTimer = null;
 let leaving = false;
+let joiningGuest = false;
 
 function setHomeStatus(text, error = false) {
   els.homeStatus.textContent = text || "";
@@ -65,22 +67,22 @@ function nickname() {
   return value || "Player";
 }
 
-function showLobby(code, isHost) {
+function showHome() {
+  els.viewTable.classList.add("hidden");
+  els.viewHome.classList.remove("hidden");
+  currentRoom = "";
+  if (location.hash !== "#home") location.hash = "home";
+  refreshResumeUi();
+}
+
+function showTable(code, isHost) {
   els.viewHome.classList.add("hidden");
-  els.viewLobby.classList.remove("hidden");
+  els.viewTable.classList.remove("hidden");
   els.roomCodeDisplay.textContent = code;
   currentRoom = code;
   els.roleLabel.textContent = isHost ? "You are the host" : "You are a guest";
   els.btnStart.classList.toggle("hidden", !isHost);
-}
-
-function showHome() {
-  els.viewLobby.classList.add("hidden");
-  els.viewHome.classList.remove("hidden");
-  els.playerList.innerHTML = "";
-  els.counterValue.textContent = "0";
-  currentRoom = "";
-  refreshResumeUi();
+  if (location.hash !== "#table") location.hash = "table";
 }
 
 function appendCardButton(parent, card, { playable }) {
@@ -100,16 +102,67 @@ function appendCardButton(parent, card, { playable }) {
   parent.append(btn);
 }
 
+function renderDeck(count) {
+  els.deckPile.innerHTML = "";
+  const n = Math.min(8, Math.max(0, count));
+  for (let i = 0; i < n; i++) {
+    const back = document.createElement("div");
+    back.className = "deck-back";
+    back.style.left = `${i * 2}px`;
+    back.style.top = `${-i * 2}px`;
+    back.style.zIndex = String(i);
+    els.deckPile.append(back);
+  }
+  const label = document.createElement("div");
+  label.className = "deck-count";
+  label.textContent = String(count);
+  els.deckPile.append(label);
+}
+
+function renderOpponents(view, phase) {
+  els.opponents.innerHTML = "";
+  const players = view.players || {};
+  const counts = view.handCounts || {};
+  for (const [id, player] of Object.entries(players)) {
+    if (id === selfId) continue;
+    const box = document.createElement("div");
+    box.className = "opponent" + (player.connected === false ? " offline" : "");
+    const name = document.createElement("div");
+    name.className = "opponent-name";
+    const bits = [player.name || "Player"];
+    if (player.isHost) bits.push("host");
+    if (player.connected === false) bits.push("away");
+    if (phase === "lobby") bits.push(player.ready ? "ready" : "not ready");
+    name.textContent = bits.join(" · ");
+    const row = document.createElement("div");
+    row.className = "card-row";
+    const n = counts[id] ?? 0;
+    for (let i = 0; i < n; i++) {
+      const back = document.createElement("span");
+      back.className = "face-down";
+      row.append(back);
+    }
+    if (!n) {
+      row.textContent = phase === "lobby" ? "—" : "empty";
+    }
+    box.append(name, row);
+    els.opponents.append(box);
+  }
+}
+
 function renderState(view) {
   if (!view) return;
+  if (view.viewerId) selfId = view.viewerId;
   const phase = view.phase || "lobby";
   els.phaseLabel.textContent = phase;
-  els.deckCount.textContent = String(view.deckCount ?? 0);
   els.counterValue.textContent = String(view.counter ?? 0);
   els.lobbyTools.classList.toggle("hidden", phase === "playing");
   els.btnStart.classList.toggle("hidden", role !== "host" || phase === "playing");
   els.btnStart.textContent = phase === "ended" ? "Deal again" : "Start deal";
   els.handHint.classList.toggle("hidden", phase !== "playing");
+
+  renderDeck(view.deckCount ?? 0);
+  renderOpponents(view, phase);
 
   els.tableCards.innerHTML = "";
   for (const card of view.table || []) {
@@ -123,27 +176,8 @@ function renderState(view) {
   for (const card of view.hand || []) {
     appendCardButton(els.handCards, card, { playable: phase === "playing" });
   }
-  if (!(view.hand || []).length && phase !== "lobby") {
-    els.handCards.textContent = "No cards";
-  }
-
-  els.playerList.innerHTML = "";
-  const players = view.players || {};
-  const counts = view.handCounts || {};
-  for (const [id, player] of Object.entries(players)) {
-    const li = document.createElement("li");
-    const left = document.createElement("span");
-    left.textContent = player.name || "Player";
-    if (id === selfId) left.textContent += " (you)";
-    const right = document.createElement("span");
-    right.className = "tag";
-    const bits = [];
-    if (player.isHost) bits.push("host");
-    if (phase === "lobby") bits.push(player.ready ? "ready" : "not ready");
-    else bits.push(`${counts[id] ?? 0} cards`);
-    right.textContent = bits.join(" · ");
-    li.append(left, right);
-    els.playerList.append(li);
+  if (!(view.hand || []).length) {
+    els.handCards.textContent = phase === "lobby" ? "—" : "No cards";
   }
 }
 
@@ -179,7 +213,6 @@ async function beginHost({ resume }) {
   const name = nickname();
   try {
     initFirebase();
-    clearGuestSession();
     const host = createHost({
       name,
       initialState: saved
@@ -194,7 +227,7 @@ async function beginHost({ resume }) {
     role = "host";
     selfId = host.hostId;
     const code = await host.start(saved?.roomCode);
-    showLobby(code, true);
+    showTable(code, true);
     setLobbyStatus({ text: "connected" });
   } catch (err) {
     console.error(err);
@@ -205,8 +238,6 @@ async function beginHost({ resume }) {
     els.btnResume.disabled = false;
   }
 }
-
-let joiningGuest = false;
 
 async function beginGuest(code, { fromRetry = false } = {}) {
   if (!isFirebaseConfigured() || joiningGuest) return;
@@ -221,20 +252,22 @@ async function beginGuest(code, { fromRetry = false } = {}) {
     }
     session = null;
   }
+  const playerId = getOrCreatePlayerId();
   let guest = null;
   try {
     initFirebase();
     guest = createGuest({
       name: nickname(),
+      playerId,
       onState: renderState,
       onStatus: onGuestStatus,
     });
     session = guest;
     role = "guest";
-    selfId = guest.guestId;
+    selfId = playerId;
     await guest.join(code);
-    saveGuestSession({ roomCode: code, name: nickname() });
-    showLobby(code, false);
+    saveGuestSession({ roomCode: code, name: nickname(), playerId });
+    showTable(code, false);
     setLobbyStatus({ text: "connected" });
     stopGuestRetry();
   } catch (err) {
@@ -277,6 +310,10 @@ function scheduleGuestRetry() {
 async function leave({ endTable = false } = {}) {
   leaving = true;
   stopGuestRetry();
+  if (role === "guest" && session?.sendIntent) {
+    session.sendIntent("leaveSeat");
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
   if (session) {
     await session.stop();
     session = null;
@@ -330,19 +367,23 @@ els.btnStart.addEventListener("click", () => {
 });
 
 window.addEventListener("pagehide", () => {
-  if (role === "host" && session) {
-    session.stop();
-  } else if (role === "guest" && session) {
-    session.stop();
+  if (session) session.stop();
+});
+
+window.addEventListener("hashchange", () => {
+  if (location.hash === "#home" && session) {
+    /* stay at table unless they Leave */
+    location.hash = "table";
   }
 });
 
 refreshResumeUi();
+if (location.hash === "#table" && !session) location.hash = "home";
 
 if (!isFirebaseConfigured()) {
   els.configError.classList.remove("hidden");
   els.configError.textContent =
-    "Firebase is not configured. Copy js/config.example.js to js/config.js and paste your web app keys (see README).";
+    "Firebase is not configured. See docs/SETUP.md for local keys.";
   els.btnHost.disabled = true;
   els.btnJoin.disabled = true;
   els.btnResume.disabled = true;

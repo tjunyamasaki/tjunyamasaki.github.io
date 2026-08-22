@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lobby MVP</title>
+    <title>Card lobby</title>
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <main class="shell">
-      <p id="config-error" class="banner banner-error hidden"></p>
+    <p id="config-error" class="banner banner-error hidden"></p>
 
-      <section id="view-home" class="card">
-        <h1>Lobby</h1>
+    <section id="view-home" class="page page-home">
+      <div class="home-card">
+        <h1>Card table</h1>
         <p class="lede">
-          Player 1 hosts. Others join with a room code. State lives on the host
-          and syncs over WebRTC.
+          Host a room, share the code, then play at the table. The host keeps
+          the deck.
         </p>
 
         <label class="field">
@@ -39,43 +39,48 @@
         </div>
 
         <p id="home-status" class="status"></p>
-      </section>
+      </div>
+    </section>
 
-      <section id="view-lobby" class="card hidden">
-        <header class="lobby-head">
-          <div>
-            <p class="muted" id="role-label"></p>
-            <h2>Room <span id="room-code-display"></span></h2>
-          </div>
-          <button id="btn-leave" type="button" class="ghost">Leave</button>
-        </header>
-
-        <p id="lobby-status" class="status"></p>
-        <p class="muted">Phase: <strong id="phase-label">lobby</strong> · Deck: <span id="deck-count">0</span></p>
-
-        <div id="lobby-tools">
-          <p class="counter-line">
-            Shared counter: <strong id="counter-value">0</strong>
+    <section id="view-table" class="page page-table hidden">
+      <header class="table-head">
+        <div>
+          <p class="muted" id="role-label"></p>
+          <h2>Room <span id="room-code-display"></span></h2>
+          <p class="muted">
+            <span id="phase-label">lobby</span>
+            · <span id="lobby-status" class="status"></span>
           </p>
-          <div class="actions">
-            <button id="btn-bump" type="button">Bump counter</button>
-            <button id="btn-ready" type="button">Toggle ready</button>
-            <button id="btn-start" type="button">Start deal</button>
+        </div>
+        <button id="btn-leave" type="button" class="ghost">Leave</button>
+      </header>
+
+      <div id="lobby-tools" class="table-toolbar">
+        <span>Counter: <strong id="counter-value">0</strong></span>
+        <div class="actions">
+          <button id="btn-bump" type="button">Bump</button>
+          <button id="btn-ready" type="button">Ready</button>
+          <button id="btn-start" type="button">Start deal</button>
+        </div>
+      </div>
+
+      <div id="opponents" class="opponents"></div>
+
+      <div class="felt">
+        <div class="felt-center">
+          <div id="deck-pile" class="deck-pile" title="Draw pile"></div>
+          <div>
+            <p class="felt-label">Table</p>
+            <div id="table-cards" class="card-row"></div>
           </div>
         </div>
+      </div>
 
-        <div id="table-section">
-          <h3>Table</h3>
-          <div id="table-cards" class="card-row"></div>
-          <h3>Your hand</h3>
-          <p id="hand-hint" class="muted hidden">Tap a card to play it.</p>
-          <div id="hand-cards" class="card-row"></div>
-        </div>
-
-        <h3>Players</h3>
-        <ul id="player-list" class="player-list"></ul>
-      </section>
-    </main>
+      <div class="you">
+        <p class="felt-label">Your hand <span id="hand-hint" class="muted hidden">· tap to play</span></p>
+        <div id="hand-cards" class="card-row"></div>
+      </div>
+    </section>
 
     <script type="module" src="js/app.js"></script>
   </body>

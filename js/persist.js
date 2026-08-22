@@ -19,12 +19,13 @@ function write(key, value) {
   }
 }
 
-export function saveHostSession({ roomCode, name, lobbyState }) {
+export function saveHostSession({ roomCode, name, lobbyState, secret }) {
   if (!roomCode || !lobbyState) return;
   write(HOST_KEY, {
     roomCode,
     name,
     lobbyState,
+    secret: secret || null,
     savedAt: Date.now(),
   });
 }
@@ -66,5 +67,17 @@ export function lobbyStateForResume(saved, hostName) {
   return {
     counter: saved?.counter ?? 0,
     players: { host },
+  };
+}
+
+export function secretForResume(savedSecret) {
+  if (!savedSecret) {
+    return { phase: "lobby", deck: [], table: [], hands: { host: [] } };
+  }
+  return {
+    phase: savedSecret.phase || "lobby",
+    deck: savedSecret.deck || [],
+    table: savedSecret.table || [],
+    hands: { host: savedSecret.hands?.host || [] },
   };
 }

@@ -10,7 +10,9 @@ import {
   loadGuestSession,
   clearGuestSession,
   lobbyStateForResume,
+  secretForResume,
 } from "./persist.js";
+import { cardLabel } from "./cards.js";
 
 const els = {
   configError: document.getElementById("config-error"),
@@ -26,12 +28,19 @@ const els = {
   btnLeave: document.getElementById("btn-leave"),
   btnBump: document.getElementById("btn-bump"),
   btnReady: document.getElementById("btn-ready"),
+  btnStart: document.getElementById("btn-start"),
   homeStatus: document.getElementById("home-status"),
   lobbyStatus: document.getElementById("lobby-status"),
   roleLabel: document.getElementById("role-label"),
   roomCodeDisplay: document.getElementById("room-code-display"),
   counterValue: document.getElementById("counter-value"),
   playerList: document.getElementById("player-list"),
+  phaseLabel: document.getElementById("phase-label"),
+  deckCount: document.getElementById("deck-count"),
+  lobbyTools: document.getElementById("lobby-tools"),
+  tableCards: document.getElementById("table-cards"),
+  handCards: document.getElementById("hand-cards"),
+  handHint: document.getElementById("hand-hint"),
 };
 
 let session = null;
@@ -62,6 +71,7 @@ function showLobby(code, isHost) {
   els.roomCodeDisplay.textContent = code;
   currentRoom = code;
   els.roleLabel.textContent = isHost ? "You are the host" : "You are a guest";
+  els.btnStart.classList.toggle("hidden", !isHost);
 }
 
 function showHome() {
@@ -73,11 +83,53 @@ function showHome() {
   refreshResumeUi();
 }
 
-function renderState(lobbyState) {
-  if (!lobbyState) return;
-  els.counterValue.textContent = String(lobbyState.counter ?? 0);
+function appendCardButton(parent, card, { playable }) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "playing-card" + (card.color === "red" ? " red" : "");
+  btn.textContent = cardLabel(card);
+  if (playable) {
+    btn.addEventListener("click", () => {
+      if (!session) return;
+      if (role === "host") session.hostIntent("playCard", { cardId: card.id });
+      else session.sendIntent("playCard", { cardId: card.id });
+    });
+  } else {
+    btn.disabled = true;
+  }
+  parent.append(btn);
+}
+
+function renderState(view) {
+  if (!view) return;
+  const phase = view.phase || "lobby";
+  els.phaseLabel.textContent = phase;
+  els.deckCount.textContent = String(view.deckCount ?? 0);
+  els.counterValue.textContent = String(view.counter ?? 0);
+  els.lobbyTools.classList.toggle("hidden", phase === "playing");
+  els.btnStart.classList.toggle("hidden", role !== "host" || phase === "playing");
+  els.btnStart.textContent = phase === "ended" ? "Deal again" : "Start deal";
+  els.handHint.classList.toggle("hidden", phase !== "playing");
+
+  els.tableCards.innerHTML = "";
+  for (const card of view.table || []) {
+    appendCardButton(els.tableCards, card, { playable: false });
+  }
+  if (!(view.table || []).length) {
+    els.tableCards.textContent = phase === "lobby" ? "—" : "Empty";
+  }
+
+  els.handCards.innerHTML = "";
+  for (const card of view.hand || []) {
+    appendCardButton(els.handCards, card, { playable: phase === "playing" });
+  }
+  if (!(view.hand || []).length && phase !== "lobby") {
+    els.handCards.textContent = "No cards";
+  }
+
   els.playerList.innerHTML = "";
-  const players = lobbyState.players || {};
+  const players = view.players || {};
+  const counts = view.handCounts || {};
   for (const [id, player] of Object.entries(players)) {
     const li = document.createElement("li");
     const left = document.createElement("span");
@@ -87,7 +139,8 @@ function renderState(lobbyState) {
     right.className = "tag";
     const bits = [];
     if (player.isHost) bits.push("host");
-    bits.push(player.ready ? "ready" : "not ready");
+    if (phase === "lobby") bits.push(player.ready ? "ready" : "not ready");
+    else bits.push(`${counts[id] ?? 0} cards`);
     right.textContent = bits.join(" · ");
     li.append(left, right);
     els.playerList.append(li);
@@ -132,6 +185,7 @@ async function beginHost({ resume }) {
       initialState: saved
         ? lobbyStateForResume(saved.lobbyState, name)
         : undefined,
+      initialSecret: saved ? secretForResume(saved.secret) : undefined,
       onState: renderState,
       onStatus: setLobbyStatus,
       onPersist: saveHostSession,
@@ -269,6 +323,10 @@ els.btnReady.addEventListener("click", () => {
   if (!session) return;
   if (role === "host") session.hostIntent("ready");
   else session.sendIntent("ready");
+});
+
+els.btnStart.addEventListener("click", () => {
+  if (role === "host" && session) session.hostIntent("start");
 });
 
 window.addEventListener("pagehide", () => {

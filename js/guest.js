@@ -117,8 +117,8 @@ export function createGuest({ name, onState, onStatus }) {
     return guestId;
   }
 
-  function sendIntent(action) {
-    send({ type: "intent", action });
+  function sendIntent(action, extra = {}) {
+    send({ type: "intent", action, ...extra });
   }
 
   async function stop() {

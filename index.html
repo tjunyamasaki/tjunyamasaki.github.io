@@ -51,13 +51,25 @@
         </header>
 
         <p id="lobby-status" class="status"></p>
+        <p class="muted">Phase: <strong id="phase-label">lobby</strong> · Deck: <span id="deck-count">0</span></p>
 
-        <p class="counter-line">
-          Shared counter: <strong id="counter-value">0</strong>
-        </p>
-        <div class="actions">
-          <button id="btn-bump" type="button">Bump counter</button>
-          <button id="btn-ready" type="button">Toggle ready</button>
+        <div id="lobby-tools">
+          <p class="counter-line">
+            Shared counter: <strong id="counter-value">0</strong>
+          </p>
+          <div class="actions">
+            <button id="btn-bump" type="button">Bump counter</button>
+            <button id="btn-ready" type="button">Toggle ready</button>
+            <button id="btn-start" type="button">Start deal</button>
+          </div>
+        </div>
+
+        <div id="table-section">
+          <h3>Table</h3>
+          <div id="table-cards" class="card-row"></div>
+          <h3>Your hand</h3>
+          <p id="hand-hint" class="muted hidden">Tap a card to play it.</p>
+          <div id="hand-cards" class="card-row"></div>
         </div>
 
         <h3>Players</h3>

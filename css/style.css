@@ -159,3 +159,37 @@ button:disabled {
 .status.error {
   color: var(--danger);
 }
+
+.card-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-height: 3rem;
+  margin: 0.4rem 0 0.9rem;
+}
+
+button.playing-card {
+  min-width: 2.6rem;
+  padding: 0.55rem 0.4rem;
+  background: #f4f1ea;
+  color: #1a1a1a;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+button.playing-card.red {
+  color: #b91c1c;
+}
+
+button.playing-card:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.face-down {
+  background: #334155;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+}

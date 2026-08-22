@@ -11,10 +11,22 @@ import {
   writeOffer,
   createIceBuffer,
 } from "./signaling.js";
+import { cardsPerPlayer, createDeck, deal, shuffle } from "./cards.js";
 
-const HOST_ID = "host";
+export const HOST_ID = "host";
 
-export function createHost({ name, onState, onStatus, onPersist, initialState }) {
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+export function createHost({
+  name,
+  onState,
+  onStatus,
+  onPersist,
+  initialState,
+  initialSecret,
+}) {
   const connections = new Map();
   let roomCode = "";
   let unsubGuests = () => {};
@@ -31,22 +43,49 @@ export function createHost({ name, onState, onStatus, onPersist, initialState })
     lobbyState.players[HOST_ID].name = name;
   }
 
+  let phase = initialSecret?.phase || "lobby";
+  let deck = clone(initialSecret?.deck || []);
+  let table = clone(initialSecret?.table || []);
+  let hands = clone(initialSecret?.hands || { [HOST_ID]: [] });
+
   function setStatus(text, error = false) {
     onStatus({ text, error });
   }
 
   function persist() {
     if (!roomCode) return;
-    onPersist?.({ roomCode, name, lobbyState });
+    onPersist?.({
+      roomCode,
+      name,
+      lobbyState,
+      secret: { phase, deck, table, hands },
+    });
+  }
+
+  function snapshotFor(viewerId) {
+    const handCounts = {};
+    for (const id of Object.keys(lobbyState.players)) {
+      handCounts[id] = (hands[id] || []).length;
+    }
+    return {
+      phase,
+      counter: lobbyState.counter,
+      players: clone(lobbyState.players),
+      table: clone(table),
+      deckCount: deck.length,
+      hand: clone(hands[viewerId] || []),
+      handCounts,
+    };
   }
 
   function broadcast() {
-    onState({ ...lobbyState, players: { ...lobbyState.players } });
+    onState(snapshotFor(HOST_ID));
     persist();
-    const payload = JSON.stringify({ type: "state", lobbyState });
-    for (const session of connections.values()) {
+    for (const [guestId, session] of connections) {
       if (session.channel?.readyState === "open") {
-        session.channel.send(payload);
+        session.channel.send(
+          JSON.stringify({ type: "state", lobbyState: snapshotFor(guestId) })
+        );
       }
     }
   }
@@ -57,13 +96,43 @@ export function createHost({ name, onState, onStatus, onPersist, initialState })
     }
   }
 
+  function totalCardsInHands() {
+    return Object.values(hands).reduce((sum, list) => sum + (list?.length || 0), 0);
+  }
+
+  function startDeal() {
+    if (phase !== "lobby" && phase !== "ended") return;
+    const ids = Object.keys(lobbyState.players);
+    const count = cardsPerPlayer(ids.length);
+    const dealt = deal(shuffle(createDeck()), ids, count);
+    deck = dealt.deck;
+    hands = dealt.hands;
+    table = [];
+    phase = "playing";
+  }
+
+  function playCard(peerId, cardId) {
+    if (phase !== "playing") return;
+    const hand = hands[peerId];
+    if (!hand) return;
+    const index = hand.findIndex((card) => card.id === cardId);
+    if (index < 0) return;
+    const [card] = hand.splice(index, 1);
+    table.push({ ...card, playedBy: peerId });
+    if (totalCardsInHands() === 0) phase = "ended";
+  }
+
   function applyIntent(peerId, intent) {
     const player = lobbyState.players[peerId];
     if (!player) return;
-    if (intent.action === "ready") {
+    if (intent.action === "ready" && phase === "lobby") {
       player.ready = !player.ready;
-    } else if (intent.action === "bump") {
+    } else if (intent.action === "bump" && phase === "lobby") {
       lobbyState.counter += 1;
+    } else if (intent.action === "start" && peerId === HOST_ID) {
+      startDeal();
+    } else if (intent.action === "playCard") {
+      playCard(peerId, intent.cardId);
     }
     broadcast();
   }
@@ -82,6 +151,10 @@ export function createHost({ name, onState, onStatus, onPersist, initialState })
     }
     if (!tearingDown && lobbyState.players[guestId]) {
       delete lobbyState.players[guestId];
+      if (hands[guestId]) {
+        deck.push(...hands[guestId]);
+        delete hands[guestId];
+      }
       broadcast();
     }
   }
@@ -140,7 +213,8 @@ export function createHost({ name, onState, onStatus, onPersist, initialState })
         ready: false,
         isHost: false,
       };
-      sendTo(channel, { type: "state", lobbyState });
+      if (!hands[guestId]) hands[guestId] = [];
+      sendTo(channel, { type: "state", lobbyState: snapshotFor(guestId) });
       broadcast();
       setStatus("connected");
     };
@@ -187,8 +261,8 @@ export function createHost({ name, onState, onStatus, onPersist, initialState })
     return roomCode;
   }
 
-  function hostIntent(action) {
-    applyIntent(HOST_ID, { action });
+  function hostIntent(action, extra = {}) {
+    applyIntent(HOST_ID, { action, ...extra });
   }
 
   async function stop() {

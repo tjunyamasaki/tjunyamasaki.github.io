@@ -1,0 +1,20 @@
+---
+description: Core architecture; local docs in docs/ (gitignored)
+alwaysApply: true
+---
+
+# This repo
+
+Vanilla GitHub Pages card-lobby. Host browser is authoritative. Firebase RTDB is signaling only (rooms, SDP, ICE). Game/lobby state goes over WebRTC data channels (star: guests to host).
+
+Handoff docs are **local only** under `docs/` (gitignored). There is no root `AGENTS.md`. Before coding, read:
+
+- `docs/AGENTS.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DECISIONS.md`
+- `docs/ROADMAP.md`
+- `docs/SETUP.md`
+
+Do not: put game state in Firebase; add a bundler/game engine without an ADR; commit `js/config.js`, `docs/`, or service accounts; mesh WebRTC; run a Node game server as the default path.
+
+Extend `lobbyState` and `{ type: "intent" }` / `{ type: "state" }` for new features. Update ADRs when reversing a decision. Keep public `README.md` player-facing only.

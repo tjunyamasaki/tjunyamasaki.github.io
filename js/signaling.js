@@ -49,8 +49,8 @@ export function roomRef(code, ...parts) {
   return ref(db, path);
 }
 
-export async function createRoom(hostId) {
-  const code = randomRoomCode();
+export async function createRoom(hostId, existingCode) {
+  const code = existingCode || randomRoomCode();
   await set(roomRef(code), {
     hostId,
     createdAt: Date.now(),

@@ -14,25 +14,35 @@ import {
 
 const HOST_ID = "host";
 
-export function createHost({ name, onState, onStatus }) {
+export function createHost({ name, onState, onStatus, onPersist, initialState }) {
   const connections = new Map();
   let roomCode = "";
   let unsubGuests = () => {};
   const guestUnsubs = new Map();
+  let tearingDown = false;
 
-  const lobbyState = {
+  const lobbyState = initialState || {
     counter: 0,
     players: {
       [HOST_ID]: { name, ready: false, isHost: true },
     },
   };
+  if (lobbyState.players[HOST_ID]) {
+    lobbyState.players[HOST_ID].name = name;
+  }
 
   function setStatus(text, error = false) {
     onStatus({ text, error });
   }
 
+  function persist() {
+    if (!roomCode) return;
+    onPersist?.({ roomCode, name, lobbyState });
+  }
+
   function broadcast() {
     onState({ ...lobbyState, players: { ...lobbyState.players } });
+    persist();
     const payload = JSON.stringify({ type: "state", lobbyState });
     for (const session of connections.values()) {
       if (session.channel?.readyState === "open") {
@@ -70,7 +80,7 @@ export function createHost({ name, onState, onStatus }) {
       stop();
       guestUnsubs.delete(guestId);
     }
-    if (lobbyState.players[guestId]) {
+    if (!tearingDown && lobbyState.players[guestId]) {
       delete lobbyState.players[guestId];
       broadcast();
     }
@@ -116,6 +126,7 @@ export function createHost({ name, onState, onStatus }) {
     };
 
     pc.onconnectionstatechange = () => {
+      if (tearingDown) return;
       const state = pc.connectionState;
       if (state === "disconnected" || state === "failed" || state === "closed") {
         dropGuest(guestId);
@@ -134,7 +145,9 @@ export function createHost({ name, onState, onStatus }) {
       setStatus("connected");
     };
 
-    channel.onclose = () => dropGuest(guestId);
+    channel.onclose = () => {
+      if (!tearingDown) dropGuest(guestId);
+    };
 
     channel.onmessage = (event) => {
       let msg;
@@ -159,9 +172,10 @@ export function createHost({ name, onState, onStatus }) {
     await writeOffer(roomCode, guestId, pc.localDescription);
   }
 
-  async function start() {
+  async function start(existingCode) {
+    tearingDown = false;
     setStatus("signaling");
-    roomCode = await createRoom(HOST_ID);
+    roomCode = await createRoom(HOST_ID, existingCode);
     unsubGuests = listenNewGuests(roomCode, (guestId, info) => {
       attachGuest(guestId, info).catch((err) => {
         console.error(err);
@@ -178,6 +192,8 @@ export function createHost({ name, onState, onStatus }) {
   }
 
   async function stop() {
+    tearingDown = true;
+    persist();
     unsubGuests();
     for (const id of [...connections.keys()]) {
       dropGuest(id);

@@ -60,6 +60,11 @@
         <button id="btn-leave" type="button" class="ghost">Leave</button>
       </header>
 
+      <div id="color-picks" class="color-picks hidden">
+        <span class="muted">Your color</span>
+        <div id="color-swatches" class="color-swatches" role="listbox" aria-label="Your color"></div>
+      </div>
+
       <div id="lobby-tools" class="table-toolbar">
         <div class="actions">
           <button id="btn-start" type="button">Start deal</button>
@@ -73,8 +78,10 @@
 
       <div id="layout-highcard" class="felt">
         <div class="felt-center">
-          <div id="deck-pile" class="deck-pile" title="Draw pile"></div>
-          <div>
+          <div class="zone" data-space="deck">
+            <div id="deck-pile" class="deck-pile" title="Draw pile"></div>
+          </div>
+          <div class="zone" data-space="shared">
             <p class="felt-label">Table</p>
             <div id="table-cards" class="card-row"></div>
           </div>
@@ -96,7 +103,7 @@
             <div id="discard-cards" class="card-row"></div>
           </div>
         </div>
-        <div class="zone zone-mine">
+        <div class="zone zone-mine" id="my-space" data-space="personal">
           <p class="felt-label">Your space</p>
           <div id="my-personal" class="card-row"></div>
         </div>
@@ -108,11 +115,16 @@
           <button type="button" data-act="place-personal">Place in your space</button>
           <button type="button" data-act="place-discard">Place in discard</button>
           <button type="button" data-act="endTurn">End turn</button>
+          <select id="send-target"></select>
+          <button type="button" data-act="sendCards">Send to player</button>
         </div>
       </div>
 
-      <div class="you">
-        <p class="felt-label">Your hand <span id="hand-hint" class="muted hidden">· tap to play</span></p>
+      <div class="you" id="you-area" data-space="hand">
+        <p class="felt-label">
+          Your hand <span id="hand-hint" class="muted hidden">· tap to play</span>
+          <span id="hand-sort" class="hand-sort"></span>
+        </p>
         <div id="hand-cards" class="card-row"></div>
       </div>
 
@@ -142,6 +154,29 @@
         <p class="felt-label">Turn order</p>
         <ul id="order-list" class="order-list"></ul>
         <button type="button" data-act="setOrder">Apply order</button>
+      </div>
+
+      <div id="game-settings" class="host-tools hidden">
+        <p class="felt-label">Game settings</p>
+        <div class="actions">
+          <label class="muted">Decks
+            <input id="setting-decks" type="number" min="1" max="8" value="1" class="num" />
+          </label>
+          <label class="muted">Min players
+            <input id="setting-min" type="number" min="1" max="15" value="1" class="num" />
+          </label>
+          <label class="muted">Max players
+            <input id="setting-max" type="number" min="1" max="15" value="15" class="num" />
+          </label>
+        </div>
+        <p class="felt-label">Visible spaces</p>
+        <div id="space-toggles" class="ban-ranks"></div>
+        <p class="felt-label">Rank order (lowest → highest)</p>
+        <ul id="rank-order" class="order-list"></ul>
+        <p class="felt-label">Banished cards</p>
+        <div id="ban-ranks" class="ban-ranks"></div>
+        <div id="ban-grid" class="ban-grid"></div>
+        <p class="muted">Changing decks or banished cards rebuilds the shoe and clears the table.</p>
       </div>
     </section>
 

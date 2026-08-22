@@ -86,7 +86,7 @@ export function lobbyStateForResume(saved, hostName) {
     };
   }
   if (!players.host) {
-    players.host = { name: hostName || "Host", ready: false, isHost: true, connected: true };
+    players.host = { name: hostName || "Host", ready: false, isHost: true, connected: true, color: 0 };
   }
   players.host.name = hostName || players.host.name;
   players.host.isHost = true;
@@ -106,6 +106,7 @@ export function secretForResume(savedSecret) {
     gameId: savedSecret.gameId || "freeplay",
     message: savedSecret.message || "",
     tableState: savedSecret.tableState || null,
+    settings: savedSecret.settings || null,
     deck: savedSecret.deck,
     table: savedSecret.table,
     hands: savedSecret.hands,

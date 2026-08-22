@@ -1,6 +1,5 @@
 import {
   ICE_CONFIG,
-  MAX_PLAYERS,
   createRoom,
   deleteRoom,
   listenAnswer,
@@ -13,15 +12,40 @@ import {
 } from "./signaling.js";
 import { getGame } from "./games.js";
 import {
+  resolvePreset,
+  freshShoe,
+  compositionKey,
+} from "./gameSettings.js";
+import {
   createTableState,
   ensurePlayers,
   snapshotTable,
 } from "./tableState.js";
 
 export const HOST_ID = "host";
+const COLOR_COUNT = 15;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function nextFreeColor(players, exceptId) {
+  const used = new Set();
+  for (const [id, player] of Object.entries(players)) {
+    if (id !== exceptId && Number.isInteger(player.color)) used.add(player.color);
+  }
+  for (let i = 0; i < COLOR_COUNT; i++) {
+    if (!used.has(i)) return i;
+  }
+  return 0;
+}
+
+function ensureColors(players) {
+  for (const id of Object.keys(players)) {
+    if (!Number.isInteger(players[id].color)) {
+      players[id].color = nextFreeColor(players, id);
+    }
+  }
 }
 
 export function createHost({
@@ -42,7 +66,7 @@ export function createHost({
   const lobbyState = initialState || {
     counter: 0,
     players: {
-      [HOST_ID]: { name, ready: false, isHost: true, connected: true },
+      [HOST_ID]: { name, ready: false, isHost: true, connected: true, color: 0 },
     },
   };
   if (lobbyState.players[HOST_ID]) {
@@ -54,7 +78,13 @@ export function createHost({
   let phase = initialSecret?.phase || "lobby";
   let message = initialSecret?.message || "";
   const game = getGame(initialSecret?.gameId || requestedGameId);
-  const ts = createTableState(Object.keys(lobbyState.players), initialSecret);
+  let settings = resolvePreset(game, initialSecret?.settings);
+  const ts = createTableState(Object.keys(lobbyState.players), initialSecret, settings);
+  let autoDecks =
+    typeof game.decksForPlayers === "function"
+      ? game.decksForPlayers(Object.keys(lobbyState.players).length)
+      : null;
+  if (autoDecks != null && settings.decks !== autoDecks) autoDecks = null;
 
   function setStatus(text, error = false) {
     onStatus({ text, error });
@@ -66,12 +96,13 @@ export function createHost({
       roomCode,
       name,
       lobbyState,
-      secret: { phase, message, gameId: game.id, tableState: ts },
+      secret: { phase, message, gameId: game.id, tableState: ts, settings },
     });
   }
 
   function snapshotFor(viewerId) {
     ensurePlayers(ts, Object.keys(lobbyState.players));
+    ensureColors(lobbyState.players);
     const zones = snapshotTable(ts, viewerId, lobbyState.players);
     return {
       phase,
@@ -92,6 +123,7 @@ export function createHost({
       gameId: game.id,
       gameName: game.name,
       usesZones: Boolean(game.usesZones),
+      settings: clone(settings),
       message,
     };
   }
@@ -120,12 +152,12 @@ export function createHost({
   function startDeal() {
     if (phase !== "lobby" && phase !== "ended") return false;
     const ids = Object.keys(lobbyState.players);
-    if (ids.length < game.minPlayers) {
-      setStatus(`Need at least ${game.minPlayers} players.`, true);
+    if (ids.length < settings.minPlayers) {
+      setStatus(`Need at least ${settings.minPlayers} players.`, true);
       return false;
     }
     if (!game.beginRound) return false;
-    const dealt = game.beginRound(ids);
+    const dealt = game.beginRound(ids, settings);
     ts.deck = dealt.deck;
     ts.hands = dealt.hands;
     ts.shared = [];
@@ -148,6 +180,7 @@ export function createHost({
       hands: ts.hands,
       playerIds: Object.keys(lobbyState.players),
       players: lobbyState.players,
+      settings,
     });
     phase = result.phase || phase;
     message = result.message || "";
@@ -169,6 +202,32 @@ export function createHost({
     for (const [guestId, session] of [...connections]) {
       if (session.playerId === playerId) closeGuestLink(guestId);
     }
+    syncPresetDecks();
+  }
+
+  function syncPresetDecks() {
+    if (phase !== "lobby" || typeof game.decksForPlayers !== "function") return;
+    const count = Object.keys(lobbyState.players).length;
+    const next = game.decksForPlayers(count);
+    if (next === settings.decks) {
+      autoDecks = next;
+      return;
+    }
+    if (autoDecks != null && settings.decks !== autoDecks) return;
+    settings = resolvePreset(game, { ...settings, decks: next });
+    ts.deck = freshShoe(settings);
+    ts.discard = [];
+    ts.shared = [];
+    for (const id of Object.keys(lobbyState.players)) {
+      ts.hands[id] = [];
+      ts.personal[id] = [];
+    }
+    ts.history = [];
+    autoDecks = next;
+    message =
+      next === 1
+        ? "Using 1 deck (4 or fewer players)."
+        : `Using ${next} decks (${count} players).`;
   }
 
   function applyIntent(peerId, intent) {
@@ -180,6 +239,36 @@ export function createHost({
       lobbyState.counter += 1;
     } else if (intent.action === "leaveSeat" && peerId !== HOST_ID) {
       removeSeat(peerId);
+    } else if (intent.action === "setColor") {
+      const color = Number(intent.color);
+      if (!Number.isInteger(color) || color < 0 || color >= COLOR_COUNT) return;
+      const taken = Object.entries(lobbyState.players).some(
+        ([id, other]) => id !== peerId && other.color === color
+      );
+      if (taken) {
+        setStatus("That color is taken.", true);
+        return;
+      }
+      player.color = color;
+    } else if (intent.action === "setSettings" && peerId === HOST_ID) {
+      const next = resolvePreset(game, { ...settings, ...intent.settings });
+      const rebuild = compositionKey(next) !== compositionKey(settings);
+      settings = next;
+      if (typeof game.decksForPlayers === "function") {
+        autoDecks = game.decksForPlayers(Object.keys(lobbyState.players).length);
+        if (settings.decks !== autoDecks) autoDecks = null;
+      }
+      if (rebuild) {
+        ts.deck = freshShoe(settings);
+        ts.discard = [];
+        ts.shared = [];
+        for (const id of Object.keys(lobbyState.players)) {
+          ts.hands[id] = [];
+          ts.personal[id] = [];
+        }
+        ts.history = [];
+        message = "Deck rebuilt from settings.";
+      }
     } else if (game.applyAction) {
       const ctx = {
         ts,
@@ -188,6 +277,7 @@ export function createHost({
         HOST_ID,
         phase,
         message,
+        settings,
       };
       const err = game.applyAction(ctx, peerId, intent);
       phase = ctx.phase;
@@ -245,13 +335,16 @@ export function createHost({
     if (existing) {
       existing.name = playerName || existing.name;
       existing.connected = true;
+      if (!Number.isInteger(existing.color)) {
+        existing.color = nextFreeColor(lobbyState.players, playerId);
+      }
       if (!ts.hands[playerId]) ts.hands[playerId] = [];
       if (!ts.personal[playerId]) ts.personal[playerId] = [];
       if (!ts.playerOrder.includes(playerId)) ts.playerOrder.push(playerId);
       return true;
     }
 
-    if (Object.keys(lobbyState.players).length >= MAX_PLAYERS) {
+    if (Object.keys(lobbyState.players).length >= settings.maxPlayers) {
       return false;
     }
     lobbyState.players[playerId] = {
@@ -259,10 +352,12 @@ export function createHost({
       ready: false,
       isHost: false,
       connected: true,
+      color: nextFreeColor(lobbyState.players, playerId),
     };
     if (!ts.hands[playerId]) ts.hands[playerId] = [];
     if (!ts.personal[playerId]) ts.personal[playerId] = [];
     if (!ts.playerOrder.includes(playerId)) ts.playerOrder.push(playerId);
+    syncPresetDecks();
     return true;
   }
 
@@ -271,8 +366,12 @@ export function createHost({
 
     const incomingId = info.playerId || guestId;
     const isReturn = Boolean(lobbyState.players[incomingId]);
-    if (!isReturn && Object.keys(lobbyState.players).length >= MAX_PLAYERS) {
-      await rejectGuest(roomCode, guestId, "Lobby is full (15 players).");
+    if (!isReturn && Object.keys(lobbyState.players).length >= settings.maxPlayers) {
+      await rejectGuest(
+        roomCode,
+        guestId,
+        `Lobby is full (${settings.maxPlayers} players).`
+      );
       return;
     }
 

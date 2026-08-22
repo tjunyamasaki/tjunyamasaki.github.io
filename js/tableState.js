@@ -1,4 +1,4 @@
-import { createDeck, shuffle } from "./cards.js";
+import { freshShoe } from "./gameSettings.js";
 
 export function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -14,7 +14,7 @@ export function emptyZones(playerIds) {
   return { personal, hands };
 }
 
-export function createTableState(playerIds, saved = null) {
+export function createTableState(playerIds, saved = null, settings = null) {
   if (saved?.tableState) {
     const ts = clone(saved.tableState);
     ts.history = ts.history || [];
@@ -36,7 +36,7 @@ export function createTableState(playerIds, saved = null) {
     };
   }
   return {
-    deck: shuffle(createDeck()),
+    deck: freshShoe(settings),
     discard: [],
     shared: [],
     personal: zones.personal,

@@ -1,4 +1,5 @@
-import { shuffle, createDeck, cardLabel } from "../cards.js";
+import { shuffle, cardLabel, defaultCardOrder } from "../cards.js";
+import { freshShoe } from "../gameSettings.js";
 import {
   clone,
   currentPlayerId,
@@ -8,7 +9,7 @@ import {
 
 const HISTORY_CAP = 40;
 
-function pushHistory(ts, phase, message) {
+export function pushHistory(ts, phase, message) {
   ts.history.push(
     clone({
       deck: ts.deck,
@@ -132,6 +133,10 @@ export function applyFreeplayAction(ctx, actorId, intent) {
   }
 
   if (action === "startGame") {
+    const min = ctx.settings?.minPlayers || 1;
+    if (Object.keys(ctx.players).length < min) {
+      return `Need at least ${min} players.`;
+    }
     pushHistory(ts, ctx.phase, ctx.message);
     const ids = Object.keys(ctx.players);
     for (const id of ids) {
@@ -178,14 +183,17 @@ export function applyFreeplayAction(ctx, actorId, intent) {
   }
 
   if (action === "dealAll") {
-    const count = Number(intent.count) || 0;
-    pushHistory(ts, ctx.phase, ctx.message);
+    const requested = Math.max(0, Number(intent.count) || 0);
     const ids = ts.playerOrder.length ? ts.playerOrder : Object.keys(ctx.players);
+    const n = ids.length;
+    if (!n) return "No players.";
+    const each = Math.min(requested, Math.floor(ts.deck.length / n));
+    pushHistory(ts, ctx.phase, ctx.message);
     for (const id of ids) {
       if (!ts.hands[id]) ts.hands[id] = [];
-      ts.hands[id].push(...drawFromDeck(ts, count));
+      ts.hands[id].push(...drawFromDeck(ts, each));
     }
-    announce(ctx, actorId, `dealt ${count} to each player.`);
+    announce(ctx, actorId, `dealt ${each} to each player.`);
     return;
   }
 
@@ -222,7 +230,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
   if (action === "resetGame") {
     pushHistory(ts, ctx.phase, ctx.message);
     const ids = Object.keys(ctx.players);
-    ts.deck = shuffle(createDeck());
+    ts.deck = freshShoe(ctx.settings);
     ts.discard = [];
     ts.shared = [];
     for (const id of ids) {
@@ -244,7 +252,24 @@ export const freeplayGame = {
   id: "freeplay",
   name: "Free play (test)",
   blurb: "Sandbox table: shared space, personal spaces, discard, turns, host tools.",
-  minPlayers: 1,
   usesZones: true,
+  tableActions: {
+    placeShared: true,
+    placePersonal: true,
+    placeDiscard: true,
+    endTurn: true,
+    sendCards: false,
+  },
+  preset: {
+    ...defaultCardOrder(),
+    decks: 1,
+    minPlayers: 1,
+    maxPlayers: 15,
+    banished: [],
+    spaces: { deck: true, shared: true, personal: true, discard: true, hand: true },
+    handSortDefault: "suit",
+    handSortModes: ["suit", "rank"],
+  },
+  handSort: { default: "suit", modes: ["suit", "rank"] },
   applyAction: applyFreeplayAction,
 };

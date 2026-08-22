@@ -13,8 +13,9 @@ import {
   secretForResume,
   getOrCreatePlayerId,
 } from "./persist.js";
-import { cardLabel } from "./cards.js";
-import { gameList } from "./games.js";
+import { cardLabel, HAND_SORT_MODES, resolveHandSort, sortHand, RANKS, SUITS } from "./cards.js";
+import { gameList, getGame } from "./games.js";
+import { faceKey, isBanished, TABLE_SPACES } from "./gameSettings.js";
 
 const els = {
   configError: document.getElementById("config-error"),
@@ -35,9 +36,12 @@ const els = {
   roomCodeDisplay: document.getElementById("room-code-display"),
   phaseLabel: document.getElementById("phase-label"),
   lobbyTools: document.getElementById("lobby-tools"),
+  colorPicks: document.getElementById("color-picks"),
+  colorSwatches: document.getElementById("color-swatches"),
   tableCards: document.getElementById("table-cards"),
   handCards: document.getElementById("hand-cards"),
   handHint: document.getElementById("hand-hint"),
+  handSort: document.getElementById("hand-sort"),
   opponents: document.getElementById("opponents"),
   deckPile: document.getElementById("deck-pile"),
   gameType: document.getElementById("game-type"),
@@ -48,6 +52,7 @@ const els = {
   layoutFreeplay: document.getElementById("layout-freeplay"),
   freeplayBar: document.getElementById("freeplay-bar"),
   playerActions: document.getElementById("player-actions"),
+  sendTarget: document.getElementById("send-target"),
   hostTools: document.getElementById("host-tools"),
   sharedCards: document.getElementById("shared-cards"),
   myPersonal: document.getElementById("my-personal"),
@@ -59,6 +64,16 @@ const els = {
   drawCount: document.getElementById("draw-count"),
   clearTarget: document.getElementById("clear-target"),
   orderList: document.getElementById("order-list"),
+  gameSettings: document.getElementById("game-settings"),
+  settingDecks: document.getElementById("setting-decks"),
+  settingMin: document.getElementById("setting-min"),
+  settingMax: document.getElementById("setting-max"),
+  rankOrder: document.getElementById("rank-order"),
+  banRanks: document.getElementById("ban-ranks"),
+  banGrid: document.getElementById("ban-grid"),
+  spaceToggles: document.getElementById("space-toggles"),
+  mySpace: document.getElementById("my-space"),
+  youArea: document.getElementById("you-area"),
 };
 
 let session = null;
@@ -68,9 +83,86 @@ let currentRoom = "";
 let guestRetryTimer = null;
 let leaving = false;
 let joiningGuest = false;
-let selectedGameId = "highcard";
+let selectedGameId = "freeplay";
 let lastView = null;
 let selectedCardIds = new Set();
+let handSortMode = null;
+
+const HAND_SORT_KEY = "lobby.handSort.v1";
+
+function readHandSortStore() {
+  try {
+    return JSON.parse(sessionStorage.getItem(HAND_SORT_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function handSortSpec(view) {
+  const game = getGame(view?.gameId);
+  const spec = resolveHandSort(game, view?.settings);
+  const stored = readHandSortStore()[game.id];
+  const mode =
+    (handSortMode && spec.modes.includes(handSortMode) && handSortMode) ||
+    (spec.modes.includes(stored) && stored) ||
+    spec.defaultMode;
+  return { ...spec, primary: mode, gameId: game.id };
+}
+
+function setHandSortMode(gameId, mode) {
+  handSortMode = mode;
+  try {
+    const store = readHandSortStore();
+    store[gameId] = mode;
+    sessionStorage.setItem(HAND_SORT_KEY, JSON.stringify(store));
+  } catch {
+    /* ignore */
+  }
+}
+
+function renderHandSort(spec) {
+  els.handSort.innerHTML = "";
+  for (const mode of HAND_SORT_MODES) {
+    if (!spec.modes.includes(mode.id)) continue;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ghost sort-btn" + (spec.primary === mode.id ? " selected" : "");
+    btn.textContent = mode.label;
+    btn.addEventListener("click", () => {
+      setHandSortMode(spec.gameId, mode.id);
+      if (lastView) renderState(lastView);
+    });
+    els.handSort.append(btn);
+  }
+}
+
+const SEAT_COUNT = 15;
+
+function seatIndex(view, playerId) {
+  if (!playerId || !view) return -1;
+  const picked = view.players?.[playerId]?.color;
+  if (Number.isInteger(picked) && picked >= 0) return picked % SEAT_COUNT;
+  const order = view.playerOrder?.length
+    ? view.playerOrder
+    : Object.keys(view.players || {});
+  let index = order.indexOf(playerId);
+  if (index < 0) index = Object.keys(view.players || {}).indexOf(playerId);
+  return index < 0 ? -1 : index % SEAT_COUNT;
+}
+
+function seatClass(view, playerId) {
+  const index = seatIndex(view, playerId);
+  return index < 0 ? "" : `seat-${index}`;
+}
+
+function setSeatClass(el, view, playerId) {
+  if (!el) return;
+  for (const name of [...el.classList]) {
+    if (name.startsWith("seat-")) el.classList.remove(name);
+  }
+  const name = seatClass(view, playerId);
+  if (name) el.classList.add(name);
+}
 
 function setHomeStatus(text, error = false) {
   els.homeStatus.textContent = text || "";
@@ -111,10 +203,12 @@ function sendAction(action, extra = {}) {
   else session.sendIntent(action, extra);
 }
 
-function appendCardButton(parent, card, { playable, selectable }) {
+function appendCardButton(parent, card, { playable, selectable, view, ownerId }) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "playing-card" + (card.color === "red" ? " red" : "");
+  const seat = seatClass(view || lastView, card.playedBy || ownerId);
+  if (seat) btn.classList.add(seat);
   if (selectable && selectedCardIds.has(card.id)) btn.classList.add("selected-card");
   btn.textContent = cardLabel(card);
   if (selectable) {
@@ -163,6 +257,8 @@ function renderOpponents(view, phase) {
     if (id === selfId) continue;
     const box = document.createElement("div");
     box.className = "opponent" + (player.connected === false ? " offline" : "");
+    setSeatClass(box, view, id);
+    if (phase === "playing" && view.currentPlayerId === id) box.classList.add("is-turn");
     const name = document.createElement("div");
     name.className = "opponent-name";
     const bits = [player.name || "Player"];
@@ -172,7 +268,7 @@ function renderOpponents(view, phase) {
     const row = document.createElement("div");
     row.className = "card-row";
     const personal = (view.personal && view.personal[id]) || [];
-    if (view.usesZones) {
+    if (view.usesZones && spaceVisible(view, "personal")) {
       const space = document.createElement("div");
       space.className = "opponent-space";
       const spaceLabel = document.createElement("span");
@@ -181,7 +277,7 @@ function renderOpponents(view, phase) {
       space.append(spaceLabel);
       if (personal.length) {
         for (const card of personal) {
-          appendCardButton(space, card, { playable: false });
+          appendCardButton(space, card, { playable: false, view, ownerId: id });
         }
       } else {
         const empty = document.createElement("span");
@@ -191,10 +287,10 @@ function renderOpponents(view, phase) {
       }
       row.append(space);
     }
-    const n = counts[id] ?? 0;
+    const n = spaceVisible(view, "hand") ? counts[id] ?? 0 : 0;
     for (let i = 0; i < n; i++) {
       const back = document.createElement("span");
-      back.className = "face-down";
+      back.className = "face-down " + (seatClass(view, id) || "");
       row.append(back);
     }
     if (!view.usesZones && !n && !personal.length) {
@@ -205,6 +301,18 @@ function renderOpponents(view, phase) {
   }
 }
 
+function tableActions(view) {
+  const game = getGame(view?.gameId);
+  return {
+    placeShared: true,
+    placePersonal: true,
+    placeDiscard: true,
+    endTurn: true,
+    sendCards: false,
+    ...(game.tableActions || {}),
+  };
+}
+
 function renderState(view) {
   if (!view) return;
   lastView = view;
@@ -212,16 +320,22 @@ function renderState(view) {
   const phase = view.phase || "lobby";
   const zoned = Boolean(view.usesZones);
   els.phaseLabel.textContent = phase;
-  els.lobbyTools.classList.toggle("hidden", role !== "host" || phase === "playing");
-  els.btnStart.classList.toggle("hidden", role !== "host" || phase === "playing");
+  els.lobbyTools.classList.toggle(
+    "hidden",
+    zoned || role !== "host" || phase === "playing"
+  );
+  els.btnStart.classList.toggle(
+    "hidden",
+    zoned || role !== "host" || phase === "playing"
+  );
   els.btnStart.textContent = zoned
     ? "Start game"
     : phase === "ended"
       ? "Deal again"
       : "Start deal";
-  els.handHint.classList.toggle("hidden", phase !== "playing");
+  els.handHint.classList.toggle("hidden", !zoned && phase !== "playing");
   els.handHint.textContent = zoned
-    ? "· tap cards, then Place"
+    ? "· tap cards, then an action"
     : "· tap to play";
   if (view.gameName) els.gameNameLabel.textContent = view.gameName;
   if (view.message) {
@@ -234,56 +348,106 @@ function renderState(view) {
 
   const turnName = view.players?.[view.currentPlayerId]?.name;
   els.turnLabel.textContent = zoned && turnName ? `Turn: ${turnName}` : "";
+  setSeatClass(els.turnLabel, view, view.currentPlayerId);
+
+  setSeatClass(els.mySpace, view, selfId);
+  setSeatClass(els.youArea, view, selfId);
 
   els.layoutHighcard.classList.toggle("hidden", zoned);
   els.layoutFreeplay.classList.toggle("hidden", !zoned);
   els.freeplayBar.classList.toggle("hidden", !zoned);
   els.hostTools.classList.toggle("hidden", !zoned || role !== "host");
+  els.gameSettings.classList.toggle("hidden", role !== "host");
+  applySpaceVisibility(view);
+  const acts = tableActions(view);
   const myTurn =
     phase === "playing" &&
     (role === "host" || view.currentPlayerId === selfId);
+  const lobbyPass = phase === "lobby" && acts.sendCards;
+  const canSelectHand = zoned && (myTurn || lobbyPass);
   for (const btn of els.playerActions.querySelectorAll("button")) {
-    btn.disabled = !myTurn;
+    const act = btn.dataset.act;
+    if (act === "sendCards") btn.disabled = !lobbyPass;
+    else btn.disabled = !myTurn;
   }
+  if (els.sendTarget) els.sendTarget.disabled = !lobbyPass;
   const undoBtn = els.hostTools.querySelector('[data-act="undo"]');
   if (undoBtn) undoBtn.disabled = !view.canUndo;
 
+  renderColorPicks(view);
   renderOpponents(view, phase);
 
   if (zoned) {
     renderDeck(els.fpDeck, view.deckCount ?? 0);
-    fillRow(els.sharedCards, view.shared, { playable: false });
+    fillRow(els.sharedCards, view.shared, { playable: false, view });
     fillRow(els.myPersonal, (view.personal && view.personal[selfId]) || [], {
       playable: false,
+      view,
+      ownerId: selfId,
     });
     els.discardCards.innerHTML = "";
     if (view.discardTop) {
-      appendCardButton(els.discardCards, view.discardTop, { playable: false });
+      appendCardButton(els.discardCards, view.discardTop, {
+        playable: false,
+        view,
+      });
     }
     const dc = document.createElement("span");
     dc.className = "muted";
     dc.textContent = ` ${view.discardCount ?? 0}`;
     els.discardCards.append(dc);
     fillHostControls(view);
+    fillSendTarget(view);
   } else {
     renderDeck(els.deckPile, view.deckCount ?? 0);
-    fillRow(els.tableCards, view.table || view.shared, { playable: false });
+    fillRow(els.tableCards, view.table || view.shared, { playable: false, view });
   }
 
-  const handIds = new Set((view.hand || []).map((card) => card.id));
+  if (role === "host") fillGameSettings(view);
+
+  const sortSpec = handSortSpec(view);
+  renderHandSort(sortSpec);
+  const hand = sortHand(view.hand || [], sortSpec);
+  const handIds = new Set(hand.map((card) => card.id));
   for (const id of [...selectedCardIds]) {
     if (!handIds.has(id)) selectedCardIds.delete(id);
   }
 
   els.handCards.innerHTML = "";
-  for (const card of view.hand || []) {
+  for (const card of hand) {
     appendCardButton(els.handCards, card, {
       playable: !zoned && phase === "playing",
-      selectable: zoned && myTurn,
+      selectable: canSelectHand,
+      view,
+      ownerId: selfId,
     });
   }
   if (!(view.hand || []).length) {
     els.handCards.textContent = phase === "lobby" ? "—" : "No cards";
+  }
+}
+
+function renderColorPicks(view) {
+  els.colorPicks.classList.remove("hidden");
+  const mine = view.players?.[selfId]?.color;
+  const taken = new Set(
+    Object.entries(view.players || {})
+      .filter(([id, player]) => id !== selfId && Number.isInteger(player.color))
+      .map(([, player]) => player.color)
+  );
+  els.colorSwatches.innerHTML = "";
+  for (let i = 0; i < SEAT_COUNT; i++) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `color-swatch seat-${i}`;
+    btn.setAttribute("aria-label", `Color ${i + 1}`);
+    if (mine === i) btn.classList.add("selected");
+    if (taken.has(i)) {
+      btn.disabled = true;
+      btn.title = "Taken";
+    }
+    btn.addEventListener("click", () => sendAction("setColor", { color: i }));
+    els.colorSwatches.append(btn);
   }
 }
 
@@ -322,6 +486,7 @@ function fillHostControls(view) {
   order.forEach((id, index) => {
     const li = document.createElement("li");
     li.dataset.playerId = id;
+    setSeatClass(li, view, id);
     const label = document.createElement("span");
     label.textContent = `${index + 1}. ${players[id]?.name || id}`;
     const up = document.createElement("button");
@@ -351,6 +516,167 @@ function moveOrder(index, delta) {
   const b = items[next];
   if (delta < 0) els.orderList.insertBefore(a, b);
   else els.orderList.insertBefore(b, a);
+}
+
+function fillSendTarget(view) {
+  const select = els.sendTarget;
+  if (!select) return;
+  const prev = select.value;
+  select.innerHTML = "";
+  for (const [id, player] of Object.entries(view.players || {})) {
+    if (id === selfId) continue;
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = player.name + (id === "host" ? " (host)" : "");
+    select.append(opt);
+  }
+  if ([...select.options].some((o) => o.value === prev)) select.value = prev;
+}
+
+function spaceVisible(view, id) {
+  const spaces = view?.settings?.spaces;
+  if (!spaces) return true;
+  return spaces[id] !== false;
+}
+
+function applySpaceVisibility(view) {
+  for (const el of document.querySelectorAll("[data-space]")) {
+    const id = el.dataset.space;
+    el.classList.toggle("hidden", !spaceVisible(view, id));
+  }
+  const acts = tableActions(view);
+  const map = {
+    "place-shared": { space: "shared", flag: acts.placeShared },
+    "place-personal": { space: "personal", flag: acts.placePersonal },
+    "place-discard": { space: "discard", flag: acts.placeDiscard },
+    endTurn: { flag: acts.endTurn },
+    sendCards: { flag: acts.sendCards && view.phase === "lobby" },
+    drawToShared: { space: "shared", flag: true },
+  };
+  for (const btn of document.querySelectorAll("[data-act]")) {
+    const rule = map[btn.dataset.act];
+    if (!rule) continue;
+    const hideSpace = rule.space && !spaceVisible(view, rule.space);
+    btn.classList.toggle("hidden", hideSpace || rule.flag === false);
+  }
+  if (els.sendTarget) {
+    els.sendTarget.classList.toggle(
+      "hidden",
+      !acts.sendCards || view.phase !== "lobby"
+    );
+  }
+}
+
+function patchSettings(patch) {
+  const current = lastView?.settings;
+  if (!current) return;
+  sendAction("setSettings", { settings: { ...current, ...patch } });
+}
+
+function fillGameSettings(view) {
+  const s = view.settings;
+  if (!s || role !== "host") return;
+  const focused = document.activeElement;
+  if (focused !== els.settingDecks) els.settingDecks.value = String(s.decks);
+  if (focused !== els.settingMin) els.settingMin.value = String(s.minPlayers);
+  if (focused !== els.settingMax) els.settingMax.value = String(s.maxPlayers);
+
+  els.spaceToggles.innerHTML = "";
+  for (const space of TABLE_SPACES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    const on = s.spaces?.[space.id] !== false;
+    btn.className = "ghost sort-btn" + (on ? " selected" : "");
+    btn.textContent = space.label;
+    btn.addEventListener("click", () => {
+      patchSettings({
+        spaces: { ...s.spaces, [space.id]: !on },
+      });
+    });
+    els.spaceToggles.append(btn);
+  }
+
+  els.rankOrder.innerHTML = "";
+  s.ranks.forEach((rank, index) => {
+    const li = document.createElement("li");
+    const label = document.createElement("span");
+    label.textContent = `${index + 1}. ${rank}`;
+    const up = document.createElement("button");
+    up.type = "button";
+    up.className = "ghost";
+    up.textContent = "Up";
+    up.addEventListener("click", () => moveRank(s.ranks, index, -1));
+    const down = document.createElement("button");
+    down.type = "button";
+    down.className = "ghost";
+    down.textContent = "Down";
+    down.addEventListener("click", () => moveRank(s.ranks, index, 1));
+    li.append(label, up, down);
+    els.rankOrder.append(li);
+  });
+
+  els.banRanks.innerHTML = "";
+  for (const rank of RANKS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ghost sort-btn" + (s.banished.includes(rank) ? " selected" : "");
+    btn.textContent = rank;
+    btn.title = s.banished.includes(rank) ? "Unban this rank" : "Ban this rank";
+    btn.addEventListener("click", () => toggleRankBan(s, rank));
+    els.banRanks.append(btn);
+  }
+
+  els.banGrid.innerHTML = "";
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      const key = faceKey(rank, suit.id);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className =
+        "playing-card ban-card" +
+        (suit.color === "red" ? " red" : "") +
+        (isBanished(rank, suit.id, s.banished) ? " banned" : "");
+      btn.textContent = cardLabel({ rank, symbol: suit.symbol });
+      btn.addEventListener("click", () => toggleFaceBan(s, rank, suit.id, key));
+      els.banGrid.append(btn);
+    }
+  }
+}
+
+function moveRank(ranks, index, delta) {
+  const next = index + delta;
+  if (next < 0 || next >= ranks.length) return;
+  const copy = ranks.slice();
+  [copy[index], copy[next]] = [copy[next], copy[index]];
+  patchSettings({ ranks: copy });
+}
+
+function toggleRankBan(settings, rank) {
+  let banished = settings.banished.slice();
+  const faces = SUITS.map((suit) => faceKey(rank, suit.id));
+  if (banished.includes(rank)) {
+    banished = banished.filter((item) => item !== rank && !faces.includes(item));
+  } else {
+    banished = banished.filter((item) => !faces.includes(item));
+    banished.push(rank);
+  }
+  patchSettings({ banished });
+}
+
+function toggleFaceBan(settings, rank, suitId, key) {
+  let banished = settings.banished.slice();
+  if (banished.includes(rank)) {
+    banished = banished.filter((item) => item !== rank);
+    for (const suit of SUITS) {
+      const other = faceKey(rank, suit.id);
+      if (other !== key && !banished.includes(other)) banished.push(other);
+    }
+  } else if (banished.includes(key)) {
+    banished = banished.filter((item) => item !== key);
+  } else {
+    banished.push(key);
+  }
+  patchSettings({ banished });
 }
 
 function placeSelected(dest) {
@@ -566,6 +892,17 @@ els.btnStart.addEventListener("click", () => {
   else session.hostIntent("start");
 });
 
+function onSettingNumber() {
+  patchSettings({
+    decks: Number(els.settingDecks.value),
+    minPlayers: Number(els.settingMin.value),
+    maxPlayers: Number(els.settingMax.value),
+  });
+}
+els.settingDecks.addEventListener("change", onSettingNumber);
+els.settingMin.addEventListener("change", onSettingNumber);
+els.settingMax.addEventListener("change", onSettingNumber);
+
 function onTableAction(event) {
   const btn = event.target.closest("[data-act]");
   if (!btn || !session || btn.disabled) return;
@@ -580,6 +917,21 @@ function onTableAction(event) {
   }
   if (act === "place-discard") {
     placeSelected({ type: "discard" });
+    return;
+  }
+  if (act === "sendCards") {
+    const cardIds = [...selectedCardIds];
+    if (!cardIds.length) {
+      setLobbyStatus({ text: "Select cards in your hand first.", error: true });
+      return;
+    }
+    const playerId = els.sendTarget.value;
+    if (!playerId) {
+      setLobbyStatus({ text: "Pick a player to send to.", error: true });
+      return;
+    }
+    sendAction("sendCards", { cardIds, playerId });
+    selectedCardIds.clear();
     return;
   }
   if (act === "deal") {

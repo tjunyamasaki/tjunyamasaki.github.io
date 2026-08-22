@@ -54,6 +54,65 @@ export function cardLabel(card) {
   return `${card.rank}${card.symbol}`;
 }
 
+export const HAND_SORT_MODES = [
+  { id: "suit", label: "Suit" },
+  { id: "rank", label: "Value" },
+];
+
+export function defaultCardOrder() {
+  return {
+    suits: SUITS.map((s) => s.id),
+    ranks: RANKS.slice(),
+  };
+}
+
+/**
+ * Game modules may set:
+ *   cardOrder: { suits: ["s","h","d","c"], ranks: ["A","2",...,"K"] }
+ *   handSort:  { default: "suit"|"rank", modes: ["suit","rank"] }
+ */
+export function resolveHandSort(game, settings) {
+  const base = defaultCardOrder();
+  const custom = game?.cardOrder || {};
+  const modes =
+    settings?.handSortModes ||
+    game?.handSort?.modes ||
+    HAND_SORT_MODES.map((m) => m.id);
+  return {
+    suits: settings?.suits || custom.suits || base.suits,
+    ranks: settings?.ranks || custom.ranks || base.ranks,
+    modes,
+    defaultMode:
+      settings?.handSortDefault ||
+      game?.handSort?.default ||
+      modes[0] ||
+      "suit",
+  };
+}
+
+export function compareCards(a, b, { suits, ranks, primary }) {
+  const suitOf = (card) => {
+    const i = suits.indexOf(card.suit);
+    return i < 0 ? 99 : i;
+  };
+  const rankOf = (card) => {
+    const i = ranks.indexOf(card.rank);
+    return i < 0 ? 99 : i;
+  };
+  if (primary === "rank") {
+    const byRank = rankOf(a) - rankOf(b);
+    if (byRank) return byRank;
+    return suitOf(a) - suitOf(b);
+  }
+  const bySuit = suitOf(a) - suitOf(b);
+  if (bySuit) return bySuit;
+  return rankOf(a) - rankOf(b);
+}
+
+export function sortHand(cards, spec) {
+  return (cards || []).slice().sort((a, b) => compareCards(a, b, spec));
+}
+
 /** Ace high. */
 export function rankValue(card) {
   const map = { A: 14, K: 13, Q: 12, J: 11 };

@@ -11,7 +11,12 @@ import {
   writeOffer,
   createIceBuffer,
 } from "./signaling.js";
-import { getGame, beginRound } from "./games.js";
+import { getGame } from "./games.js";
+import {
+  createTableState,
+  ensurePlayers,
+  snapshotTable,
+} from "./tableState.js";
 
 export const HOST_ID = "host";
 
@@ -47,11 +52,9 @@ export function createHost({
   }
 
   let phase = initialSecret?.phase || "lobby";
-  let deck = clone(initialSecret?.deck || []);
-  let table = clone(initialSecret?.table || []);
-  let hands = clone(initialSecret?.hands || { [HOST_ID]: [] });
   let message = initialSecret?.message || "";
   const game = getGame(initialSecret?.gameId || requestedGameId);
+  const ts = createTableState(Object.keys(lobbyState.players), initialSecret);
 
   function setStatus(text, error = false) {
     onStatus({ text, error });
@@ -63,26 +66,32 @@ export function createHost({
       roomCode,
       name,
       lobbyState,
-      secret: { phase, deck, table, hands, gameId: game.id, message },
+      secret: { phase, message, gameId: game.id, tableState: ts },
     });
   }
 
   function snapshotFor(viewerId) {
-    const handCounts = {};
-    for (const id of Object.keys(lobbyState.players)) {
-      handCounts[id] = (hands[id] || []).length;
-    }
+    ensurePlayers(ts, Object.keys(lobbyState.players));
+    const zones = snapshotTable(ts, viewerId, lobbyState.players);
     return {
       phase,
       counter: lobbyState.counter,
       players: clone(lobbyState.players),
-      table: clone(table),
-      deckCount: deck.length,
-      hand: clone(hands[viewerId] || []),
-      handCounts,
+      table: zones.shared,
+      deckCount: zones.deckCount,
+      hand: zones.hand,
+      handCounts: zones.handCounts,
+      shared: zones.shared,
+      personal: zones.personal,
+      discardCount: zones.discardCount,
+      discardTop: zones.discardTop,
+      playerOrder: zones.playerOrder,
+      currentPlayerId: zones.currentPlayerId,
+      canUndo: zones.canUndo,
       viewerId,
       gameId: game.id,
       gameName: game.name,
+      usesZones: Boolean(game.usesZones),
       message,
     };
   }
@@ -115,10 +124,12 @@ export function createHost({
       setStatus(`Need at least ${game.minPlayers} players.`, true);
       return false;
     }
-    const dealt = beginRound(game, ids);
-    deck = dealt.deck;
-    hands = dealt.hands;
-    table = [];
+    if (!game.beginRound) return false;
+    const dealt = game.beginRound(ids);
+    ts.deck = dealt.deck;
+    ts.hands = dealt.hands;
+    ts.shared = [];
+    ts.discard = [];
     message = "";
     phase = "playing";
     return true;
@@ -126,15 +137,15 @@ export function createHost({
 
   function playCard(peerId, cardId) {
     if (phase !== "playing") return;
-    const hand = hands[peerId];
+    const hand = ts.hands[peerId];
     if (!hand) return;
     const index = hand.findIndex((card) => card.id === cardId);
     if (index < 0) return;
     const [card] = hand.splice(index, 1);
-    table.push({ ...card, playedBy: peerId });
+    ts.shared.push({ ...card, playedBy: peerId });
     const result = game.afterPlay({
-      table,
-      hands,
+      table: ts.shared,
+      hands: ts.hands,
       playerIds: Object.keys(lobbyState.players),
       players: lobbyState.players,
     });
@@ -144,10 +155,16 @@ export function createHost({
 
   function removeSeat(playerId) {
     if (playerId === HOST_ID) return;
-    if (hands[playerId]) {
-      deck.push(...hands[playerId]);
-      delete hands[playerId];
+    if (ts.hands[playerId]) {
+      ts.deck.push(...ts.hands[playerId]);
+      delete ts.hands[playerId];
     }
+    if (ts.personal[playerId]) {
+      ts.deck.push(...ts.personal[playerId]);
+      delete ts.personal[playerId];
+    }
+    ts.playerOrder = ts.playerOrder.filter((id) => id !== playerId);
+    if (ts.turnIndex >= ts.playerOrder.length) ts.turnIndex = 0;
     delete lobbyState.players[playerId];
     for (const [guestId, session] of [...connections]) {
       if (session.playerId === playerId) closeGuestLink(guestId);
@@ -161,12 +178,25 @@ export function createHost({
       player.ready = !player.ready;
     } else if (intent.action === "bump" && phase === "lobby") {
       lobbyState.counter += 1;
+    } else if (intent.action === "leaveSeat" && peerId !== HOST_ID) {
+      removeSeat(peerId);
+    } else if (game.applyAction) {
+      const ctx = {
+        ts,
+        players: lobbyState.players,
+        isHost: peerId === HOST_ID,
+        HOST_ID,
+        phase,
+        message,
+      };
+      const err = game.applyAction(ctx, peerId, intent);
+      phase = ctx.phase;
+      message = ctx.message;
+      if (typeof err === "string") setStatus(err, true);
     } else if (intent.action === "start" && peerId === HOST_ID) {
       if (!startDeal()) return;
     } else if (intent.action === "playCard") {
       playCard(peerId, intent.cardId);
-    } else if (intent.action === "leaveSeat" && peerId !== HOST_ID) {
-      removeSeat(peerId);
     }
     broadcast();
   }
@@ -215,7 +245,8 @@ export function createHost({
     if (existing) {
       existing.name = playerName || existing.name;
       existing.connected = true;
-      if (!hands[playerId]) hands[playerId] = [];
+      if (!ts.hands[playerId]) ts.hands[playerId] = [];
+      if (!ts.personal[playerId]) ts.personal[playerId] = [];
       return true;
     }
 
@@ -228,7 +259,9 @@ export function createHost({
       isHost: false,
       connected: true,
     };
-    if (!hands[playerId]) hands[playerId] = [];
+    if (!ts.hands[playerId]) ts.hands[playerId] = [];
+    if (!ts.personal[playerId]) ts.personal[playerId] = [];
+    if (!ts.playerOrder.includes(playerId)) ts.playerOrder.push(playerId);
     return true;
   }
 

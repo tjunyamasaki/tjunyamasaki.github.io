@@ -22,10 +22,8 @@
           <input id="nickname" type="text" maxlength="24" placeholder="Your name" autocomplete="nickname" />
         </label>
 
-        <label class="field">
-          Game
-          <select id="game-type"></select>
-        </label>
+        <p class="field">Game</p>
+        <div id="game-type" class="game-picks" role="listbox" aria-label="Game"></div>
         <p id="game-blurb" class="muted"></p>
 
         <div class="actions">
@@ -72,16 +70,73 @@
       </div>
 
       <p id="round-message" class="round-message hidden"></p>
+      <p id="turn-label" class="muted turn-label"></p>
 
       <div id="opponents" class="opponents"></div>
 
-      <div class="felt">
+      <div id="layout-highcard" class="felt">
         <div class="felt-center">
           <div id="deck-pile" class="deck-pile" title="Draw pile"></div>
           <div>
             <p class="felt-label">Table</p>
             <div id="table-cards" class="card-row"></div>
           </div>
+        </div>
+      </div>
+
+      <div id="layout-freeplay" class="felt hidden">
+        <div class="felt-center zones">
+          <div class="zone" data-space="deck">
+            <p class="felt-label">Deck</p>
+            <div id="fp-deck" class="deck-pile"></div>
+          </div>
+          <div class="zone" data-space="shared">
+            <p class="felt-label">Shared</p>
+            <div id="shared-cards" class="card-row"></div>
+          </div>
+          <div class="zone" data-space="discard">
+            <p class="felt-label">Discard</p>
+            <div id="discard-cards" class="card-row"></div>
+          </div>
+        </div>
+        <div class="zone zone-mine">
+          <p class="felt-label">Your space</p>
+          <div id="my-personal" class="card-row"></div>
+        </div>
+      </div>
+
+      <div id="freeplay-bar" class="action-bar hidden">
+        <div class="actions">
+          <button type="button" data-act="undo">Undo</button>
+          <button type="button" data-act="place-shared">Place in shared</button>
+          <button type="button" data-act="place-personal">Place in your space</button>
+          <button type="button" data-act="place-discard">Place in discard</button>
+          <button type="button" data-act="endTurn">End turn</button>
+        </div>
+        <div id="host-tools" class="host-tools hidden">
+          <p class="felt-label">Host</p>
+          <div class="actions">
+            <button type="button" data-act="startGame">Start game</button>
+            <button type="button" data-act="shuffle">Shuffle deck</button>
+            <button type="button" data-act="reshuffle">Reshuffle discard into deck</button>
+            <button type="button" data-act="resetGame">Reset game</button>
+          </div>
+          <div class="actions">
+            <input id="deal-count" type="number" min="1" max="52" value="5" class="num" />
+            <select id="deal-target"></select>
+            <button type="button" data-act="deal">Deal to player</button>
+          </div>
+          <div class="actions">
+            <input id="draw-count" type="number" min="1" max="52" value="1" class="num" />
+            <button type="button" data-act="drawToShared">Flip from deck to shared</button>
+          </div>
+          <div class="actions">
+            <select id="clear-target"></select>
+            <button type="button" data-act="clearSpace">Discard whole space</button>
+          </div>
+          <p class="felt-label">Turn order</p>
+          <ul id="order-list" class="order-list"></ul>
+          <button type="button" data-act="setOrder">Apply order</button>
         </div>
       </div>
 

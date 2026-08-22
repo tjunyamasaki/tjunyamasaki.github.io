@@ -240,8 +240,8 @@ function renderState(view) {
   els.freeplayBar.classList.toggle("hidden", !zoned);
   els.hostTools.classList.toggle("hidden", !zoned || role !== "host");
   const myTurn =
-    role === "host" ||
-    (phase === "playing" && view.currentPlayerId === selfId);
+    phase === "playing" &&
+    (role === "host" || view.currentPlayerId === selfId);
   for (const btn of els.playerActions.querySelectorAll("button")) {
     btn.disabled = !myTurn;
   }

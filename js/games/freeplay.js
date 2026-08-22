@@ -52,8 +52,8 @@ function advanceTurn(ts) {
 }
 
 function canPlayerAct(ctx, actorId) {
-  if (ctx.isHost) return true;
   if (ctx.phase !== "playing") return false;
+  if (ctx.isHost) return true;
   return currentPlayerId(ctx.ts) === actorId;
 }
 
@@ -81,7 +81,9 @@ export function applyFreeplayAction(ctx, actorId, intent) {
   const action = intent.action;
 
   if (action === "endTurn") {
-    if (!canPlayerAct(ctx, actorId)) return "Not your turn.";
+    if (!canPlayerAct(ctx, actorId)) {
+      return ctx.phase !== "playing" ? "Start the game first." : "Not your turn.";
+    }
     pushHistory(ts, ctx.phase, ctx.message);
     advanceTurn(ts);
     const next = ctx.players[currentPlayerId(ts)]?.name;
@@ -90,7 +92,9 @@ export function applyFreeplayAction(ctx, actorId, intent) {
   }
 
   if (action === "placeCard") {
-    if (!canPlayerAct(ctx, actorId)) return "Not your turn.";
+    if (!canPlayerAct(ctx, actorId)) {
+      return ctx.phase !== "playing" ? "Start the game first." : "Not your turn.";
+    }
     const dest = intent.dest || { type: "shared" };
     if (dest.type === "personal" && dest.playerId !== actorId && !isHost) {
       return "You can only place into your own space.";

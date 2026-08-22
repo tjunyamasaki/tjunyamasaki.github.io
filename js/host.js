@@ -233,26 +233,7 @@ export function createHost({
   function seatPlayer(playerId, playerName, guestId) {
     if (!playerId) playerId = guestId;
     const session = connections.get(guestId);
-    if (session) {
-      const previousId = session.playerId;
-      session.playerId = playerId;
-      if (
-        previousId &&
-        previousId !== playerId &&
-        previousId !== HOST_ID &&
-        lobbyState.players[previousId] &&
-        !lobbyState.players[previousId].isHost
-      ) {
-        if (!ts.hands[playerId]) ts.hands[playerId] = ts.hands[previousId] || [];
-        else ts.hands[playerId].push(...(ts.hands[previousId] || []));
-        if (!ts.personal[playerId]) ts.personal[playerId] = ts.personal[previousId] || [];
-        else ts.personal[playerId].push(...(ts.personal[previousId] || []));
-        delete ts.hands[previousId];
-        delete ts.personal[previousId];
-        ts.playerOrder = ts.playerOrder.filter((id) => id !== previousId);
-        delete lobbyState.players[previousId];
-      }
-    }
+    if (session) session.playerId = playerId;
 
     for (const [otherId, other] of [...connections]) {
       if (otherId !== guestId && other.playerId === playerId) {
@@ -335,6 +316,15 @@ export function createHost({
     };
 
     channel.onopen = () => {
+      const ok = seatPlayer(incomingId, info.name || "Guest", guestId);
+      if (!ok) {
+        rejectGuest(roomCode, guestId, "Lobby is full (15 players).");
+        closeGuestLink(guestId);
+        return;
+      }
+      const playerId = connections.get(guestId)?.playerId || incomingId;
+      sendTo(channel, { type: "state", lobbyState: snapshotFor(playerId) });
+      broadcast();
       setStatus("connected");
     };
 
@@ -347,21 +337,13 @@ export function createHost({
       } catch {
         return;
       }
-      const session = connections.get(guestId);
+      const playerId = connections.get(guestId)?.playerId || incomingId;
       if (msg.type === "hello") {
-        const seatId = msg.playerId || session?.playerId || incomingId;
-        const ok = seatPlayer(seatId, msg.name || info.name || "Guest", guestId);
-        if (!ok) {
-          rejectGuest(roomCode, guestId, "Lobby is full (15 players).");
-          closeGuestLink(guestId);
-          return;
-        }
+        seatPlayer(msg.playerId || playerId, msg.name || info.name, guestId);
         broadcast();
-        return;
       }
       if (msg.type === "intent") {
-        const playerId = session?.playerId;
-        if (playerId) applyIntent(playerId, msg);
+        applyIntent(playerId, msg);
       }
     };
 

@@ -1,4 +1,4 @@
-import { shuffle, createDeck } from "../cards.js";
+import { shuffle, createDeck, cardLabel } from "../cards.js";
 import {
   clone,
   currentPlayerId,
@@ -57,6 +57,21 @@ function canPlayerAct(ctx, actorId) {
   return currentPlayerId(ctx.ts) === actorId;
 }
 
+function actorName(ctx, actorId) {
+  return ctx.players[actorId]?.name || "Player";
+}
+
+function announce(ctx, actorId, text) {
+  ctx.message = `${actorName(ctx, actorId)} ${text}`;
+}
+
+function spaceLabel(ctx, dest, actorId) {
+  if (!dest || dest.type === "shared") return "the shared space";
+  if (dest.type === "discard") return "the discard pile";
+  if (dest.playerId === actorId) return "their space";
+  return `${ctx.players[dest.playerId]?.name || "a player"}'s space`;
+}
+
 /**
  * Pure-ish command. Mutates ctx.ts / ctx.phase / ctx.message.
  * Later UI can call the same action names from card/space clicks.
@@ -65,49 +80,52 @@ export function applyFreeplayAction(ctx, actorId, intent) {
   const { ts, isHost } = ctx;
   const action = intent.action;
 
-  if (action === "undo") {
-    const snap = ts.history.pop();
-    if (!snap) return "Nothing to undo.";
-    restore(ts, snap);
-    ctx.phase = snap.phase;
-    ctx.message = snap.message || "";
-    return;
-  }
-
   if (action === "endTurn") {
     if (!canPlayerAct(ctx, actorId)) return "Not your turn.";
     pushHistory(ts, ctx.phase, ctx.message);
     advanceTurn(ts);
+    const next = ctx.players[currentPlayerId(ts)]?.name;
+    announce(ctx, actorId, next ? `ended their turn. ${next}'s turn.` : "ended their turn.");
     return;
   }
 
   if (action === "placeCard") {
     if (!canPlayerAct(ctx, actorId)) return "Not your turn.";
-    pushHistory(ts, ctx.phase, ctx.message);
-    const card = pullFrom(ts.hands[actorId] || [], intent.cardId);
-    if (!card) {
-      ts.history.pop();
-      return "That card is not in your hand.";
-    }
     const dest = intent.dest || { type: "shared" };
     if (dest.type === "personal" && dest.playerId !== actorId && !isHost) {
-      ts.hands[actorId].push(card);
-      ts.history.pop();
       return "You can only place into your own space.";
     }
     const list = zoneList(ts, dest);
-    if (!list) {
-      ts.hands[actorId].push(card);
-      ts.history.pop();
-      return "Unknown space.";
+    if (!list) return "Unknown space.";
+    const ids = intent.cardIds || (intent.cardId ? [intent.cardId] : []);
+    pushHistory(ts, ctx.phase, ctx.message);
+    const moved = [];
+    for (const id of ids) {
+      const card = pullFrom(ts.hands[actorId] || [], id);
+      if (card) moved.push(card);
     }
-    list.push({ ...card, playedBy: actorId });
-    if (!isHost || currentPlayerId(ts) === actorId) advanceTurn(ts);
-    ctx.message = "";
+    if (!moved.length) {
+      ts.history.pop();
+      return "Those cards are not in your hand.";
+    }
+    for (const card of moved) {
+      list.push({ ...card, playedBy: actorId });
+    }
+    const labels = moved.map(cardLabel).join(", ");
+    announce(ctx, actorId, `placed ${labels} in ${spaceLabel(ctx, dest, actorId)}.`);
     return;
   }
 
   if (!isHost) return "Only the host can do that.";
+
+  if (action === "undo") {
+    const snap = ts.history.pop();
+    if (!snap) return "Nothing to undo.";
+    restore(ts, snap);
+    ctx.phase = snap.phase;
+    announce(ctx, actorId, "undid the last action.");
+    return;
+  }
 
   if (action === "startGame") {
     pushHistory(ts, ctx.phase, ctx.message);
@@ -116,7 +134,8 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     }
     ts.turnIndex = 0;
     ctx.phase = "playing";
-    ctx.message = "";
+    const first = ctx.players[currentPlayerId(ts)]?.name;
+    announce(ctx, actorId, first ? `started the game. ${first}'s turn.` : "started the game.");
     return;
   }
 
@@ -128,13 +147,14 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     pushHistory(ts, ctx.phase, ctx.message);
     ts.playerOrder = ids;
     ts.turnIndex = Math.min(ts.turnIndex, ids.length - 1);
+    announce(ctx, actorId, "set the player order.");
     return;
   }
 
   if (action === "shuffle") {
     pushHistory(ts, ctx.phase, ctx.message);
     ts.deck = shuffle(ts.deck);
-    ctx.message = "Deck shuffled.";
+    announce(ctx, actorId, "shuffled the deck.");
     return;
   }
 
@@ -144,8 +164,21 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     if (!ctx.players[to]) return "Unknown player.";
     pushHistory(ts, ctx.phase, ctx.message);
     if (!ts.hands[to]) ts.hands[to] = [];
-    ts.hands[to].push(...drawFromDeck(ts, count));
-    ctx.message = `Dealt ${count} to ${ctx.players[to].name}.`;
+    const cards = drawFromDeck(ts, count);
+    ts.hands[to].push(...cards);
+    announce(ctx, actorId, `dealt ${cards.length} to ${ctx.players[to].name}.`);
+    return;
+  }
+
+  if (action === "dealAll") {
+    const count = Number(intent.count) || 0;
+    pushHistory(ts, ctx.phase, ctx.message);
+    const ids = ts.playerOrder.length ? ts.playerOrder : Object.keys(ctx.players);
+    for (const id of ids) {
+      if (!ts.hands[id]) ts.hands[id] = [];
+      ts.hands[id].push(...drawFromDeck(ts, count));
+    }
+    announce(ctx, actorId, `dealt ${count} to each player.`);
     return;
   }
 
@@ -154,7 +187,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     pushHistory(ts, ctx.phase, ctx.message);
     const cards = drawFromDeck(ts, count);
     ts.shared.push(...cards);
-    ctx.message = `Drew ${cards.length} to shared space.`;
+    announce(ctx, actorId, `flipped ${cards.length} from the deck to the shared space.`);
     return;
   }
 
@@ -167,7 +200,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
       return "Unknown space.";
     }
     ts.discard.push(...list.splice(0, list.length));
-    ctx.message = "Moved space to discard.";
+    announce(ctx, actorId, `moved ${spaceLabel(ctx, dest, actorId)} to the discard pile.`);
     return;
   }
 
@@ -175,7 +208,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     pushHistory(ts, ctx.phase, ctx.message);
     ts.deck = shuffle([...ts.discard, ...ts.deck]);
     ts.discard = [];
-    ctx.message = "Discard shuffled into deck.";
+    announce(ctx, actorId, "shuffled the discard pile into the deck.");
     return;
   }
 
@@ -193,7 +226,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     ts.turnIndex = 0;
     ts.history = [];
     ctx.phase = "lobby";
-    ctx.message = "Game reset.";
+    announce(ctx, actorId, "reset the game.");
     return;
   }
 

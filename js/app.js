@@ -28,14 +28,11 @@ const els = {
   btnDiscard: document.getElementById("btn-discard"),
   resumeRow: document.getElementById("resume-row"),
   btnLeave: document.getElementById("btn-leave"),
-  btnBump: document.getElementById("btn-bump"),
-  btnReady: document.getElementById("btn-ready"),
   btnStart: document.getElementById("btn-start"),
   homeStatus: document.getElementById("home-status"),
   lobbyStatus: document.getElementById("lobby-status"),
   roleLabel: document.getElementById("role-label"),
   roomCodeDisplay: document.getElementById("room-code-display"),
-  counterValue: document.getElementById("counter-value"),
   phaseLabel: document.getElementById("phase-label"),
   lobbyTools: document.getElementById("lobby-tools"),
   tableCards: document.getElementById("table-cards"),
@@ -50,6 +47,7 @@ const els = {
   layoutHighcard: document.getElementById("layout-highcard"),
   layoutFreeplay: document.getElementById("layout-freeplay"),
   freeplayBar: document.getElementById("freeplay-bar"),
+  playerActions: document.getElementById("player-actions"),
   hostTools: document.getElementById("host-tools"),
   sharedCards: document.getElementById("shared-cards"),
   myPersonal: document.getElementById("my-personal"),
@@ -72,7 +70,7 @@ let leaving = false;
 let joiningGuest = false;
 let selectedGameId = "highcard";
 let lastView = null;
-let selectedCardId = null;
+let selectedCardIds = new Set();
 
 function setHomeStatus(text, error = false) {
   els.homeStatus.textContent = text || "";
@@ -117,11 +115,12 @@ function appendCardButton(parent, card, { playable, selectable }) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "playing-card" + (card.color === "red" ? " red" : "");
-  if (selectable && card.id === selectedCardId) btn.classList.add("selected-card");
+  if (selectable && selectedCardIds.has(card.id)) btn.classList.add("selected-card");
   btn.textContent = cardLabel(card);
   if (selectable) {
     btn.addEventListener("click", () => {
-      selectedCardId = card.id;
+      if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
+      else selectedCardIds.add(card.id);
       if (lastView) renderState(lastView);
     });
   } else if (playable) {
@@ -169,7 +168,6 @@ function renderOpponents(view, phase) {
     const bits = [player.name || "Player"];
     if (player.isHost) bits.push("host");
     if (player.connected === false) bits.push("away");
-    if (phase === "lobby") bits.push(player.ready ? "ready" : "not ready");
     name.textContent = bits.join(" · ");
     const row = document.createElement("div");
     row.className = "card-row";
@@ -214,9 +212,8 @@ function renderState(view) {
   const phase = view.phase || "lobby";
   const zoned = Boolean(view.usesZones);
   els.phaseLabel.textContent = phase;
-  els.counterValue.textContent = String(view.counter ?? 0);
-  els.lobbyTools.classList.toggle("hidden", phase === "playing" && !zoned);
-  els.btnStart.classList.toggle("hidden", role !== "host" || (phase === "playing" && !zoned));
+  els.lobbyTools.classList.toggle("hidden", role !== "host" || phase === "playing");
+  els.btnStart.classList.toggle("hidden", role !== "host" || phase === "playing");
   els.btnStart.textContent = zoned
     ? "Start game"
     : phase === "ended"
@@ -224,7 +221,7 @@ function renderState(view) {
       : "Start deal";
   els.handHint.classList.toggle("hidden", phase !== "playing");
   els.handHint.textContent = zoned
-    ? "· tap a card, then Place"
+    ? "· tap cards, then Place"
     : "· tap to play";
   if (view.gameName) els.gameNameLabel.textContent = view.gameName;
   if (view.message) {
@@ -242,7 +239,13 @@ function renderState(view) {
   els.layoutFreeplay.classList.toggle("hidden", !zoned);
   els.freeplayBar.classList.toggle("hidden", !zoned);
   els.hostTools.classList.toggle("hidden", !zoned || role !== "host");
-  const undoBtn = els.freeplayBar.querySelector('[data-act="undo"]');
+  const myTurn =
+    role === "host" ||
+    (phase === "playing" && view.currentPlayerId === selfId);
+  for (const btn of els.playerActions.querySelectorAll("button")) {
+    btn.disabled = !myTurn;
+  }
+  const undoBtn = els.hostTools.querySelector('[data-act="undo"]');
   if (undoBtn) undoBtn.disabled = !view.canUndo;
 
   renderOpponents(view, phase);
@@ -267,11 +270,16 @@ function renderState(view) {
     fillRow(els.tableCards, view.table || view.shared, { playable: false });
   }
 
+  const handIds = new Set((view.hand || []).map((card) => card.id));
+  for (const id of [...selectedCardIds]) {
+    if (!handIds.has(id)) selectedCardIds.delete(id);
+  }
+
   els.handCards.innerHTML = "";
   for (const card of view.hand || []) {
     appendCardButton(els.handCards, card, {
       playable: !zoned && phase === "playing",
-      selectable: zoned,
+      selectable: zoned && myTurn,
     });
   }
   if (!(view.hand || []).length) {
@@ -346,12 +354,13 @@ function moveOrder(index, delta) {
 }
 
 function placeSelected(dest) {
-  if (!selectedCardId) {
-    setLobbyStatus({ text: "Select a card in your hand first.", error: true });
+  const cardIds = [...selectedCardIds];
+  if (!cardIds.length) {
+    setLobbyStatus({ text: "Select cards in your hand first.", error: true });
     return;
   }
-  sendAction("placeCard", { cardId: selectedCardId, dest });
-  selectedCardId = null;
+  sendAction("placeCard", { cardIds, dest });
+  selectedCardIds.clear();
 }
 
 function refreshResumeUi() {
@@ -551,27 +560,15 @@ els.joinCode.addEventListener("input", () => {
 
 els.btnLeave.addEventListener("click", () => leave({ endTable: true }));
 
-els.btnBump.addEventListener("click", () => {
-  if (!session) return;
-  if (role === "host") session.hostIntent("bump");
-  else session.sendIntent("bump");
-});
-
-els.btnReady.addEventListener("click", () => {
-  if (!session) return;
-  if (role === "host") session.hostIntent("ready");
-  else session.sendIntent("ready");
-});
-
 els.btnStart.addEventListener("click", () => {
   if (role !== "host" || !session) return;
   if (lastView?.usesZones) session.hostIntent("startGame");
   else session.hostIntent("start");
 });
 
-els.freeplayBar.addEventListener("click", (event) => {
+function onTableAction(event) {
   const btn = event.target.closest("[data-act]");
-  if (!btn || !session) return;
+  if (!btn || !session || btn.disabled) return;
   const act = btn.dataset.act;
   if (act === "place-shared") {
     placeSelected({ type: "shared" });
@@ -592,6 +589,10 @@ els.freeplayBar.addEventListener("click", (event) => {
     });
     return;
   }
+  if (act === "dealAll") {
+    sendAction("dealAll", { count: Number(els.dealCount.value) });
+    return;
+  }
   if (act === "drawToShared") {
     sendAction("drawToShared", { count: Number(els.drawCount.value) });
     return;
@@ -610,7 +611,10 @@ els.freeplayBar.addEventListener("click", (event) => {
     return;
   }
   sendAction(act);
-});
+}
+
+els.freeplayBar.addEventListener("click", onTableAction);
+els.hostTools.addEventListener("click", onTableAction);
 
 window.addEventListener("pagehide", () => {
   if (session) session.stop();

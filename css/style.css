@@ -331,9 +331,10 @@ button.game-pick.selected {
 }
 
 .host-tools {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
+  margin-top: auto;
+  padding: 0.75rem 1rem 1.25rem;
   border-top: 1px dashed var(--line);
+  background: #15202b;
 }
 
 .zones {

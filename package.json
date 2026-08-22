@@ -1,0 +1,9 @@
+{
+  "name": "tjunyamasaki.github.io",
+  "private": true,
+  "description": "Local npm scripts only. The site stays vanilla ES modules; no bundler.",
+  "scripts": {
+    "start": "npx --yes serve .",
+    "config": "node -e \"require('fs').copyFileSync('js/config.example.js', 'js/config.js')\""
+  }
+}

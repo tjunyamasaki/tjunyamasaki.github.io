@@ -129,9 +129,12 @@ export function applyFreeplayAction(ctx, actorId, intent) {
 
   if (action === "startGame") {
     pushHistory(ts, ctx.phase, ctx.message);
-    if (!ts.playerOrder.length) {
-      ts.playerOrder = Object.keys(ctx.players);
+    const ids = Object.keys(ctx.players);
+    for (const id of ids) {
+      if (!ts.playerOrder.includes(id)) ts.playerOrder.push(id);
     }
+    ts.playerOrder = ts.playerOrder.filter((id) => ctx.players[id]);
+    if (!ts.playerOrder.length) ts.playerOrder = ids;
     ts.turnIndex = 0;
     ctx.phase = "playing";
     const first = ctx.players[currentPlayerId(ts)]?.name;

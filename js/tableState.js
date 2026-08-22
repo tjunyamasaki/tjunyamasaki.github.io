@@ -53,6 +53,12 @@ export function ensurePlayers(ts, playerIds) {
     if (!ts.personal[id]) ts.personal[id] = [];
     if (!ts.playerOrder.includes(id)) ts.playerOrder.push(id);
   }
+  const live = new Set(playerIds);
+  ts.playerOrder = ts.playerOrder.filter((id) => live.has(id));
+  if (!ts.playerOrder.length) {
+    ts.playerOrder = playerIds.slice();
+  }
+  if (ts.turnIndex >= ts.playerOrder.length) ts.turnIndex = 0;
 }
 
 export function currentPlayerId(ts) {

@@ -233,7 +233,26 @@ export function createHost({
   function seatPlayer(playerId, playerName, guestId) {
     if (!playerId) playerId = guestId;
     const session = connections.get(guestId);
-    if (session) session.playerId = playerId;
+    if (session) {
+      const previousId = session.playerId;
+      session.playerId = playerId;
+      if (
+        previousId &&
+        previousId !== playerId &&
+        previousId !== HOST_ID &&
+        lobbyState.players[previousId] &&
+        !lobbyState.players[previousId].isHost
+      ) {
+        if (!ts.hands[playerId]) ts.hands[playerId] = ts.hands[previousId] || [];
+        else ts.hands[playerId].push(...(ts.hands[previousId] || []));
+        if (!ts.personal[playerId]) ts.personal[playerId] = ts.personal[previousId] || [];
+        else ts.personal[playerId].push(...(ts.personal[previousId] || []));
+        delete ts.hands[previousId];
+        delete ts.personal[previousId];
+        ts.playerOrder = ts.playerOrder.filter((id) => id !== previousId);
+        delete lobbyState.players[previousId];
+      }
+    }
 
     for (const [otherId, other] of [...connections]) {
       if (otherId !== guestId && other.playerId === playerId) {
@@ -247,6 +266,7 @@ export function createHost({
       existing.connected = true;
       if (!ts.hands[playerId]) ts.hands[playerId] = [];
       if (!ts.personal[playerId]) ts.personal[playerId] = [];
+      if (!ts.playerOrder.includes(playerId)) ts.playerOrder.push(playerId);
       return true;
     }
 
@@ -315,15 +335,6 @@ export function createHost({
     };
 
     channel.onopen = () => {
-      const ok = seatPlayer(incomingId, info.name || "Guest", guestId);
-      if (!ok) {
-        rejectGuest(roomCode, guestId, "Lobby is full (15 players).");
-        closeGuestLink(guestId);
-        return;
-      }
-      const playerId = connections.get(guestId)?.playerId || incomingId;
-      sendTo(channel, { type: "state", lobbyState: snapshotFor(playerId) });
-      broadcast();
       setStatus("connected");
     };
 
@@ -336,13 +347,21 @@ export function createHost({
       } catch {
         return;
       }
-      const playerId = connections.get(guestId)?.playerId || incomingId;
+      const session = connections.get(guestId);
       if (msg.type === "hello") {
-        seatPlayer(msg.playerId || playerId, msg.name || info.name, guestId);
+        const seatId = msg.playerId || session?.playerId || incomingId;
+        const ok = seatPlayer(seatId, msg.name || info.name || "Guest", guestId);
+        if (!ok) {
+          rejectGuest(roomCode, guestId, "Lobby is full (15 players).");
+          closeGuestLink(guestId);
+          return;
+        }
         broadcast();
+        return;
       }
       if (msg.type === "intent") {
-        applyIntent(playerId, msg);
+        const playerId = session?.playerId;
+        if (playerId) applyIntent(playerId, msg);
       }
     };
 

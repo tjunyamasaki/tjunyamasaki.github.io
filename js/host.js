@@ -11,7 +11,7 @@ import {
   writeOffer,
   createIceBuffer,
 } from "./signaling.js";
-import { cardsPerPlayer, createDeck, deal, shuffle } from "./cards.js";
+import { getGame, beginRound } from "./games.js";
 
 export const HOST_ID = "host";
 
@@ -26,6 +26,7 @@ export function createHost({
   onPersist,
   initialState,
   initialSecret,
+  gameId: requestedGameId,
 }) {
   const connections = new Map();
   let roomCode = "";
@@ -49,6 +50,8 @@ export function createHost({
   let deck = clone(initialSecret?.deck || []);
   let table = clone(initialSecret?.table || []);
   let hands = clone(initialSecret?.hands || { [HOST_ID]: [] });
+  let message = initialSecret?.message || "";
+  const game = getGame(initialSecret?.gameId || requestedGameId);
 
   function setStatus(text, error = false) {
     onStatus({ text, error });
@@ -60,7 +63,7 @@ export function createHost({
       roomCode,
       name,
       lobbyState,
-      secret: { phase, deck, table, hands },
+      secret: { phase, deck, table, hands, gameId: game.id, message },
     });
   }
 
@@ -78,6 +81,9 @@ export function createHost({
       hand: clone(hands[viewerId] || []),
       handCounts,
       viewerId,
+      gameId: game.id,
+      gameName: game.name,
+      message,
     };
   }
 
@@ -102,19 +108,20 @@ export function createHost({
     }
   }
 
-  function totalCardsInHands() {
-    return Object.values(hands).reduce((sum, list) => sum + (list?.length || 0), 0);
-  }
-
   function startDeal() {
-    if (phase !== "lobby" && phase !== "ended") return;
+    if (phase !== "lobby" && phase !== "ended") return false;
     const ids = Object.keys(lobbyState.players);
-    const count = cardsPerPlayer(ids.length);
-    const dealt = deal(shuffle(createDeck()), ids, count);
+    if (ids.length < game.minPlayers) {
+      setStatus(`Need at least ${game.minPlayers} players.`, true);
+      return false;
+    }
+    const dealt = beginRound(game, ids);
     deck = dealt.deck;
     hands = dealt.hands;
     table = [];
+    message = "";
     phase = "playing";
+    return true;
   }
 
   function playCard(peerId, cardId) {
@@ -125,7 +132,14 @@ export function createHost({
     if (index < 0) return;
     const [card] = hand.splice(index, 1);
     table.push({ ...card, playedBy: peerId });
-    if (totalCardsInHands() === 0) phase = "ended";
+    const result = game.afterPlay({
+      table,
+      hands,
+      playerIds: Object.keys(lobbyState.players),
+      players: lobbyState.players,
+    });
+    phase = result.phase || phase;
+    message = result.message || "";
   }
 
   function removeSeat(playerId) {
@@ -148,7 +162,7 @@ export function createHost({
     } else if (intent.action === "bump" && phase === "lobby") {
       lobbyState.counter += 1;
     } else if (intent.action === "start" && peerId === HOST_ID) {
-      startDeal();
+      if (!startDeal()) return;
     } else if (intent.action === "playCard") {
       playCard(peerId, intent.cardId);
     } else if (intent.action === "leaveSeat" && peerId !== HOST_ID) {

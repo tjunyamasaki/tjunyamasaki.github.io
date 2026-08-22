@@ -99,12 +99,14 @@ export function lobbyStateForResume(saved, hostName) {
 
 export function secretForResume(savedSecret) {
   if (!savedSecret) {
-    return { phase: "lobby", deck: [], table: [], hands: { host: [] } };
+    return { phase: "lobby", deck: [], table: [], hands: { host: [] }, gameId: "freeplay", message: "" };
   }
   return {
     phase: savedSecret.phase || "lobby",
     deck: savedSecret.deck || [],
     table: savedSecret.table || [],
     hands: { ...(savedSecret.hands || { host: [] }) },
+    gameId: savedSecret.gameId || "freeplay",
+    message: savedSecret.message || "",
   };
 }

@@ -14,6 +14,7 @@ import {
   getOrCreatePlayerId,
 } from "./persist.js";
 import { cardLabel } from "./cards.js";
+import { gameList } from "./games.js";
 
 const els = {
   configError: document.getElementById("config-error"),
@@ -42,6 +43,10 @@ const els = {
   handHint: document.getElementById("hand-hint"),
   opponents: document.getElementById("opponents"),
   deckPile: document.getElementById("deck-pile"),
+  gameType: document.getElementById("game-type"),
+  gameBlurb: document.getElementById("game-blurb"),
+  gameNameLabel: document.getElementById("game-name-label"),
+  roundMessage: document.getElementById("round-message"),
 };
 
 let session = null;
@@ -160,6 +165,14 @@ function renderState(view) {
   els.btnStart.classList.toggle("hidden", role !== "host" || phase === "playing");
   els.btnStart.textContent = phase === "ended" ? "Deal again" : "Start deal";
   els.handHint.classList.toggle("hidden", phase !== "playing");
+  if (view.gameName) els.gameNameLabel.textContent = view.gameName;
+  if (view.message) {
+    els.roundMessage.textContent = view.message;
+    els.roundMessage.classList.remove("hidden");
+  } else {
+    els.roundMessage.classList.add("hidden");
+    els.roundMessage.textContent = "";
+  }
 
   renderDeck(view.deckCount ?? 0);
   renderOpponents(view, phase);
@@ -219,6 +232,7 @@ async function beginHost({ resume }) {
         ? lobbyStateForResume(saved.lobbyState, name)
         : undefined,
       initialSecret: saved ? secretForResume(saved.secret) : undefined,
+      gameId: saved ? undefined : els.gameType.value,
       onState: renderState,
       onStatus: setLobbyStatus,
       onPersist: saveHostSession,
@@ -327,6 +341,23 @@ async function leave({ endTable = false } = {}) {
   setHomeStatus("");
 }
 
+function fillGameSelect() {
+  els.gameType.innerHTML = "";
+  for (const game of gameList()) {
+    const opt = document.createElement("option");
+    opt.value = game.id;
+    opt.textContent = game.name;
+    els.gameType.append(opt);
+  }
+  els.gameType.value = "highcard";
+  els.gameBlurb.textContent = gameList().find((g) => g.id === els.gameType.value)?.blurb || "";
+}
+
+els.gameType.addEventListener("change", () => {
+  const game = gameList().find((g) => g.id === els.gameType.value);
+  els.gameBlurb.textContent = game?.blurb || "";
+});
+
 els.btnHost.addEventListener("click", () => beginHost({ resume: false }));
 els.btnResume.addEventListener("click", () => beginHost({ resume: true }));
 els.btnDiscard.addEventListener("click", () => {
@@ -377,6 +408,7 @@ window.addEventListener("hashchange", () => {
   }
 });
 
+fillGameSelect();
 refreshResumeUi();
 if (location.hash === "#table" && !session) location.hash = "home";
 

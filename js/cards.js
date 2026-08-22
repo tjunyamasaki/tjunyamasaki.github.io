@@ -53,3 +53,10 @@ export function deal(deck, playerIds, count) {
 export function cardLabel(card) {
   return `${card.rank}${card.symbol}`;
 }
+
+/** Ace high. */
+export function rankValue(card) {
+  const map = { A: 14, K: 13, Q: 12, J: 11 };
+  if (map[card.rank]) return map[card.rank];
+  return Number(card.rank);
+}

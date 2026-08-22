@@ -22,6 +22,12 @@
           <input id="nickname" type="text" maxlength="24" placeholder="Your name" autocomplete="nickname" />
         </label>
 
+        <label class="field">
+          Game
+          <select id="game-type"></select>
+        </label>
+        <p id="game-blurb" class="muted"></p>
+
         <div class="actions">
           <button id="btn-host" type="button">Host lobby</button>
         </div>
@@ -47,6 +53,7 @@
         <div>
           <p class="muted" id="role-label"></p>
           <h2>Room <span id="room-code-display"></span></h2>
+          <p class="muted" id="game-name-label"></p>
           <p class="muted">
             <span id="phase-label">lobby</span>
             · <span id="lobby-status" class="status"></span>
@@ -63,6 +70,8 @@
           <button id="btn-start" type="button">Start deal</button>
         </div>
       </div>
+
+      <p id="round-message" class="round-message hidden"></p>
 
       <div id="opponents" class="opponents"></div>
 

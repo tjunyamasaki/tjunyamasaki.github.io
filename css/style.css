@@ -287,6 +287,25 @@ button.playing-card:disabled {
   color: var(--accent);
 }
 
+.round-message {
+  margin: 0.5rem 1rem 0;
+  padding: 0.6rem 0.8rem;
+  background: #14532d;
+  border-radius: 8px;
+  color: #d1fae5;
+  font-weight: 650;
+}
+
+select {
+  width: 100%;
+  padding: 0.7rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #11141a;
+  color: var(--text);
+  font-size: 1rem;
+}
+
 .status.error {
   color: var(--danger);
 }

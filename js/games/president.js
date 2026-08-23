@@ -16,7 +16,7 @@ function applyPresidentAction(ctx, actorId, intent) {
     const ids = intent.cardIds || (intent.cardId ? [intent.cardId] : []);
     if (!ids.length) return "Select cards in your hand first.";
     const { ts } = ctx;
-    pushHistory(ts, ctx.phase, ctx.message);
+    pushHistory(ts, ctx.phase, ctx.message, ctx.players);
     if (!ts.hands[actorId]) ts.hands[actorId] = [];
     if (!ts.hands[to]) ts.hands[to] = [];
     const moved = [];
@@ -50,6 +50,7 @@ export const presidentGame = {
     placeDiscard: false,
     endTurn: true,
     sendCards: true,
+    betCoins: true,
   },
   preset: {
     ...defaultCardOrder(),

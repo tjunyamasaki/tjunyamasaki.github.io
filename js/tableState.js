@@ -34,6 +34,7 @@ export function createTableState(playerIds, saved = null, settings = null) {
       playerOrder: ids,
       turnIndex: 0,
       history: [],
+      pot: 0,
     };
   }
   return {
@@ -46,6 +47,7 @@ export function createTableState(playerIds, saved = null, settings = null) {
     playerOrder: ids,
     turnIndex: 0,
     history: [],
+    pot: 0,
   };
 }
 
@@ -53,6 +55,7 @@ export function ensurePlayers(ts, playerIds) {
   if (!ts.special) ts.special = [];
   if (!ts.shared) ts.shared = [];
   if (!ts.discard) ts.discard = [];
+  if (!Number.isInteger(ts.pot)) ts.pot = 0;
   for (const id of playerIds) {
     if (!ts.hands[id]) ts.hands[id] = [];
     if (!ts.personal[id]) ts.personal[id] = [];
@@ -105,5 +108,6 @@ export function snapshotTable(ts, viewerId, players) {
     playerOrder: ts.playerOrder.slice(),
     currentPlayerId: currentPlayerId(ts),
     canUndo: ts.history.length > 0,
+    pot: ts.pot || 0,
   };
 }

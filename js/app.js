@@ -73,6 +73,12 @@ const els = {
   settingHandView: document.getElementById("setting-hand-view"),
   settingShowPoints: document.getElementById("setting-show-points"),
   settingShowLives: document.getElementById("setting-show-lives"),
+  settingShowCoins: document.getElementById("setting-show-coins"),
+  settingCoins: document.getElementById("setting-coins"),
+  btnSetCoinsAll: document.getElementById("btn-set-coins-all"),
+  potPile: document.getElementById("pot-pile"),
+  potValue: document.getElementById("pot-value"),
+  betCount: document.getElementById("bet-count"),
   youStats: document.getElementById("you-stats"),
   playerRoster: document.getElementById("player-roster"),
   rankOrder: document.getElementById("rank-order"),
@@ -286,37 +292,45 @@ function renderDeck(target, count) {
   el.append(label);
 }
 
+const STAT_META = {
+  points: { className: "stat-star", label: "Points" },
+  lives: { className: "stat-heart", label: "Lives" },
+  coins: { className: "stat-coin", label: "Coins" },
+};
+
 function bumpPlayerStat(playerId, stat, delta) {
   if (role !== "host") return;
   sendAction("setPlayerStat", { playerId, stat, delta });
 }
 
 function appendStatBadge(parent, view, playerId, stat, value) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = stat === "lives" ? "stat-heart" : "stat-star";
-  btn.textContent = String(value ?? 0);
-  btn.title =
-    role === "host"
-      ? stat === "lives"
-        ? "Lives · click +1, right-click −1"
-        : "Points · click +1, right-click −1"
-      : stat === "lives"
-        ? "Lives"
-        : "Points";
+  const meta = STAT_META[stat];
+  const wrap = document.createElement("span");
+  wrap.className = "stat-wrap";
   if (role === "host") {
-    btn.addEventListener("click", (event) => {
-      event.preventDefault();
-      bumpPlayerStat(playerId, stat, 1);
-    });
-    btn.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      bumpPlayerStat(playerId, stat, -1);
-    });
-  } else {
-    btn.disabled = true;
+    const minus = document.createElement("button");
+    minus.type = "button";
+    minus.className = "stat-adj";
+    minus.textContent = "−";
+    minus.setAttribute("aria-label", `Remove ${meta.label}`);
+    minus.addEventListener("click", () => bumpPlayerStat(playerId, stat, -1));
+    wrap.append(minus);
   }
-  parent.append(btn);
+  const badge = document.createElement("span");
+  badge.className = meta.className;
+  badge.textContent = String(value ?? 0);
+  badge.title = meta.label;
+  wrap.append(badge);
+  if (role === "host") {
+    const plus = document.createElement("button");
+    plus.type = "button";
+    plus.className = "stat-adj";
+    plus.textContent = "+";
+    plus.setAttribute("aria-label", `Add ${meta.label}`);
+    plus.addEventListener("click", () => bumpPlayerStat(playerId, stat, 1));
+    wrap.append(plus);
+  }
+  parent.append(wrap);
 }
 
 function fillPlayerStats(el, view, playerId) {
@@ -329,6 +343,9 @@ function fillPlayerStats(el, view, playerId) {
   }
   if (view.settings?.showLives) {
     appendStatBadge(el, view, playerId, "lives", player.lives);
+  }
+  if (view.settings?.showCoins) {
+    appendStatBadge(el, view, playerId, "coins", player.coins);
   }
 }
 
@@ -416,6 +433,7 @@ function tableActions(view) {
     placeDiscard: true,
     endTurn: true,
     sendCards: false,
+    betCoins: false,
     ...(game.tableActions || {}),
   };
 }
@@ -458,13 +476,21 @@ function renderState(view) {
   const acts = tableActions(view);
   const myTurn = phase === "playing" && view.currentPlayerId === selfId;
   const lobbyPass = phase === "lobby" && acts.sendCards;
+  const showCoins = Boolean(view.settings?.showCoins);
+  const canBet = zoned && phase === "playing" && acts.betCoins && showCoins;
   const canSelectHand = zoned && (myTurn || lobbyPass);
   for (const btn of els.playerActions.querySelectorAll("button")) {
     const act = btn.dataset.act;
     if (act === "sendCards") btn.disabled = !lobbyPass;
+    else if (act === "betCoins") btn.disabled = !canBet;
     else btn.disabled = !myTurn;
   }
   if (els.sendTarget) els.sendTarget.disabled = !lobbyPass;
+  if (els.betCount) els.betCount.disabled = !canBet;
+  if (els.potPile) {
+    els.potPile.classList.toggle("hidden", !zoned || !showCoins);
+    if (els.potValue) els.potValue.textContent = String(view.pot ?? 0);
+  }
   const undoBtn = els.hostTools.querySelector('[data-act="undo"]');
   if (undoBtn) undoBtn.disabled = !view.canUndo;
 
@@ -605,6 +631,7 @@ function applySpaceVisibility(view) {
     "place-discard": { space: "discard", flag: acts.placeDiscard },
     endTurn: { flag: acts.endTurn },
     sendCards: { flag: acts.sendCards && view.phase === "lobby" },
+    betCoins: { flag: acts.betCoins && Boolean(view.settings?.showCoins) },
     drawToShared: { space: "table", flag: true },
     drawToSpecial: { space: "special", flag: true },
   };
@@ -618,6 +645,12 @@ function applySpaceVisibility(view) {
     els.sendTarget.classList.toggle(
       "hidden",
       !acts.sendCards || view.phase !== "lobby"
+    );
+  }
+  if (els.betCount) {
+    els.betCount.classList.toggle(
+      "hidden",
+      !acts.betCoins || !view.settings?.showCoins
     );
   }
 }
@@ -709,6 +742,8 @@ function fillRankOrder(view) {
 function fillPlayerRoster(view) {
   const el = els.playerRoster;
   if (!el) return;
+  const focused = document.activeElement;
+  if (focused && el.contains(focused) && focused.matches("input")) return;
   el.innerHTML = "";
   const players = view.players || {};
   const order = view.playerOrder?.length
@@ -726,7 +761,25 @@ function fillPlayerRoster(view) {
     stats.className = "player-stats";
     appendStatBadge(stats, view, id, "points", player.points);
     appendStatBadge(stats, view, id, "lives", player.lives);
-    row.append(name, stats);
+    appendStatBadge(stats, view, id, "coins", player.coins);
+    const coinField = document.createElement("label");
+    coinField.className = "muted player-coin-field";
+    coinField.append("Set coins");
+    const coinInput = document.createElement("input");
+    coinInput.type = "number";
+    coinInput.min = "0";
+    coinInput.max = "999";
+    coinInput.className = "num";
+    coinInput.value = String(player.coins ?? 0);
+    coinInput.addEventListener("change", () => {
+      sendAction("setPlayerStat", {
+        playerId: id,
+        stat: "coins",
+        value: Number(coinInput.value),
+      });
+    });
+    coinField.append(coinInput);
+    row.append(name, stats, coinField);
     el.append(row);
   }
 }
@@ -743,6 +796,7 @@ function fillGameSettings(view) {
   els.settingHandView.classList.toggle("selected", s.opponentHandView === "collapsed");
   els.settingShowPoints.classList.toggle("selected", s.showPoints !== false);
   els.settingShowLives.classList.toggle("selected", Boolean(s.showLives));
+  els.settingShowCoins.classList.toggle("selected", Boolean(s.showCoins));
 
   els.spaceToggles.innerHTML = "";
   for (const space of SPACE_VISIBILITY) {
@@ -1057,6 +1111,16 @@ els.settingShowPoints.addEventListener("click", () => {
 els.settingShowLives.addEventListener("click", () => {
   patchSettings({ showLives: !lastView?.settings?.showLives });
 });
+els.settingShowCoins.addEventListener("click", () => {
+  patchSettings({ showCoins: !lastView?.settings?.showCoins });
+});
+els.btnSetCoinsAll.addEventListener("click", () => {
+  sendAction("setPlayerStat", {
+    playerId: "all",
+    stat: "coins",
+    value: Number(els.settingCoins.value),
+  });
+});
 
 els.btnTurnChange.addEventListener("click", () => {
   turnOrderPicks = [];
@@ -1123,6 +1187,10 @@ function onTableAction(event) {
     }
     sendAction("sendCards", { cardIds, playerId });
     selectedCardIds.clear();
+    return;
+  }
+  if (act === "betCoins") {
+    sendAction("betCoins", { amount: Number(els.betCount.value) });
     return;
   }
   if (act === "deal") {

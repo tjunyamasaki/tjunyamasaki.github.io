@@ -49,6 +49,7 @@ export function defaultPreset() {
     opponentHandView: "expanded",
     showPoints: true,
     showLives: false,
+    showCoins: false,
   };
 }
 
@@ -86,6 +87,7 @@ export function resolvePreset(game, overrides = {}) {
     opponentHandView: fromGame.opponentHandView ?? base.opponentHandView,
     showPoints: fromGame.showPoints ?? base.showPoints,
     showLives: fromGame.showLives ?? base.showLives,
+    showCoins: fromGame.showCoins ?? base.showCoins,
   };
   const next = { ...merged, ...overrides };
   next.ranks = (overrides.ranks || merged.ranks).slice();
@@ -107,6 +109,7 @@ export function resolvePreset(game, overrides = {}) {
     next.opponentHandView === "collapsed" ? "collapsed" : "expanded";
   next.showPoints = next.showPoints !== false;
   next.showLives = Boolean(next.showLives);
+  next.showCoins = Boolean(next.showCoins);
   return next;
 }
 

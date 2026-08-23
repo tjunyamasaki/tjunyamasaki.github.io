@@ -232,9 +232,33 @@ button.color-swatch:disabled {
   gap: 0.2rem;
 }
 
+.stat-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.12rem;
+}
+
+.stat-adj {
+  width: 1.45rem;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  padding: 0;
+  border-radius: 999px;
+  background: #11141a;
+  color: var(--text);
+  border: 1px solid var(--line);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .stat-star,
-.stat-heart {
+.stat-heart,
+.stat-coin {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.7rem;
   height: 1.7rem;
   padding: 0;
@@ -250,12 +274,14 @@ button.color-swatch:disabled {
   color: #1a1204;
 }
 
-.stat-heart {
+.stat-heart,
+.stat-coin {
   color: #fff;
 }
 
 .stat-star::before,
-.stat-heart::before {
+.stat-heart::before,
+.stat-coin::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -294,10 +320,16 @@ button.color-swatch:disabled {
   );
 }
 
-button.stat-star:disabled,
-button.stat-heart:disabled {
-  opacity: 1;
-  cursor: default;
+.stat-coin::before {
+  background: #d97706;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px #fbbf24;
+}
+
+.stat-coin.pot-coin {
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 0.95rem;
 }
 
 .opponent.offline {
@@ -642,6 +674,14 @@ input.num {
 
 .player-row-name {
   font-weight: 650;
+}
+
+.player-coin-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
 }
 
 .order-list {

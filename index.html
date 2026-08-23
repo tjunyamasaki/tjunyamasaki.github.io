@@ -102,6 +102,10 @@
             <div class="zone" data-space="special">
               <div id="special-cards" class="card-stack" title="Special"></div>
             </div>
+            <div class="zone" id="pot-pile">
+              <p class="felt-label">Pot</p>
+              <div id="pot-value" class="stat-coin pot-coin">0</div>
+            </div>
           </div>
           <div class="zone zone-table" data-space="table">
             <p class="felt-label">Table</p>
@@ -122,6 +126,8 @@
           <button type="button" data-act="endTurn">End turn</button>
           <select id="send-target"></select>
           <button type="button" data-act="sendCards">Send to player</button>
+          <input id="bet-count" type="number" min="1" max="999" value="1" class="num" aria-label="Bet amount" />
+          <button type="button" data-act="betCoins">Bet</button>
         </div>
       </div>
 
@@ -195,6 +201,13 @@
           <div class="actions">
             <button id="setting-show-points" type="button" class="ghost sort-btn">Points</button>
             <button id="setting-show-lives" type="button" class="ghost sort-btn">Lives</button>
+            <button id="setting-show-coins" type="button" class="ghost sort-btn">Coins</button>
+          </div>
+          <div class="actions">
+            <label class="muted">Coins
+              <input id="setting-coins" type="number" min="0" max="999" value="0" class="num" />
+            </label>
+            <button id="btn-set-coins-all" type="button">Set all players</button>
           </div>
         </details>
         <details class="host-section" open>

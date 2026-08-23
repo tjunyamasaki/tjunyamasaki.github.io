@@ -48,6 +48,7 @@ function ensureColors(players) {
     }
     if (!Number.isInteger(players[id].points)) players[id].points = 0;
     if (!Number.isInteger(players[id].lives)) players[id].lives = 0;
+    if (!Number.isInteger(players[id].coins)) players[id].coins = 0;
   }
 }
 
@@ -69,7 +70,7 @@ export function createHost({
   const lobbyState = initialState || {
     counter: 0,
     players: {
-      [HOST_ID]: { name, ready: false, isHost: true, connected: true, color: 0, points: 0, lives: 0 },
+      [HOST_ID]: { name, ready: false, isHost: true, connected: true, color: 0, points: 0, lives: 0, coins: 0 },
     },
   };
   if (lobbyState.players[HOST_ID]) {
@@ -124,6 +125,7 @@ export function createHost({
       playerOrder: zones.playerOrder,
       currentPlayerId: zones.currentPlayerId,
       canUndo: zones.canUndo,
+      pot: zones.pot,
       viewerId,
       gameId: game.id,
       gameName: game.name,
@@ -259,12 +261,26 @@ export function createHost({
       }
       player.color = color;
     } else if (intent.action === "setPlayerStat" && peerId === HOST_ID) {
-      const target = lobbyState.players[intent.playerId];
-      const key = intent.stat === "lives" ? "lives" : "points";
-      if (!target) return;
-      const delta = Number(intent.delta);
-      if (!delta) return;
-      target[key] = Math.max(0, Math.min(99, (Number(target[key]) || 0) + delta));
+      const key =
+        intent.stat === "lives" ? "lives" : intent.stat === "coins" ? "coins" : "points";
+      const cap = key === "coins" ? 999 : 99;
+      const apply = (target) => {
+        if (!target) return;
+        if (intent.value !== undefined && intent.value !== null && intent.value !== "") {
+          const value = Math.floor(Number(intent.value));
+          if (!Number.isFinite(value)) return;
+          target[key] = Math.max(0, Math.min(cap, value));
+          return;
+        }
+        const delta = Number(intent.delta);
+        if (!delta) return;
+        target[key] = Math.max(0, Math.min(cap, (Number(target[key]) || 0) + delta));
+      };
+      if (intent.playerId === "all") {
+        for (const target of Object.values(lobbyState.players)) apply(target);
+      } else {
+        apply(lobbyState.players[intent.playerId]);
+      }
     } else if (intent.action === "setSettings" && peerId === HOST_ID) {
       const next = resolvePreset(game, { ...settings, ...intent.settings });
       const rebuild = compositionKey(next) !== compositionKey(settings);
@@ -371,6 +387,7 @@ export function createHost({
       }
       if (!Number.isInteger(existing.points)) existing.points = 0;
       if (!Number.isInteger(existing.lives)) existing.lives = 0;
+      if (!Number.isInteger(existing.coins)) existing.coins = 0;
       if (!ts.hands[playerId]) ts.hands[playerId] = [];
       if (!ts.personal[playerId]) ts.personal[playerId] = [];
       if (!ts.playerOrder.includes(playerId)) ts.playerOrder.push(playerId);
@@ -388,6 +405,7 @@ export function createHost({
       color: nextFreeColor(lobbyState.players, playerId),
       points: 0,
       lives: 0,
+      coins: 0,
     };
     if (!ts.hands[playerId]) ts.hands[playerId] = [];
     if (!ts.personal[playerId]) ts.personal[playerId] = [];

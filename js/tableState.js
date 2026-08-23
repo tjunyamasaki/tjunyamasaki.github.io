@@ -28,6 +28,7 @@ export function createTableState(playerIds, saved = null, settings = null) {
       deck: clone(saved.deck || []),
       discard: [],
       shared: clone(saved.table || []),
+      special: [],
       personal: zones.personal,
       hands: { ...zones.hands, ...(saved.hands || {}) },
       playerOrder: ids,
@@ -39,6 +40,7 @@ export function createTableState(playerIds, saved = null, settings = null) {
     deck: freshShoe(settings),
     discard: [],
     shared: [],
+    special: [],
     personal: zones.personal,
     hands: zones.hands,
     playerOrder: ids,
@@ -48,6 +50,9 @@ export function createTableState(playerIds, saved = null, settings = null) {
 }
 
 export function ensurePlayers(ts, playerIds) {
+  if (!ts.special) ts.special = [];
+  if (!ts.shared) ts.shared = [];
+  if (!ts.discard) ts.discard = [];
   for (const id of playerIds) {
     if (!ts.hands[id]) ts.hands[id] = [];
     if (!ts.personal[id]) ts.personal[id] = [];
@@ -90,8 +95,10 @@ export function snapshotTable(ts, viewerId, players) {
   return {
     deckCount: ts.deck.length,
     discardCount: ts.discard.length,
+    discard: clone(ts.discard),
     discardTop: ts.discard.length ? clone(ts.discard[ts.discard.length - 1]) : null,
     shared: clone(ts.shared),
+    special: clone(ts.special || []),
     personal,
     hand: clone(ts.hands[viewerId] || []),
     handCounts,

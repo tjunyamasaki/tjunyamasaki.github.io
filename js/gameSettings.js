@@ -4,16 +4,34 @@ export const PRESET_MAX_PLAYERS = 15;
 
 export const TABLE_SPACES = [
   { id: "deck", label: "Deck" },
-  { id: "shared", label: "Shared / table" },
-  { id: "personal", label: "Personal spaces" },
+  { id: "table", label: "Table" },
   { id: "discard", label: "Discard" },
+  { id: "special", label: "Special", defaultVisible: false },
+  { id: "personal", label: "Personal spaces" },
   { id: "hand", label: "Hands" },
+];
+
+export const SPACE_VISIBILITY = [
+  { id: "deck", label: "Deck" },
+  { id: "table", label: "Table" },
+  { id: "discard", label: "Discard" },
+  { id: "special", label: "Special" },
+  { id: "personal", label: "Personal" },
 ];
 
 export function defaultSpaces() {
   const spaces = {};
-  for (const space of TABLE_SPACES) spaces[space.id] = true;
+  for (const space of TABLE_SPACES) {
+    spaces[space.id] = space.defaultVisible !== false;
+  }
   return spaces;
+}
+
+function normalizeSpaces(spaces = {}) {
+  const next = { ...spaces };
+  if (next.shared !== undefined && next.table === undefined) next.table = next.shared;
+  delete next.shared;
+  return next;
 }
 
 export function defaultPreset() {
@@ -27,6 +45,10 @@ export function defaultPreset() {
     spaces: defaultSpaces(),
     handSortDefault: "suit",
     handSortModes: ["suit", "rank"],
+    skipEmptyHands: false,
+    opponentHandView: "expanded",
+    showPoints: true,
+    showLives: false,
   };
 }
 
@@ -54,24 +76,37 @@ export function resolvePreset(game, overrides = {}) {
     ranks: (fromGame.ranks || game?.cardOrder?.ranks || base.ranks).slice(),
     suits: (fromGame.suits || game?.cardOrder?.suits || base.suits).slice(),
     banished: (fromGame.banished || base.banished).slice(),
-    spaces: { ...base.spaces, ...(fromGame.spaces || {}) },
+    spaces: { ...base.spaces, ...normalizeSpaces(fromGame.spaces) },
     decks: fromGame.decks ?? base.decks,
     handSortDefault:
       fromGame.handSortDefault ?? game?.handSort?.default ?? base.handSortDefault,
     handSortModes:
       fromGame.handSortModes ?? game?.handSort?.modes ?? base.handSortModes,
+    skipEmptyHands: fromGame.skipEmptyHands ?? base.skipEmptyHands,
+    opponentHandView: fromGame.opponentHandView ?? base.opponentHandView,
+    showPoints: fromGame.showPoints ?? base.showPoints,
+    showLives: fromGame.showLives ?? base.showLives,
   };
   const next = { ...merged, ...overrides };
   next.ranks = (overrides.ranks || merged.ranks).slice();
   next.suits = (overrides.suits || merged.suits).slice();
   next.banished = [...new Set(overrides.banished || merged.banished)];
-  next.spaces = { ...base.spaces, ...(merged.spaces || {}), ...(overrides.spaces || {}) };
+  next.spaces = {
+    ...base.spaces,
+    ...normalizeSpaces(merged.spaces),
+    ...normalizeSpaces(overrides.spaces),
+  };
   next.decks = Math.max(1, Math.min(8, Number(next.decks) || 1));
   next.minPlayers = Math.max(1, Number(next.minPlayers) || 1);
   next.maxPlayers = Math.max(
     next.minPlayers,
     Math.min(PRESET_MAX_PLAYERS, Number(next.maxPlayers) || PRESET_MAX_PLAYERS)
   );
+  next.skipEmptyHands = Boolean(next.skipEmptyHands);
+  next.opponentHandView =
+    next.opponentHandView === "collapsed" ? "collapsed" : "expanded";
+  next.showPoints = next.showPoints !== false;
+  next.showLives = Boolean(next.showLives);
   return next;
 }
 

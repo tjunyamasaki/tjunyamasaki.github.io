@@ -15,6 +15,7 @@ export function pushHistory(ts, phase, message) {
       deck: ts.deck,
       discard: ts.discard,
       shared: ts.shared,
+      special: ts.special,
       personal: ts.personal,
       hands: ts.hands,
       playerOrder: ts.playerOrder,
@@ -30,6 +31,7 @@ function restore(ts, snap) {
   ts.deck = clone(snap.deck);
   ts.discard = clone(snap.discard);
   ts.shared = clone(snap.shared);
+  ts.special = clone(snap.special || []);
   ts.personal = clone(snap.personal);
   ts.hands = clone(snap.hands);
   ts.playerOrder = clone(snap.playerOrder);
@@ -37,9 +39,14 @@ function restore(ts, snap) {
 }
 
 function zoneList(ts, dest) {
-  if (!dest || dest.type === "shared") return ts.shared;
-  if (dest.type === "discard") return ts.discard;
-  if (dest.type === "personal") {
+  const type = dest?.type;
+  if (!dest || type === "shared" || type === "table") return ts.shared;
+  if (type === "discard") return ts.discard;
+  if (type === "special") {
+    if (!ts.special) ts.special = [];
+    return ts.special;
+  }
+  if (type === "personal") {
     const id = dest.playerId;
     if (!ts.personal[id]) ts.personal[id] = [];
     return ts.personal[id];
@@ -54,8 +61,18 @@ function advanceTurn(ts) {
 
 function canPlayerAct(ctx, actorId) {
   if (ctx.phase !== "playing") return false;
-  if (ctx.isHost) return true;
   return currentPlayerId(ctx.ts) === actorId;
+}
+
+function skipEmptyHands(ts, settings) {
+  if (!settings?.skipEmptyHands) return;
+  const n = ts.playerOrder.length;
+  if (!n) return;
+  for (let i = 0; i < n; i++) {
+    const id = currentPlayerId(ts);
+    if ((ts.hands[id] || []).length > 0) return;
+    ts.turnIndex = (ts.turnIndex + 1) % n;
+  }
 }
 
 function actorName(ctx, actorId) {
@@ -67,8 +84,9 @@ function announce(ctx, actorId, text) {
 }
 
 function spaceLabel(ctx, dest, actorId) {
-  if (!dest || dest.type === "shared") return "the shared space";
+  if (!dest || dest.type === "shared" || dest.type === "table") return "the table";
   if (dest.type === "discard") return "the discard pile";
+  if (dest.type === "special") return "the special pile";
   if (dest.playerId === actorId) return "their space";
   return `${ctx.players[dest.playerId]?.name || "a player"}'s space`;
 }
@@ -87,6 +105,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     }
     pushHistory(ts, ctx.phase, ctx.message);
     advanceTurn(ts);
+    skipEmptyHands(ts, ctx.settings);
     const next = ctx.players[currentPlayerId(ts)]?.name;
     announce(ctx, actorId, next ? `ended their turn. ${next}'s turn.` : "ended their turn.");
     return;
@@ -118,6 +137,15 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     }
     const labels = moved.map(cardLabel).join(", ");
     announce(ctx, actorId, `placed ${labels} in ${spaceLabel(ctx, dest, actorId)}.`);
+    if (ctx.phase === "playing") {
+      const before = currentPlayerId(ts);
+      skipEmptyHands(ts, ctx.settings);
+      const now = currentPlayerId(ts);
+      if (now && now !== before) {
+        const next = ctx.players[now]?.name;
+        if (next) ctx.message += ` ${next}'s turn.`;
+      }
+    }
     return;
   }
 
@@ -146,6 +174,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     if (!ts.playerOrder.length) ts.playerOrder = ids;
     ts.turnIndex = 0;
     ctx.phase = "playing";
+    skipEmptyHands(ts, ctx.settings);
     const first = ctx.players[currentPlayerId(ts)]?.name;
     announce(ctx, actorId, first ? `started the game. ${first}'s turn.` : "started the game.");
     return;
@@ -159,6 +188,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     pushHistory(ts, ctx.phase, ctx.message);
     ts.playerOrder = ids;
     ts.turnIndex = Math.min(ts.turnIndex, ids.length - 1);
+    skipEmptyHands(ts, ctx.settings);
     announce(ctx, actorId, "set the player order.");
     return;
   }
@@ -179,6 +209,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     const cards = drawFromDeck(ts, count);
     ts.hands[to].push(...cards);
     announce(ctx, actorId, `dealt ${cards.length} to ${ctx.players[to].name}.`);
+    if (ctx.phase === "playing") skipEmptyHands(ts, ctx.settings);
     return;
   }
 
@@ -194,6 +225,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
       ts.hands[id].push(...drawFromDeck(ts, each));
     }
     announce(ctx, actorId, `dealt ${each} to each player.`);
+    if (ctx.phase === "playing") skipEmptyHands(ts, ctx.settings);
     return;
   }
 
@@ -202,7 +234,17 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     pushHistory(ts, ctx.phase, ctx.message);
     const cards = drawFromDeck(ts, count);
     ts.shared.push(...cards);
-    announce(ctx, actorId, `flipped ${cards.length} from the deck to the shared space.`);
+    announce(ctx, actorId, `flipped ${cards.length} from the deck to the table.`);
+    return;
+  }
+
+  if (action === "drawToSpecial") {
+    const count = Number(intent.count) || 0;
+    pushHistory(ts, ctx.phase, ctx.message);
+    if (!ts.special) ts.special = [];
+    const cards = drawFromDeck(ts, count);
+    ts.special.push(...cards);
+    announce(ctx, actorId, `flipped ${cards.length} from the deck to the special pile.`);
     return;
   }
 
@@ -216,6 +258,19 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     }
     ts.discard.push(...list.splice(0, list.length));
     announce(ctx, actorId, `moved ${spaceLabel(ctx, dest, actorId)} to the discard pile.`);
+    return;
+  }
+
+  if (action === "discardAllPersonal") {
+    pushHistory(ts, ctx.phase, ctx.message);
+    let n = 0;
+    for (const id of Object.keys(ctx.players)) {
+      const list = ts.personal[id];
+      if (!list?.length) continue;
+      n += list.length;
+      ts.discard.push(...list.splice(0, list.length));
+    }
+    announce(ctx, actorId, `moved all player spaces (${n} cards) to the discard pile.`);
     return;
   }
 
@@ -233,6 +288,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
     ts.deck = freshShoe(ctx.settings);
     ts.discard = [];
     ts.shared = [];
+    ts.special = [];
     for (const id of ids) {
       ts.personal[id] = [];
       ts.hands[id] = [];
@@ -251,7 +307,7 @@ export function applyFreeplayAction(ctx, actorId, intent) {
 export const freeplayGame = {
   id: "freeplay",
   name: "Free play (test)",
-  blurb: "Sandbox table: shared space, personal spaces, discard, turns, host tools.",
+  blurb: "Sandbox table: table, personal spaces, discard, turns, host tools.",
   usesZones: true,
   tableActions: {
     placeShared: true,
@@ -266,7 +322,14 @@ export const freeplayGame = {
     minPlayers: 1,
     maxPlayers: 15,
     banished: [],
-    spaces: { deck: true, shared: true, personal: true, discard: true, hand: true },
+    spaces: {
+      deck: true,
+      table: true,
+      special: false,
+      personal: true,
+      discard: true,
+      hand: true,
+    },
     handSortDefault: "suit",
     handSortModes: ["suit", "rank"],
   },

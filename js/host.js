@@ -20,6 +20,7 @@ import {
   createTableState,
   ensurePlayers,
   snapshotTable,
+  currentPlayerId,
 } from "./tableState.js";
 
 export const HOST_ID = "host";
@@ -45,6 +46,8 @@ function ensureColors(players) {
     if (!Number.isInteger(players[id].color)) {
       players[id].color = nextFreeColor(players, id);
     }
+    if (!Number.isInteger(players[id].points)) players[id].points = 0;
+    if (!Number.isInteger(players[id].lives)) players[id].lives = 0;
   }
 }
 
@@ -66,7 +69,7 @@ export function createHost({
   const lobbyState = initialState || {
     counter: 0,
     players: {
-      [HOST_ID]: { name, ready: false, isHost: true, connected: true, color: 0 },
+      [HOST_ID]: { name, ready: false, isHost: true, connected: true, color: 0, points: 0, lives: 0 },
     },
   };
   if (lobbyState.players[HOST_ID]) {
@@ -113,7 +116,9 @@ export function createHost({
       hand: zones.hand,
       handCounts: zones.handCounts,
       shared: zones.shared,
+      special: zones.special,
       personal: zones.personal,
+      discard: zones.discard,
       discardCount: zones.discardCount,
       discardTop: zones.discardTop,
       playerOrder: zones.playerOrder,
@@ -162,6 +167,7 @@ export function createHost({
     ts.hands = dealt.hands;
     ts.shared = [];
     ts.discard = [];
+    ts.special = [];
     message = "";
     phase = "playing";
     return true;
@@ -169,6 +175,7 @@ export function createHost({
 
   function playCard(peerId, cardId) {
     if (phase !== "playing") return;
+    if (peerId === HOST_ID && currentPlayerId(ts) !== HOST_ID) return;
     const hand = ts.hands[peerId];
     if (!hand) return;
     const index = hand.findIndex((card) => card.id === cardId);
@@ -218,6 +225,7 @@ export function createHost({
     ts.deck = freshShoe(settings);
     ts.discard = [];
     ts.shared = [];
+    ts.special = [];
     for (const id of Object.keys(lobbyState.players)) {
       ts.hands[id] = [];
       ts.personal[id] = [];
@@ -250,6 +258,13 @@ export function createHost({
         return;
       }
       player.color = color;
+    } else if (intent.action === "setPlayerStat" && peerId === HOST_ID) {
+      const target = lobbyState.players[intent.playerId];
+      const key = intent.stat === "lives" ? "lives" : "points";
+      if (!target) return;
+      const delta = Number(intent.delta);
+      if (!delta) return;
+      target[key] = Math.max(0, Math.min(99, (Number(target[key]) || 0) + delta));
     } else if (intent.action === "setSettings" && peerId === HOST_ID) {
       const next = resolvePreset(game, { ...settings, ...intent.settings });
       const rebuild = compositionKey(next) !== compositionKey(settings);
@@ -262,6 +277,7 @@ export function createHost({
         ts.deck = freshShoe(settings);
         ts.discard = [];
         ts.shared = [];
+        ts.special = [];
         for (const id of Object.keys(lobbyState.players)) {
           ts.hands[id] = [];
           ts.personal[id] = [];
@@ -285,6 +301,21 @@ export function createHost({
       if (typeof err === "string") setStatus(err, true);
     } else if (intent.action === "start" && peerId === HOST_ID) {
       if (!startDeal()) return;
+    } else if (intent.action === "resetGame" && peerId === HOST_ID) {
+      const ids = Object.keys(lobbyState.players);
+      ts.deck = freshShoe(settings);
+      ts.discard = [];
+      ts.shared = [];
+      ts.special = [];
+      for (const id of ids) {
+        ts.hands[id] = [];
+        ts.personal[id] = [];
+      }
+      ts.playerOrder = ids.slice();
+      ts.turnIndex = 0;
+      ts.history = [];
+      message = "";
+      phase = "lobby";
     } else if (intent.action === "playCard") {
       playCard(peerId, intent.cardId);
     }
@@ -338,6 +369,8 @@ export function createHost({
       if (!Number.isInteger(existing.color)) {
         existing.color = nextFreeColor(lobbyState.players, playerId);
       }
+      if (!Number.isInteger(existing.points)) existing.points = 0;
+      if (!Number.isInteger(existing.lives)) existing.lives = 0;
       if (!ts.hands[playerId]) ts.hands[playerId] = [];
       if (!ts.personal[playerId]) ts.personal[playerId] = [];
       if (!ts.playerOrder.includes(playerId)) ts.playerOrder.push(playerId);
@@ -353,6 +386,8 @@ export function createHost({
       isHost: false,
       connected: true,
       color: nextFreeColor(lobbyState.players, playerId),
+      points: 0,
+      lives: 0,
     };
     if (!ts.hands[playerId]) ts.hands[playerId] = [];
     if (!ts.personal[playerId]) ts.personal[playerId] = [];

@@ -13,15 +13,23 @@ import {
 import { getGame } from "./games.js";
 import {
   resolvePreset,
-  freshShoe,
   compositionKey,
 } from "./gameSettings.js";
 import {
   createTableState,
   ensurePlayers,
   snapshotTable,
-  currentPlayerId,
+  resetTable,
+  moveAll,
+  handZoneId,
+  personalZoneId,
 } from "./tableState.js";
+import {
+  DEFAULT_STAT_KEYS,
+  emptyPlayerStats,
+  ensurePlayerStats,
+  setPlayerStatValue,
+} from "./stats.js";
 
 export const HOST_ID = "host";
 const COLOR_COUNT = 15;
@@ -46,9 +54,7 @@ function ensureColors(players) {
     if (!Number.isInteger(players[id].color)) {
       players[id].color = nextFreeColor(players, id);
     }
-    if (!Number.isInteger(players[id].points)) players[id].points = 0;
-    if (!Number.isInteger(players[id].lives)) players[id].lives = 0;
-    if (!Number.isInteger(players[id].coins)) players[id].coins = 0;
+    ensurePlayerStats(players[id]);
   }
 }
 
@@ -70,7 +76,15 @@ export function createHost({
   const lobbyState = initialState || {
     counter: 0,
     players: {
-      [HOST_ID]: { name, ready: false, isHost: true, connected: true, color: 0, points: 0, lives: 0, coins: 0 },
+      [HOST_ID]: {
+        name,
+        ready: false,
+        isHost: true,
+        connected: true,
+        color: 0,
+        ...emptyPlayerStats(),
+        stats: emptyPlayerStats(),
+      },
     },
   };
   if (lobbyState.players[HOST_ID]) {
@@ -105,14 +119,14 @@ export function createHost({
   }
 
   function snapshotFor(viewerId) {
-    ensurePlayers(ts, Object.keys(lobbyState.players));
+    ensurePlayers(ts, Object.keys(lobbyState.players), settings);
     ensureColors(lobbyState.players);
     const zones = snapshotTable(ts, viewerId, lobbyState.players);
     return {
       phase,
       counter: lobbyState.counter,
       players: clone(lobbyState.players),
-      table: zones.shared,
+      table: zones.table,
       deckCount: zones.deckCount,
       hand: zones.hand,
       handCounts: zones.handCounts,
@@ -129,7 +143,7 @@ export function createHost({
       viewerId,
       gameId: game.id,
       gameName: game.name,
-      usesZones: Boolean(game.usesZones),
+      layout: game.layout || "table",
       settings: clone(settings),
       message,
     };
@@ -156,55 +170,12 @@ export function createHost({
     }
   }
 
-  function startDeal() {
-    if (phase !== "lobby" && phase !== "ended") return false;
-    const ids = Object.keys(lobbyState.players);
-    if (ids.length < settings.minPlayers) {
-      setStatus(`Need at least ${settings.minPlayers} players.`, true);
-      return false;
-    }
-    if (!game.beginRound) return false;
-    const dealt = game.beginRound(ids, settings);
-    ts.deck = dealt.deck;
-    ts.hands = dealt.hands;
-    ts.shared = [];
-    ts.discard = [];
-    ts.special = [];
-    message = "";
-    phase = "playing";
-    return true;
-  }
-
-  function playCard(peerId, cardId) {
-    if (phase !== "playing") return;
-    if (peerId === HOST_ID && currentPlayerId(ts) !== HOST_ID) return;
-    const hand = ts.hands[peerId];
-    if (!hand) return;
-    const index = hand.findIndex((card) => card.id === cardId);
-    if (index < 0) return;
-    const [card] = hand.splice(index, 1);
-    ts.shared.push({ ...card, playedBy: peerId });
-    const result = game.afterPlay({
-      table: ts.shared,
-      hands: ts.hands,
-      playerIds: Object.keys(lobbyState.players),
-      players: lobbyState.players,
-      settings,
-    });
-    phase = result.phase || phase;
-    message = result.message || "";
-  }
-
   function removeSeat(playerId) {
     if (playerId === HOST_ID) return;
-    if (ts.hands[playerId]) {
-      ts.deck.push(...ts.hands[playerId]);
-      delete ts.hands[playerId];
-    }
-    if (ts.personal[playerId]) {
-      ts.deck.push(...ts.personal[playerId]);
-      delete ts.personal[playerId];
-    }
+    moveAll(ts, { role: "hand", owner: playerId }, { id: "stock" });
+    moveAll(ts, { role: "personal", owner: playerId }, { id: "stock" });
+    delete ts.zones[handZoneId(playerId)];
+    delete ts.zones[personalZoneId(playerId)];
     ts.playerOrder = ts.playerOrder.filter((id) => id !== playerId);
     if (ts.turnIndex >= ts.playerOrder.length) ts.turnIndex = 0;
     delete lobbyState.players[playerId];
@@ -224,15 +195,7 @@ export function createHost({
     }
     if (autoDecks != null && settings.decks !== autoDecks) return;
     settings = resolvePreset(game, { ...settings, decks: next });
-    ts.deck = freshShoe(settings);
-    ts.discard = [];
-    ts.shared = [];
-    ts.special = [];
-    for (const id of Object.keys(lobbyState.players)) {
-      ts.hands[id] = [];
-      ts.personal[id] = [];
-    }
-    ts.history = [];
+    resetTable(ts, Object.keys(lobbyState.players), settings);
     autoDecks = next;
     message =
       next === 1
@@ -261,20 +224,19 @@ export function createHost({
       }
       player.color = color;
     } else if (intent.action === "setPlayerStat" && peerId === HOST_ID) {
-      const key =
-        intent.stat === "lives" ? "lives" : intent.stat === "coins" ? "coins" : "points";
-      const cap = key === "coins" ? 999 : 99;
+      const key = DEFAULT_STAT_KEYS.includes(intent.stat) ? intent.stat : "points";
       const apply = (target) => {
         if (!target) return;
+        ensurePlayerStats(target);
         if (intent.value !== undefined && intent.value !== null && intent.value !== "") {
           const value = Math.floor(Number(intent.value));
           if (!Number.isFinite(value)) return;
-          target[key] = Math.max(0, Math.min(cap, value));
+          setPlayerStatValue(target, key, value);
           return;
         }
         const delta = Number(intent.delta);
         if (!delta) return;
-        target[key] = Math.max(0, Math.min(cap, (Number(target[key]) || 0) + delta));
+        setPlayerStatValue(target, key, (Number(target.stats[key]) || 0) + delta);
       };
       if (intent.playerId === "all") {
         for (const target of Object.values(lobbyState.players)) apply(target);
@@ -290,15 +252,7 @@ export function createHost({
         if (settings.decks !== autoDecks) autoDecks = null;
       }
       if (rebuild) {
-        ts.deck = freshShoe(settings);
-        ts.discard = [];
-        ts.shared = [];
-        ts.special = [];
-        for (const id of Object.keys(lobbyState.players)) {
-          ts.hands[id] = [];
-          ts.personal[id] = [];
-        }
-        ts.history = [];
+        resetTable(ts, Object.keys(lobbyState.players), settings);
         message = "Deck rebuilt from settings.";
       }
     } else if (game.applyAction) {
@@ -315,25 +269,6 @@ export function createHost({
       phase = ctx.phase;
       message = ctx.message;
       if (typeof err === "string") setStatus(err, true);
-    } else if (intent.action === "start" && peerId === HOST_ID) {
-      if (!startDeal()) return;
-    } else if (intent.action === "resetGame" && peerId === HOST_ID) {
-      const ids = Object.keys(lobbyState.players);
-      ts.deck = freshShoe(settings);
-      ts.discard = [];
-      ts.shared = [];
-      ts.special = [];
-      for (const id of ids) {
-        ts.hands[id] = [];
-        ts.personal[id] = [];
-      }
-      ts.playerOrder = ids.slice();
-      ts.turnIndex = 0;
-      ts.history = [];
-      message = "";
-      phase = "lobby";
-    } else if (intent.action === "playCard") {
-      playCard(peerId, intent.cardId);
     }
     broadcast();
   }
@@ -385,11 +320,8 @@ export function createHost({
       if (!Number.isInteger(existing.color)) {
         existing.color = nextFreeColor(lobbyState.players, playerId);
       }
-      if (!Number.isInteger(existing.points)) existing.points = 0;
-      if (!Number.isInteger(existing.lives)) existing.lives = 0;
-      if (!Number.isInteger(existing.coins)) existing.coins = 0;
-      if (!ts.hands[playerId]) ts.hands[playerId] = [];
-      if (!ts.personal[playerId]) ts.personal[playerId] = [];
+      ensurePlayerStats(existing);
+      ensurePlayers(ts, Object.keys(lobbyState.players), settings);
       if (!ts.playerOrder.includes(playerId)) ts.playerOrder.push(playerId);
       return true;
     }
@@ -403,12 +335,10 @@ export function createHost({
       isHost: false,
       connected: true,
       color: nextFreeColor(lobbyState.players, playerId),
-      points: 0,
-      lives: 0,
-      coins: 0,
+      ...emptyPlayerStats(),
+      stats: emptyPlayerStats(),
     };
-    if (!ts.hands[playerId]) ts.hands[playerId] = [];
-    if (!ts.personal[playerId]) ts.personal[playerId] = [];
+    ensurePlayers(ts, Object.keys(lobbyState.players), settings);
     if (!ts.playerOrder.includes(playerId)) ts.playerOrder.push(playerId);
     syncPresetDecks();
     return true;

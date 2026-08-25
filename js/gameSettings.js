@@ -50,6 +50,7 @@ export function defaultPreset() {
     showPoints: true,
     showLives: false,
     showCoins: false,
+    catalog: null,
   };
 }
 
@@ -88,6 +89,7 @@ export function resolvePreset(game, overrides = {}) {
     showPoints: fromGame.showPoints ?? base.showPoints,
     showLives: fromGame.showLives ?? base.showLives,
     showCoins: fromGame.showCoins ?? base.showCoins,
+    catalog: fromGame.catalog || null,
   };
   const next = { ...merged, ...overrides };
   next.ranks = (overrides.ranks || merged.ranks).slice();
@@ -98,6 +100,7 @@ export function resolvePreset(game, overrides = {}) {
     ...normalizeSpaces(merged.spaces),
     ...normalizeSpaces(overrides.spaces),
   };
+  next.catalog = overrides.catalog || merged.catalog || null;
   next.decks = Math.max(1, Math.min(8, Number(next.decks) || 1));
   next.minPlayers = Math.max(1, Number(next.minPlayers) || 1);
   next.maxPlayers = Math.max(
@@ -120,28 +123,85 @@ export function isBanished(rank, suit, banished) {
 
 export function makeCard(rank, suitId, copy = 0) {
   const suit = SUITS.find((s) => s.id === suitId) || SUITS[0];
-  return {
-    id: copy ? `${rank}${suitId}-${copy}` : `${rank}${suitId}`,
+  const face = {
     rank,
     suit: suitId,
     symbol: suit.symbol,
     color: suit.color,
-    copy,
   };
+  return {
+    id: copy ? `${rank}${suitId}-${copy}` : `${rank}${suitId}`,
+    kind: "card",
+    face,
+    copy,
+    rank: face.rank,
+    suit: face.suit,
+    symbol: face.symbol,
+    color: face.color,
+  };
+}
+
+export function makeToken(face, copy = 0) {
+  const label = face?.label || "token";
+  const color = face?.color || "black";
+  const slug = String(label).replace(/\s+/g, "-").toLowerCase();
+  return {
+    id: copy ? `${slug}-${copy}` : slug,
+    kind: "token",
+    face: { label, color },
+    copy,
+    color,
+  };
+}
+
+export function instantiateTemplate(template, copy = 0) {
+  if (template.kind === "token") {
+    return makeToken(template.face || template, copy);
+  }
+  const face = template.face || template;
+  return makeCard(face.rank, face.suit, copy);
+}
+
+export function catalogFromPreset(preset) {
+  if (preset?.catalog?.length) return preset.catalog;
+  const templates = [];
+  for (const suitId of preset.suits) {
+    for (const rank of RANKS) {
+      if (isBanished(rank, suitId, preset.banished)) continue;
+      const suit = SUITS.find((s) => s.id === suitId) || SUITS[0];
+      templates.push({
+        kind: "card",
+        face: {
+          rank,
+          suit: suitId,
+          symbol: suit.symbol,
+          color: suit.color,
+        },
+      });
+    }
+  }
+  return templates;
 }
 
 export function createShoe(settings) {
   const preset = resolvePreset(null, settings);
-  const cards = [];
-  for (let copy = 0; copy < preset.decks; copy++) {
-    for (const suitId of preset.suits) {
-      for (const rank of RANKS) {
-        if (isBanished(rank, suitId, preset.banished)) continue;
-        cards.push(makeCard(rank, suitId, copy));
+  const elements = [];
+  if (preset.catalog?.length) {
+    for (const template of preset.catalog) {
+      const copies = Math.max(1, Number(template.copies) || 1);
+      for (let copy = 0; copy < copies; copy++) {
+        elements.push(instantiateTemplate(template, copies > 1 ? copy : 0));
       }
     }
+    return elements;
   }
-  return cards;
+  const catalog = catalogFromPreset(preset);
+  for (let copy = 0; copy < preset.decks; copy++) {
+    for (const template of catalog) {
+      elements.push(instantiateTemplate(template, copy));
+    }
+  }
+  return elements;
 }
 
 export function freshShoe(settings) {
@@ -152,6 +212,7 @@ export function compositionKey(settings) {
   return JSON.stringify({
     decks: settings.decks,
     suits: settings.suits,
-    banished: [...settings.banished].sort(),
+    banished: [...(settings.banished || [])].sort(),
+    catalog: settings.catalog || null,
   });
 }

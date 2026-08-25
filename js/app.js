@@ -109,7 +109,13 @@ let handSortMode = null;
 let turnOrderPicks = null;
 let rankOrderPicks = null;
 
-const HAND_SORT_KEY = "lobby.handSort.v1";
+function compactLayout(view) {
+  return (view?.layout || (view?.gameId === "highcard" ? "compact" : "table")) === "compact";
+}
+
+function playerStat(player, key) {
+  return Number(player?.stats?.[key] ?? player?.[key]) || 0;
+}
 
 function readHandSortStore() {
   try {
@@ -228,7 +234,7 @@ function sendAction(action, extra = {}) {
 function appendCardButton(parent, card, { playable, selectable, view, ownerId }) {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "playing-card" + (card.color === "red" ? " red" : "");
+  btn.className = "playing-card" + ((card.color ?? card.face?.color) === "red" ? " red" : "");
   const seat = seatClass(view || lastView, card.playedBy || ownerId);
   if (seat) btn.classList.add(seat);
   if (selectable && selectedCardIds.has(card.id)) btn.classList.add("selected-card");
@@ -240,7 +246,9 @@ function appendCardButton(parent, card, { playable, selectable, view, ownerId })
       if (lastView) renderState(lastView);
     });
   } else if (playable) {
-    btn.addEventListener("click", () => sendAction("playCard", { cardId: card.id }));
+    btn.addEventListener("click", () =>
+      sendAction("placeCard", { cardIds: [card.id], dest: { type: "shared" } })
+    );
   } else {
     btn.disabled = true;
   }
@@ -339,13 +347,13 @@ function fillPlayerStats(el, view, playerId) {
   const player = view.players?.[playerId];
   if (!player) return;
   if (view.settings?.showPoints !== false) {
-    appendStatBadge(el, view, playerId, "points", player.points);
+    appendStatBadge(el, view, playerId, "points", playerStat(player, "points"));
   }
   if (view.settings?.showLives) {
-    appendStatBadge(el, view, playerId, "lives", player.lives);
+    appendStatBadge(el, view, playerId, "lives", playerStat(player, "lives"));
   }
   if (view.settings?.showCoins) {
-    appendStatBadge(el, view, playerId, "coins", player.coins);
+    appendStatBadge(el, view, playerId, "coins", playerStat(player, "coins"));
   }
 }
 
@@ -378,7 +386,7 @@ function renderOpponents(view, phase) {
     const row = document.createElement("div");
     row.className = "card-row";
     const personal = (view.personal && view.personal[id]) || [];
-    if (view.usesZones && spaceVisible(view, "personal")) {
+    if (!compactLayout(view) && spaceVisible(view, "personal")) {
       const space = document.createElement("div");
       space.className = "opponent-space";
       const spaceLabel = document.createElement("span");
@@ -417,7 +425,7 @@ function renderOpponents(view, phase) {
         row.append(back);
       }
     }
-    if (!view.usesZones && !n && !personal.length && !collapsed) {
+    if (compactLayout(view) && !n && !personal.length && !collapsed) {
       row.textContent = phase === "lobby" ? "—" : "empty";
     }
     box.append(name, row);
@@ -443,7 +451,7 @@ function renderState(view) {
   lastView = view;
   if (view.viewerId) selfId = view.viewerId;
   const phase = view.phase || "lobby";
-  const zoned = Boolean(view.usesZones);
+  const zoned = !compactLayout(view);
   els.phaseLabel.textContent = phase;
   els.lobbyTools.classList.add("hidden");
   els.btnStart.classList.add("hidden");
@@ -590,11 +598,11 @@ function fillHostControls(view) {
   }
   const startBtn = els.btnHostStart;
   if (startBtn) {
-    startBtn.textContent = view.usesZones
-      ? "Start"
-      : view.phase === "ended"
+    startBtn.textContent = compactLayout(view)
+      ? view.phase === "ended"
         ? "Deal again"
-        : "Start";
+        : "Start"
+      : "Start";
   }
 }
 
@@ -759,9 +767,9 @@ function fillPlayerRoster(view) {
     name.textContent = (player.name || id) + (player.isHost ? " · host" : "");
     const stats = document.createElement("span");
     stats.className = "player-stats";
-    appendStatBadge(stats, view, id, "points", player.points);
-    appendStatBadge(stats, view, id, "lives", player.lives);
-    appendStatBadge(stats, view, id, "coins", player.coins);
+    appendStatBadge(stats, view, id, "points", playerStat(player, "points"));
+    appendStatBadge(stats, view, id, "lives", playerStat(player, "lives"));
+    appendStatBadge(stats, view, id, "coins", playerStat(player, "coins"));
     const coinField = document.createElement("label");
     coinField.className = "muted player-coin-field";
     coinField.append("Set coins");
@@ -770,7 +778,7 @@ function fillPlayerRoster(view) {
     coinInput.min = "0";
     coinInput.max = "999";
     coinInput.className = "num";
-    coinInput.value = String(player.coins ?? 0);
+    coinInput.value = String(playerStat(player, "coins"));
     coinInput.addEventListener("change", () => {
       sendAction("setPlayerStat", {
         playerId: id,
@@ -1082,8 +1090,7 @@ els.btnLeave.addEventListener("click", () => leave({ endTable: true }));
 
 function hostStart() {
   if (role !== "host" || !session) return;
-  if (lastView?.usesZones) session.hostIntent("startGame");
-  else session.hostIntent("start");
+  session.hostIntent("startGame");
 }
 
 els.btnStart.addEventListener("click", hostStart);

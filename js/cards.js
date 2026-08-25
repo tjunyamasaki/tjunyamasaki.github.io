@@ -13,6 +13,8 @@ export function createDeck() {
     for (const rank of RANKS) {
       cards.push({
         id: `${rank}${suit.id}`,
+        kind: "card",
+        face: { rank, suit: suit.id, symbol: suit.symbol, color: suit.color },
         rank,
         suit: suit.id,
         symbol: suit.symbol,
@@ -51,7 +53,11 @@ export function deal(deck, playerIds, count) {
 }
 
 export function cardLabel(card) {
-  return `${card.rank}${card.symbol}`;
+  if (!card) return "";
+  if (card.kind === "token") return card.face?.label || card.label || "?";
+  const rank = card.rank ?? card.face?.rank;
+  const symbol = card.symbol ?? card.face?.symbol;
+  return `${rank}${symbol}`;
 }
 
 export const HAND_SORT_MODES = [
@@ -92,11 +98,11 @@ export function resolveHandSort(game, settings) {
 
 export function compareCards(a, b, { suits, ranks, primary }) {
   const suitOf = (card) => {
-    const i = suits.indexOf(card.suit);
+    const i = suits.indexOf(card.suit ?? card.face?.suit);
     return i < 0 ? 99 : i;
   };
   const rankOf = (card) => {
-    const i = ranks.indexOf(card.rank);
+    const i = ranks.indexOf(card.rank ?? card.face?.rank);
     return i < 0 ? 99 : i;
   };
   if (primary === "rank") {
@@ -115,7 +121,8 @@ export function sortHand(cards, spec) {
 
 /** Ace high. */
 export function rankValue(card) {
+  const rank = card.rank ?? card.face?.rank;
   const map = { A: 14, K: 13, Q: 12, J: 11 };
-  if (map[card.rank]) return map[card.rank];
-  return Number(card.rank);
+  if (map[rank]) return map[rank];
+  return Number(rank);
 }

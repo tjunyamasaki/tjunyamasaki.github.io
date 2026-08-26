@@ -512,6 +512,27 @@ button.playing-card:disabled {
   cursor: default;
 }
 
+.deal-fly,
+.card-fly {
+  position: relative;
+  z-index: 50;
+  pointer-events: none;
+}
+
+#card-fly-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+
+#card-fly-layer .card-ghost {
+  position: fixed;
+  margin: 0;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
 .face-down {
   width: 1.35rem;
   height: 1.9rem;

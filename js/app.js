@@ -16,6 +16,7 @@ import {
 import { cardLabel, cardSprite, HAND_SORT_MODES, resolveHandSort, sortHand, RANKS, SUITS } from "./cards.js";
 import { gameList, getGame } from "./games.js";
 import { faceKey, isBanished, SPACE_VISIBILITY } from "./gameSettings.js";
+import { captureCardOrigins, playTableMoves } from "./tableAnim.js";
 
 const els = {
   configError: document.getElementById("config-error"),
@@ -257,6 +258,7 @@ function appendCardButton(parent, card, { selectable, view, ownerId }) {
   const seat = seatClass(view || lastView, card.playedBy || ownerId);
   if (seat) btn.classList.add(seat);
   if (selectable && selectedCardIds.has(card.id)) btn.classList.add("selected-card");
+  if (card.id) btn.dataset.cardId = card.id;
   paintCardFace(btn, card);
   if (selectable) {
     btn.addEventListener("click", () => {
@@ -312,6 +314,7 @@ function renderCardStack(el, cards, view) {
     btn.className = "playing-card stack-card" + (top.color === "red" ? " red" : "");
     const seat = seatClass(view || lastView, top.playedBy);
     if (seat) btn.classList.add(seat);
+    if (top.id) btn.dataset.cardId = top.id;
     paintCardFace(btn, top);
     btn.disabled = true;
     el.append(btn);
@@ -409,6 +412,7 @@ function renderOpponents(view, phase) {
       "opponent" +
       (player.connected === false ? " offline" : "") +
       (collapsed ? " collapsed" : "");
+    box.dataset.playerId = id;
     setSeatClass(box, view, id);
     if (phase === "playing" && view.currentPlayerId === id) box.classList.add("is-turn");
     const name = document.createElement("div");
@@ -477,6 +481,9 @@ function tableActions(view) {
 
 function renderState(view) {
   if (!view) return;
+  const prev = lastView;
+  const origins =
+    prev && prev !== view ? captureCardOrigins(els.viewTable) : { cards: {}, players: {}, zones: {} };
   lastView = view;
   if (view.viewerId) selfId = view.viewerId;
   const phase = view.phase || "lobby";
@@ -572,6 +579,14 @@ function renderState(view) {
   if (!(view.hand || []).length) {
     els.handCards.textContent = phase === "lobby" ? "—" : "No cards";
   }
+
+  playTableMoves(prev, view, {
+    selfId,
+    origins,
+    deckEl: els.fpDeck,
+    feltEl: els.layoutFreeplay,
+    root: els.viewTable,
+  });
 }
 
 function renderColorPicks(view) {

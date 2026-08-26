@@ -1,7 +1,7 @@
 export const DEFAULT_STAT_KEYS = ["points", "lives", "coins"];
 
 export const STAT_CAPS = {
-  points: 99,
+  points: 999,
   lives: 99,
   coins: 999,
 };

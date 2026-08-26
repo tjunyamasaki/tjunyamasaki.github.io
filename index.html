@@ -82,8 +82,7 @@
             <div id="deck-pile" class="deck-pile" title="Draw pile"></div>
           </div>
           <div class="zone" data-space="table">
-            <p class="felt-label">Table</p>
-            <div id="table-cards" class="card-row"></div>
+            <div id="table-cards" class="space-stack"></div>
           </div>
         </div>
       </div>
@@ -108,13 +107,11 @@
             </div>
           </div>
           <div class="zone zone-table" data-space="table">
-            <p class="felt-label">Table</p>
-            <div id="shared-cards" class="card-row"></div>
+            <div id="shared-cards" class="space-stack"></div>
           </div>
         </div>
         <div class="zone zone-mine" id="my-space" data-space="personal">
-          <p class="felt-label">Your space</p>
-          <div id="my-personal" class="card-row"></div>
+          <div id="my-personal" class="space-stack"></div>
         </div>
       </div>
 
@@ -123,9 +120,12 @@
           <button type="button" data-act="place-shared">Place on table</button>
           <button type="button" data-act="place-personal">Place in your space</button>
           <button type="button" data-act="place-discard">Place in discard</button>
+          <button type="button" data-act="drawCard">Draw</button>
+          <button type="button" data-act="stay">Stay</button>
           <button type="button" data-act="endTurn">End turn</button>
           <select id="send-target"></select>
           <button type="button" data-act="sendCards">Send to player</button>
+          <button type="button" data-act="targetPlayer">Play on player</button>
           <input id="bet-count" type="number" min="1" max="999" value="1" class="num" aria-label="Bet amount" />
           <button type="button" data-act="betCoins">Bet</button>
         </div>
@@ -170,6 +170,10 @@
           </div>
         </details>
         <details class="host-section">
+          <summary class="felt-label">Action log</summary>
+          <div id="action-log" class="action-log muted">No actions yet.</div>
+        </details>
+        <details class="host-section">
           <summary class="felt-label">Move</summary>
           <p class="muted">No actions yet.</p>
         </details>
@@ -180,7 +184,7 @@
         <details class="host-section" open>
           <summary class="felt-label">General</summary>
           <div class="actions">
-            <label class="muted">Decks
+            <label class="muted" id="setting-decks-field">Decks
               <input id="setting-decks" type="number" min="1" max="8" value="1" class="num" />
             </label>
             <label class="muted">Min players
@@ -195,6 +199,14 @@
           <summary class="felt-label">Spaces</summary>
           <p class="muted">Visibility</p>
           <div id="space-toggles" class="ban-ranks"></div>
+          <div class="actions">
+            <label class="muted">Personal rows
+              <input id="setting-personal-rows" type="number" min="1" max="4" value="1" class="num" />
+            </label>
+            <label class="muted">Table rows
+              <input id="setting-shared-rows" type="number" min="1" max="4" value="1" class="num" />
+            </label>
+          </div>
         </details>
         <details class="host-section" open>
           <summary class="felt-label">Player</summary>
@@ -250,7 +262,7 @@
               <button id="btn-rank-cancel" type="button" class="ghost hidden">Cancel</button>
             </div>
           </details>
-          <details class="host-section">
+          <details class="host-section" id="setting-french-shoe">
             <summary class="felt-label">Banished cards</summary>
             <div id="ban-ranks" class="ban-ranks"></div>
             <div id="ban-grid" class="ban-grid"></div>

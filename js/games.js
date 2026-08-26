@@ -1,11 +1,13 @@
 import { freeplayGame } from "./games/freeplay.js";
 import { highcardGame } from "./games/highcard.js";
 import { presidentGame } from "./games/president.js";
+import { flipSevenGame } from "./games/flipSeven.js";
 
 export const GAMES = {
   [freeplayGame.id]: freeplayGame,
   [highcardGame.id]: highcardGame,
   [presidentGame.id]: presidentGame,
+  [flipSevenGame.id]: flipSevenGame,
 };
 
 export function gameList() {

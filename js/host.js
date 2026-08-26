@@ -33,6 +33,7 @@ import {
 
 export const HOST_ID = "host";
 const COLOR_COUNT = 15;
+const ACTION_LOG_CAP = 200;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -98,6 +99,9 @@ export function createHost({
   const game = getGame(initialSecret?.gameId || requestedGameId);
   let settings = resolvePreset(game, initialSecret?.settings);
   const ts = createTableState(Object.keys(lobbyState.players), initialSecret, settings);
+  let actionLog = Array.isArray(initialSecret?.actionLog)
+    ? clone(initialSecret.actionLog)
+    : [];
   let autoDecks =
     typeof game.decksForPlayers === "function"
       ? game.decksForPlayers(Object.keys(lobbyState.players).length)
@@ -114,7 +118,7 @@ export function createHost({
       roomCode,
       name,
       lobbyState,
-      secret: { phase, message, gameId: game.id, tableState: ts, settings },
+      secret: { phase, message, gameId: game.id, tableState: ts, settings, actionLog },
     });
   }
 
@@ -122,7 +126,7 @@ export function createHost({
     ensurePlayers(ts, Object.keys(lobbyState.players), settings);
     ensureColors(lobbyState.players);
     const zones = snapshotTable(ts, viewerId, lobbyState.players);
-    return {
+    const snap = {
       phase,
       counter: lobbyState.counter,
       players: clone(lobbyState.players),
@@ -138,6 +142,8 @@ export function createHost({
       discardTop: zones.discardTop,
       playerOrder: zones.playerOrder,
       currentPlayerId: zones.currentPlayerId,
+      inactiveIds: zones.inactiveIds,
+      bustedIds: zones.bustedIds,
       canUndo: zones.canUndo,
       pot: zones.pot,
       viewerId,
@@ -147,6 +153,8 @@ export function createHost({
       settings: clone(settings),
       message,
     };
+    if (viewerId === HOST_ID) snap.actionLog = clone(actionLog);
+    return snap;
   }
 
   function broadcast() {
@@ -203,9 +211,42 @@ export function createHost({
         : `Using ${next} decks (${count} players).`;
   }
 
+  function summarizeIntent(intent) {
+    const parts = [];
+    for (const [key, value] of Object.entries(intent || {})) {
+      if (key === "type" || key === "action") continue;
+      if (value == null || value === "") continue;
+      const text =
+        typeof value === "object" ? JSON.stringify(value) : String(value);
+      parts.push(`${key}=${text}`);
+    }
+    const detail = parts.join(" ");
+    return detail.length > 180 ? detail.slice(0, 177) + "…" : detail;
+  }
+
+  function logAction(peerId, intent, extra = {}) {
+    const lastN = actionLog.length ? actionLog[actionLog.length - 1].n : 0;
+    const cards = (ts.lastDrawn || []).filter(Boolean).join(", ");
+    ts.lastDrawn = [];
+    actionLog.push({
+      n: lastN + 1,
+      actor: lobbyState.players[peerId]?.name || peerId,
+      action: intent?.action || "?",
+      card: cards,
+      detail: summarizeIntent(intent),
+      error: extra.error || "",
+      result: extra.error ? "" : extra.result || "",
+    });
+    if (actionLog.length > ACTION_LOG_CAP) {
+      actionLog.splice(0, actionLog.length - ACTION_LOG_CAP);
+    }
+  }
+
   function applyIntent(peerId, intent) {
+    ts.lastDrawn = [];
     const player = lobbyState.players[peerId];
     if (!player && intent.action !== "leaveSeat") return;
+    let error = "";
     if (intent.action === "ready" && phase === "lobby") {
       player.ready = !player.ready;
     } else if (intent.action === "bump" && phase === "lobby") {
@@ -219,7 +260,10 @@ export function createHost({
         ([id, other]) => id !== peerId && other.color === color
       );
       if (taken) {
-        setStatus("That color is taken.", true);
+        error = "That color is taken.";
+        setStatus(error, true);
+        logAction(peerId, intent, { error });
+        broadcast();
         return;
       }
       player.color = color;
@@ -268,8 +312,12 @@ export function createHost({
       const err = game.applyAction(ctx, peerId, intent);
       phase = ctx.phase;
       message = ctx.message;
-      if (typeof err === "string") setStatus(err, true);
+      if (typeof err === "string") {
+        error = err;
+        setStatus(err, true);
+      }
     }
+    logAction(peerId, intent, { error, result: message });
     broadcast();
   }
 

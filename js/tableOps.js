@@ -3,6 +3,8 @@ import {
   clone,
   currentPlayerId,
   handZoneId,
+  isInactive,
+  clearInactive,
   move,
   moveAll,
   personalZoneId,
@@ -30,6 +32,8 @@ export function pushHistory(ts, phase, message, players) {
       message,
       stats: tableStats(ts),
       playersStats: snapshotPlayersStats(players),
+      inactiveIds: (ts.inactiveIds || []).slice(),
+      bustedIds: (ts.bustedIds || []).slice(),
     })
   );
   if (ts.history.length > HISTORY_CAP) ts.history.shift();
@@ -78,6 +82,8 @@ export function restore(ts, snap, players) {
   }
   ts.playerOrder = clone(snap.playerOrder);
   ts.turnIndex = snap.turnIndex;
+  ts.inactiveIds = Array.isArray(snap.inactiveIds) ? clone(snap.inactiveIds) : [];
+  ts.bustedIds = Array.isArray(snap.bustedIds) ? clone(snap.bustedIds) : [];
   ts.stats = { pot: snap.stats?.pot ?? snap.pot ?? 0 };
   tableStats(ts);
   if (players) {
@@ -92,23 +98,30 @@ export function restore(ts, snap, players) {
 }
 
 function destToRef(dest, actorId) {
-  if (!dest || dest.type === "shared" || dest.type === "table") {
+  const type = dest?.type || dest;
+  if (!dest || type === "shared" || type === "table") {
     return { id: "shared" };
   }
-  if (dest.type === "discard") return { id: "discard" };
-  if (dest.type === "special") return { id: "special" };
-  if (dest.type === "personal") {
+  if (type === "discard") return { id: "discard" };
+  if (type === "special") return { id: "special" };
+  if (type === "personal") {
     return { role: "personal", owner: dest.playerId || actorId };
   }
-  if (dest.type === "hand") {
+  if (type === "hand") {
     return { role: "hand", owner: dest.playerId || actorId };
   }
   if (dest.id) return dest;
-  return { id: dest.type };
+  return { id: type };
+}
+
+function settingsDest(ctx, key, playerId, intentDest) {
+  const type = intentDest?.type || ctx.settings?.[key] || "hand";
+  return destToRef({ type, playerId: intentDest?.playerId || playerId }, playerId);
 }
 
 export function canPlayerAct(ctx, actorId) {
   if (ctx.phase !== "playing") return false;
+  if (isInactive(ctx.ts, actorId)) return false;
   return currentPlayerId(ctx.ts) === actorId;
 }
 
@@ -126,6 +139,21 @@ export function skipEmptyHands(ts, settings) {
     if (zoneItems(ts, { role: "hand", owner: id }).length > 0) return;
     ts.turnIndex = (ts.turnIndex + 1) % n;
   }
+}
+
+export function skipInactive(ts) {
+  const n = ts.playerOrder.length;
+  if (!n) return;
+  for (let i = 0; i < n; i++) {
+    const id = currentPlayerId(ts);
+    if (!isInactive(ts, id)) return;
+    ts.turnIndex = (ts.turnIndex + 1) % n;
+  }
+}
+
+export function skipSeats(ts, settings) {
+  skipEmptyHands(ts, settings);
+  skipInactive(ts);
 }
 
 export function actorName(ctx, actorId) {
@@ -171,7 +199,7 @@ export function applyTableAction(ctx, actorId, intent) {
     }
     pushHistory(ts, ctx.phase, ctx.message, ctx.players);
     advanceTurn(ts);
-    skipEmptyHands(ts, ctx.settings);
+    skipSeats(ts, ctx.settings);
     const next = ctx.players[currentPlayerId(ts)]?.name;
     announce(ctx, actorId, next ? `ended their turn. ${next}'s turn.` : "ended their turn.");
     return;
@@ -203,13 +231,35 @@ export function applyTableAction(ctx, actorId, intent) {
     announce(ctx, actorId, `placed ${labels} in ${spaceLabel(ctx, dest, actorId)}.`);
     if (ctx.phase === "playing") {
       const before = currentPlayerId(ts);
-      skipEmptyHands(ts, ctx.settings);
+      skipSeats(ts, ctx.settings);
       const now = currentPlayerId(ts);
       if (now && now !== before) {
         const next = ctx.players[now]?.name;
         if (next) ctx.message += ` ${next}'s turn.`;
       }
     }
+    return;
+  }
+
+  if (action === "drawCard") {
+    if (!canPlayerAct(ctx, actorId)) {
+      return ctx.phase !== "playing" ? "Start the game first." : "Not your turn.";
+    }
+    const count = Math.max(1, Number(intent.count) || 1);
+    const to = settingsDest(ctx, "drawDest", actorId, intent.dest);
+    if (!resolveZone(ts, to)) return "Unknown space.";
+    const stockLen = zoneItems(ts, { id: "stock" }).length;
+    if (!stockLen) return "The deck is empty.";
+    pushHistory(ts, ctx.phase, ctx.message, ctx.players);
+    const { moved } = move(ts, {
+      count,
+      from: { id: "stock" },
+      to,
+      playedBy: actorId,
+    });
+    ts.lastDrawn = moved.map(cardLabel);
+    const labels = moved.map(cardLabel).join(", ");
+    announce(ctx, actorId, `drew ${labels}.`);
     return;
   }
 
@@ -254,8 +304,9 @@ export function applyTableAction(ctx, actorId, intent) {
     ts.playerOrder = ts.playerOrder.filter((id) => ctx.players[id]);
     if (!ts.playerOrder.length) ts.playerOrder = ids;
     ts.turnIndex = 0;
+    clearInactive(ts);
     ctx.phase = "playing";
-    skipEmptyHands(ts, ctx.settings);
+    skipSeats(ts, ctx.settings);
     const first = ctx.players[currentPlayerId(ts)]?.name;
     announce(ctx, actorId, first ? `started the game. ${first}'s turn.` : "started the game.");
     return;
@@ -269,7 +320,7 @@ export function applyTableAction(ctx, actorId, intent) {
     pushHistory(ts, ctx.phase, ctx.message, ctx.players);
     ts.playerOrder = ids;
     ts.turnIndex = Math.min(ts.turnIndex, ids.length - 1);
-    skipEmptyHands(ts, ctx.settings);
+    skipSeats(ts, ctx.settings);
     announce(ctx, actorId, "set the player order.");
     return;
   }
@@ -287,13 +338,14 @@ export function applyTableAction(ctx, actorId, intent) {
     const count = Number(intent.count) || 0;
     if (!ctx.players[to]) return "Unknown player.";
     pushHistory(ts, ctx.phase, ctx.message, ctx.players);
+    const dest = settingsDest(ctx, "dealDest", to, intent.dest);
     const { moved } = move(ts, {
       count,
       from: { id: "stock" },
-      to: { role: "hand", owner: to },
+      to: dest,
     });
     announce(ctx, actorId, `dealt ${moved.length} to ${ctx.players[to].name}.`);
-    if (ctx.phase === "playing") skipEmptyHands(ts, ctx.settings);
+    if (ctx.phase === "playing") skipSeats(ts, ctx.settings);
     return;
   }
 
@@ -306,10 +358,14 @@ export function applyTableAction(ctx, actorId, intent) {
     const each = Math.min(requested, Math.floor(stockLen / n));
     pushHistory(ts, ctx.phase, ctx.message, ctx.players);
     for (const id of ids) {
-      move(ts, { count: each, from: { id: "stock" }, to: { role: "hand", owner: id } });
+      move(ts, {
+        count: each,
+        from: { id: "stock" },
+        to: settingsDest(ctx, "dealDest", id, intent.dest),
+      });
     }
     announce(ctx, actorId, `dealt ${each} to each player.`);
-    if (ctx.phase === "playing") skipEmptyHands(ts, ctx.settings);
+    if (ctx.phase === "playing") skipSeats(ts, ctx.settings);
     return;
   }
 

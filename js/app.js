@@ -64,11 +64,16 @@ const els = {
   dealCount: document.getElementById("deal-count"),
   dealTarget: document.getElementById("deal-target"),
   discardTarget: document.getElementById("discard-target"),
+  actionLog: document.getElementById("action-log"),
   orderList: document.getElementById("order-list"),
   gameSettings: document.getElementById("game-settings"),
   settingDecks: document.getElementById("setting-decks"),
+  settingDecksField: document.getElementById("setting-decks-field"),
+  settingFrenchShoe: document.getElementById("setting-french-shoe"),
   settingMin: document.getElementById("setting-min"),
   settingMax: document.getElementById("setting-max"),
+  settingPersonalRows: document.getElementById("setting-personal-rows"),
+  settingSharedRows: document.getElementById("setting-shared-rows"),
   settingSkipEmpty: document.getElementById("setting-skip-empty"),
   settingHandView: document.getElementById("setting-hand-view"),
   settingShowPoints: document.getElementById("setting-show-points"),
@@ -255,10 +260,35 @@ function appendCardButton(parent, card, { playable, selectable, view, ownerId })
   parent.append(btn);
 }
 
-function fillRow(el, cards, opts) {
+function splitSpaceRows(cards, rowCount) {
+  const n = Math.max(1, Math.min(4, Number(rowCount) || 1));
+  const list = cards || [];
+  const rows = Array.from({ length: n }, () => []);
+  if (n <= 1) {
+    rows[0] = list.slice();
+    return rows;
+  }
+  if (n === 2) {
+    for (const card of list) {
+      if (card.kind === "token") rows[1].push(card);
+      else rows[0].push(card);
+    }
+    return rows;
+  }
+  const size = Math.max(1, Math.ceil(list.length / n));
+  list.forEach((card, i) => rows[Math.min(n - 1, Math.floor(i / size))].push(card));
+  return rows;
+}
+
+function fillSpace(el, cards, opts, rowCount) {
+  if (!el) return;
   el.innerHTML = "";
-  for (const card of cards || []) appendCardButton(el, card, opts);
-  if (!(cards || []).length) el.textContent = "—";
+  for (const rowCards of splitSpaceRows(cards, rowCount)) {
+    const row = document.createElement("div");
+    row.className = "card-row";
+    for (const card of rowCards) appendCardButton(row, card, opts);
+    el.append(row);
+  }
 }
 
 function renderCardStack(el, cards, view) {
@@ -377,6 +407,8 @@ function renderOpponents(view, phase) {
     const labels = [player.name || "Player"];
     if (player.isHost) labels.push("host");
     if (player.connected === false) labels.push("away");
+    if ((view.bustedIds || []).includes(id)) labels.push("bust");
+    else if ((view.inactiveIds || []).includes(id)) labels.push("out");
     bits.textContent = labels.join(" · ");
     name.append(bits);
     const stats = document.createElement("span");
@@ -388,21 +420,8 @@ function renderOpponents(view, phase) {
     const personal = (view.personal && view.personal[id]) || [];
     if (!compactLayout(view) && spaceVisible(view, "personal")) {
       const space = document.createElement("div");
-      space.className = "opponent-space";
-      const spaceLabel = document.createElement("span");
-      spaceLabel.className = "muted";
-      spaceLabel.textContent = "space";
-      space.append(spaceLabel);
-      if (personal.length) {
-        for (const card of personal) {
-          appendCardButton(space, card, { playable: false, view, ownerId: id });
-        }
-      } else {
-        const empty = document.createElement("span");
-        empty.className = "muted";
-        empty.textContent = " —";
-        space.append(empty);
-      }
+      space.className = "opponent-space space-stack";
+      fillSpace(space, personal, { playable: false, view, ownerId: id }, view.settings?.personalRows);
       row.append(space);
     }
     const n = spaceVisible(view, "hand") ? counts[id] ?? 0 : 0;
@@ -442,6 +461,9 @@ function tableActions(view) {
     endTurn: true,
     sendCards: false,
     betCoins: false,
+    drawCard: false,
+    stay: false,
+    targetPlayer: false,
     ...(game.tableActions || {}),
   };
 }
@@ -482,18 +504,28 @@ function renderState(view) {
   els.gameSettings.classList.toggle("hidden", role !== "host");
   applySpaceVisibility(view);
   const acts = tableActions(view);
-  const myTurn = phase === "playing" && view.currentPlayerId === selfId;
+  const game = getGame(view?.gameId);
+  const myTurn =
+    phase === "playing" &&
+    view.currentPlayerId === selfId &&
+    !(view.inactiveIds || []).includes(selfId);
   const lobbyPass = phase === "lobby" && acts.sendCards;
+  const needTarget = Boolean(game.needsTarget?.(view, selfId));
+  const needTargetAny = Object.keys(view.players || {}).some((id) =>
+    game.needsTarget?.(view, id)
+  );
   const showCoins = Boolean(view.settings?.showCoins);
   const canBet = zoned && phase === "playing" && acts.betCoins && showCoins;
   const canSelectHand = zoned && (myTurn || lobbyPass);
+  const canTarget = zoned && phase === "playing" && acts.targetPlayer && needTarget;
   for (const btn of els.playerActions.querySelectorAll("button")) {
     const act = btn.dataset.act;
     if (act === "sendCards") btn.disabled = !lobbyPass;
     else if (act === "betCoins") btn.disabled = !canBet;
-    else btn.disabled = !myTurn;
+    else if (act === "targetPlayer") btn.disabled = !canTarget;
+    else btn.disabled = !myTurn || needTargetAny;
   }
-  if (els.sendTarget) els.sendTarget.disabled = !lobbyPass;
+  if (els.sendTarget) els.sendTarget.disabled = !(lobbyPass || canTarget);
   if (els.betCount) els.betCount.disabled = !canBet;
   if (els.potPile) {
     els.potPile.classList.toggle("hidden", !zoned || !showCoins);
@@ -508,17 +540,17 @@ function renderState(view) {
 
   if (zoned) {
     renderDeck(els.fpDeck, view.deckCount ?? 0);
-    fillRow(els.sharedCards, view.shared, { playable: false, view });
-    fillRow(els.myPersonal, (view.personal && view.personal[selfId]) || [], {
+    fillSpace(els.sharedCards, view.shared, { playable: false, view }, view.settings?.sharedRows);
+    fillSpace(els.myPersonal, (view.personal && view.personal[selfId]) || [], {
       playable: false,
       view,
       ownerId: selfId,
-    });
+    }, view.settings?.personalRows);
     renderCardStack(els.discardCards, view.discard, view);
     renderCardStack(els.specialCards, view.special, view);
   } else {
     renderDeck(els.deckPile, view.deckCount ?? 0);
-    fillRow(els.tableCards, view.table || view.shared, { playable: false, view });
+    fillSpace(els.tableCards, view.table || view.shared, { playable: false, view }, view.settings?.sharedRows);
   }
 
   if (role === "host") fillHostControls(view);
@@ -604,18 +636,58 @@ function fillHostControls(view) {
         : "Start"
       : "Start";
   }
+  fillActionLog(view);
+}
+
+function fillActionLog(view) {
+  const el = els.actionLog;
+  if (!el) return;
+  const rows = view.actionLog || [];
+  el.innerHTML = "";
+  if (!rows.length) {
+    el.textContent = "No actions yet.";
+    return;
+  }
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i];
+    const line = document.createElement("div");
+    line.className = "action-log-row" + (row.error ? " error" : "");
+    const bits = [`#${row.n} ${row.actor} ${row.action}`];
+    const prefix = document.createElement("span");
+    prefix.textContent = bits[0];
+    line.append(prefix);
+    if (row.card) {
+      const card = document.createElement("span");
+      card.className = "action-log-card";
+      card.textContent = ` ${row.card}`;
+      line.append(card);
+    }
+    const rest = [];
+    if (row.detail) rest.push(row.detail);
+    if (row.error) rest.push("✕ " + row.error);
+    else if (row.result) rest.push("→ " + row.result);
+    if (rest.length) {
+      const tail = document.createElement("span");
+      tail.textContent = " " + rest.join(" ");
+      line.append(tail);
+    }
+    el.append(line);
+  }
 }
 
 function fillSendTarget(view) {
   const select = els.sendTarget;
   if (!select) return;
   const prev = select.value;
+  const includeSelf = tableActions(view).targetPlayer && view.phase === "playing";
   select.innerHTML = "";
   for (const [id, player] of Object.entries(view.players || {})) {
-    if (id === selfId) continue;
+    if (!includeSelf && id === selfId) continue;
+    if ((view.inactiveIds || []).includes(id)) continue;
     const opt = document.createElement("option");
     opt.value = id;
-    opt.textContent = player.name + (id === "host" ? " (host)" : "");
+    opt.textContent =
+      (id === selfId ? "You" : player.name) + (id === "host" ? " (host)" : "");
     select.append(opt);
   }
   if ([...select.options].some((o) => o.value === prev)) select.value = prev;
@@ -638,8 +710,11 @@ function applySpaceVisibility(view) {
     "place-personal": { space: "personal", flag: acts.placePersonal },
     "place-discard": { space: "discard", flag: acts.placeDiscard },
     endTurn: { flag: acts.endTurn },
+    stay: { flag: acts.stay },
     sendCards: { flag: acts.sendCards && view.phase === "lobby" },
+    targetPlayer: { flag: acts.targetPlayer && view.phase === "playing" },
     betCoins: { flag: acts.betCoins && Boolean(view.settings?.showCoins) },
+    drawCard: { flag: acts.drawCard },
     drawToShared: { space: "table", flag: true },
     drawToSpecial: { space: "special", flag: true },
   };
@@ -650,10 +725,10 @@ function applySpaceVisibility(view) {
     btn.classList.toggle("hidden", hideSpace || rule.flag === false);
   }
   if (els.sendTarget) {
-    els.sendTarget.classList.toggle(
-      "hidden",
-      !acts.sendCards || view.phase !== "lobby"
-    );
+    const showTarget =
+      (acts.sendCards && view.phase === "lobby") ||
+      (acts.targetPlayer && view.phase === "playing");
+    els.sendTarget.classList.toggle("hidden", !showTarget);
   }
   if (els.betCount) {
     els.betCount.classList.toggle(
@@ -764,7 +839,14 @@ function fillPlayerRoster(view) {
     setSeatClass(row, view, id);
     const name = document.createElement("span");
     name.className = "player-row-name";
-    name.textContent = (player.name || id) + (player.isHost ? " · host" : "");
+    name.textContent =
+      (player.name || id) +
+      (player.isHost ? " · host" : "") +
+      ((view.bustedIds || []).includes(id)
+        ? " · bust"
+        : (view.inactiveIds || []).includes(id)
+          ? " · out"
+          : "");
     const stats = document.createElement("span");
     stats.className = "player-stats";
     appendStatBadge(stats, view, id, "points", playerStat(player, "points"));
@@ -799,12 +881,22 @@ function fillGameSettings(view) {
   if (focused !== els.settingDecks) els.settingDecks.value = String(s.decks);
   if (focused !== els.settingMin) els.settingMin.value = String(s.minPlayers);
   if (focused !== els.settingMax) els.settingMax.value = String(s.maxPlayers);
+  if (focused !== els.settingPersonalRows && els.settingPersonalRows) {
+    els.settingPersonalRows.value = String(s.personalRows || 1);
+  }
+  if (focused !== els.settingSharedRows && els.settingSharedRows) {
+    els.settingSharedRows.value = String(s.sharedRows || 1);
+  }
 
   els.settingSkipEmpty.classList.toggle("selected", Boolean(s.skipEmptyHands));
   els.settingHandView.classList.toggle("selected", s.opponentHandView === "collapsed");
   els.settingShowPoints.classList.toggle("selected", s.showPoints !== false);
   els.settingShowLives.classList.toggle("selected", Boolean(s.showLives));
   els.settingShowCoins.classList.toggle("selected", Boolean(s.showCoins));
+
+  const customCatalog = Boolean(s.catalog?.length);
+  els.settingDecksField?.classList.toggle("hidden", customCatalog);
+  els.settingFrenchShoe?.classList.toggle("hidden", customCatalog);
 
   els.spaceToggles.innerHTML = "";
   for (const space of SPACE_VISIBILITY) {
@@ -826,6 +918,9 @@ function fillGameSettings(view) {
   fillRankOrder(view);
 
   els.banRanks.innerHTML = "";
+  els.banGrid.innerHTML = "";
+  if (customCatalog) return;
+
   for (const rank of RANKS) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -1100,11 +1195,15 @@ function onSettingNumber() {
     decks: Number(els.settingDecks.value),
     minPlayers: Number(els.settingMin.value),
     maxPlayers: Number(els.settingMax.value),
+    personalRows: Number(els.settingPersonalRows.value),
+    sharedRows: Number(els.settingSharedRows.value),
   });
 }
 els.settingDecks.addEventListener("change", onSettingNumber);
 els.settingMin.addEventListener("change", onSettingNumber);
 els.settingMax.addEventListener("change", onSettingNumber);
+els.settingPersonalRows.addEventListener("change", onSettingNumber);
+els.settingSharedRows.addEventListener("change", onSettingNumber);
 els.settingSkipEmpty.addEventListener("click", () => {
   patchSettings({ skipEmptyHands: !lastView?.settings?.skipEmptyHands });
 });
@@ -1181,6 +1280,14 @@ function onTableAction(event) {
     placeSelected({ type: "discard" });
     return;
   }
+  if (act === "drawCard") {
+    sendAction("drawCard", { count: 1 });
+    return;
+  }
+  if (act === "stay") {
+    sendAction("stay");
+    return;
+  }
   if (act === "sendCards") {
     const cardIds = [...selectedCardIds];
     if (!cardIds.length) {
@@ -1194,6 +1301,15 @@ function onTableAction(event) {
     }
     sendAction("sendCards", { cardIds, playerId });
     selectedCardIds.clear();
+    return;
+  }
+  if (act === "targetPlayer") {
+    const playerId = els.sendTarget.value;
+    if (!playerId) {
+      setLobbyStatus({ text: "Pick a player.", error: true });
+      return;
+    }
+    sendAction("targetPlayer", { playerId });
     return;
   }
   if (act === "betCoins") {

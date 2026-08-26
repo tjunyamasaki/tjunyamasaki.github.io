@@ -51,6 +51,10 @@ export function defaultPreset() {
     showLives: false,
     showCoins: false,
     catalog: null,
+    dealDest: "hand",
+    drawDest: "personal",
+    personalRows: 1,
+    sharedRows: 1,
   };
 }
 
@@ -90,6 +94,10 @@ export function resolvePreset(game, overrides = {}) {
     showLives: fromGame.showLives ?? base.showLives,
     showCoins: fromGame.showCoins ?? base.showCoins,
     catalog: fromGame.catalog || null,
+    dealDest: fromGame.dealDest ?? base.dealDest,
+    drawDest: fromGame.drawDest ?? base.drawDest,
+    personalRows: fromGame.personalRows ?? base.personalRows,
+    sharedRows: fromGame.sharedRows ?? base.sharedRows,
   };
   const next = { ...merged, ...overrides };
   next.ranks = (overrides.ranks || merged.ranks).slice();
@@ -113,7 +121,21 @@ export function resolvePreset(game, overrides = {}) {
   next.showPoints = next.showPoints !== false;
   next.showLives = Boolean(next.showLives);
   next.showCoins = Boolean(next.showCoins);
+  next.dealDest = destType(next.dealDest, base.dealDest);
+  next.drawDest = destType(next.drawDest, base.drawDest);
+  next.personalRows = clampRows(next.personalRows);
+  next.sharedRows = clampRows(next.sharedRows);
   return next;
+}
+
+function clampRows(value) {
+  return Math.max(1, Math.min(4, Number(value) || 1));
+}
+
+const DEST_TYPES = new Set(["hand", "personal", "shared", "discard", "special"]);
+
+function destType(value, fallback) {
+  return DEST_TYPES.has(value) ? value : fallback;
 }
 
 export function isBanished(rank, suit, banished) {
@@ -122,12 +144,12 @@ export function isBanished(rank, suit, banished) {
 }
 
 export function makeCard(rank, suitId, copy = 0) {
-  const suit = SUITS.find((s) => s.id === suitId) || SUITS[0];
+  const suit = SUITS.find((s) => s.id === suitId);
   const face = {
     rank,
-    suit: suitId,
-    symbol: suit.symbol,
-    color: suit.color,
+    suit: suitId || "",
+    symbol: suit?.symbol || "",
+    color: suit?.color || "black",
   };
   return {
     id: copy ? `${rank}${suitId}-${copy}` : `${rank}${suitId}`,

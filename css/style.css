@@ -437,6 +437,14 @@ button.sort-btn.selected {
   flex-wrap: wrap;
   gap: 0.35rem;
   min-height: 2.5rem;
+  align-items: center;
+}
+
+.space-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
 }
 
 button.playing-card {
@@ -546,6 +554,36 @@ button.game-pick.selected {
   border-left: 1px solid var(--line);
 }
 
+.action-log {
+  max-height: 14rem;
+  overflow: auto;
+  margin-top: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #0f1720;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.action-log-row + .action-log-row {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--line);
+}
+
+.action-log-row.error {
+  color: #fca5a5;
+}
+
+.action-log-card {
+  color: #fef3c7;
+  font-weight: 600;
+}
+
 .opponent.collapsed {
   min-width: 4.5rem;
 }
@@ -609,10 +647,6 @@ button.game-pick.selected {
 }
 
 .opponent-space {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
   width: 100%;
   margin-bottom: 0.25rem;
 }

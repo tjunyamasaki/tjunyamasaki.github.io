@@ -81,6 +81,8 @@ export function createTableState(playerIds, saved = null, settings = null) {
       delete ts.personal;
     }
     tableStats(ts);
+    if (!Array.isArray(ts.inactiveIds)) ts.inactiveIds = [];
+    if (!Array.isArray(ts.bustedIds)) ts.bustedIds = [];
     ensurePlayers(ts, playerIds, settings);
     return ts;
   }
@@ -92,6 +94,8 @@ export function createTableState(playerIds, saved = null, settings = null) {
       turnIndex: 0,
       history: [],
       stats: { pot: 0 },
+      inactiveIds: [],
+      bustedIds: [],
     };
     tableStats(ts);
     return ts;
@@ -102,6 +106,8 @@ export function createTableState(playerIds, saved = null, settings = null) {
     turnIndex: 0,
     history: [],
     stats: { pot: 0 },
+    inactiveIds: [],
+    bustedIds: [],
   };
   ts.zones.stock.items = freshShoe(settings);
   tableStats(ts);
@@ -114,6 +120,8 @@ export function rebuildTable(ts, playerIds, settings) {
   ts.zones.stock.items = freshShoe(settings);
   ts.playerOrder = ids;
   ts.turnIndex = 0;
+  ts.inactiveIds = [];
+  ts.bustedIds = [];
   ts.stats = { pot: 0 };
   tableStats(ts);
 }
@@ -142,6 +150,10 @@ export function ensurePlayers(ts, playerIds, settings = null) {
   }
   const live = new Set(playerIds);
   ts.playerOrder = ts.playerOrder.filter((id) => live.has(id));
+  if (!Array.isArray(ts.inactiveIds)) ts.inactiveIds = [];
+  ts.inactiveIds = ts.inactiveIds.filter((id) => live.has(id));
+  if (!Array.isArray(ts.bustedIds)) ts.bustedIds = [];
+  ts.bustedIds = ts.bustedIds.filter((id) => live.has(id));
   if (!ts.playerOrder.length) ts.playerOrder = playerIds.slice();
   if (ts.turnIndex >= ts.playerOrder.length) ts.turnIndex = 0;
   for (const zone of Object.values(ts.zones)) {
@@ -154,6 +166,32 @@ export function ensurePlayers(ts, playerIds, settings = null) {
 export function currentPlayerId(ts) {
   if (!ts.playerOrder.length) return null;
   return ts.playerOrder[ts.turnIndex % ts.playerOrder.length];
+}
+
+export function isInactive(ts, playerId) {
+  return (ts.inactiveIds || []).includes(playerId);
+}
+
+export function setInactive(ts, playerId) {
+  if (!playerId) return;
+  if (!Array.isArray(ts.inactiveIds)) ts.inactiveIds = [];
+  if (!ts.inactiveIds.includes(playerId)) ts.inactiveIds.push(playerId);
+}
+
+export function clearInactive(ts) {
+  ts.inactiveIds = [];
+  ts.bustedIds = [];
+}
+
+export function isBusted(ts, playerId) {
+  return (ts.bustedIds || []).includes(playerId);
+}
+
+export function setBusted(ts, playerId) {
+  setInactive(ts, playerId);
+  if (!playerId) return;
+  if (!Array.isArray(ts.bustedIds)) ts.bustedIds = [];
+  if (!ts.bustedIds.includes(playerId)) ts.bustedIds.push(playerId);
 }
 
 export function resolveZone(ts, ref) {
@@ -258,6 +296,8 @@ export function snapshotTable(ts, viewerId, players) {
     handCounts,
     playerOrder: ts.playerOrder.slice(),
     currentPlayerId: currentPlayerId(ts),
+    inactiveIds: (ts.inactiveIds || []).slice(),
+    bustedIds: (ts.bustedIds || []).slice(),
     canUndo: ts.history.length > 0,
     pot: tableStats(ts).pot || 0,
   };

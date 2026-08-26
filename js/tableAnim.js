@@ -133,6 +133,11 @@ export function tableFlights(prev, view, selfId) {
 
   const push = (flight) => {
     if (flight.id) used.add(flight.id);
+    const fromHidden = flight.from?.type === "deck" || flight.from?.type === "player";
+    const showsFace =
+      flight.dest?.type === "el" ||
+      (flight.dest?.type === "zone" && flight.dest.zone && flight.dest.zone !== "deck");
+    flight.reveal = Boolean(fromHidden && showsFace);
     flights.push(flight);
   };
 
@@ -200,6 +205,7 @@ export function tableFlights(prev, view, selfId) {
 }
 
 export function captureCardOrigins(root) {
+  // Pile ids / data-* hooks: docs/TABLE_ANIM.md — keep in sync when adding spaces.
   const cards = {};
   const players = {};
   const zones = {};
@@ -299,14 +305,36 @@ function invertOffset(from, to) {
   };
 }
 
-function flyEl(el, from, delay) {
+function flipFace(spin, delay) {
+  if (!spin) return;
+  spin.style.transform = "rotateY(180deg)";
+  const anim = spin.animate(
+    [{ transform: "rotateY(180deg)" }, { transform: "rotateY(0deg)" }],
+    {
+      duration: DURATION_MS,
+      delay,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      fill: "both",
+    }
+  );
+  const clear = () => {
+    spin.style.transform = "";
+  };
+  anim.finished.then(clear, clear);
+}
+
+function flyEl(el, from, delay, reveal) {
   const to = el.getBoundingClientRect();
   if (!to.width && !to.height) return;
   const { dx, dy } = invertOffset(from, to);
-  if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+  if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
+    if (reveal) flipFace(el.querySelector(".card-3d"), delay);
+    return;
+  }
   const invert = `translate(${dx}px, ${dy}px) scale(0.92)`;
   el.classList.add("card-fly");
   el.style.transform = invert;
+  if (reveal) flipFace(el.querySelector(".card-3d"), delay);
   const anim = el.animate([{ transform: invert }, { transform: "none" }], {
     duration: DURATION_MS,
     delay,
@@ -320,7 +348,7 @@ function flyEl(el, from, delay) {
   anim.finished.then(clear, clear);
 }
 
-function flyGhost(from, to, delay, clone) {
+function flyGhost(from, to, delay, clone, reveal) {
   if (!from || !to) return;
   const dx = to.left + to.width / 2 - (from.left + from.width / 2);
   const dy = to.top + to.height / 2 - (from.top + from.height / 2);
@@ -335,6 +363,7 @@ function flyGhost(from, to, delay, clone) {
   ghost.style.height = `${from.height}px`;
   ghost.disabled = true;
   layer.append(ghost);
+  if (reveal) flipFace(ghost.querySelector(".card-3d"), delay);
   const anim = ghost.animate(
     [
       { transform: "translate(0, 0) scale(1)" },
@@ -366,10 +395,10 @@ export function playTableMoves(prev, view, { selfId, origins, deckEl, feltEl, ro
     const dest = destTarget(flight, scope, deckEl, feltEl);
     if (!from || (!dest.el && !dest.rect)) return;
     const delay = i * gap;
-    if (dest.el) flyEl(dest.el, from, delay);
+    if (dest.el) flyEl(dest.el, from, delay, flight.reveal);
     else {
       const clone = flight.id ? snap.cards[flight.id]?.node : null;
-      flyGhost(from, dest.rect, delay, clone);
+      flyGhost(from, dest.rect, delay, clone, flight.reveal);
     }
   });
 }

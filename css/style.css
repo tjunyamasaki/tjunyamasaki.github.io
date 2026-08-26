@@ -479,25 +479,68 @@ button.sort-btn.selected {
   width: 100%;
 }
 
+.felt,
+.you,
+.opponents,
+#card-fly-layer {
+  perspective: 900px;
+}
+
 button.playing-card {
-  min-width: 2.6rem;
-  padding: 0.55rem 0.4rem;
-  background: #f4f1ea;
+  position: relative;
+  width: 2.7rem;
+  min-width: 2.7rem;
+  height: 3.8rem;
+  padding: 0;
+  background: transparent;
   color: #1a1a1a;
   font-size: 1.05rem;
   font-weight: 700;
+  transform-style: preserve-3d;
+}
+
+.card-3d {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.card-front,
+.card-back {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-front {
+  background: #f4f1ea;
   box-shadow: inset 0 0 0 2px var(--seat, transparent);
 }
 
-button.playing-card.red {
+.card-back {
+  transform: rotateY(180deg);
+  background: repeating-linear-gradient(
+    135deg,
+    #1e3a5f,
+    #1e3a5f 6px,
+    #163250 6px,
+    #163250 12px
+  );
+  border: 2px solid var(--seat, #93c5fd);
+}
+
+button.playing-card.red .card-front {
   color: #b91c1c;
 }
 
-button.playing-card.has-sprite {
-  width: 2.7rem;
-  height: 3.8rem;
-  min-width: 2.7rem;
-  padding: 0;
+button.playing-card.has-sprite .card-front {
   background-color: #dbeafe;
   background-size: cover;
   background-position: center;
@@ -531,6 +574,7 @@ button.playing-card:disabled {
   margin: 0;
   box-sizing: border-box;
   pointer-events: none;
+  transform-style: preserve-3d;
 }
 
 .face-down {
@@ -800,17 +844,17 @@ input.num {
   padding-left: 0.45rem;
 }
 
-button.playing-card.selected-card {
+button.playing-card.selected-card .card-front {
   outline: none;
   background-color: color-mix(in srgb, var(--seat, var(--accent)) 20%, #fff);
   box-shadow: inset 0 0 0 2px var(--seat, var(--accent));
 }
 
-button.playing-card.has-sprite.selected-card {
+button.playing-card.has-sprite.selected-card .card-front {
   background-color: transparent;
 }
 
-.you button.playing-card:not(.selected-card) {
+.you button.playing-card:not(.selected-card) .card-front {
   box-shadow: none;
 }
 

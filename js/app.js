@@ -240,26 +240,44 @@ function sendAction(action, extra = {}) {
 function paintCardFace(btn, card) {
   const label = cardLabel(card);
   const sprite = cardSprite(card);
+  const front = btn.querySelector(".card-front") || btn;
   btn.setAttribute("aria-label", label);
   btn.title = label;
   if (sprite) {
     btn.classList.add("has-sprite");
-    btn.style.backgroundImage = `url("${sprite}")`;
-    btn.textContent = "";
+    front.style.backgroundImage = `url("${sprite}")`;
+    front.textContent = "";
   } else {
-    btn.textContent = label;
+    btn.classList.remove("has-sprite");
+    front.style.backgroundImage = "";
+    front.textContent = label;
   }
 }
 
-function appendCardButton(parent, card, { selectable, view, ownerId }) {
+function makePlayingCard(card, extraClass = "") {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "playing-card" + ((card.color ?? card.face?.color) === "red" ? " red" : "");
+  btn.className =
+    "playing-card" + extraClass + ((card.color ?? card.face?.color) === "red" ? " red" : "");
+  const spin = document.createElement("span");
+  spin.className = "card-3d";
+  const front = document.createElement("span");
+  front.className = "card-front";
+  const back = document.createElement("span");
+  back.className = "card-back";
+  back.setAttribute("aria-hidden", "true");
+  spin.append(front, back);
+  btn.append(spin);
+  if (card.id) btn.dataset.cardId = card.id;
+  paintCardFace(btn, card);
+  return btn;
+}
+
+function appendCardButton(parent, card, { selectable, view, ownerId }) {
+  const btn = makePlayingCard(card);
   const seat = seatClass(view || lastView, card.playedBy || ownerId);
   if (seat) btn.classList.add(seat);
   if (selectable && selectedCardIds.has(card.id)) btn.classList.add("selected-card");
-  if (card.id) btn.dataset.cardId = card.id;
-  paintCardFace(btn, card);
   if (selectable) {
     btn.addEventListener("click", () => {
       if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
@@ -309,13 +327,9 @@ function renderCardStack(el, cards, view) {
   const list = cards || [];
   const top = list[list.length - 1];
   if (top) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "playing-card stack-card" + (top.color === "red" ? " red" : "");
+    const btn = makePlayingCard(top, " stack-card");
     const seat = seatClass(view || lastView, top.playedBy);
     if (seat) btn.classList.add(seat);
-    if (top.id) btn.dataset.cardId = top.id;
-    paintCardFace(btn, top);
     btn.disabled = true;
     el.append(btn);
   }

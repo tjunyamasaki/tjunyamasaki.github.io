@@ -58,10 +58,6 @@ export function defaultPreset() {
   };
 }
 
-export function aceHighRanks() {
-  return ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
-}
-
 /** President / shed: 3 low, 2 high. */
 export function presidentRanks() {
   return ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"];

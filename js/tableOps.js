@@ -188,10 +188,7 @@ function idsOf(intent) {
 export function applyTableAction(ctx, actorId, intent) {
   const { ts, isHost } = ctx;
   let action = intent.action;
-  if (action === "endTurn") action = "endTurn";
   if (action === "start") action = "startGame";
-  if (action === "playCard") action = "placeCard";
-  if (action === "sendCards") action = "sendCards";
 
   if (action === "endTurn") {
     if (!canPlayerAct(ctx, actorId)) {

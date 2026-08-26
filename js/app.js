@@ -39,17 +39,14 @@ const els = {
   lobbyTools: document.getElementById("lobby-tools"),
   colorPicks: document.getElementById("color-picks"),
   colorSwatches: document.getElementById("color-swatches"),
-  tableCards: document.getElementById("table-cards"),
   handCards: document.getElementById("hand-cards"),
   handHint: document.getElementById("hand-hint"),
   handSort: document.getElementById("hand-sort"),
   opponents: document.getElementById("opponents"),
-  deckPile: document.getElementById("deck-pile"),
   gameType: document.getElementById("game-type"),
   gameBlurb: document.getElementById("game-blurb"),
   gameNameLabel: document.getElementById("game-name-label"),
   roundMessage: document.getElementById("round-message"),
-  layoutHighcard: document.getElementById("layout-highcard"),
   layoutFreeplay: document.getElementById("layout-freeplay"),
   freeplayBar: document.getElementById("freeplay-bar"),
   playerActions: document.getElementById("player-actions"),
@@ -113,10 +110,6 @@ let selectedCardIds = new Set();
 let handSortMode = null;
 let turnOrderPicks = null;
 let rankOrderPicks = null;
-
-function compactLayout(view) {
-  return (view?.layout || (view?.gameId === "highcard" ? "compact" : "table")) === "compact";
-}
 
 function playerStat(player, key) {
   return Number(player?.stats?.[key] ?? player?.[key]) || 0;
@@ -236,7 +229,7 @@ function sendAction(action, extra = {}) {
   else session.sendIntent(action, extra);
 }
 
-function appendCardButton(parent, card, { playable, selectable, view, ownerId }) {
+function appendCardButton(parent, card, { selectable, view, ownerId }) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "playing-card" + ((card.color ?? card.face?.color) === "red" ? " red" : "");
@@ -250,10 +243,6 @@ function appendCardButton(parent, card, { playable, selectable, view, ownerId })
       else selectedCardIds.add(card.id);
       if (lastView) renderState(lastView);
     });
-  } else if (playable) {
-    btn.addEventListener("click", () =>
-      sendAction("placeCard", { cardIds: [card.id], dest: { type: "shared" } })
-    );
   } else {
     btn.disabled = true;
   }
@@ -312,8 +301,8 @@ function renderCardStack(el, cards, view) {
   el.append(count);
 }
 
-function renderDeck(target, count) {
-  const el = target || els.deckPile;
+function renderDeck(el, count) {
+  if (!el) return;
   el.innerHTML = "";
   const n = Math.min(8, Math.max(0, count));
   for (let i = 0; i < n; i++) {
@@ -418,10 +407,10 @@ function renderOpponents(view, phase) {
     const row = document.createElement("div");
     row.className = "card-row";
     const personal = (view.personal && view.personal[id]) || [];
-    if (!compactLayout(view) && spaceVisible(view, "personal")) {
+    if (spaceVisible(view, "personal")) {
       const space = document.createElement("div");
       space.className = "opponent-space space-stack";
-      fillSpace(space, personal, { playable: false, view, ownerId: id }, view.settings?.personalRows);
+      fillSpace(space, personal, { view, ownerId: id }, view.settings?.personalRows);
       row.append(space);
     }
     const n = spaceVisible(view, "hand") ? counts[id] ?? 0 : 0;
@@ -443,9 +432,6 @@ function renderOpponents(view, phase) {
         back.className = "face-down " + (seatClass(view, id) || "");
         row.append(back);
       }
-    }
-    if (compactLayout(view) && !n && !personal.length && !collapsed) {
-      row.textContent = phase === "lobby" ? "—" : "empty";
     }
     box.append(name, row);
     els.opponents.append(box);
@@ -473,14 +459,11 @@ function renderState(view) {
   lastView = view;
   if (view.viewerId) selfId = view.viewerId;
   const phase = view.phase || "lobby";
-  const zoned = !compactLayout(view);
   els.phaseLabel.textContent = phase;
   els.lobbyTools.classList.add("hidden");
   els.btnStart.classList.add("hidden");
-  els.handHint.classList.toggle("hidden", !zoned && phase !== "playing");
-  els.handHint.textContent = zoned
-    ? "· tap cards, then an action"
-    : "· tap to play";
+  els.handHint.classList.remove("hidden");
+  els.handHint.textContent = "· tap cards, then an action";
   if (view.gameName) els.gameNameLabel.textContent = view.gameName;
   if (view.message) {
     els.roundMessage.textContent = view.message;
@@ -491,15 +474,14 @@ function renderState(view) {
   }
 
   const turnName = view.players?.[view.currentPlayerId]?.name;
-  els.turnLabel.textContent = zoned && turnName ? `Turn: ${turnName}` : "";
+  els.turnLabel.textContent = turnName ? `Turn: ${turnName}` : "";
   setSeatClass(els.turnLabel, view, view.currentPlayerId);
 
   setSeatClass(els.mySpace, view, selfId);
   setSeatClass(els.youArea, view, selfId);
 
-  els.layoutHighcard.classList.toggle("hidden", zoned);
-  els.layoutFreeplay.classList.toggle("hidden", !zoned);
-  els.freeplayBar.classList.toggle("hidden", !zoned);
+  els.layoutFreeplay.classList.remove("hidden");
+  els.freeplayBar.classList.remove("hidden");
   els.hostTools.classList.toggle("hidden", role !== "host");
   els.gameSettings.classList.toggle("hidden", role !== "host");
   applySpaceVisibility(view);
@@ -515,9 +497,9 @@ function renderState(view) {
     game.needsTarget?.(view, id)
   );
   const showCoins = Boolean(view.settings?.showCoins);
-  const canBet = zoned && phase === "playing" && acts.betCoins && showCoins;
-  const canSelectHand = zoned && (myTurn || lobbyPass);
-  const canTarget = zoned && phase === "playing" && acts.targetPlayer && needTarget;
+  const canBet = phase === "playing" && acts.betCoins && showCoins;
+  const canSelectHand = myTurn || lobbyPass;
+  const canTarget = phase === "playing" && acts.targetPlayer && needTarget;
   for (const btn of els.playerActions.querySelectorAll("button")) {
     const act = btn.dataset.act;
     if (act === "sendCards") btn.disabled = !lobbyPass;
@@ -528,7 +510,7 @@ function renderState(view) {
   if (els.sendTarget) els.sendTarget.disabled = !(lobbyPass || canTarget);
   if (els.betCount) els.betCount.disabled = !canBet;
   if (els.potPile) {
-    els.potPile.classList.toggle("hidden", !zoned || !showCoins);
+    els.potPile.classList.toggle("hidden", !showCoins);
     if (els.potValue) els.potValue.textContent = String(view.pot ?? 0);
   }
   const undoBtn = els.hostTools.querySelector('[data-act="undo"]');
@@ -538,23 +520,17 @@ function renderState(view) {
   renderOpponents(view, phase);
   fillPlayerStats(els.youStats, view, selfId);
 
-  if (zoned) {
-    renderDeck(els.fpDeck, view.deckCount ?? 0);
-    fillSpace(els.sharedCards, view.shared, { playable: false, view }, view.settings?.sharedRows);
-    fillSpace(els.myPersonal, (view.personal && view.personal[selfId]) || [], {
-      playable: false,
-      view,
-      ownerId: selfId,
-    }, view.settings?.personalRows);
-    renderCardStack(els.discardCards, view.discard, view);
-    renderCardStack(els.specialCards, view.special, view);
-  } else {
-    renderDeck(els.deckPile, view.deckCount ?? 0);
-    fillSpace(els.tableCards, view.table || view.shared, { playable: false, view }, view.settings?.sharedRows);
-  }
+  renderDeck(els.fpDeck, view.deckCount ?? 0);
+  fillSpace(els.sharedCards, view.shared, { view }, view.settings?.sharedRows);
+  fillSpace(els.myPersonal, (view.personal && view.personal[selfId]) || [], {
+    view,
+    ownerId: selfId,
+  }, view.settings?.personalRows);
+  renderCardStack(els.discardCards, view.discard, view);
+  renderCardStack(els.specialCards, view.special, view);
 
   if (role === "host") fillHostControls(view);
-  if (zoned) fillSendTarget(view);
+  fillSendTarget(view);
   if (role === "host") fillGameSettings(view);
 
   const sortSpec = handSortSpec(view);
@@ -568,10 +544,6 @@ function renderState(view) {
   els.handCards.innerHTML = "";
   for (const card of hand) {
     appendCardButton(els.handCards, card, {
-      playable:
-        !zoned &&
-        phase === "playing" &&
-        (role !== "host" || view.currentPlayerId === selfId),
       selectable: canSelectHand,
       view,
       ownerId: selfId,
@@ -629,13 +601,7 @@ function fillHostControls(view) {
     els.discardTarget.value = prevDiscard;
   }
   const startBtn = els.btnHostStart;
-  if (startBtn) {
-    startBtn.textContent = compactLayout(view)
-      ? view.phase === "ended"
-        ? "Deal again"
-        : "Start"
-      : "Start";
-  }
+  if (startBtn) startBtn.textContent = "Start";
   fillActionLog(view);
 }
 

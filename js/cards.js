@@ -34,24 +34,6 @@ export function shuffle(cards) {
   return a;
 }
 
-export function cardsPerPlayer(playerCount) {
-  const n = Math.max(1, playerCount);
-  return Math.min(5, Math.floor(52 / n));
-}
-
-export function deal(deck, playerIds, count) {
-  const rest = deck.slice();
-  const hands = {};
-  for (const id of playerIds) hands[id] = [];
-  for (let n = 0; n < count; n++) {
-    for (const id of playerIds) {
-      if (!rest.length) break;
-      hands[id].push(rest.pop());
-    }
-  }
-  return { deck: rest, hands };
-}
-
 export function cardLabel(card) {
   if (!card) return "";
   if (card.kind === "token") return card.face?.label || card.label || "?";
@@ -117,12 +99,4 @@ export function compareCards(a, b, { suits, ranks, primary }) {
 
 export function sortHand(cards, spec) {
   return (cards || []).slice().sort((a, b) => compareCards(a, b, spec));
-}
-
-/** Ace high. */
-export function rankValue(card) {
-  const rank = card.rank ?? card.face?.rank;
-  const map = { A: 14, K: 13, Q: 12, J: 11 };
-  if (map[rank]) return map[rank];
-  return Number(rank);
 }

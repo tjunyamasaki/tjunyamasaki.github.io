@@ -8,7 +8,7 @@ Everyone needs internet (to load the page). For a table, join the **same Wi-Fi o
 2. **Host:** pick a **Game**, tap **Host lobby**, share the code. Keep this tab open.
 3. **Others:** enter that code and tap **Join**.
 4. **Toggle ready** / **Bump** in the lobby. Host taps **Start deal**.
-5. You see the facedown **deck** (with a count), other players’ **facedown** hands, and your own cards. Tap a card to play it. When every hand is empty, the host can **Deal again**.
+5. You see the **deck**, other players’ **facedown** hands, the table, and your own cards. Select cards, then use a table action. The host can **Start** a deal and use host tools.
 
 Refresh keeps your seat in that tab. **Leave** gives up the seat. If the host closes the tab, they tap **Resume room** in the same browser.
 

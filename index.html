@@ -48,17 +48,14 @@
 
     <section id="view-table" class="page page-table hidden">
       <header class="table-head">
-        <div>
-          <p class="muted" id="role-label"></p>
-          <h2>Room <span id="room-code-display"></span></h2>
-          <p class="muted" id="game-name-label"></p>
-          <p class="muted">
-            <span id="phase-label">lobby</span>
-            · <span id="lobby-status" class="status"></span>
-          </p>
-        </div>
-        <button id="btn-leave" type="button" class="ghost">Leave</button>
+        <h2 class="table-head-title">
+          Room <span id="room-code-display"></span>
+          <span class="table-head-dash" aria-hidden="true">-</span>
+          <span id="game-name-label"></span>
+        </h2>
+        <button id="btn-leave" type="button" class="ghost table-head-leave">Leave</button>
       </header>
+      <p id="lobby-status" class="status table-status hidden"></p>
 
       <div id="color-picks" class="color-picks hidden">
         <span class="muted">Your color</span>

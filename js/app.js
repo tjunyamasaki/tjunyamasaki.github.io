@@ -13,7 +13,7 @@ import {
   secretForResume,
   getOrCreatePlayerId,
 } from "./persist.js";
-import { cardLabel, HAND_SORT_MODES, resolveHandSort, sortHand, RANKS, SUITS } from "./cards.js";
+import { cardLabel, cardSprite, HAND_SORT_MODES, resolveHandSort, sortHand, RANKS, SUITS } from "./cards.js";
 import { gameList, getGame } from "./games.js";
 import { faceKey, isBanished, SPACE_VISIBILITY } from "./gameSettings.js";
 
@@ -33,9 +33,7 @@ const els = {
   btnHostStart: document.getElementById("btn-host-start"),
   homeStatus: document.getElementById("home-status"),
   lobbyStatus: document.getElementById("lobby-status"),
-  roleLabel: document.getElementById("role-label"),
   roomCodeDisplay: document.getElementById("room-code-display"),
-  phaseLabel: document.getElementById("phase-label"),
   lobbyTools: document.getElementById("lobby-tools"),
   colorPicks: document.getElementById("color-picks"),
   colorSwatches: document.getElementById("color-swatches"),
@@ -194,9 +192,19 @@ function setHomeStatus(text, error = false) {
   els.homeStatus.classList.toggle("error", error);
 }
 
+const CONNECTION_STATUS = new Set([
+  "connected",
+  "signaling",
+  "connecting",
+  "host gone",
+  "reconnecting… waiting for host",
+]);
+
 function setLobbyStatus({ text, error }) {
-  els.lobbyStatus.textContent = text || "";
-  els.lobbyStatus.classList.toggle("error", Boolean(error));
+  const hide = !text || CONNECTION_STATUS.has(text);
+  els.lobbyStatus.textContent = hide ? "" : text;
+  els.lobbyStatus.classList.toggle("error", Boolean(error) && !hide);
+  els.lobbyStatus.classList.toggle("hidden", hide);
 }
 
 function nickname() {
@@ -212,12 +220,11 @@ function showHome() {
   refreshResumeUi();
 }
 
-function showTable(code, isHost) {
+function showTable(code) {
   els.viewHome.classList.add("hidden");
   els.viewTable.classList.remove("hidden");
   els.roomCodeDisplay.textContent = code;
   currentRoom = code;
-  els.roleLabel.textContent = isHost ? "You are the host" : "You are a guest";
   els.lobbyTools.classList.add("hidden");
   els.btnStart.classList.add("hidden");
   if (location.hash !== "#table") location.hash = "table";
@@ -229,6 +236,20 @@ function sendAction(action, extra = {}) {
   else session.sendIntent(action, extra);
 }
 
+function paintCardFace(btn, card) {
+  const label = cardLabel(card);
+  const sprite = cardSprite(card);
+  btn.setAttribute("aria-label", label);
+  btn.title = label;
+  if (sprite) {
+    btn.classList.add("has-sprite");
+    btn.style.backgroundImage = `url("${sprite}")`;
+    btn.textContent = "";
+  } else {
+    btn.textContent = label;
+  }
+}
+
 function appendCardButton(parent, card, { selectable, view, ownerId }) {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -236,7 +257,7 @@ function appendCardButton(parent, card, { selectable, view, ownerId }) {
   const seat = seatClass(view || lastView, card.playedBy || ownerId);
   if (seat) btn.classList.add(seat);
   if (selectable && selectedCardIds.has(card.id)) btn.classList.add("selected-card");
-  btn.textContent = cardLabel(card);
+  paintCardFace(btn, card);
   if (selectable) {
     btn.addEventListener("click", () => {
       if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
@@ -291,7 +312,7 @@ function renderCardStack(el, cards, view) {
     btn.className = "playing-card stack-card" + (top.color === "red" ? " red" : "");
     const seat = seatClass(view || lastView, top.playedBy);
     if (seat) btn.classList.add(seat);
-    btn.textContent = cardLabel(top);
+    paintCardFace(btn, top);
     btn.disabled = true;
     el.append(btn);
   }
@@ -459,7 +480,6 @@ function renderState(view) {
   lastView = view;
   if (view.viewerId) selfId = view.viewerId;
   const phase = view.phase || "lobby";
-  els.phaseLabel.textContent = phase;
   els.lobbyTools.classList.add("hidden");
   els.btnStart.classList.add("hidden");
   els.handHint.classList.remove("hidden");
@@ -999,7 +1019,7 @@ async function beginHost({ resume }) {
     role = "host";
     selfId = host.hostId;
     const code = await host.start(saved?.roomCode);
-    showTable(code, true);
+    showTable(code);
     setLobbyStatus({ text: "connected" });
   } catch (err) {
     console.error(err);
@@ -1039,7 +1059,7 @@ async function beginGuest(code, { fromRetry = false } = {}) {
     selfId = playerId;
     await guest.join(code);
     saveGuestSession({ roomCode: code, name: nickname(), playerId });
-    showTable(code, false);
+    showTable(code);
     setLobbyStatus({ text: "connected" });
     stopGuestRetry();
   } catch (err) {

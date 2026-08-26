@@ -42,6 +42,16 @@ export function cardLabel(card) {
   return `${rank}${symbol}`;
 }
 
+/** Optional face art. Keys are token labels (Flip Seven Freeze is the first test). */
+const TOKEN_SPRITES = {
+  Freeze: "assets/flip-seven-freeze.png",
+};
+
+export function cardSprite(card) {
+  if (!card || card.kind !== "token") return "";
+  return TOKEN_SPRITES[card.face?.label || card.label] || "";
+}
+
 export const HAND_SORT_MODES = [
   { id: "suit", label: "Suit" },
   { id: "rank", label: "Value" },

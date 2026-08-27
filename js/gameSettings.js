@@ -46,7 +46,7 @@ export function defaultPreset() {
     handSortDefault: "suit",
     handSortModes: ["suit", "rank"],
     skipEmptyHands: false,
-    opponentHandView: "expanded",
+    opponentHandView: "collapsed",
     showPoints: true,
     showLives: false,
     showCoins: false,

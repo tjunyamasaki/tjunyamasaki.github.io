@@ -71,60 +71,67 @@
       <p id="round-message" class="round-message hidden"></p>
       <p id="turn-label" class="muted turn-label"></p>
 
-      <div id="opponents" class="opponents"></div>
-
       <div id="layout-freeplay" class="felt hidden">
-        <div class="felt-board">
-          <div class="pile-row">
-            <div class="zone" data-space="deck">
-              <p class="felt-label">Deck</p>
-              <div id="fp-deck" class="deck-pile"></div>
+        <div class="felt-arena">
+          <div id="seats-north" class="seats seats-north"></div>
+          <div id="seats-west" class="seats seats-west"></div>
+          <div class="felt-board">
+            <div class="pile-row">
+              <div class="zone" data-space="deck">
+                <p class="felt-label">Deck</p>
+                <div id="fp-deck" class="deck-pile"></div>
+              </div>
+              <div class="zone" data-space="discard">
+                <p class="felt-label">Discard</p>
+                <div id="discard-cards" class="card-stack"></div>
+              </div>
+              <div class="zone" data-space="special">
+                <div id="special-cards" class="card-stack" title="Special"></div>
+              </div>
+              <div class="zone" id="pot-pile">
+                <p class="felt-label">Pot</p>
+                <div id="pot-value" class="stat-coin pot-coin">0</div>
+              </div>
             </div>
-            <div class="zone" data-space="discard">
-              <p class="felt-label">Discard</p>
-              <div id="discard-cards" class="card-stack"></div>
-            </div>
-            <div class="zone" data-space="special">
-              <div id="special-cards" class="card-stack" title="Special"></div>
-            </div>
-            <div class="zone" id="pot-pile">
-              <p class="felt-label">Pot</p>
-              <div id="pot-value" class="stat-coin pot-coin">0</div>
+            <div class="zone zone-table" data-space="table">
+              <div id="shared-cards" class="space-stack"></div>
             </div>
           </div>
-          <div class="zone zone-table" data-space="table">
-            <div id="shared-cards" class="space-stack"></div>
+          <div id="seats-east" class="seats seats-east"></div>
+          <div class="seat-south" id="seat-south">
+            <div class="zone zone-mine" id="my-space" data-space="personal">
+              <div id="my-personal" class="space-stack"></div>
+            </div>
+            <div class="you" id="you-area" data-space="hand">
+              <p id="bot-control" class="bot-control hidden">
+                Controlling <span id="bot-control-name"></span>
+                <button id="btn-bot-self" type="button" class="ghost">Back to you</button>
+              </p>
+              <p class="felt-label">
+                <span id="hand-owner-label">Your hand</span>
+                <span id="you-stats" class="player-stats"></span>
+                <span id="hand-hint" class="muted hidden">· tap cards, then an action</span>
+                <span id="hand-sort" class="hand-sort"></span>
+              </p>
+              <div id="hand-cards" class="card-row card-fan" data-origin="bottom"></div>
+            </div>
+            <div id="freeplay-bar" class="action-bar hidden">
+              <div id="player-actions" class="actions">
+                <button type="button" data-act="place-shared">Place on table</button>
+                <button type="button" data-act="place-personal">Place in your space</button>
+                <button type="button" data-act="place-discard">Place in discard</button>
+                <button type="button" data-act="drawCard">Draw</button>
+                <button type="button" data-act="stay">Stay</button>
+                <button type="button" data-act="endTurn">End turn</button>
+                <select id="send-target"></select>
+                <button type="button" data-act="sendCards">Send to player</button>
+                <button type="button" data-act="targetPlayer">Play on player</button>
+                <input id="bet-count" type="number" min="1" max="999" value="1" class="num" aria-label="Bet amount" />
+                <button type="button" data-act="betCoins">Bet</button>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="zone zone-mine" id="my-space" data-space="personal">
-          <div id="my-personal" class="space-stack"></div>
-        </div>
-      </div>
-
-      <div id="freeplay-bar" class="action-bar hidden">
-        <div id="player-actions" class="actions">
-          <button type="button" data-act="place-shared">Place on table</button>
-          <button type="button" data-act="place-personal">Place in your space</button>
-          <button type="button" data-act="place-discard">Place in discard</button>
-          <button type="button" data-act="drawCard">Draw</button>
-          <button type="button" data-act="stay">Stay</button>
-          <button type="button" data-act="endTurn">End turn</button>
-          <select id="send-target"></select>
-          <button type="button" data-act="sendCards">Send to player</button>
-          <button type="button" data-act="targetPlayer">Play on player</button>
-          <input id="bet-count" type="number" min="1" max="999" value="1" class="num" aria-label="Bet amount" />
-          <button type="button" data-act="betCoins">Bet</button>
-        </div>
-      </div>
-
-      <div class="you" id="you-area" data-space="hand">
-        <p class="felt-label">
-          Your hand
-          <span id="you-stats" class="player-stats"></span>
-          <span id="hand-hint" class="muted hidden">· tap cards, then an action</span>
-          <span id="hand-sort" class="hand-sort"></span>
-        </p>
-        <div id="hand-cards" class="card-row"></div>
       </div>
 
       <div id="host-tools" class="host-tools hidden">
@@ -210,6 +217,9 @@
         </details>
         <details class="host-section" open>
           <summary class="felt-label">Players</summary>
+          <div class="actions" id="bot-tools">
+            <button id="btn-add-bot" type="button">Add bot</button>
+          </div>
           <div id="player-roster" class="player-roster"></div>
         </details>
         <details class="host-section">

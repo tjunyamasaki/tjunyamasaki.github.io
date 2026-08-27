@@ -34,6 +34,25 @@ import {
 export const HOST_ID = "host";
 const COLOR_COUNT = 15;
 const ACTION_LOG_CAP = 200;
+const HOST_ONLY_ACTIONS = new Set([
+  "undo",
+  "startGame",
+  "start",
+  "setOrder",
+  "shuffle",
+  "deal",
+  "dealAll",
+  "drawToSpecial",
+  "drawToShared",
+  "clearSpace",
+  "discardAllPersonal",
+  "reshuffle",
+  "resetGame",
+  "setSettings",
+  "setPlayerStat",
+  "addBot",
+  "removeBot",
+]);
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -99,6 +118,7 @@ export function createHost({
   const game = getGame(initialSecret?.gameId || requestedGameId);
   let settings = resolvePreset(game, initialSecret?.settings);
   const ts = createTableState(Object.keys(lobbyState.players), initialSecret, settings);
+  let hostSeatId = HOST_ID;
   let actionLog = Array.isArray(initialSecret?.actionLog)
     ? clone(initialSecret.actionLog)
     : [];
@@ -150,15 +170,20 @@ export function createHost({
       gameId: game.id,
       gameName: game.name,
       layout: game.layout || "table",
+      allowBots: Boolean(game.allowBots),
       settings: clone(settings),
       message,
     };
-    if (viewerId === HOST_ID) snap.actionLog = clone(actionLog);
+    if (viewerId === HOST_ID || lobbyState.players[viewerId]?.isBot) {
+      snap.actionLog = clone(actionLog);
+      snap.hostSeatId = hostSeatId;
+    }
     return snap;
   }
 
   function broadcast() {
-    onState(snapshotFor(HOST_ID));
+    if (!lobbyState.players[hostSeatId]?.isBot) hostSeatId = HOST_ID;
+    onState(snapshotFor(hostSeatId));
     persist();
     for (const session of connections.values()) {
       if (session.channel?.readyState === "open" && session.playerId) {
@@ -187,10 +212,40 @@ export function createHost({
     ts.playerOrder = ts.playerOrder.filter((id) => id !== playerId);
     if (ts.turnIndex >= ts.playerOrder.length) ts.turnIndex = 0;
     delete lobbyState.players[playerId];
+    if (hostSeatId === playerId) hostSeatId = HOST_ID;
     for (const [guestId, session] of [...connections]) {
       if (session.playerId === playerId) closeGuestLink(guestId);
     }
     syncPresetDecks();
+  }
+
+  function nextBotSeat() {
+    let n = 1;
+    while (lobbyState.players[`bot:${n}`]) n += 1;
+    return { id: `bot:${n}`, name: `Bot ${n}` };
+  }
+
+  function addBotSeat() {
+    if (!game.allowBots) return "This game does not use bot seats.";
+    if (Object.keys(lobbyState.players).length >= settings.maxPlayers) {
+      return `Lobby is full (${settings.maxPlayers} players).`;
+    }
+    const { id, name } = nextBotSeat();
+    lobbyState.players[id] = {
+      name,
+      ready: true,
+      isHost: false,
+      isBot: true,
+      connected: true,
+      color: nextFreeColor(lobbyState.players, id),
+      ...emptyPlayerStats(),
+      stats: emptyPlayerStats(),
+    };
+    ensurePlayers(ts, Object.keys(lobbyState.players), settings);
+    if (!ts.playerOrder.includes(id)) ts.playerOrder.push(id);
+    syncPresetDecks();
+    message = `Added ${name}.`;
+    return "";
   }
 
   function syncPresetDecks() {
@@ -286,6 +341,22 @@ export function createHost({
         for (const target of Object.values(lobbyState.players)) apply(target);
       } else {
         apply(lobbyState.players[intent.playerId]);
+      }
+    } else if (intent.action === "addBot" && peerId === HOST_ID) {
+      const err = addBotSeat();
+      if (err) {
+        error = err;
+        setStatus(err, true);
+      }
+    } else if (intent.action === "removeBot" && peerId === HOST_ID) {
+      const target = lobbyState.players[intent.playerId];
+      if (!game.allowBots || !target?.isBot) {
+        error = game.allowBots ? "That seat is not a bot." : "This game does not use bot seats.";
+        setStatus(error, true);
+      } else {
+        const name = target.name || "Bot";
+        removeSeat(intent.playerId);
+        message = `Removed ${name}.`;
       }
     } else if (intent.action === "setSettings" && peerId === HOST_ID) {
       const next = resolvePreset(game, { ...settings, ...intent.settings });
@@ -497,8 +568,17 @@ export function createHost({
     return roomCode;
   }
 
+  function setHostSeat(playerId) {
+    if (!game.allowBots) return;
+    if (playerId === HOST_ID || lobbyState.players[playerId]?.isBot) {
+      hostSeatId = playerId;
+      broadcast();
+    }
+  }
+
   function hostIntent(action, extra = {}) {
-    applyIntent(HOST_ID, { action, ...extra });
+    const actor = HOST_ONLY_ACTIONS.has(action) ? HOST_ID : hostSeatId;
+    applyIntent(actor, { action, ...extra });
   }
 
   async function stop() {
@@ -517,5 +597,5 @@ export function createHost({
     }
   }
 
-  return { start, stop, hostIntent, hostId: HOST_ID };
+  return { start, stop, hostIntent, setHostSeat, hostId: HOST_ID };
 }

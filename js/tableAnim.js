@@ -323,9 +323,93 @@ function flipFace(spin, delay) {
   anim.finished.then(clear, clear);
 }
 
+function unrotatedRect(el) {
+  if (!el) return null;
+  const inline = el.style.transform;
+  const trans = el.style.transition;
+  el.style.transition = "none";
+  el.style.transform = "none";
+  const rect = copyRect(el.getBoundingClientRect());
+  el.style.transform = inline;
+  el.style.transition = trans;
+  return rect;
+}
+
+function flyIntoFan(el, from, delay, reveal) {
+  const slot = el.closest(".fan-slot");
+  if (!slot || !from) return;
+  const to = unrotatedRect(slot);
+  if (!to || (!to.width && !to.height)) return;
+  const rot = (slot.style.getPropertyValue("--fan-rot") || "0deg").trim() || "0deg";
+  const dx = from.left - to.left;
+  const dy = from.top - to.top;
+  const start = `translate(${dx}px, ${dy}px) rotate(0deg)`;
+  const end = `rotate(${rot})`;
+  slot.style.transition = "none";
+  slot.style.transform = start;
+  if (reveal) flipFace(el.querySelector(".card-3d"), delay);
+  const anim = slot.animate([{ transform: start }, { transform: end }], {
+    duration: DURATION_MS,
+    delay,
+    easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    fill: "both",
+  });
+  const clear = () => {
+    slot.style.transform = "";
+    slot.style.transition = "";
+  };
+  anim.finished.then(clear, clear);
+}
+
+function flyGhost(from, to, delay, clone, reveal, onDone) {
+  if (!from || !to) {
+    onDone?.();
+    return;
+  }
+  const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+  const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+  if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
+    onDone?.();
+    return;
+  }
+  const layer = ensureLayer();
+  const ghost = clone ? clone.cloneNode(true) : document.createElement("div");
+  if (!clone) ghost.className = "deck-back card-ghost";
+  ghost.classList.add("card-ghost", "card-fly");
+  ghost.style.visibility = "visible";
+  ghost.style.left = `${from.left}px`;
+  ghost.style.top = `${from.top}px`;
+  ghost.style.width = `${from.width}px`;
+  ghost.style.height = `${from.height}px`;
+  ghost.disabled = true;
+  layer.append(ghost);
+  if (reveal) flipFace(ghost.querySelector(".card-3d"), delay);
+  const anim = ghost.animate(
+    [
+      { transform: "translate(0, 0) scale(1)" },
+      { transform: `translate(${dx}px, ${dy}px) scale(0.92)` },
+    ],
+    {
+      duration: DURATION_MS,
+      delay,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      fill: "both",
+    }
+  );
+  const done = () => {
+    ghost.remove();
+    onDone?.();
+  };
+  anim.finished.then(done, done);
+}
+
 function flyEl(el, from, delay, reveal) {
   const to = el.getBoundingClientRect();
   if (!to.width && !to.height) return;
+  if (el.closest(".fan-slot")) {
+    flyIntoFan(el, from, delay, reveal);
+    return;
+  }
   const { dx, dy } = invertOffset(from, to);
   if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
     if (reveal) flipFace(el.querySelector(".card-3d"), delay);
@@ -346,40 +430,6 @@ function flyEl(el, from, delay, reveal) {
     el.style.transform = "";
   };
   anim.finished.then(clear, clear);
-}
-
-function flyGhost(from, to, delay, clone, reveal) {
-  if (!from || !to) return;
-  const dx = to.left + to.width / 2 - (from.left + from.width / 2);
-  const dy = to.top + to.height / 2 - (from.top + from.height / 2);
-  if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
-  const layer = ensureLayer();
-  const ghost = clone ? clone.cloneNode(true) : document.createElement("div");
-  if (!clone) ghost.className = "deck-back card-ghost";
-  ghost.classList.add("card-ghost", "card-fly");
-  ghost.style.left = `${from.left}px`;
-  ghost.style.top = `${from.top}px`;
-  ghost.style.width = `${from.width}px`;
-  ghost.style.height = `${from.height}px`;
-  ghost.disabled = true;
-  layer.append(ghost);
-  if (reveal) flipFace(ghost.querySelector(".card-3d"), delay);
-  const anim = ghost.animate(
-    [
-      { transform: "translate(0, 0) scale(1)" },
-      { transform: `translate(${dx}px, ${dy}px) scale(0.92)` },
-    ],
-    {
-      duration: DURATION_MS,
-      delay,
-      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      fill: "both",
-    }
-  );
-  anim.finished.then(
-    () => ghost.remove(),
-    () => ghost.remove()
-  );
 }
 
 export function playTableMoves(prev, view, { selfId, origins, deckEl, feltEl, root }) {

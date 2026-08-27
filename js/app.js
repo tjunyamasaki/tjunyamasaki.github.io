@@ -41,7 +41,10 @@ const els = {
   handCards: document.getElementById("hand-cards"),
   handHint: document.getElementById("hand-hint"),
   handSort: document.getElementById("hand-sort"),
-  opponents: document.getElementById("opponents"),
+  seatsNorth: document.getElementById("seats-north"),
+  seatsWest: document.getElementById("seats-west"),
+  seatsEast: document.getElementById("seats-east"),
+  seatSouth: document.getElementById("seat-south"),
   gameType: document.getElementById("game-type"),
   gameBlurb: document.getElementById("game-blurb"),
   gameNameLabel: document.getElementById("game-name-label"),
@@ -82,6 +85,12 @@ const els = {
   betCount: document.getElementById("bet-count"),
   youStats: document.getElementById("you-stats"),
   playerRoster: document.getElementById("player-roster"),
+  botTools: document.getElementById("bot-tools"),
+  btnAddBot: document.getElementById("btn-add-bot"),
+  botControl: document.getElementById("bot-control"),
+  botControlName: document.getElementById("bot-control-name"),
+  btnBotSelf: document.getElementById("btn-bot-self"),
+  handOwnerLabel: document.getElementById("hand-owner-label"),
   rankOrder: document.getElementById("rank-order"),
   banRanks: document.getElementById("ban-ranks"),
   banGrid: document.getElementById("ban-grid"),
@@ -95,6 +104,8 @@ const els = {
   mySpace: document.getElementById("my-space"),
   youArea: document.getElementById("you-area"),
 };
+
+const SEAT_STACK_MQ = window.matchMedia("(max-width: 720px)");
 
 let session = null;
 let role = null;
@@ -241,17 +252,38 @@ function paintCardFace(btn, card) {
   const label = cardLabel(card);
   const sprite = cardSprite(card);
   const front = btn.querySelector(".card-front") || btn;
+  const rank = card.rank ?? card.face?.rank;
+  const symbol = card.symbol ?? card.face?.symbol;
   btn.setAttribute("aria-label", label);
   btn.title = label;
+  front.replaceChildren();
+  front.style.backgroundImage = "";
+  btn.classList.remove("has-sprite", "has-index");
   if (sprite) {
     btn.classList.add("has-sprite");
     front.style.backgroundImage = `url("${sprite}")`;
-    front.textContent = "";
-  } else {
-    btn.classList.remove("has-sprite");
-    front.style.backgroundImage = "";
-    front.textContent = label;
+    return;
   }
+  if (card.kind !== "token" && (rank || symbol)) {
+    btn.classList.add("has-index");
+    const index = document.createElement("span");
+    index.className = "card-index";
+    if (rank) {
+      const rankEl = document.createElement("span");
+      rankEl.className = "card-rank";
+      rankEl.textContent = String(rank);
+      index.append(rankEl);
+    }
+    if (symbol) {
+      const suitEl = document.createElement("span");
+      suitEl.className = "card-suit";
+      suitEl.textContent = symbol;
+      index.append(suitEl);
+    }
+    front.append(index);
+    return;
+  }
+  front.textContent = label;
 }
 
 function makePlayingCard(card, extraClass = "") {
@@ -273,21 +305,55 @@ function makePlayingCard(card, extraClass = "") {
   return btn;
 }
 
-function appendCardButton(parent, card, { selectable, view, ownerId }) {
+function wrapFanSlot(child, selected) {
+  const slot = document.createElement("span");
+  slot.className = "fan-slot" + (selected ? " selected" : "");
+  slot.append(child);
+  return slot;
+}
+
+function layoutFan(container) {
+  if (!container) return;
+  const slots = [...container.children].filter((el) => el.classList.contains("fan-slot"));
+  const n = slots.length;
+  container.dataset.count = String(n);
+  if (!n) return;
+  const cardW = parseFloat(getComputedStyle(container).getPropertyValue("--fan-card-w")) || 4.05;
+  const spread = n <= 1 ? 0 : Math.min(96, 26 + n * 6.2);
+  const step = n <= 1 ? cardW : Math.max(cardW * 0.2, cardW * 0.5 - n * 0.06);
+  container.style.setProperty("--fan-step", `${step}rem`);
+  slots.forEach((slot, i) => {
+    const t = n === 1 ? 0.5 : i / (n - 1);
+    const rot = -spread / 2 + t * spread;
+    slot.style.setProperty("--fan-rot", `${rot}deg`);
+    const z = String(i + 1);
+    slot.style.setProperty("--fan-z", z);
+    slot.style.zIndex = z;
+  });
+}
+
+function toggleHandCard(cardId, btn) {
+  const on = !selectedCardIds.has(cardId);
+  if (on) selectedCardIds.add(cardId);
+  else selectedCardIds.delete(cardId);
+  const cardBtn =
+    btn || els.handCards?.querySelector(`[data-card-id="${cardId}"]`);
+  cardBtn?.classList.toggle("selected-card", on);
+  const slot = cardBtn?.closest(".fan-slot");
+  if (slot) slot.classList.toggle("selected", on);
+}
+
+function appendCardButton(parent, card, { selectable, view, ownerId, fan } = {}) {
   const btn = makePlayingCard(card);
   const seat = seatClass(view || lastView, card.playedBy || ownerId);
   if (seat) btn.classList.add(seat);
   if (selectable && selectedCardIds.has(card.id)) btn.classList.add("selected-card");
   if (selectable) {
-    btn.addEventListener("click", () => {
-      if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
-      else selectedCardIds.add(card.id);
-      if (lastView) renderState(lastView);
-    });
+    btn.addEventListener("click", () => toggleHandCard(card.id, btn));
   } else {
     btn.disabled = true;
   }
-  parent.append(btn);
+  parent.append(fan ? wrapFanSlot(btn, btn.classList.contains("selected-card")) : btn);
 }
 
 function splitSpaceRows(cards, rowCount) {
@@ -414,19 +480,62 @@ function fillPlayerStats(el, view, playerId) {
   }
 }
 
+function playerOrderList(view) {
+  const players = view.players || {};
+  const order = view.playerOrder?.length ? view.playerOrder : Object.keys(players);
+  return order.filter((id) => players[id]);
+}
+
+/** Seats after you in playerOrder: left of you first (east of the screen). */
+function opponentsClockwise(view) {
+  const order = playerOrderList(view);
+  const i = order.indexOf(selfId);
+  if (i < 0) return order.filter((id) => id !== selfId);
+  return [...order.slice(i + 1), ...order.slice(0, i)];
+}
+
+function splitSeatRails(n) {
+  if (n <= 0) return { west: 0, north: 0, east: 0 };
+  if (n === 1) return { west: 0, north: 1, east: 0 };
+  if (n === 2) return { west: 1, north: 0, east: 1 };
+  const side = Math.min(3, Math.floor(n / 3));
+  return { west: side, north: n - side * 2, east: side };
+}
+
 function renderOpponents(view, phase) {
-  els.opponents.innerHTML = "";
+  for (const rail of [els.seatsNorth, els.seatsWest, els.seatsEast]) {
+    if (rail) rail.innerHTML = "";
+  }
   const players = view.players || {};
   const counts = view.handCounts || {};
-  const collapsed = view.settings?.opponentHandView === "collapsed";
-  for (const [id, player] of Object.entries(players)) {
-    if (id === selfId) continue;
+  const around = opponentsClockwise(view);
+  const crowded = around.length > 6;
+  const collapsed =
+    view.settings?.opponentHandView === "collapsed" || crowded;
+  const stacked = SEAT_STACK_MQ.matches;
+  const split = stacked ? { west: 0, north: around.length, east: 0 } : splitSeatRails(around.length);
+  const rails = {
+    east: around.slice(0, split.east),
+    north: around.slice(split.east, split.east + split.north),
+    west: around.slice(split.east + split.north),
+  };
+  const arena = els.layoutFreeplay?.querySelector(".felt-arena");
+  if (arena) {
+    arena.dataset.seats = String(around.length);
+    arena.classList.toggle("felt-stacked", stacked);
+    arena.classList.toggle("felt-crowded", crowded);
+  }
+
+  const mount = (id, railName) => {
+    const player = players[id];
+    if (!player) return;
     const box = document.createElement("div");
     box.className =
       "opponent" +
       (player.connected === false ? " offline" : "") +
       (collapsed ? " collapsed" : "");
     box.dataset.playerId = id;
+    box.dataset.rail = railName;
     setSeatClass(box, view, id);
     if (phase === "playing" && view.currentPlayerId === id) box.classList.add("is-turn");
     const name = document.createElement("div");
@@ -434,6 +543,7 @@ function renderOpponents(view, phase) {
     const bits = document.createElement("span");
     const labels = [player.name || "Player"];
     if (player.isHost) labels.push("host");
+    if (player.isBot) labels.push("bot");
     if (player.connected === false) labels.push("away");
     if ((view.bustedIds || []).includes(id)) labels.push("bust");
     else if ((view.inactiveIds || []).includes(id)) labels.push("out");
@@ -443,17 +553,19 @@ function renderOpponents(view, phase) {
     stats.className = "player-stats";
     fillPlayerStats(stats, view, id);
     name.append(stats);
-    const row = document.createElement("div");
-    row.className = "card-row";
+    const body = document.createElement("div");
+    body.className = "opponent-body";
     const personal = (view.personal && view.personal[id]) || [];
     if (spaceVisible(view, "personal")) {
       const space = document.createElement("div");
       space.className = "opponent-space space-stack";
       fillSpace(space, personal, { view, ownerId: id }, view.settings?.personalRows);
-      row.append(space);
+      body.append(space);
     }
+    const hand = document.createElement("div");
     const n = spaceVisible(view, "hand") ? counts[id] ?? 0 : 0;
     if (collapsed) {
+      hand.className = "opponent-hand card-row";
       const pile = document.createElement("div");
       pile.className = "mini-pile";
       pile.title = `${n} in hand`;
@@ -464,17 +576,41 @@ function renderOpponents(view, phase) {
       count.className = "deck-count";
       count.textContent = String(n);
       pile.append(count);
-      row.append(pile);
+      hand.append(pile);
     } else {
+      hand.className = "opponent-hand card-row";
       for (let i = 0; i < n; i++) {
         const back = document.createElement("span");
         back.className = "face-down " + (seatClass(view, id) || "");
-        row.append(back);
+        hand.append(back);
       }
     }
-    box.append(name, row);
-    els.opponents.append(box);
-  }
+    body.append(hand);
+    if (
+      role === "host" &&
+      view.allowBots &&
+      id !== selfId &&
+      (player.isBot || id === "host")
+    ) {
+      const take = document.createElement("button");
+      take.type = "button";
+      take.className = "ghost seat-control";
+      take.textContent = "Play as";
+      take.addEventListener("click", (event) => {
+        event.stopPropagation();
+        session?.setHostSeat?.(id);
+      });
+      name.append(take);
+    }
+    box.append(name, body);
+    const host =
+      railName === "west" ? els.seatsWest : railName === "east" ? els.seatsEast : els.seatsNorth;
+    host?.append(box);
+  };
+
+  for (const id of rails.west) mount(id, "west");
+  for (const id of rails.north) mount(id, "north");
+  for (const id of rails.east) mount(id, "east");
 }
 
 function tableActions(view) {
@@ -520,6 +656,25 @@ function renderState(view) {
 
   setSeatClass(els.mySpace, view, selfId);
   setSeatClass(els.youArea, view, selfId);
+  setSeatClass(els.seatSouth, view, selfId);
+  const myTurnSeat = phase === "playing" && view.currentPlayerId === selfId;
+  els.youArea?.classList.toggle("is-turn", myTurnSeat);
+  els.seatSouth?.classList.toggle("is-turn", myTurnSeat);
+  const sittingBot = Boolean(view.players?.[selfId]?.isBot);
+  if (els.handOwnerLabel) {
+    els.handOwnerLabel.textContent = sittingBot
+      ? `${view.players[selfId].name || "Bot"}'s hand`
+      : "Your hand";
+  }
+  if (els.botControl) {
+    els.botControl.classList.toggle(
+      "hidden",
+      role !== "host" || !sittingBot || !view.allowBots
+    );
+    if (els.botControlName) {
+      els.botControlName.textContent = view.players?.[selfId]?.name || "bot";
+    }
+  }
 
   els.layoutFreeplay.classList.remove("hidden");
   els.freeplayBar.classList.remove("hidden");
@@ -583,15 +738,19 @@ function renderState(view) {
   }
 
   els.handCards.innerHTML = "";
+  els.handCards.style.removeProperty("--fan-step");
   for (const card of hand) {
     appendCardButton(els.handCards, card, {
       selectable: canSelectHand,
       view,
       ownerId: selfId,
+      fan: true,
     });
   }
   if (!(view.hand || []).length) {
     els.handCards.textContent = phase === "lobby" ? "—" : "No cards";
+  } else {
+    layoutFan(els.handCards);
   }
 
   playTableMoves(prev, view, {
@@ -637,7 +796,10 @@ function fillHostControls(view) {
     for (const [id, player] of Object.entries(players)) {
       const opt = document.createElement("option");
       opt.value = id;
-      opt.textContent = player.name + (id === "host" ? " (host)" : "");
+      opt.textContent =
+        player.name +
+        (id === "host" ? " (host)" : "") +
+        (player.isBot ? " (bot)" : "");
       select.append(opt);
     }
   };
@@ -807,7 +969,9 @@ function fillTurnOrder(view) {
   const items = order.map((id) => ({
     id,
     playerId: id,
-    label: (players[id]?.name || id) + (id === "host" ? " (host)" : ""),
+    label: (players[id]?.name || id) +
+      (id === "host" ? " (host)" : "") +
+      (players[id]?.isBot ? " (bot)" : ""),
   }));
   renderOrderChips(els.orderList, items, {
     editing,
@@ -857,6 +1021,7 @@ function fillPlayerRoster(view) {
     name.textContent =
       (player.name || id) +
       (player.isHost ? " · host" : "") +
+      (player.isBot ? " · bot" : "") +
       ((view.bustedIds || []).includes(id)
         ? " · bust"
         : (view.inactiveIds || []).includes(id)
@@ -885,6 +1050,33 @@ function fillPlayerRoster(view) {
     });
     coinField.append(coinInput);
     row.append(name, stats, coinField);
+    if (view.allowBots && (player.isBot || id === "host")) {
+      const actions = document.createElement("div");
+      actions.className = "player-row-actions";
+      if (id === selfId) {
+        const mark = document.createElement("span");
+        mark.className = "muted";
+        mark.textContent = "playing";
+        actions.append(mark);
+      } else {
+        const take = document.createElement("button");
+        take.type = "button";
+        take.textContent = "Play as";
+        take.addEventListener("click", () => session?.setHostSeat?.(id));
+        actions.append(take);
+      }
+      if (player.isBot) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "ghost";
+        remove.textContent = "Remove";
+        remove.addEventListener("click", () =>
+          sendAction("removeBot", { playerId: id })
+        );
+        actions.append(remove);
+      }
+      row.append(actions);
+    }
     el.append(row);
   }
 }
@@ -931,6 +1123,9 @@ function fillGameSettings(view) {
   fillPlayerRoster(view);
   fillTurnOrder(view);
   fillRankOrder(view);
+  if (els.botTools) {
+    els.botTools.classList.toggle("hidden", !view.allowBots);
+  }
 
   els.banRanks.innerHTML = "";
   els.banGrid.innerHTML = "";
@@ -1242,6 +1437,8 @@ els.btnSetCoinsAll.addEventListener("click", () => {
     value: Number(els.settingCoins.value),
   });
 });
+els.btnAddBot?.addEventListener("click", () => sendAction("addBot"));
+els.btnBotSelf?.addEventListener("click", () => session?.setHostSeat?.("host"));
 
 els.btnTurnChange.addEventListener("click", () => {
   turnOrderPicks = [];
@@ -1384,6 +1581,10 @@ window.addEventListener("hashchange", () => {
     /* stay at table unless they Leave */
     location.hash = "table";
   }
+});
+
+SEAT_STACK_MQ.addEventListener("change", () => {
+  if (lastView) renderState(lastView);
 });
 
 fillGameSelect();

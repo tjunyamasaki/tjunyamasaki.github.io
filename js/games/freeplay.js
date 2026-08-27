@@ -6,6 +6,8 @@ export const freeplayGame = {
   name: "Free play (test)",
   blurb: "Sandbox table: table, personal spaces, discard, turns, host tools.",
   layout: "table",
+  /** Host debug seats (no WebRTC). Not a table rule. */
+  allowBots: true,
   tableActions: {
     placeShared: true,
     placePersonal: true,

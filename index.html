@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Card lobby</title>
     <link rel="stylesheet" href="css/style.css" />
   </head>
@@ -53,219 +53,261 @@
           <span class="table-head-dash" aria-hidden="true">-</span>
           <span id="game-name-label"></span>
         </h2>
+        <p id="turn-label" class="muted turn-chip"></p>
+        <button id="btn-start" type="button" class="table-head-start hidden">Start</button>
+        <button id="btn-menu" type="button" class="ghost table-head-menu">Menu</button>
         <button id="btn-leave" type="button" class="ghost table-head-leave">Leave</button>
       </header>
-      <p id="lobby-status" class="status table-status hidden"></p>
+
+      <div class="table-toasts">
+        <p id="lobby-status" class="status table-status hidden"></p>
+        <p id="round-message" class="round-message hidden"></p>
+      </div>
 
       <div id="color-picks" class="color-picks hidden">
         <span class="muted">Your color</span>
         <div id="color-swatches" class="color-swatches" role="listbox" aria-label="Your color"></div>
       </div>
 
-      <div id="lobby-tools" class="table-toolbar hidden">
-        <div class="actions">
-          <button id="btn-start" type="button">Start deal</button>
-        </div>
-      </div>
+      <div id="lobby-tools" class="table-toolbar hidden"></div>
 
-      <p id="round-message" class="round-message hidden"></p>
-      <p id="turn-label" class="muted turn-label"></p>
+      <div id="hands-strip" class="hands-strip" data-space="hand"></div>
 
       <div id="layout-freeplay" class="felt hidden">
         <div class="felt-arena">
-          <div id="seats-north" class="seats seats-north"></div>
-          <div id="seats-west" class="seats seats-west"></div>
-          <div class="felt-board">
-            <div class="pile-row">
-              <div class="zone" data-space="deck">
+          <div id="table-grid" class="table-grid">
+            <div class="pile-cluster">
+              <div class="zone zone-pile" data-space="deck" data-drop="deck">
                 <p class="felt-label">Deck</p>
                 <div id="fp-deck" class="deck-pile"></div>
               </div>
-              <div class="zone" data-space="discard">
+              <div class="zone zone-pile" data-space="discard" data-drop="discard">
                 <p class="felt-label">Discard</p>
                 <div id="discard-cards" class="card-stack"></div>
               </div>
-              <div class="zone" data-space="special">
+              <div class="zone zone-pile" data-space="special" data-drop="special">
+                <p class="felt-label">Special</p>
                 <div id="special-cards" class="card-stack" title="Special"></div>
               </div>
-              <div class="zone" id="pot-pile">
+              <div class="zone zone-pile" id="pot-pile">
                 <p class="felt-label">Pot</p>
                 <div id="pot-value" class="stat-coin pot-coin">0</div>
               </div>
             </div>
-            <div class="zone zone-table" data-space="table">
-              <div id="shared-cards" class="space-stack"></div>
+            <div class="zone zone-table" data-space="table" data-drop="shared">
+              <div id="shared-cards" class="space-stack space-chip"></div>
+            </div>
+            <div id="player-grid" class="player-grid"></div>
+            <div id="personal-park" class="personal-park">
+              <div class="zone zone-mine" id="my-space" data-space="personal" data-drop="personal">
+                <div id="my-personal" class="space-stack space-chip"></div>
+              </div>
             </div>
           </div>
-          <div id="seats-east" class="seats seats-east"></div>
           <div class="seat-south" id="seat-south">
-            <div class="zone zone-mine" id="my-space" data-space="personal">
-              <div id="my-personal" class="space-stack"></div>
-            </div>
             <div class="you" id="you-area" data-space="hand">
               <p id="bot-control" class="bot-control hidden">
                 Controlling <span id="bot-control-name"></span>
                 <button id="btn-bot-self" type="button" class="ghost">Back to you</button>
               </p>
-              <p class="felt-label">
+              <p class="felt-label you-chrome">
                 <span id="hand-owner-label">Your hand</span>
                 <span id="you-stats" class="player-stats"></span>
-                <span id="hand-hint" class="muted hidden">· tap cards, then an action</span>
+                <span id="hand-hint" class="muted hidden">· tap a space</span>
                 <span id="hand-sort" class="hand-sort"></span>
               </p>
+              <button id="hand-peek" type="button" class="hand-peek" aria-label="Lift hand" aria-pressed="false"></button>
               <div id="hand-cards" class="card-row card-fan" data-origin="bottom"></div>
             </div>
-            <div id="freeplay-bar" class="action-bar hidden">
-              <div id="player-actions" class="actions">
-                <button type="button" data-act="place-shared">Place on table</button>
-                <button type="button" data-act="place-personal">Place in your space</button>
-                <button type="button" data-act="place-discard">Place in discard</button>
-                <button type="button" data-act="drawCard">Draw</button>
-                <button type="button" data-act="stay">Stay</button>
-                <button type="button" data-act="endTurn">End turn</button>
-                <select id="send-target"></select>
-                <button type="button" data-act="sendCards">Send to player</button>
-                <button type="button" data-act="targetPlayer">Play on player</button>
-                <input id="bet-count" type="number" min="1" max="999" value="1" class="num" aria-label="Bet amount" />
-                <button type="button" data-act="betCoins">Bet</button>
+            <div id="player-dock" class="player-dock">
+              <button type="button" data-act="stay">Stay</button>
+              <button type="button" data-act="endTurn">End turn</button>
+              <div class="dock-more">
+                <button id="btn-overflow" type="button" class="ghost">More</button>
+                <div id="freeplay-bar" class="action-overflow hidden">
+                  <div id="player-actions" class="actions">
+                    <button type="button" data-act="place-shared">Place on table</button>
+                    <button type="button" data-act="place-personal">Place in your space</button>
+                    <button type="button" data-act="place-discard">Place in discard</button>
+                    <button type="button" data-act="drawCard">Draw</button>
+                    <select id="send-target"></select>
+                    <button type="button" data-act="sendCards">Send to player</button>
+                    <button type="button" data-act="targetPlayer">Play on player</button>
+                    <input id="bet-count" type="number" min="1" max="999" value="1" class="num" aria-label="Bet amount" />
+                    <button type="button" data-act="betCoins">Bet</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div id="host-tools" class="host-tools hidden">
-        <details class="host-section" open>
-          <summary class="felt-label">Game</summary>
-          <div class="actions">
-            <button type="button" data-act="undo">Undo</button>
-            <button id="btn-host-start" type="button" data-act="hostStart">Start</button>
-            <button type="button" data-act="resetGame">Reset</button>
-          </div>
-        </details>
-        <details class="host-section" open>
-          <summary class="felt-label">Deal</summary>
-          <div class="actions">
-            <input id="deal-count" type="number" min="1" max="52" value="5" class="num" aria-label="Deal count" />
-            <button type="button" data-act="dealAll">All</button>
-            <select id="deal-target" aria-label="Deal to player"></select>
-            <button type="button" data-act="deal">Player</button>
-            <button type="button" data-act="drawToSpecial">Flip from deck</button>
-          </div>
-        </details>
-        <details class="host-section" open>
-          <summary class="felt-label">Discard</summary>
-          <div class="actions">
-            <button type="button" data-act="discardShared">All table</button>
-            <button type="button" data-act="discardAllPersonal">All player spaces</button>
-            <select id="discard-target" aria-label="Discard player space"></select>
-            <button type="button" data-act="discardPlayer">Player space</button>
-          </div>
-        </details>
-        <details class="host-section">
-          <summary class="felt-label">Action log</summary>
-          <div id="action-log" class="action-log muted">No actions yet.</div>
-        </details>
-        <details class="host-section">
-          <summary class="felt-label">Move</summary>
-          <p class="muted">No actions yet.</p>
-        </details>
-      </div>
-
-      <div id="game-settings" class="host-tools hidden">
-        <p class="felt-label">Game settings</p>
-        <details class="host-section" open>
-          <summary class="felt-label">General</summary>
-          <div class="actions">
-            <label class="muted" id="setting-decks-field">Decks
-              <input id="setting-decks" type="number" min="1" max="8" value="1" class="num" />
-            </label>
-            <label class="muted">Min players
-              <input id="setting-min" type="number" min="1" max="15" value="1" class="num" />
-            </label>
-            <label class="muted">Max players
-              <input id="setting-max" type="number" min="1" max="15" value="15" class="num" />
-            </label>
-          </div>
-        </details>
-        <details class="host-section" open>
-          <summary class="felt-label">Spaces</summary>
-          <p class="muted">Visibility</p>
-          <div id="space-toggles" class="ban-ranks"></div>
-          <div class="actions">
-            <label class="muted">Personal rows
-              <input id="setting-personal-rows" type="number" min="1" max="4" value="1" class="num" />
-            </label>
-            <label class="muted">Table rows
-              <input id="setting-shared-rows" type="number" min="1" max="4" value="1" class="num" />
-            </label>
-          </div>
-        </details>
-        <details class="host-section" open>
-          <summary class="felt-label">Player</summary>
-          <div class="actions">
-            <button id="setting-show-points" type="button" class="ghost sort-btn">Points</button>
-            <button id="setting-show-lives" type="button" class="ghost sort-btn">Lives</button>
-            <button id="setting-show-coins" type="button" class="ghost sort-btn">Coins</button>
-          </div>
-          <div class="actions">
-            <label class="muted">Coins
-              <input id="setting-coins" type="number" min="0" max="999" value="0" class="num" />
-            </label>
-            <button id="btn-set-coins-all" type="button">Set all players</button>
-          </div>
-        </details>
-        <details class="host-section" open>
-          <summary class="felt-label">Players</summary>
-          <div class="actions" id="bot-tools">
-            <button id="btn-add-bot" type="button">Add bot</button>
-          </div>
-          <div id="player-roster" class="player-roster"></div>
-        </details>
-        <details class="host-section">
-          <summary class="felt-label">View</summary>
-          <div class="actions">
-            <button id="setting-hand-view" type="button" class="ghost sort-btn">Collapsed view</button>
-          </div>
-        </details>
-        <details class="host-section">
-          <summary class="felt-label">Turn</summary>
-          <div class="actions">
-            <button id="setting-skip-empty" type="button" class="ghost sort-btn">Skip turn if no cards</button>
-          </div>
-        </details>
-        <details class="host-section">
-          <summary class="felt-label">Turn order</summary>
-          <div id="order-list" class="order-chips"></div>
-          <div class="actions">
-            <button id="btn-turn-change" type="button">Change order</button>
-            <button id="btn-turn-save" type="button" class="hidden">Save</button>
-            <button id="btn-turn-cancel" type="button" class="ghost hidden">Cancel</button>
-          </div>
-        </details>
-        <details class="host-section">
-          <summary class="felt-label">Cards</summary>
-          <div class="actions">
-            <button type="button" data-act="shuffle">Shuffle deck</button>
-            <button type="button" data-act="reshuffle">Reshuffle discard into deck</button>
-          </div>
-          <details class="host-section">
-            <summary class="felt-label">Order</summary>
-            <div id="rank-order" class="order-chips"></div>
+      <dialog id="table-menu" class="sheet">
+        <div class="sheet-head">
+          <h3>Menu</h3>
+          <button id="btn-menu-close" type="button" class="ghost">Close</button>
+        </div>
+        <section class="sheet-block">
+          <p class="felt-label">Your color</p>
+          <div id="menu-color-swatches" class="color-swatches" role="listbox" aria-label="Your color"></div>
+        </section>
+        <div id="host-tools" class="host-tools hidden">
+          <details class="host-section" open>
+            <summary class="felt-label">Game</summary>
             <div class="actions">
-              <button id="btn-rank-change" type="button">Change order</button>
-              <button id="btn-rank-save" type="button" class="hidden">Save</button>
-              <button id="btn-rank-cancel" type="button" class="ghost hidden">Cancel</button>
+              <button type="button" data-act="undo">Undo</button>
+              <button id="btn-host-start" type="button" data-act="hostStart">Start</button>
+              <button type="button" data-act="resetGame">Reset</button>
             </div>
           </details>
-          <details class="host-section" id="setting-french-shoe">
-            <summary class="felt-label">Banished cards</summary>
-            <div id="ban-ranks" class="ban-ranks"></div>
-            <div id="ban-grid" class="ban-grid"></div>
-            <p class="muted">Changing decks or banished cards rebuilds the shoe and clears the table.</p>
+          <details class="host-section" open>
+            <summary class="felt-label">Deal</summary>
+            <div class="actions">
+              <input id="deal-count" type="number" min="1" max="52" value="5" class="num" aria-label="Deal count" />
+              <button type="button" data-act="dealAll">All</button>
+              <select id="deal-target" aria-label="Deal to player"></select>
+              <button type="button" data-act="deal">Player</button>
+              <button type="button" data-act="drawToSpecial">Flip from deck</button>
+            </div>
           </details>
-        </details>
-      </div>
+          <details class="host-section" open>
+            <summary class="felt-label">Discard</summary>
+            <div class="actions">
+              <button type="button" data-act="discardShared">All table</button>
+              <button type="button" data-act="discardAllPersonal">All player spaces</button>
+              <select id="discard-target" aria-label="Discard player space"></select>
+              <button type="button" data-act="discardPlayer">Player space</button>
+            </div>
+          </details>
+          <details class="host-section">
+            <summary class="felt-label">Action log</summary>
+            <div id="action-log" class="action-log muted">No actions yet.</div>
+          </details>
+          <details class="host-section">
+            <summary class="felt-label">Move</summary>
+            <p class="muted">No actions yet.</p>
+          </details>
+        </div>
+
+        <div id="game-settings" class="host-tools hidden">
+          <p class="felt-label">Game settings</p>
+          <details class="host-section" open>
+            <summary class="felt-label">General</summary>
+            <div class="actions">
+              <label class="muted" id="setting-decks-field">Decks
+                <input id="setting-decks" type="number" min="1" max="8" value="1" class="num" />
+              </label>
+              <label class="muted">Min players
+                <input id="setting-min" type="number" min="1" max="15" value="1" class="num" />
+              </label>
+              <label class="muted">Max players
+                <input id="setting-max" type="number" min="1" max="15" value="15" class="num" />
+              </label>
+            </div>
+          </details>
+          <details class="host-section" open>
+            <summary class="felt-label">Spaces</summary>
+            <p class="muted">Visibility</p>
+            <div id="space-toggles" class="ban-ranks"></div>
+            <p class="muted">Card layout</p>
+            <div class="actions">
+              <button id="setting-space-view-grid" type="button" class="ghost sort-btn">Grid</button>
+              <button id="setting-space-view-stack" type="button" class="ghost sort-btn">Stacked</button>
+            </div>
+            <div class="actions">
+              <label class="muted">Personal rows
+                <input id="setting-personal-rows" type="number" min="1" max="4" value="1" class="num" />
+              </label>
+              <label class="muted">Table rows
+                <input id="setting-shared-rows" type="number" min="1" max="4" value="1" class="num" />
+              </label>
+            </div>
+          </details>
+          <details class="host-section" open>
+            <summary class="felt-label">Player</summary>
+            <div class="actions">
+              <button id="setting-show-points" type="button" class="ghost sort-btn">Points</button>
+              <button id="setting-show-lives" type="button" class="ghost sort-btn">Lives</button>
+              <button id="setting-show-coins" type="button" class="ghost sort-btn">Coins</button>
+            </div>
+            <div class="actions">
+              <label class="muted">Coins
+                <input id="setting-coins" type="number" min="0" max="999" value="0" class="num" />
+              </label>
+              <button id="btn-set-coins-all" type="button">Set all players</button>
+            </div>
+          </details>
+          <details class="host-section" open>
+            <summary class="felt-label">Players</summary>
+            <div class="actions" id="bot-tools">
+              <button id="btn-add-bot" type="button">Add bot</button>
+            </div>
+            <div id="player-roster" class="player-roster"></div>
+          </details>
+          <details class="host-section">
+            <summary class="felt-label">View</summary>
+            <div class="actions">
+              <button id="setting-hand-view" type="button" class="ghost sort-btn">Collapsed view</button>
+            </div>
+          </details>
+          <details class="host-section">
+            <summary class="felt-label">Turn</summary>
+            <div class="actions">
+              <button id="setting-skip-empty" type="button" class="ghost sort-btn">Skip turn if no cards</button>
+            </div>
+          </details>
+          <details class="host-section">
+            <summary class="felt-label">Turn order</summary>
+            <div id="order-list" class="order-chips"></div>
+            <div class="actions">
+              <button id="btn-turn-change" type="button">Change order</button>
+              <button id="btn-turn-save" type="button" class="hidden">Save</button>
+              <button id="btn-turn-cancel" type="button" class="ghost hidden">Cancel</button>
+            </div>
+          </details>
+          <details class="host-section">
+            <summary class="felt-label">Cards</summary>
+            <div class="actions">
+              <button type="button" data-act="shuffle">Shuffle deck</button>
+              <button type="button" data-act="reshuffle">Reshuffle discard into deck</button>
+            </div>
+            <details class="host-section">
+              <summary class="felt-label">Order</summary>
+              <div id="rank-order" class="order-chips"></div>
+              <div class="actions">
+                <button id="btn-rank-change" type="button">Change order</button>
+                <button id="btn-rank-save" type="button" class="hidden">Save</button>
+                <button id="btn-rank-cancel" type="button" class="ghost hidden">Cancel</button>
+              </div>
+            </details>
+            <details class="host-section" id="setting-french-shoe">
+              <summary class="felt-label">French shoe</summary>
+              <p class="muted">Look</p>
+              <div class="actions">
+                <span class="muted">Faces</span>
+                <div id="face-variants" class="ban-ranks"></div>
+              </div>
+              <div class="actions">
+                <span class="muted">Backs</span>
+                <div id="back-variants" class="ban-ranks"></div>
+              </div>
+              <p class="muted">Banished cards</p>
+              <div id="ban-ranks" class="ban-ranks"></div>
+              <div id="ban-grid" class="ban-grid"></div>
+              <p class="muted">Changing decks or banished cards rebuilds the shoe and clears the table.</p>
+            </details>
+          </details>
+        </div>
+      </dialog>
+
+      <dialog id="space-overlay" class="space-overlay">
+        <div class="sheet-head">
+          <h3 id="space-overlay-title">Space</h3>
+          <button id="space-overlay-close" type="button" class="ghost">Close</button>
+        </div>
+        <div id="space-overlay-body" class="space-overlay-body"></div>
+      </dialog>
     </section>
 
     <script type="module" src="js/app.js"></script>

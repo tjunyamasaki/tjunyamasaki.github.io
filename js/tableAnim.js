@@ -211,6 +211,7 @@ export function captureCardOrigins(root) {
   const zones = {};
   if (!root) return { cards, players, zones };
   for (const el of root.querySelectorAll("[data-card-id]")) {
+    if (el.closest("#space-overlay, #table-menu")) continue;
     const id = el.dataset.cardId;
     if (!id) continue;
     cards[id] = {
@@ -218,7 +219,8 @@ export function captureCardOrigins(root) {
       node: el.cloneNode(true),
     };
   }
-  for (const box of root.querySelectorAll("[data-player-id]")) {
+  for (const box of root.querySelectorAll('[data-pile="hand"][data-player-id]')) {
+    if (box.closest("#space-overlay, #table-menu")) continue;
     const playerId = box.dataset.playerId;
     const pile = box.querySelector(".mini-pile") || box.querySelector(".face-down") || box;
     players[playerId] = copyRect(pile.getBoundingClientRect());
@@ -233,11 +235,13 @@ export function captureCardOrigins(root) {
 }
 
 function queryCard(root, id) {
-  return root.querySelector(`[data-card-id="${cssEscape(id)}"]`);
+  const felt = root.querySelector("#layout-freeplay") || root;
+  return felt.querySelector(`[data-card-id="${cssEscape(id)}"]`);
 }
 
 function playerBox(root, playerId) {
-  return root.querySelector(`[data-player-id="${cssEscape(playerId)}"]`);
+  const sel = `[data-pile="hand"][data-player-id="${cssEscape(playerId)}"]`;
+  return root.querySelector(sel) || document.querySelector(sel);
 }
 
 function liveZoneRect(root, zone, deckEl, feltEl) {

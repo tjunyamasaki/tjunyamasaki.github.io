@@ -19,6 +19,26 @@ export const SPACE_VISIBILITY = [
   { id: "personal", label: "Personal" },
 ];
 
+/** Host-synced french-shoe cosmetics. Default matches current CSS. */
+export const FACE_VARIANTS = [
+  { id: "default", label: "Classic" },
+  { id: "pips", label: "Pips" },
+  { id: "ornate", label: "Ornate" },
+];
+
+export const BACK_VARIANTS = [
+  { id: "default", label: "Stripe" },
+  { id: "lattice", label: "Lattice" },
+  { id: "dots", label: "Dots" },
+];
+
+const FACE_VARIANT_IDS = new Set(FACE_VARIANTS.map((v) => v.id));
+const BACK_VARIANT_IDS = new Set(BACK_VARIANTS.map((v) => v.id));
+
+function variantId(value, allowed, fallback) {
+  return allowed.has(value) ? value : fallback;
+}
+
 export function defaultSpaces() {
   const spaces = {};
   for (const space of TABLE_SPACES) {
@@ -46,7 +66,7 @@ export function defaultPreset() {
     handSortDefault: "suit",
     handSortModes: ["suit", "rank"],
     skipEmptyHands: false,
-    opponentHandView: "expanded",
+    opponentHandView: "collapsed",
     showPoints: true,
     showLives: false,
     showCoins: false,
@@ -55,6 +75,9 @@ export function defaultPreset() {
     drawDest: "personal",
     personalRows: 1,
     sharedRows: 1,
+    spaceView: "grid",
+    faceVariant: "default",
+    backVariant: "default",
   };
 }
 
@@ -94,6 +117,9 @@ export function resolvePreset(game, overrides = {}) {
     drawDest: fromGame.drawDest ?? base.drawDest,
     personalRows: fromGame.personalRows ?? base.personalRows,
     sharedRows: fromGame.sharedRows ?? base.sharedRows,
+    spaceView: fromGame.spaceView ?? base.spaceView,
+    faceVariant: fromGame.faceVariant ?? base.faceVariant,
+    backVariant: fromGame.backVariant ?? base.backVariant,
   };
   const next = { ...merged, ...overrides };
   next.ranks = (overrides.ranks || merged.ranks).slice();
@@ -121,6 +147,9 @@ export function resolvePreset(game, overrides = {}) {
   next.drawDest = destType(next.drawDest, base.drawDest);
   next.personalRows = clampRows(next.personalRows);
   next.sharedRows = clampRows(next.sharedRows);
+  next.spaceView = next.spaceView === "stacked" ? "stacked" : "grid";
+  next.faceVariant = variantId(next.faceVariant, FACE_VARIANT_IDS, "default");
+  next.backVariant = variantId(next.backVariant, BACK_VARIANT_IDS, "default");
   return next;
 }
 

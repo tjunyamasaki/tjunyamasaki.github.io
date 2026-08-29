@@ -82,7 +82,7 @@ export function lobbyStateForResume(saved, hostName) {
   for (const [id, player] of Object.entries(source)) {
     players[id] = {
       ...player,
-      connected: id === "host",
+      connected: id === "host" || Boolean(player.isBot),
     };
   }
   if (!players.host) {

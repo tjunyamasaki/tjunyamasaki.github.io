@@ -15,7 +15,9 @@ import {
 } from "./persist.js";
 import { cardLabel, cardSprite, HAND_SORT_MODES, resolveHandSort, sortHand, RANKS, SUITS } from "./cards.js";
 import { gameList, getGame } from "./games.js";
-import { faceKey, isBanished, SPACE_VISIBILITY } from "./gameSettings.js";
+import { faceKey, isBanished, SPACE_VISIBILITY, FACE_VARIANTS, BACK_VARIANTS } from "./gameSettings.js";
+import { captureCardOrigins, playTableMoves } from "./tableAnim.js";
+import { layoutSpaceEl } from "./spaceLayout.js";
 
 const els = {
   configError: document.getElementById("config-error"),
@@ -40,7 +42,10 @@ const els = {
   handCards: document.getElementById("hand-cards"),
   handHint: document.getElementById("hand-hint"),
   handSort: document.getElementById("hand-sort"),
-  opponents: document.getElementById("opponents"),
+  handsStrip: document.getElementById("hands-strip"),
+  tableGrid: document.getElementById("table-grid"),
+  playerGrid: document.getElementById("player-grid"),
+  personalPark: document.getElementById("personal-park"),
   gameType: document.getElementById("game-type"),
   gameBlurb: document.getElementById("game-blurb"),
   gameNameLabel: document.getElementById("game-name-label"),
@@ -65,10 +70,14 @@ const els = {
   settingDecks: document.getElementById("setting-decks"),
   settingDecksField: document.getElementById("setting-decks-field"),
   settingFrenchShoe: document.getElementById("setting-french-shoe"),
+  faceVariants: document.getElementById("face-variants"),
+  backVariants: document.getElementById("back-variants"),
   settingMin: document.getElementById("setting-min"),
   settingMax: document.getElementById("setting-max"),
   settingPersonalRows: document.getElementById("setting-personal-rows"),
   settingSharedRows: document.getElementById("setting-shared-rows"),
+  settingSpaceViewGrid: document.getElementById("setting-space-view-grid"),
+  settingSpaceViewStack: document.getElementById("setting-space-view-stack"),
   settingSkipEmpty: document.getElementById("setting-skip-empty"),
   settingHandView: document.getElementById("setting-hand-view"),
   settingShowPoints: document.getElementById("setting-show-points"),
@@ -81,6 +90,12 @@ const els = {
   betCount: document.getElementById("bet-count"),
   youStats: document.getElementById("you-stats"),
   playerRoster: document.getElementById("player-roster"),
+  botTools: document.getElementById("bot-tools"),
+  btnAddBot: document.getElementById("btn-add-bot"),
+  botControl: document.getElementById("bot-control"),
+  botControlName: document.getElementById("bot-control-name"),
+  btnBotSelf: document.getElementById("btn-bot-self"),
+  handOwnerLabel: document.getElementById("hand-owner-label"),
   rankOrder: document.getElementById("rank-order"),
   banRanks: document.getElementById("ban-ranks"),
   banGrid: document.getElementById("ban-grid"),
@@ -93,7 +108,22 @@ const els = {
   btnRankCancel: document.getElementById("btn-rank-cancel"),
   mySpace: document.getElementById("my-space"),
   youArea: document.getElementById("you-area"),
+  seatSouth: document.getElementById("seat-south"),
+  btnMenu: document.getElementById("btn-menu"),
+  btnMenuClose: document.getElementById("btn-menu-close"),
+  tableMenu: document.getElementById("table-menu"),
+  menuColorSwatches: document.getElementById("menu-color-swatches"),
+  spaceOverlay: document.getElementById("space-overlay"),
+  spaceOverlayTitle: document.getElementById("space-overlay-title"),
+  spaceOverlayBody: document.getElementById("space-overlay-body"),
+  spaceOverlayClose: document.getElementById("space-overlay-close"),
+  playerDock: document.getElementById("player-dock"),
+  btnOverflow: document.getElementById("btn-overflow"),
+  handPeek: document.getElementById("hand-peek"),
 };
+
+const HAND_SORT_KEY = "cardLobby.handSort";
+const LONG_PRESS_MS = 480;
 
 let session = null;
 let role = null;
@@ -108,6 +138,9 @@ let selectedCardIds = new Set();
 let handSortMode = null;
 let turnOrderPicks = null;
 let rankOrderPicks = null;
+let suppressFeltClick = false;
+let longPressTimer = null;
+let spaceLayoutObserver = null;
 
 function playerStat(player, key) {
   return Number(player?.stats?.[key] ?? player?.[key]) || 0;
@@ -213,6 +246,8 @@ function nickname() {
 }
 
 function showHome() {
+  closeSpaceOverlay();
+  closeTableMenu();
   els.viewTable.classList.add("hidden");
   els.viewHome.classList.remove("hidden");
   currentRoom = "";
@@ -226,7 +261,6 @@ function showTable(code) {
   els.roomCodeDisplay.textContent = code;
   currentRoom = code;
   els.lobbyTools.classList.add("hidden");
-  els.btnStart.classList.add("hidden");
   if (location.hash !== "#table") location.hash = "table";
 }
 
@@ -236,38 +270,172 @@ function sendAction(action, extra = {}) {
   else session.sendIntent(action, extra);
 }
 
+function paintIndex(rank, symbol) {
+  const index = document.createElement("span");
+  index.className = "card-index";
+  if (rank) {
+    const rankEl = document.createElement("span");
+    rankEl.className = "card-rank";
+    rankEl.textContent = String(rank);
+    index.append(rankEl);
+  }
+  if (symbol) {
+    const suitEl = document.createElement("span");
+    suitEl.className = "card-suit";
+    suitEl.textContent = symbol;
+    index.append(suitEl);
+  }
+  return index;
+}
+
+const PIP_SLOTS = {
+  2: ["t", "b"],
+  3: ["t", "c", "b"],
+  4: ["tl", "tr", "bl", "br"],
+  5: ["tl", "tr", "c", "bl", "br"],
+  6: ["tl", "tr", "ml", "mr", "bl", "br"],
+  7: ["tl", "tr", "tc", "ml", "mr", "bl", "br"],
+  8: ["tl", "tr", "tc", "ml", "mr", "bc", "bl", "br"],
+  9: ["tl", "tr", "tcl", "tcr", "c", "bcl", "bcr", "bl", "br"],
+  10: ["tl", "tr", "tcl", "tcr", "ml", "mr", "bcl", "bcr", "bl", "br"],
+};
+
 function paintCardFace(btn, card) {
   const label = cardLabel(card);
   const sprite = cardSprite(card);
+  const front = btn.querySelector(".card-front") || btn;
+  const rank = card.rank ?? card.face?.rank;
+  const symbol = card.symbol ?? card.face?.symbol;
+  const variant = lastView?.settings?.faceVariant || "default";
   btn.setAttribute("aria-label", label);
   btn.title = label;
+  front.replaceChildren();
+  front.style.backgroundImage = "";
+  btn.classList.remove("has-sprite", "has-index", "has-pips", "has-ornate");
   if (sprite) {
     btn.classList.add("has-sprite");
-    btn.style.backgroundImage = `url("${sprite}")`;
-    btn.textContent = "";
-  } else {
-    btn.textContent = label;
+    front.style.backgroundImage = `url("${sprite}")`;
+    return;
   }
+  if (card.kind !== "token" && (rank || symbol)) {
+    btn.classList.add("has-index");
+    front.append(paintIndex(rank, symbol));
+    if (variant === "pips") {
+      const slots = PIP_SLOTS[String(rank)];
+      if (slots) {
+        btn.classList.add("has-pips");
+        const wrap = document.createElement("span");
+        wrap.className = `card-pips pips-${rank}`;
+        for (const pos of slots) {
+          const pip = document.createElement("span");
+          pip.className = `pip pip-${pos}`;
+          pip.textContent = symbol || "";
+          wrap.append(pip);
+        }
+        front.append(wrap);
+      } else if (symbol) {
+        const center = document.createElement("span");
+        center.className = "card-center";
+        center.textContent = symbol;
+        front.append(center);
+      }
+    } else if (variant === "ornate") {
+      btn.classList.add("has-ornate");
+      if (symbol || rank) {
+        const center = document.createElement("span");
+        center.className = "card-center";
+        center.textContent = symbol || String(rank);
+        front.append(center);
+      }
+      const br = paintIndex(rank, symbol);
+      br.classList.add("card-index-br");
+      front.append(br);
+    }
+    return;
+  }
+  front.textContent = label;
 }
 
-function appendCardButton(parent, card, { selectable, view, ownerId }) {
+function makePlayingCard(card, extraClass = "") {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "playing-card" + ((card.color ?? card.face?.color) === "red" ? " red" : "");
+  btn.className =
+    "playing-card" + extraClass + ((card.color ?? card.face?.color) === "red" ? " red" : "");
+  const spin = document.createElement("span");
+  spin.className = "card-3d";
+  const front = document.createElement("span");
+  front.className = "card-front";
+  const back = document.createElement("span");
+  back.className = "card-back";
+  back.setAttribute("aria-hidden", "true");
+  spin.append(front, back);
+  btn.append(spin);
+  if (card.id) btn.dataset.cardId = card.id;
+  paintCardFace(btn, card);
+  return btn;
+}
+
+function wrapFanSlot(child, selected) {
+  const slot = document.createElement("span");
+  slot.className = "fan-slot" + (selected ? " selected" : "");
+  slot.append(child);
+  return slot;
+}
+
+function layoutFan(container) {
+  if (!container) return;
+  const slots = [...container.children].filter((el) => el.classList.contains("fan-slot"));
+  const n = slots.length;
+  container.dataset.count = String(n);
+  if (!n) return;
+  const cardW = parseFloat(getComputedStyle(container).getPropertyValue("--fan-card-w")) || 4.7;
+  const spread = n <= 1 ? 0 : Math.min(96, 26 + n * 6.2);
+  const step = n <= 1 ? cardW : Math.max(cardW * 0.2, cardW * 0.5 - n * 0.06);
+  container.style.setProperty("--fan-step", `${step}rem`);
+  slots.forEach((slot, i) => {
+    const t = n === 1 ? 0.5 : i / (n - 1);
+    const rot = -spread / 2 + t * spread;
+    slot.style.setProperty("--fan-rot", `${rot}deg`);
+    const z = String(i + 1);
+    slot.style.setProperty("--fan-z", z);
+    slot.style.zIndex = z;
+  });
+}
+
+function toggleHandCard(cardId, btn) {
+  const on = !selectedCardIds.has(cardId);
+  if (on) selectedCardIds.add(cardId);
+  else selectedCardIds.delete(cardId);
+  const cardBtn =
+    btn || els.handCards?.querySelector(`[data-card-id="${cardId}"]`);
+  cardBtn?.classList.toggle("selected-card", on);
+  const slot = cardBtn?.closest(".fan-slot");
+  if (slot) slot.classList.toggle("selected", on);
+  updateDropTargets(lastView);
+}
+
+function clearHandSelection() {
+  selectedCardIds.clear();
+  for (const el of els.handCards?.querySelectorAll(".selected-card") || []) {
+    el.classList.remove("selected-card");
+  }
+  for (const el of els.handCards?.querySelectorAll(".fan-slot.selected") || []) {
+    el.classList.remove("selected");
+  }
+  updateDropTargets(lastView);
+}
+
+function appendCardButton(parent, card, { selectable, view, ownerId, fan } = {}) {
+  const btn = makePlayingCard(card);
   const seat = seatClass(view || lastView, card.playedBy || ownerId);
   if (seat) btn.classList.add(seat);
   if (selectable && selectedCardIds.has(card.id)) btn.classList.add("selected-card");
-  paintCardFace(btn, card);
   if (selectable) {
-    btn.addEventListener("click", () => {
-      if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
-      else selectedCardIds.add(card.id);
-      if (lastView) renderState(lastView);
-    });
+    btn.addEventListener("click", () => toggleHandCard(card.id, btn));
   } else {
     btn.disabled = true;
   }
-  parent.append(btn);
+  parent.append(fan ? wrapFanSlot(btn, btn.classList.contains("selected-card")) : btn);
 }
 
 function splitSpaceRows(cards, rowCount) {
@@ -290,15 +458,46 @@ function splitSpaceRows(cards, rowCount) {
   return rows;
 }
 
+function spaceViewMode(view) {
+  return view?.settings?.spaceView === "stacked" ? "stacked" : "grid";
+}
+
 function fillSpace(el, cards, opts, rowCount) {
   if (!el) return;
   el.innerHTML = "";
-  for (const rowCards of splitSpaceRows(cards, rowCount)) {
+  const mode = spaceViewMode(opts?.view || lastView);
+  const kind = opts?.spaceKind || el.dataset.spaceKind || "personal";
+  el.dataset.spaceKind = kind;
+  el.classList.add("space-chip", "space-stack");
+  el.classList.toggle("space-view-grid", mode === "grid");
+  el.classList.toggle("space-view-stack", mode === "stacked");
+  const list = cards || [];
+  el.dataset.cardCount = String(list.length);
+  for (const rowCards of splitSpaceRows(list, rowCount)) {
+    if (!rowCards.length) continue;
     const row = document.createElement("div");
-    row.className = "card-row";
-    for (const card of rowCards) appendCardButton(row, card, opts);
+    row.className = "space-pile";
+    row.dataset.count = String(rowCards.length);
+    for (const card of rowCards) {
+      appendCardButton(row, card, {
+        ...opts,
+        selectable: false,
+      });
+    }
     el.append(row);
   }
+}
+
+function layoutTableSpaces() {
+  for (const el of els.tableGrid?.querySelectorAll(".space-chip") || []) {
+    layoutSpaceEl(el);
+  }
+}
+
+function ensureSpaceLayoutObserver() {
+  if (spaceLayoutObserver || typeof ResizeObserver === "undefined" || !els.tableGrid) return;
+  spaceLayoutObserver = new ResizeObserver(() => layoutTableSpaces());
+  spaceLayoutObserver.observe(els.tableGrid);
 }
 
 function renderCardStack(el, cards, view) {
@@ -307,12 +506,9 @@ function renderCardStack(el, cards, view) {
   const list = cards || [];
   const top = list[list.length - 1];
   if (top) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "playing-card stack-card" + (top.color === "red" ? " red" : "");
+    const btn = makePlayingCard(top, " stack-card");
     const seat = seatClass(view || lastView, top.playedBy);
     if (seat) btn.classList.add(seat);
-    paintCardFace(btn, top);
     btn.disabled = true;
     el.append(btn);
   }
@@ -397,66 +593,193 @@ function fillPlayerStats(el, view, playerId) {
   }
 }
 
-function renderOpponents(view, phase) {
-  els.opponents.innerHTML = "";
+function playerOrderList(view) {
+  const players = view.players || {};
+  const order = view.playerOrder?.length ? view.playerOrder : Object.keys(players);
+  return order.filter((id) => players[id]);
+}
+
+function opponentsClockwise(view) {
+  const order = playerOrderList(view);
+  const i = order.indexOf(selfId);
+  if (i < 0) return order.filter((id) => id !== selfId);
+  return [...order.slice(i + 1), ...order.slice(0, i)];
+}
+
+/** Table slots: circular playerOrder rotated so You is last (bottom-right when even / 6+). */
+function tableSlotOrder(view) {
+  const order = playerOrderList(view);
+  if (!order.length) return [];
+  const others = opponentsClockwise(view);
+  if (!order.includes(selfId)) return others;
+  return [...others, selfId];
+}
+
+function personalTableOn(view) {
+  return spaceVisible(view, "personal");
+}
+
+function sharedTableOn(view) {
+  return !personalTableOn(view) && spaceVisible(view, "table");
+}
+
+function applyCardVariants(view) {
+  const root = document.documentElement;
+  root.dataset.faceVariant = view?.settings?.faceVariant || "default";
+  root.dataset.backVariant = view?.settings?.backVariant || "default";
+}
+
+function parkMySpace() {
+  if (els.mySpace && els.personalPark && els.mySpace.parentElement !== els.personalPark) {
+    els.personalPark.append(els.mySpace);
+  }
+}
+
+function fillHandPile(hand, n, seatName, collapsed) {
+  hand.innerHTML = "";
+  if (collapsed) {
+    const pile = document.createElement("div");
+    pile.className = "mini-pile";
+    pile.title = `${n} in hand`;
+    const back = document.createElement("div");
+    back.className = "deck-back " + (seatName || "");
+    pile.append(back);
+    const count = document.createElement("div");
+    count.className = "deck-count";
+    count.textContent = String(n);
+    pile.append(count);
+    hand.append(pile);
+    return;
+  }
+  for (let i = 0; i < n; i++) {
+    const back = document.createElement("span");
+    back.className = "face-down " + (seatName || "");
+    hand.append(back);
+  }
+}
+
+function renderHandsStrip(view) {
+  const strip = els.handsStrip;
+  if (!strip) return;
+  strip.innerHTML = "";
   const players = view.players || {};
   const counts = view.handCounts || {};
   const collapsed = view.settings?.opponentHandView === "collapsed";
-  for (const [id, player] of Object.entries(players)) {
-    if (id === selfId) continue;
-    const box = document.createElement("div");
-    box.className =
-      "opponent" +
-      (player.connected === false ? " offline" : "") +
-      (collapsed ? " collapsed" : "");
-    setSeatClass(box, view, id);
-    if (phase === "playing" && view.currentPlayerId === id) box.classList.add("is-turn");
+  const showHands = spaceVisible(view, "hand");
+  for (const id of playerOrderList(view)) {
+    const player = players[id];
+    if (!player) continue;
+    const chip = document.createElement("div");
+    chip.className =
+      "hand-chip" +
+      (id === selfId ? " is-you" : "") +
+      (player.connected === false ? " offline" : "");
+    chip.dataset.playerId = id;
+    chip.dataset.pile = "hand";
+    setSeatClass(chip, view, id);
     const name = document.createElement("div");
-    name.className = "opponent-name";
-    const bits = document.createElement("span");
-    const labels = [player.name || "Player"];
-    if (player.isHost) labels.push("host");
-    if (player.connected === false) labels.push("away");
-    if ((view.bustedIds || []).includes(id)) labels.push("bust");
-    else if ((view.inactiveIds || []).includes(id)) labels.push("out");
-    bits.textContent = labels.join(" · ");
-    name.append(bits);
-    const stats = document.createElement("span");
-    stats.className = "player-stats";
-    fillPlayerStats(stats, view, id);
-    name.append(stats);
-    const row = document.createElement("div");
-    row.className = "card-row";
-    const personal = (view.personal && view.personal[id]) || [];
-    if (spaceVisible(view, "personal")) {
-      const space = document.createElement("div");
-      space.className = "opponent-space space-stack";
-      fillSpace(space, personal, { view, ownerId: id }, view.settings?.personalRows);
-      row.append(space);
-    }
-    const n = spaceVisible(view, "hand") ? counts[id] ?? 0 : 0;
-    if (collapsed) {
-      const pile = document.createElement("div");
-      pile.className = "mini-pile";
-      pile.title = `${n} in hand`;
-      const back = document.createElement("div");
-      back.className = "deck-back " + (seatClass(view, id) || "");
-      pile.append(back);
-      const count = document.createElement("div");
-      count.className = "deck-count";
-      count.textContent = String(n);
-      pile.append(count);
-      row.append(pile);
-    } else {
-      for (let i = 0; i < n; i++) {
-        const back = document.createElement("span");
-        back.className = "face-down " + (seatClass(view, id) || "");
-        row.append(back);
-      }
-    }
-    box.append(name, row);
-    els.opponents.append(box);
+    name.className = "hand-chip-name";
+    name.textContent = id === selfId ? "You" : player.name || "Player";
+    const pile = document.createElement("div");
+    pile.className = "opponent-hand card-row";
+    const n = showHands ? counts[id] ?? 0 : 0;
+    fillHandPile(pile, n, seatClass(view, id), collapsed);
+    chip.append(name, pile);
+    strip.append(chip);
   }
+}
+
+function mountPlayerSlot(view, id, { span, phase }) {
+  const players = view.players || {};
+  const player = players[id];
+  if (!player || !els.playerGrid) return;
+  const mine = id === selfId;
+  const box = document.createElement("div");
+  box.className =
+    "player-slot" +
+    (mine ? " is-you" : " opponent") +
+    (player.connected === false ? " offline" : "") +
+    (span ? " is-span" : "");
+  box.dataset.playerId = id;
+  box.dataset.pile = "personal";
+  box.dataset.drop = "player";
+  setSeatClass(box, view, id);
+  if (phase === "playing" && view.currentPlayerId === id) box.classList.add("is-turn");
+  const name = document.createElement("div");
+  name.className = "opponent-name";
+  const bits = document.createElement("span");
+  const labels = [mine ? "You" : player.name || "Player"];
+  if (player.isHost) labels.push("host");
+  if (player.isBot) labels.push("bot");
+  if (player.connected === false) labels.push("away");
+  if ((view.bustedIds || []).includes(id)) labels.push("bust");
+  else if ((view.inactiveIds || []).includes(id)) labels.push("out");
+  bits.textContent = labels.join(" · ");
+  name.append(bits);
+  const stats = document.createElement("span");
+  stats.className = "player-stats";
+  fillPlayerStats(stats, view, id);
+  name.append(stats);
+  if (
+    role === "host" &&
+    view.allowBots &&
+    id !== selfId &&
+    (player.isBot || id === "host")
+  ) {
+    const take = document.createElement("button");
+    take.type = "button";
+    take.className = "ghost seat-control";
+    take.textContent = "Play as";
+    take.addEventListener("click", (event) => {
+      event.stopPropagation();
+      session?.setHostSeat?.(id);
+    });
+    name.append(take);
+  }
+  box.append(name);
+  if (mine) {
+    if (els.mySpace) box.append(els.mySpace);
+  } else {
+    const body = document.createElement("div");
+    body.className = "opponent-body";
+    const space = document.createElement("div");
+    space.className = "opponent-space space-stack space-chip";
+    fillSpace(space, (view.personal && view.personal[id]) || [], {
+      view,
+      ownerId: id,
+      spaceKind: "personal",
+    }, view.settings?.personalRows);
+    body.append(space);
+    box.append(body);
+  }
+  els.playerGrid.append(box);
+}
+
+function renderPlayerGrid(view, phase) {
+  parkMySpace();
+  if (els.playerGrid) els.playerGrid.innerHTML = "";
+  if (!personalTableOn(view)) return;
+  const order = tableSlotOrder(view);
+  const n = order.length;
+  const spanLast = n % 2 === 1;
+  for (let i = 0; i < n; i++) {
+    mountPlayerSlot(view, order[i], { span: spanLast && i === n - 1, phase });
+  }
+}
+
+function applyTableMode(view) {
+  const personal = personalTableOn(view);
+  const shared = sharedTableOn(view);
+  els.tableGrid?.classList.toggle("is-personal", personal);
+  els.tableGrid?.classList.toggle("is-shared", shared);
+  els.layoutFreeplay?.classList.toggle("is-personal", personal);
+  els.layoutFreeplay?.classList.toggle("is-shared", shared);
+}
+
+function renderOpponents(view, phase) {
+  renderHandsStrip(view);
+  renderPlayerGrid(view, phase);
+  applyTableMode(view);
 }
 
 function tableActions(view) {
@@ -475,15 +798,346 @@ function tableActions(view) {
   };
 }
 
+function playContext(view) {
+  const phase = view?.phase || "lobby";
+  const acts = tableActions(view);
+  const game = getGame(view?.gameId);
+  const myTurn =
+    phase === "playing" &&
+    view.currentPlayerId === selfId &&
+    !(view.inactiveIds || []).includes(selfId);
+  const lobbyPass = phase === "lobby" && acts.sendCards;
+  const needTarget = Boolean(game.needsTarget?.(view, selfId));
+  const needTargetAny = Object.keys(view?.players || {}).some((id) =>
+    game.needsTarget?.(view, id)
+  );
+  return {
+    phase,
+    acts,
+    game,
+    myTurn,
+    lobbyPass,
+    needTarget,
+    needTargetAny,
+    canSelectHand: myTurn || lobbyPass,
+    canPlace: myTurn && !needTargetAny,
+    canDraw: myTurn && acts.drawCard && !needTargetAny,
+    canTarget: phase === "playing" && acts.targetPlayer && needTarget,
+  };
+}
+
+function updateDropTargets(view) {
+  if (!view) return;
+  const ctx = playContext(view);
+  const hasSel = selectedCardIds.size > 0;
+  const setDrop = (name, on) => {
+    for (const el of document.querySelectorAll(`[data-drop="${name}"]`)) {
+      el.classList.toggle("is-drop", on);
+    }
+  };
+  setDrop("shared", ctx.canPlace && ctx.acts.placeShared && hasSel && sharedTableOn(view));
+  setDrop("personal", ctx.canPlace && ctx.acts.placePersonal && hasSel && personalTableOn(view));
+  setDrop("discard", ctx.canPlace && ctx.acts.placeDiscard && hasSel && spaceVisible(view, "discard"));
+  setDrop("deck", ctx.canDraw && spaceVisible(view, "deck"));
+  setDrop("special", false);
+  for (const box of document.querySelectorAll('.player-slot[data-pile="personal"][data-player-id]')) {
+    const sendOk = ctx.lobbyPass && hasSel && ctx.acts.sendCards && box.dataset.playerId !== selfId;
+    const targetOk = ctx.canTarget;
+    box.classList.toggle("is-drop", sendOk || targetOk);
+  }
+  els.youArea?.classList.toggle("is-drop", ctx.canTarget);
+  els.youArea?.classList.toggle("has-selection", hasSel);
+  if (els.handHint) {
+    els.handHint.textContent = hasSel
+      ? "· tap a highlighted space"
+      : ctx.canTarget
+        ? "· tap a player"
+        : "· tap cards, then a space";
+  }
+}
+
+function updateOverflowVisibility() {
+  const bar = els.freeplayBar;
+  if (!bar || !els.btnOverflow) return;
+  const visible = [...bar.querySelectorAll("[data-act], select, input")].some(
+    (el) => !el.classList.contains("hidden")
+  );
+  els.btnOverflow.classList.toggle("hidden", !visible);
+  if (!visible) bar.classList.add("hidden");
+  if (els.playerDock) {
+    const stayHidden = Boolean(
+      els.playerDock.querySelector('[data-act="stay"]')?.classList.contains("hidden")
+    );
+    const endHidden = Boolean(
+      els.playerDock.querySelector('[data-act="endTurn"]')?.classList.contains("hidden")
+    );
+    els.playerDock.classList.toggle("hidden", stayHidden && endHidden && !visible);
+  }
+}
+
+let overlayKind = null;
+let overlayPlayerId = null;
+
+function fillInspectCards(el, cards, view, ownerId, rowCount) {
+  if (!el) return;
+  el.innerHTML = "";
+  const list = cards || [];
+  if (!list.length) {
+    el.textContent = "Empty";
+    return;
+  }
+  for (const rowCards of splitSpaceRows(list, rowCount)) {
+    const row = document.createElement("div");
+    row.className = "card-row";
+    for (const card of rowCards) {
+      const btn = makePlayingCard(card);
+      delete btn.dataset.cardId;
+      btn.disabled = true;
+      const seat = seatClass(view || lastView, card.playedBy || ownerId);
+      if (seat) btn.classList.add(seat);
+      row.append(btn);
+    }
+    el.append(row);
+  }
+}
+
+function closeSpaceOverlay() {
+  overlayKind = null;
+  overlayPlayerId = null;
+  els.spaceOverlay?.close?.();
+}
+
+function openSpaceOverlay(kind, playerId = null) {
+  overlayKind = kind;
+  overlayPlayerId = playerId;
+  els.freeplayBar?.classList.add("hidden");
+  refreshSpaceOverlay(lastView);
+  if (els.spaceOverlay && !els.spaceOverlay.open) els.spaceOverlay.showModal();
+}
+
+function refreshSpaceOverlay(view) {
+  if (!els.spaceOverlay?.open && !overlayKind) return;
+  if (!view || !overlayKind) return;
+  const title = els.spaceOverlayTitle;
+  const body = els.spaceOverlayBody;
+  if (overlayKind === "shared") {
+    if (title) title.textContent = "Table";
+    fillInspectCards(body, view.shared, view, null, view.settings?.sharedRows);
+    return;
+  }
+  if (overlayKind === "personal") {
+    const id = overlayPlayerId || selfId;
+    const name = id === selfId ? "Your space" : `${view.players?.[id]?.name || "Player"}'s space`;
+    if (title) title.textContent = name;
+    fillInspectCards(
+      body,
+      (view.personal && view.personal[id]) || [],
+      view,
+      id,
+      view.settings?.personalRows
+    );
+    return;
+  }
+  if (overlayKind === "discard") {
+    if (title) title.textContent = "Discard";
+    fillInspectCards(body, view.discard, view, null, 1);
+    return;
+  }
+  if (overlayKind === "special") {
+    if (title) title.textContent = "Special";
+    fillInspectCards(body, view.special, view, null, 1);
+    return;
+  }
+  if (overlayKind === "deck") {
+    if (title) title.textContent = "Deck";
+    if (body) body.textContent = `${view.deckCount ?? 0} cards`;
+  }
+}
+
+function inspectDrop(drop, playerId) {
+  if (drop === "shared") openSpaceOverlay("shared");
+  else if (drop === "personal") openSpaceOverlay("personal", selfId);
+  else if (drop === "discard") openSpaceOverlay("discard");
+  else if (drop === "special") openSpaceOverlay("special");
+  else if (drop === "deck") openSpaceOverlay("deck");
+  else if (drop === "player") openSpaceOverlay("personal", playerId);
+}
+
+function handlePlayerTap(playerId) {
+  const view = lastView;
+  if (!view || !playerId) return;
+  const ctx = playContext(view);
+  if (ctx.canTarget) {
+    sendAction("targetPlayer", { playerId });
+    return;
+  }
+  if (ctx.lobbyPass && selectedCardIds.size) {
+    sendAction("sendCards", { cardIds: [...selectedCardIds], playerId });
+    clearHandSelection();
+    return;
+  }
+  inspectDrop("player", playerId);
+}
+
+function handleDropTap(drop, playerId) {
+  const view = lastView;
+  if (!view || !drop) return;
+  const ctx = playContext(view);
+  const hasSel = selectedCardIds.size > 0;
+  if (drop === "deck") {
+    if (ctx.canDraw) sendAction("drawCard", { count: 1 });
+    else inspectDrop("deck");
+    return;
+  }
+  if (drop === "shared") {
+    if (ctx.canPlace && ctx.acts.placeShared && hasSel) {
+      placeSelected({ type: "shared" });
+      return;
+    }
+    inspectDrop("shared");
+    return;
+  }
+  if (drop === "personal") {
+    if (ctx.canPlace && ctx.acts.placePersonal && hasSel) {
+      placeSelected({ type: "personal", playerId: selfId });
+      return;
+    }
+    if (ctx.canTarget) {
+      sendAction("targetPlayer", { playerId: selfId });
+      return;
+    }
+    inspectDrop("personal");
+    return;
+  }
+  if (drop === "discard") {
+    if (ctx.canPlace && ctx.acts.placeDiscard && hasSel) {
+      placeSelected({ type: "discard" });
+      return;
+    }
+    inspectDrop("discard");
+    return;
+  }
+  if (drop === "special") {
+    inspectDrop("special");
+    return;
+  }
+  if (drop === "player") handlePlayerTap(playerId);
+}
+
+function feltIgnoreTarget(target) {
+  return Boolean(
+    target.closest(
+      "#hand-cards, #player-dock, #hand-peek, #hand-sort, #bot-control, #hands-strip, .seat-control, .stat-adj"
+    )
+  );
+}
+
+function onFeltClick(event) {
+  if (suppressFeltClick) {
+    suppressFeltClick = false;
+    return;
+  }
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (feltIgnoreTarget(target)) return;
+  if (target.closest("#hand-cards")) return;
+
+  const dropEl = target.closest("[data-drop]");
+  if (dropEl && dropEl.dataset.drop !== "player") {
+    handleDropTap(dropEl.dataset.drop, dropEl.dataset.playerId);
+    return;
+  }
+  const playerBox = target.closest('.player-slot[data-pile="personal"][data-player-id]');
+  if (playerBox) {
+    handlePlayerTap(playerBox.dataset.playerId);
+    return;
+  }
+  if (dropEl) {
+    handleDropTap(dropEl.dataset.drop, dropEl.dataset.playerId);
+    return;
+  }
+  if (target.closest("#you-area") && playContext(lastView).canTarget) {
+    handlePlayerTap(selfId);
+    return;
+  }
+  if (selectedCardIds.size) clearHandSelection();
+}
+
+function clearLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}
+
+function onFeltPointerDown(event) {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const target = event.target;
+  if (!(target instanceof Element) || feltIgnoreTarget(target)) return;
+  const dropEl = target.closest("[data-drop]");
+  if (!dropEl) return;
+  const startX = event.clientX;
+  const startY = event.clientY;
+  clearLongPress();
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null;
+    suppressFeltClick = true;
+    inspectDrop(dropEl.dataset.drop, dropEl.dataset.playerId);
+    setTimeout(() => {
+      suppressFeltClick = false;
+    }, 400);
+  }, LONG_PRESS_MS);
+  const cancel = (moveEvent) => {
+    if (moveEvent.pointerId !== event.pointerId) return;
+    const dx = moveEvent.clientX - startX;
+    const dy = moveEvent.clientY - startY;
+    if (dx * dx + dy * dy > 144) {
+      clearLongPress();
+      cleanup();
+    }
+  };
+  const cleanup = () => {
+    clearLongPress();
+    window.removeEventListener("pointermove", cancel);
+    window.removeEventListener("pointerup", cleanup);
+    window.removeEventListener("pointercancel", cleanup);
+  };
+  window.addEventListener("pointermove", cancel);
+  window.addEventListener("pointerup", cleanup);
+  window.addEventListener("pointercancel", cleanup);
+}
+
+function openTableMenu() {
+  if (els.tableMenu && !els.tableMenu.open) els.tableMenu.showModal();
+}
+
+function closeTableMenu() {
+  els.tableMenu?.close?.();
+}
+
+function toggleOverflow(event) {
+  event?.stopPropagation();
+  els.freeplayBar?.classList.toggle("hidden");
+}
+
+function toggleHandPeek() {
+  const on = !els.youArea?.classList.contains("is-peek");
+  els.youArea?.classList.toggle("is-peek", on);
+  els.handPeek?.setAttribute("aria-pressed", on ? "true" : "false");
+}
+
 function renderState(view) {
   if (!view) return;
+  const prev = lastView;
+  const origins =
+    prev && prev !== view ? captureCardOrigins(els.viewTable) : { cards: {}, players: {}, zones: {} };
   lastView = view;
   if (view.viewerId) selfId = view.viewerId;
+  applyCardVariants(view);
   const phase = view.phase || "lobby";
   els.lobbyTools.classList.add("hidden");
-  els.btnStart.classList.add("hidden");
   els.handHint.classList.remove("hidden");
-  els.handHint.textContent = "· tap cards, then an action";
+  els.handHint.textContent = "· tap cards, then a space";
   if (view.gameName) els.gameNameLabel.textContent = view.gameName;
   if (view.message) {
     els.roundMessage.textContent = view.message;
@@ -499,33 +1153,45 @@ function renderState(view) {
 
   setSeatClass(els.mySpace, view, selfId);
   setSeatClass(els.youArea, view, selfId);
+  setSeatClass(els.seatSouth, view, selfId);
+  const myTurnSeat = phase === "playing" && view.currentPlayerId === selfId;
+  els.youArea?.classList.toggle("is-turn", myTurnSeat);
+  els.seatSouth?.classList.toggle("is-turn", myTurnSeat);
+  const sittingBot = Boolean(view.players?.[selfId]?.isBot);
+  if (els.handOwnerLabel) {
+    els.handOwnerLabel.textContent = sittingBot
+      ? `${view.players[selfId].name || "Bot"}'s hand`
+      : "Your hand";
+  }
+  if (els.botControl) {
+    els.botControl.classList.toggle(
+      "hidden",
+      role !== "host" || !sittingBot || !view.allowBots
+    );
+    if (els.botControlName) {
+      els.botControlName.textContent = view.players?.[selfId]?.name || "bot";
+    }
+  }
 
   els.layoutFreeplay.classList.remove("hidden");
-  els.freeplayBar.classList.remove("hidden");
+  els.freeplayBar?.classList.add("hidden");
+  els.btnStart?.classList.toggle("hidden", role !== "host");
   els.hostTools.classList.toggle("hidden", role !== "host");
   els.gameSettings.classList.toggle("hidden", role !== "host");
   applySpaceVisibility(view);
-  const acts = tableActions(view);
-  const game = getGame(view?.gameId);
-  const myTurn =
-    phase === "playing" &&
-    view.currentPlayerId === selfId &&
-    !(view.inactiveIds || []).includes(selfId);
-  const lobbyPass = phase === "lobby" && acts.sendCards;
-  const needTarget = Boolean(game.needsTarget?.(view, selfId));
-  const needTargetAny = Object.keys(view.players || {}).some((id) =>
-    game.needsTarget?.(view, id)
-  );
+  const ctx = playContext(view);
+  const { acts, myTurn, lobbyPass, needTargetAny, canSelectHand, canTarget } = ctx;
   const showCoins = Boolean(view.settings?.showCoins);
   const canBet = phase === "playing" && acts.betCoins && showCoins;
-  const canSelectHand = myTurn || lobbyPass;
-  const canTarget = phase === "playing" && acts.targetPlayer && needTarget;
-  for (const btn of els.playerActions.querySelectorAll("button")) {
-    const act = btn.dataset.act;
-    if (act === "sendCards") btn.disabled = !lobbyPass;
-    else if (act === "betCoins") btn.disabled = !canBet;
-    else if (act === "targetPlayer") btn.disabled = !canTarget;
-    else btn.disabled = !myTurn || needTargetAny;
+  const actionRoot = [els.playerActions, els.playerDock].filter(Boolean);
+  for (const root of actionRoot) {
+    for (const btn of root.querySelectorAll("button[data-act]")) {
+      const act = btn.dataset.act;
+      if (act === "sendCards") btn.disabled = !lobbyPass;
+      else if (act === "betCoins") btn.disabled = !canBet;
+      else if (act === "targetPlayer") btn.disabled = !canTarget;
+      else btn.disabled = !myTurn || needTargetAny;
+    }
   }
   if (els.sendTarget) els.sendTarget.disabled = !(lobbyPass || canTarget);
   if (els.betCount) els.betCount.disabled = !canBet;
@@ -541,10 +1207,11 @@ function renderState(view) {
   fillPlayerStats(els.youStats, view, selfId);
 
   renderDeck(els.fpDeck, view.deckCount ?? 0);
-  fillSpace(els.sharedCards, view.shared, { view }, view.settings?.sharedRows);
+  fillSpace(els.sharedCards, view.shared, { view, spaceKind: "shared" }, view.settings?.sharedRows);
   fillSpace(els.myPersonal, (view.personal && view.personal[selfId]) || [], {
     view,
     ownerId: selfId,
+    spaceKind: "personal",
   }, view.settings?.personalRows);
   renderCardStack(els.discardCards, view.discard, view);
   renderCardStack(els.specialCards, view.special, view);
@@ -562,27 +1229,52 @@ function renderState(view) {
   }
 
   els.handCards.innerHTML = "";
+  els.handCards.style.removeProperty("--fan-step");
   for (const card of hand) {
     appendCardButton(els.handCards, card, {
       selectable: canSelectHand,
       view,
       ownerId: selfId,
+      fan: true,
     });
   }
   if (!(view.hand || []).length) {
     els.handCards.textContent = phase === "lobby" ? "—" : "No cards";
+  } else {
+    layoutFan(els.handCards);
   }
+
+  ensureSpaceLayoutObserver();
+  void els.tableGrid?.offsetHeight;
+  layoutTableSpaces();
+
+  updateDropTargets(view);
+  if (els.spaceOverlay?.open) refreshSpaceOverlay(view);
+
+  playTableMoves(prev, view, {
+    selfId,
+    origins,
+    deckEl: els.fpDeck,
+    feltEl: els.layoutFreeplay,
+    root: els.viewTable,
+  });
 }
 
 function renderColorPicks(view) {
-  els.colorPicks.classList.remove("hidden");
   const mine = view.players?.[selfId]?.color;
   const taken = new Set(
     Object.entries(view.players || {})
       .filter(([id, player]) => id !== selfId && Number.isInteger(player.color))
       .map(([, player]) => player.color)
   );
-  els.colorSwatches.innerHTML = "";
+  els.colorPicks.classList.toggle("hidden", Number.isInteger(mine));
+  fillColorSwatches(els.colorSwatches, mine, taken);
+  fillColorSwatches(els.menuColorSwatches, mine, taken);
+}
+
+function fillColorSwatches(host, mine, taken) {
+  if (!host) return;
+  host.innerHTML = "";
   for (let i = 0; i < SEAT_COUNT; i++) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -594,7 +1286,20 @@ function renderColorPicks(view) {
       btn.title = "Taken";
     }
     btn.addEventListener("click", () => sendAction("setColor", { color: i }));
-    els.colorSwatches.append(btn);
+    host.append(btn);
+  }
+}
+
+function fillVariantPicks(host, variants, current, key) {
+  if (!host) return;
+  host.innerHTML = "";
+  for (const item of variants) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ghost sort-btn" + (item.id === current ? " selected" : "");
+    btn.textContent = item.label;
+    btn.addEventListener("click", () => patchSettings({ [key]: item.id }));
+    host.append(btn);
   }
 }
 
@@ -608,7 +1313,10 @@ function fillHostControls(view) {
     for (const [id, player] of Object.entries(players)) {
       const opt = document.createElement("option");
       opt.value = id;
-      opt.textContent = player.name + (id === "host" ? " (host)" : "");
+      opt.textContent =
+        player.name +
+        (id === "host" ? " (host)" : "") +
+        (player.isBot ? " (bot)" : "");
       select.append(opt);
     }
   };
@@ -688,15 +1396,18 @@ function spaceVisible(view, id) {
 function applySpaceVisibility(view) {
   for (const el of document.querySelectorAll("[data-space]")) {
     const id = el.dataset.space;
-    el.classList.toggle("hidden", !spaceVisible(view, id));
+    let on = spaceVisible(view, id);
+    if (id === "table") on = sharedTableOn(view);
+    if (id === "personal") on = personalTableOn(view);
+    el.classList.toggle("hidden", !on);
   }
   const acts = tableActions(view);
   const map = {
     "place-shared": { space: "table", flag: acts.placeShared },
     "place-personal": { space: "personal", flag: acts.placePersonal },
     "place-discard": { space: "discard", flag: acts.placeDiscard },
-    endTurn: { flag: acts.endTurn },
-    stay: { flag: acts.stay },
+    endTurn: { flag: acts.endTurn && view.phase === "playing" },
+    stay: { flag: acts.stay && view.phase === "playing" },
     sendCards: { flag: acts.sendCards && view.phase === "lobby" },
     targetPlayer: { flag: acts.targetPlayer && view.phase === "playing" },
     betCoins: { flag: acts.betCoins && Boolean(view.settings?.showCoins) },
@@ -707,7 +1418,12 @@ function applySpaceVisibility(view) {
   for (const btn of document.querySelectorAll("[data-act]")) {
     const rule = map[btn.dataset.act];
     if (!rule) continue;
-    const hideSpace = rule.space && !spaceVisible(view, rule.space);
+    const hideSpace =
+      rule.space === "table"
+        ? !sharedTableOn(view)
+        : rule.space === "personal"
+          ? !personalTableOn(view)
+          : rule.space && !spaceVisible(view, rule.space);
     btn.classList.toggle("hidden", hideSpace || rule.flag === false);
   }
   if (els.sendTarget) {
@@ -722,6 +1438,7 @@ function applySpaceVisibility(view) {
       !acts.betCoins || !view.settings?.showCoins
     );
   }
+  updateOverflowVisibility();
 }
 
 function patchSettings(patch) {
@@ -778,7 +1495,9 @@ function fillTurnOrder(view) {
   const items = order.map((id) => ({
     id,
     playerId: id,
-    label: (players[id]?.name || id) + (id === "host" ? " (host)" : ""),
+    label: (players[id]?.name || id) +
+      (id === "host" ? " (host)" : "") +
+      (players[id]?.isBot ? " (bot)" : ""),
   }));
   renderOrderChips(els.orderList, items, {
     editing,
@@ -828,6 +1547,7 @@ function fillPlayerRoster(view) {
     name.textContent =
       (player.name || id) +
       (player.isHost ? " · host" : "") +
+      (player.isBot ? " · bot" : "") +
       ((view.bustedIds || []).includes(id)
         ? " · bust"
         : (view.inactiveIds || []).includes(id)
@@ -856,6 +1576,33 @@ function fillPlayerRoster(view) {
     });
     coinField.append(coinInput);
     row.append(name, stats, coinField);
+    if (view.allowBots && (player.isBot || id === "host")) {
+      const actions = document.createElement("div");
+      actions.className = "player-row-actions";
+      if (id === selfId) {
+        const mark = document.createElement("span");
+        mark.className = "muted";
+        mark.textContent = "playing";
+        actions.append(mark);
+      } else {
+        const take = document.createElement("button");
+        take.type = "button";
+        take.textContent = "Play as";
+        take.addEventListener("click", () => session?.setHostSeat?.(id));
+        actions.append(take);
+      }
+      if (player.isBot) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "ghost";
+        remove.textContent = "Remove";
+        remove.addEventListener("click", () =>
+          sendAction("removeBot", { playerId: id })
+        );
+        actions.append(remove);
+      }
+      row.append(actions);
+    }
     el.append(row);
   }
 }
@@ -873,6 +1620,8 @@ function fillGameSettings(view) {
   if (focused !== els.settingSharedRows && els.settingSharedRows) {
     els.settingSharedRows.value = String(s.sharedRows || 1);
   }
+  els.settingSpaceViewGrid?.classList.toggle("selected", (s.spaceView || "grid") === "grid");
+  els.settingSpaceViewStack?.classList.toggle("selected", s.spaceView === "stacked");
 
   els.settingSkipEmpty.classList.toggle("selected", Boolean(s.skipEmptyHands));
   els.settingHandView.classList.toggle("selected", s.opponentHandView === "collapsed");
@@ -888,20 +1637,39 @@ function fillGameSettings(view) {
   for (const space of SPACE_VISIBILITY) {
     const btn = document.createElement("button");
     btn.type = "button";
-    const on = s.spaces?.[space.id] !== false;
+    const personalOn = personalTableOn(view);
+    let on = s.spaces?.[space.id] !== false;
+    if (space.id === "table") on = sharedTableOn(view);
+    if (space.id === "personal") on = personalOn;
     btn.className = "ghost sort-btn" + (on ? " selected" : "");
     btn.textContent = space.label;
     btn.addEventListener("click", () => {
-      patchSettings({
-        spaces: { ...s.spaces, [space.id]: !on },
-      });
+      const spaces = { ...s.spaces };
+      if (space.id === "table") {
+        const next = !sharedTableOn(view);
+        spaces.table = next;
+        if (next) spaces.personal = false;
+      } else if (space.id === "personal") {
+        const next = !personalOn;
+        spaces.personal = next;
+        if (next) spaces.table = false;
+      } else {
+        spaces[space.id] = !on;
+      }
+      patchSettings({ spaces });
     });
     els.spaceToggles.append(btn);
   }
 
+  fillVariantPicks(els.faceVariants, FACE_VARIANTS, s.faceVariant || "default", "faceVariant");
+  fillVariantPicks(els.backVariants, BACK_VARIANTS, s.backVariant || "default", "backVariant");
+
   fillPlayerRoster(view);
   fillTurnOrder(view);
   fillRankOrder(view);
+  if (els.botTools) {
+    els.botTools.classList.toggle("hidden", !view.allowBots);
+  }
 
   els.banRanks.innerHTML = "";
   els.banGrid.innerHTML = "";
@@ -969,7 +1737,7 @@ function placeSelected(dest) {
     return;
   }
   sendAction("placeCard", { cardIds, dest });
-  selectedCardIds.clear();
+  clearHandSelection();
 }
 
 function refreshResumeUi() {
@@ -1190,6 +1958,12 @@ els.settingMin.addEventListener("change", onSettingNumber);
 els.settingMax.addEventListener("change", onSettingNumber);
 els.settingPersonalRows.addEventListener("change", onSettingNumber);
 els.settingSharedRows.addEventListener("change", onSettingNumber);
+els.settingSpaceViewGrid?.addEventListener("click", () => {
+  patchSettings({ spaceView: "grid" });
+});
+els.settingSpaceViewStack?.addEventListener("click", () => {
+  patchSettings({ spaceView: "stacked" });
+});
 els.settingSkipEmpty.addEventListener("click", () => {
   patchSettings({ skipEmptyHands: !lastView?.settings?.skipEmptyHands });
 });
@@ -1213,6 +1987,8 @@ els.btnSetCoinsAll.addEventListener("click", () => {
     value: Number(els.settingCoins.value),
   });
 });
+els.btnAddBot?.addEventListener("click", () => sendAction("addBot"));
+els.btnBotSelf?.addEventListener("click", () => session?.setHostSeat?.("host"));
 
 els.btnTurnChange.addEventListener("click", () => {
   turnOrderPicks = [];
@@ -1286,7 +2062,7 @@ function onTableAction(event) {
       return;
     }
     sendAction("sendCards", { cardIds, playerId });
-    selectedCardIds.clear();
+    clearHandSelection();
     return;
   }
   if (act === "targetPlayer") {
@@ -1343,8 +2119,41 @@ function onTableAction(event) {
 }
 
 els.freeplayBar.addEventListener("click", onTableAction);
+els.playerDock?.addEventListener("click", onTableAction);
 els.hostTools.addEventListener("click", onTableAction);
 els.gameSettings.addEventListener("click", onTableAction);
+
+els.layoutFreeplay?.addEventListener("click", onFeltClick);
+els.layoutFreeplay?.addEventListener("pointerdown", onFeltPointerDown);
+
+els.btnMenu?.addEventListener("click", openTableMenu);
+els.btnMenuClose?.addEventListener("click", closeTableMenu);
+els.tableMenu?.addEventListener("click", (event) => {
+  if (event.target === els.tableMenu) closeTableMenu();
+});
+els.spaceOverlayClose?.addEventListener("click", closeSpaceOverlay);
+els.spaceOverlay?.addEventListener("click", (event) => {
+  if (event.target === els.spaceOverlay) closeSpaceOverlay();
+});
+els.spaceOverlay?.addEventListener("close", () => {
+  overlayKind = null;
+  overlayPlayerId = null;
+});
+els.btnOverflow?.addEventListener("click", toggleOverflow);
+els.handPeek?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleHandPeek();
+});
+document.addEventListener("click", (event) => {
+  if (!els.freeplayBar || els.freeplayBar.classList.contains("hidden")) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest("#freeplay-bar, #btn-overflow")) return;
+  els.freeplayBar.classList.add("hidden");
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && selectedCardIds.size) clearHandSelection();
+});
 
 window.addEventListener("pagehide", () => {
   if (session) session.stop();
@@ -1355,6 +2164,12 @@ window.addEventListener("hashchange", () => {
     /* stay at table unless they Leave */
     location.hash = "table";
   }
+});
+
+window.addEventListener("resize", () => {
+  if (!lastView) return;
+  layoutFan(els.handCards);
+  layoutTableSpaces();
 });
 
 fillGameSelect();

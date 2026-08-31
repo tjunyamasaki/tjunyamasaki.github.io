@@ -2,9 +2,9 @@
 
 Play at **https://tjunyamasaki.github.io**
 
-Everyone needs internet (to load the page). For a table, join the **same Wi-Fi or Player 1’s hotspot**.
+Everyone needs internet (to load the page). For a table, join the **same Wi-Fi or Player 1’s hotspot**. Tap **Game of Life** on the home page for Conway’s automaton.
 
-1. Open the link. Enter a nickname.
+1. Open the link. Tap **Card table**. Enter a nickname.
 2. **Host:** pick a **Game**, tap **Host lobby**, share the code. Keep this tab open.
 3. **Others:** enter that code and tap **Join**.
 4. **Toggle ready** / **Bump** in the lobby. Host taps **Start deal**.

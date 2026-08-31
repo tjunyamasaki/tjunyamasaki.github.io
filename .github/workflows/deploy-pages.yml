@@ -40,8 +40,11 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html _site/
+          cp -r lobby _site/lobby
+          cp -r game-of-life _site/game-of-life
           cp -r css _site/css
           cp -r js _site/js
+          cp -r assets _site/assets
 
       - uses: actions/upload-pages-artifact@v3
         with:

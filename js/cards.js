@@ -44,7 +44,7 @@ export function cardLabel(card) {
 
 /** Optional face art. Keys are token labels (Flip Seven Freeze is the first test). */
 const TOKEN_SPRITES = {
-  Freeze: "assets/flip-seven-freeze.png",
+  Freeze: new URL("../assets/flip-seven-freeze.png", import.meta.url).href,
 };
 
 export function cardSprite(card) {

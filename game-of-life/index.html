@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game of Life</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <p class="hub-back"><a href="../">Home</a></p>
+      <header class="header">
+        <h1>Conway’s Game of Life</h1>
+        <p class="stats">
+          Generation <span id="generation">0</span>
+          · Population <span id="population">0</span>
+          · <span id="delta">Step to see births and deaths</span>
+        </p>
+      </header>
+
+      <div class="toolbar">
+        <button type="button" id="playPause" aria-pressed="false">Play</button>
+        <button type="button" id="step">Step</button>
+        <button type="button" id="clear">Clear</button>
+        <button type="button" id="random">Random</button>
+        <button type="button" id="fit">Fit</button>
+        <span class="toolbar-sep"></span>
+        <button type="button" id="toolPaint" aria-pressed="true">Paint</button>
+        <button type="button" id="toolPan" aria-pressed="false">Pan</button>
+        <button type="button" id="rleBtn">RLE</button>
+        <button type="button" id="shareBtn">Share</button>
+        <label class="speed">
+          Speed
+          <input type="range" id="speed" min="1" max="30" value="10" />
+          <span id="speedValue">10</span>/s
+        </label>
+      </div>
+
+      <div class="workspace">
+        <div class="board-wrap">
+          <canvas id="board"></canvas>
+          <p class="hint" id="hint">
+            Click or drag to paint. Shift erases. Right-drag or Pan to move.
+            Wheel zooms. Pick a pattern, then click to stamp (R rotate, F flip).
+          </p>
+        </div>
+        <aside class="library">
+          <h2>Patterns</h2>
+          <p class="blurb" id="blurb">
+            Stamp famous objects, then compose them. A glider is a bit; a gun is
+            a clock; an eater is a sink.
+          </p>
+          <div id="patternList"></div>
+        </aside>
+      </div>
+
+      <section class="rules">
+        <h2>Rules (B3/S23)</h2>
+        <p>
+          A dead cell is <strong class="birth">born</strong> with exactly 3 live
+          neighbors. A live cell <strong>survives</strong> with 2 or 3.
+          Otherwise it <strong class="death">dies</strong>. After each step,
+          births are green and deaths are red. Edges are dead (no wrap) so guns
+          and circuits can fire into empty space.
+        </p>
+      </section>
+
+      <section class="tour" id="tour">
+        <div class="tour-copy">
+          <p class="tour-kicker" id="tourKicker">Cells to bits</p>
+          <h2 id="tourTitle">A 6-step tour</h2>
+          <p id="tourBlurb">
+            Still life → oscillator → glider → gun → eater → collision. Each
+            step loads a pattern; Play or Step to watch.
+          </p>
+        </div>
+        <div class="tour-actions">
+          <button type="button" id="tourBack" class="hidden">Back</button>
+          <button type="button" id="tourStart">Start tour</button>
+          <button type="button" id="tourNext" class="hidden">Next</button>
+          <button type="button" id="tourSkip" class="ghost hidden">Close</button>
+        </div>
+      </section>
+    </div>
+
+    <dialog id="rleDialog">
+      <h2>RLE</h2>
+      <p>
+        Paste a LifeWiki / Golly pattern, or copy the board. Header line plus
+        <code>o</code>/<code>b</code>/<code>$</code>/<code>!</code>.
+      </p>
+      <textarea id="rleText" rows="12" spellcheck="false"></textarea>
+      <div class="dialog-actions">
+        <button type="button" id="rleLoad">Load onto board</button>
+        <button type="button" id="rleCopy">Copy</button>
+        <button type="button" id="rleClose">Close</button>
+      </div>
+      <p class="dialog-status" id="rleStatus"></p>
+    </dialog>
+
+    <script type="module" src="life.js"></script>
+  </body>
+</html>

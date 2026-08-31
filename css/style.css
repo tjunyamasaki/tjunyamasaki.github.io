@@ -45,6 +45,45 @@ body:has(#view-table:not(.hidden)) {
   padding: 1.25rem;
 }
 
+.hub-back {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.hub-back a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.hub-back a:hover {
+  color: var(--text);
+}
+
+.page-tiles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+a.page-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #102018;
+  text-decoration: none;
+  font-weight: 650;
+}
+
+.page-tile-blurb {
+  font-weight: 500;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
 .page-table {
   position: relative;
   height: 100svh;

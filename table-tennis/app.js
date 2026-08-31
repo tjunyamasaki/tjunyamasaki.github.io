@@ -74,6 +74,18 @@ let selectedGroupId = "";
 let selectedPlayerId = "";
 let editingMatchId = "";
 
+const HOST_NAMES = new Set(["AdmJun", "AdmYasmin", "AdmLaio", "AdmGui"]);
+
+function canHost() {
+  return HOST_NAMES.has((els.nickname.value || "").trim());
+}
+
+function syncHostButtons() {
+  const allow = isFirebaseConfigured() && canHost();
+  els.btnHost.disabled = !allow;
+  els.btnResume.disabled = !allow;
+}
+
 function nickname() {
   const name = (els.nickname.value || "").trim() || "Player";
   saveNickname(name);
@@ -527,7 +539,7 @@ function stopGuestRetry() {
 }
 
 async function beginHost({ resume } = {}) {
-  if (!isFirebaseConfigured()) return;
+  if (!isFirebaseConfigured() || !canHost()) return;
   els.btnHost.disabled = true;
   els.btnResume.disabled = true;
   setGateStatus(resume ? "Resuming room…" : "Creating room…");
@@ -651,6 +663,7 @@ async function leave() {
   refreshResumeUi();
 }
 
+els.nickname.addEventListener("input", syncHostButtons);
 els.btnHost.addEventListener("click", () => beginHost({ resume: false }));
 els.btnResume.addEventListener("click", () => beginHost({ resume: true }));
 els.btnDiscard.addEventListener("click", () => {
@@ -751,6 +764,7 @@ els.focusClose.addEventListener("click", () => {
 
 els.nickname.value = loadNickname();
 refreshResumeUi();
+syncHostButtons();
 
 if (!isFirebaseConfigured()) {
   els.configError.classList.remove("hidden");

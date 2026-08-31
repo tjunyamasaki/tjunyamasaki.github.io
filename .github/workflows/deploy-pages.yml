@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [master]
+    branches: [games-tracker]
   workflow_dispatch:
 
 permissions:
@@ -42,6 +42,8 @@ jobs:
           cp index.html _site/
           cp -r lobby _site/lobby
           cp -r fodinha _site/fodinha
+          if [ -d presidente ]; then cp -r presidente _site/presidente; fi
+          if [ -d table-tennis ]; then cp -r table-tennis _site/table-tennis; fi
           cp -r game-of-life _site/game-of-life
           cp -r css _site/css
           cp -r js _site/js

@@ -74,16 +74,22 @@ let selectedGroupId = "";
 let selectedPlayerId = "";
 let editingMatchId = "";
 
-const HOST_NAMES = new Set(["AdmJun", "AdmYasmin", "AdmLaio", "AdmGui"]);
+const HOST_NAMES = new Set(["admjun", "admyasmin", "admlaio", "admgui"]);
 
 function canHost() {
-  return HOST_NAMES.has((els.nickname.value || "").trim());
+  return HOST_NAMES.has((els.nickname.value || "").trim().toLowerCase());
 }
 
 function syncHostButtons() {
   const allow = isFirebaseConfigured() && canHost();
   els.btnHost.disabled = !allow;
   els.btnResume.disabled = !allow;
+  if (allow) {
+    els.btnHost.removeAttribute("disabled");
+    els.btnResume.removeAttribute("disabled");
+  } else {
+    els.btnHost.setAttribute("disabled", "");
+  }
 }
 
 function nickname() {
@@ -656,7 +662,16 @@ async function leave() {
   refreshResumeUi();
 }
 
-els.nickname.addEventListener("input", syncHostButtons);
+function onNicknameEdit() {
+  const name = (els.nickname.value || "").trim();
+  if (name) saveNickname(name);
+  syncHostButtons();
+}
+
+els.nickname.addEventListener("input", onNicknameEdit);
+els.nickname.addEventListener("change", onNicknameEdit);
+els.nickname.addEventListener("keyup", onNicknameEdit);
+els.nickname.addEventListener("paste", () => setTimeout(onNicknameEdit, 0));
 els.btnHost.addEventListener("click", () => beginHost({ resume: false }));
 els.btnResume.addEventListener("click", () => beginHost({ resume: true }));
 els.btnDiscard.addEventListener("click", () => {
@@ -863,9 +878,16 @@ window.addEventListener("resize", () => {
   if (comboInput) placeCombo(comboInput);
 });
 
-els.nickname.value = loadNickname();
-refreshResumeUi();
-syncHostButtons();
+function hydrateNickname() {
+  const saved = loadNickname();
+  if (saved) els.nickname.value = saved;
+  refreshResumeUi();
+  syncHostButtons();
+}
+
+hydrateNickname();
+window.addEventListener("pageshow", hydrateNickname);
+[50, 200, 500, 1000].forEach((ms) => setTimeout(syncHostButtons, ms));
 
 if (!isFirebaseConfigured()) {
   els.configError.classList.remove("hidden");

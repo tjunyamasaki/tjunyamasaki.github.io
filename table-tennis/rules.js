@@ -400,7 +400,105 @@ export function applyAction(game, playerId, intent) {
     });
   }
   if (action === "deleteMatch") return deleteMatch(game, intent.matchId);
+  if (action === "loadBoard") {
+    if (playerId !== HOST_ID) return { error: "Only the host can load a saved board." };
+    return loadSavedBoard(game, intent);
+  }
   return { error: "Unknown action." };
+}
+
+function uniqueById(items, cap) {
+  const seen = new Set();
+  const out = [];
+  for (const item of items) {
+    if (!item?.id || seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+    if (out.length >= cap) break;
+  }
+  return out;
+}
+
+export function loadSavedBoard(game, intent) {
+  const source = intent?.game || intent;
+  if (!source || typeof source !== "object") {
+    return { error: "No saved board." };
+  }
+
+  const groups = uniqueById(
+    (Array.isArray(source.groups) ? source.groups : [])
+      .map((group) => {
+        const id = String(group?.id || "").slice(0, 40);
+        const name = normalizeName(group?.name);
+        if (!id || !name) return null;
+        return { id, name };
+      })
+      .filter(Boolean),
+    MAX_GROUPS
+  );
+  if (!groups.length) return { error: "Saved board has no groups." };
+  const groupIds = new Set(groups.map((g) => g.id));
+
+  const roster = uniqueById(
+    (Array.isArray(source.roster) ? source.roster : [])
+      .map((player) => {
+        const id = String(player?.id || "").slice(0, 40);
+        const name = normalizeName(player?.name);
+        const groupId = String(player?.groupId || "");
+        if (!id || !name || !groupIds.has(groupId)) return null;
+        return { id, name, groupId };
+      })
+      .filter(Boolean),
+    MAX_GROUPS * MAX_ROSTER
+  );
+  const byGroup = new Map(groups.map((g) => [g.id, 0]));
+  const cappedRoster = [];
+  for (const player of roster) {
+    const used = byGroup.get(player.groupId) || 0;
+    if (used >= MAX_ROSTER) continue;
+    byGroup.set(player.groupId, used + 1);
+    cappedRoster.push(player);
+  }
+  const playerIds = new Set(cappedRoster.map((p) => p.id));
+
+  const matches = uniqueById(
+    (Array.isArray(source.matches) ? source.matches : [])
+      .map((match) => {
+        const id = String(match?.id || "").slice(0, 40);
+        const aId = String(match?.aId || "");
+        const bId = String(match?.bId || "");
+        const groupId = String(match?.groupId || "");
+        const aSets = parseSets(match?.aSets);
+        const bSets = parseSets(match?.bSets);
+        if (!id || aId === bId || !playerIds.has(aId) || !playerIds.has(bId)) return null;
+        if (!groupIds.has(groupId) || Number.isNaN(aSets) || Number.isNaN(bSets)) return null;
+        const a = cappedRoster.find((p) => p.id === aId);
+        const b = cappedRoster.find((p) => p.id === bId);
+        if (!a || !b || a.groupId !== b.groupId || a.groupId !== groupId) return null;
+        return { id, groupId, aId, bId, aSets, bSets };
+      })
+      .filter(Boolean),
+    MAX_GROUPS * ((MAX_ROSTER * (MAX_ROSTER - 1)) / 2)
+  );
+  const pairSeen = new Set();
+  const uniqueMatches = [];
+  for (const match of matches) {
+    const pair = match.aId < match.bId ? `${match.aId}:${match.bId}` : `${match.bId}:${match.aId}`;
+    if (pairSeen.has(pair)) continue;
+    pairSeen.add(pair);
+    uniqueMatches.push(match);
+  }
+
+  game.groups = groups;
+  game.roster = cappedRoster;
+  game.matches = uniqueMatches;
+  game.phase = "lobby";
+  bump(game);
+  const n = uniqueMatches.length;
+  game.message = n
+    ? `Loaded ${n} ${n === 1 ? "match" : "matches"} from a saved board.`
+    : "Loaded a saved board.";
+  return {};
 }
 
 function emptyStats(player) {

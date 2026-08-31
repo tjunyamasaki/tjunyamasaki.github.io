@@ -8,6 +8,8 @@ import {
   saveNickname,
   saveHostSession,
   loadHostSession,
+  listHostArchives,
+  removeHostArchive,
   clearHostSession,
   saveGuestSession,
   loadGuestSession,
@@ -61,6 +63,10 @@ const els = {
   renameGroup: document.getElementById("rename-group"),
   btnRemoveGroup: document.getElementById("btn-remove-group"),
   playerSuggest: document.getElementById("player-suggest"),
+  savedFold: document.getElementById("saved-fold"),
+  savedList: document.getElementById("saved-list"),
+  hostSaved: document.getElementById("host-saved"),
+  savedBoardList: document.getElementById("saved-board-list"),
 };
 
 let session = null;
@@ -134,6 +140,127 @@ function send(action, extra = {}) {
   if (!session) return;
   if (role === "host") session.hostIntent(action, extra);
   else session.sendIntent(action, extra);
+}
+
+function formatSavedAt(ms) {
+  const date = new Date(ms);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function saveSummary(entry) {
+  const game = entry?.game || {};
+  const players = game.roster?.length || 0;
+  const matches = game.matches?.length || 0;
+  const groups = game.groups?.length || 0;
+  const when = formatSavedAt(entry?.savedAt);
+  const parts = [
+    `${players} ${players === 1 ? "player" : "players"}`,
+    `${matches} ${matches === 1 ? "match" : "matches"}`,
+  ];
+  if (groups > 1) parts.push(`${groups} groups`);
+  if (when) parts.push(when);
+  return parts.join(" · ");
+}
+
+function confirmReplaceBoard(entry) {
+  const n = lastState?.matches?.length || 0;
+  if (!n) return true;
+  const room = entry?.roomCode || "that board";
+  return window.confirm(
+    `Replace this board with room ${room}? ${n} ${n === 1 ? "match" : "matches"} recorded here will be replaced.`
+  );
+}
+
+function loadArchiveIntoRoom(entry) {
+  if (role !== "host" || !session || !entry?.game) return;
+  if (!confirmReplaceBoard(entry)) return;
+  send("loadBoard", {
+    game: {
+      groups: entry.game.groups,
+      roster: entry.game.roster,
+      matches: entry.game.matches,
+    },
+  });
+}
+
+function renderSavedRow(entry, { loadLabel, onLoad, onRemove, loadDisabled = false }) {
+  const row = document.createElement("div");
+  row.className = "list-row";
+  const text = document.createElement("div");
+  const title = document.createElement("div");
+  title.textContent = `Room ${entry.roomCode}`;
+  const meta = document.createElement("div");
+  meta.className = "saved-meta";
+  meta.textContent = saveSummary(entry);
+  text.append(title, meta);
+  const spacer = document.createElement("span");
+  spacer.className = "spacer";
+  const load = document.createElement("button");
+  load.type = "button";
+  load.textContent = loadLabel;
+  load.disabled = loadDisabled;
+  load.addEventListener("click", () => onLoad(entry));
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "ghost danger";
+  remove.textContent = "Remove";
+  remove.addEventListener("click", () => onRemove(entry));
+  row.append(text, spacer, load, remove);
+  return row;
+}
+
+function renderGateSaves() {
+  const saves = listHostArchives();
+  if (!saves.length) {
+    els.savedFold.classList.add("hidden");
+    els.savedList.replaceChildren();
+    return;
+  }
+  els.savedFold.classList.remove("hidden");
+  els.savedList.replaceChildren();
+  for (const entry of saves) {
+    els.savedList.append(
+      renderSavedRow(entry, {
+        loadLabel: "Open in new room",
+        loadDisabled: !isFirebaseConfigured() || !canHost(),
+        onLoad: (saved) => beginHost({ archive: saved }),
+        onRemove: (saved) => {
+          removeHostArchive(saved.roomCode);
+          refreshResumeUi();
+        },
+      })
+    );
+  }
+}
+
+function renderHostSaves(state) {
+  if (!els.hostSaved || !els.savedBoardList) return;
+  const host = Boolean(state?.youAreHost);
+  const saves = host
+    ? listHostArchives().filter((entry) => entry.roomCode !== currentRoom)
+    : [];
+  els.hostSaved.classList.toggle("hidden", !host || !saves.length);
+  els.savedBoardList.replaceChildren();
+  if (!host || !saves.length) return;
+  for (const entry of saves) {
+    els.savedBoardList.append(
+      renderSavedRow(entry, {
+        loadLabel: "Load",
+        onLoad: loadArchiveIntoRoom,
+        onRemove: (saved) => {
+          removeHostArchive(saved.roomCode);
+          renderHostSaves(lastState);
+          refreshResumeUi();
+        },
+      })
+    );
+  }
 }
 
 function currentBoard(state) {
@@ -421,6 +548,7 @@ function renderHost(state, board) {
   document.querySelectorAll(".host-only").forEach((el) => {
     el.classList.toggle("hidden", !editor);
   });
+  renderHostSaves(state);
   if (!editor || !board) return;
 
   if (document.activeElement !== els.renameGroup) {
@@ -530,6 +658,7 @@ function refreshResumeUi() {
   } else {
     els.resumeRow.classList.add("hidden");
   }
+  renderGateSaves();
   const guest = loadGuestSession();
   if (guest?.roomCode && !els.joinCode.value.trim()) {
     els.joinCode.value = guest.roomCode;
@@ -544,12 +673,14 @@ function stopGuestRetry() {
   }
 }
 
-async function beginHost({ resume } = {}) {
+async function beginHost({ resume, archive } = {}) {
   if (!isFirebaseConfigured() || !canHost()) return;
   els.btnHost.disabled = true;
   els.btnResume.disabled = true;
-  setGateStatus(resume ? "Resuming room…" : "Creating room…");
-  const saved = resume ? loadHostSession() : null;
+  const saved = resume ? loadHostSession() : archive || null;
+  setGateStatus(
+    resume ? "Resuming room…" : saved ? "Opening saved board…" : "Creating room…"
+  );
   const name = nickname();
   try {
     initFirebase();
@@ -562,7 +693,7 @@ async function beginHost({ resume } = {}) {
     });
     session = host;
     role = "host";
-    const code = await host.start(saved?.roomCode);
+    const code = await host.start(resume ? saved?.roomCode : undefined);
     showBoard(code);
     setTableStatus({ text: "connected" });
     setGateStatus("");
@@ -673,6 +804,7 @@ function onNicknameEdit() {
   const name = (els.nickname.value || "").trim();
   if (name) saveNickname(name);
   syncHostButtons();
+  renderGateSaves();
 }
 
 els.nickname.addEventListener("input", onNicknameEdit);

@@ -10,6 +10,6 @@ Everyone needs internet (to load the page). For a live board, join the **same Wi
 4. Host records results as **name A, sets, name B, sets**. New names are added to the group.
 5. The grid is sets won against that player. Tap a name for ranking detail and remaining matches. **Export** downloads a CSV of every game.
 
-Refresh keeps the host save in that browser. **Leave** drops the room. If the host closes the tab, they tap **Resume room**.
+Refresh keeps the host save in that browser. **Leave** drops the live room, but this browser keeps **saved boards**. A host can open one in a new room, or load it into another lobby from the host panel.
 
 Up to 15 people watching.

@@ -41,6 +41,11 @@
           <button id="btn-discard" type="button" class="ghost">Discard saved</button>
         </div>
 
+        <div id="saved-fold" class="saved-fold hidden">
+          <p class="muted">Saved boards in this browser. Open one in a new room, even after you leave.</p>
+          <div id="saved-list" class="saved-list"></div>
+        </div>
+
         <div class="join-row">
           <label class="field grow">
             Room code
@@ -60,6 +65,8 @@
             <li>Ranking: match wins, then set difference, then sets won, then head-to-head.</li>
             <li>Tap a name to see who they beat and who they still need to play.</li>
             <li>Host can add groups, edit any match, or remove a player.</li>
+            <li>Refresh keeps the live room. Leave ends it, but this browser keeps saved boards so a host can open them in a new room.</li>
+            <li>Host can load a saved board into the current lobby from the panel at the bottom.</li>
             <li>Export CSV downloads every recorded match as <code>name,sets,name,sets</code>.</li>
           </ul>
         </details>
@@ -161,6 +168,12 @@
           </form>
           <div class="actions">
             <button id="btn-remove-group" type="button" class="ghost danger">Remove group</button>
+          </div>
+
+          <div id="host-saved" class="host-saved hidden">
+            <h3>Saved boards</h3>
+            <p class="muted">Load a board from this browser into this room. Watchers stay; results are replaced.</p>
+            <div id="saved-board-list" class="saved-list"></div>
           </div>
         </section>
       </div>

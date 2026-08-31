@@ -580,12 +580,34 @@ table.data .num {
   font-size: 0.75rem;
 }
 
+.saved-fold {
+  margin-top: 0.85rem;
+}
+
+.saved-list,
 .roster-list,
 .match-list {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   margin-top: 0.5rem;
+}
+
+.saved-list .list-row {
+  flex-wrap: wrap;
+}
+
+.saved-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.saved-list .empty {
+  margin: 0;
+}
+
+.host-saved {
+  margin-top: 0.35rem;
 }
 
 .list-row {

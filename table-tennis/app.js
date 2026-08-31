@@ -61,7 +61,6 @@ const els = {
   formRenameGroup: document.getElementById("form-rename-group"),
   renameGroup: document.getElementById("rename-group"),
   btnRemoveGroup: document.getElementById("btn-remove-group"),
-  linkHome: document.getElementById("link-home"),
 };
 
 let session = null;
@@ -685,14 +684,6 @@ els.btnExport.addEventListener("click", () => {
   link.download = currentRoom ? `table-tennis-${currentRoom}.csv` : "table-tennis.csv";
   link.click();
   URL.revokeObjectURL(url);
-});
-els.linkHome.addEventListener("click", (event) => {
-  if (session) {
-    event.preventDefault();
-    leave().then(() => {
-      location.href = "../";
-    });
-  }
 });
 els.roomCode.addEventListener("click", async () => {
   if (!currentRoom) return;

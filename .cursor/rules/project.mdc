@@ -5,7 +5,7 @@ alwaysApply: true
 
 # This repo
 
-Vanilla GitHub Pages site. Hub at `/`; card lobby at `/lobby/`; Fodinha at `/fodinha/`, Presidente at `/presidente/`, and Table tennis at `/table-tennis/` (own rules UI; reuses `js/signaling.js`, `js/guest.js`, `js/starGameHost.js`). Host browser is authoritative. Firebase RTDB is signaling only (rooms, SDP, ICE). Game/lobby state goes over WebRTC data channels (star: guests to host).
+Vanilla GitHub Pages site. Table tennis at `/` (JS/CSS in `table-tennis/`; reuses `js/signaling.js`, `js/guest.js`, `js/starGameHost.js`). Other apps (`/lobby/`, `/fodinha/`, `/presidente/`, `/game-of-life/`) stay in the repo but are not linked from the homepage. Host browser is authoritative. Firebase RTDB is signaling only (rooms, SDP, ICE). Game/lobby state goes over WebRTC data channels (star: guests to host).
 
 Handoff docs are **local only** under `docs/` (gitignored). There is no root `AGENTS.md`. Before coding, read:
 

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Fodinha</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <p id="config-error" class="banner banner-error hidden"></p>
+
+    <section id="view-gate" class="page-gate">
+      <div class="gate-card">
+        <p class="hub-back"><a href="../">Home</a></p>
+        <p class="kicker">Trick-taking</p>
+        <h1>Fodinha</h1>
+        <p class="lede">
+          Bid exactly the tricks you will take. Miss, and you lose lives. Last
+          player standing wins.
+        </p>
+
+        <label class="field">
+          Nickname
+          <input id="nickname" type="text" maxlength="24" placeholder="Your name" autocomplete="nickname" />
+        </label>
+
+        <div class="actions">
+          <button id="btn-host" type="button">Host table</button>
+        </div>
+        <div id="resume-row" class="actions hidden">
+          <button id="btn-resume" type="button">Resume room</button>
+          <button id="btn-discard" type="button" class="ghost">Discard saved</button>
+        </div>
+
+        <div class="join-row">
+          <label class="field grow">
+            Room code
+            <input id="join-code" type="text" maxlength="6" placeholder="ABC12" autocomplete="off" />
+          </label>
+          <button id="btn-join" type="button">Join</button>
+        </div>
+
+        <p id="gate-status" class="status"></p>
+
+        <details class="rules-fold">
+          <summary>How to play</summary>
+          <ul>
+            <li>3–6 players. Everyone starts with 5 lives.</li>
+            <li>40-card deck, Truco ranking (4 low … 3 high).</li>
+            <li>A vira is turned; the next rank are manilhas (clubs strongest).</li>
+            <li>Bid the exact number of tricks you will take. Dealer is hooked: bids cannot sum to the hand size.</li>
+            <li>Follow suit if you can. Manilhas beat everything; among them clubs &gt; hearts &gt; spades &gt; diamonds.</li>
+            <li>Lose lives equal to how far you missed. Last with lives wins.</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <section id="view-table" class="page-table hidden">
+      <header class="table-head">
+        <p class="hub-back head-back"><a href="../" id="link-home">Home</a></p>
+        <h1 class="table-title">Fodinha</h1>
+        <button id="room-code" type="button" class="room-code" title="Copy room code">————</button>
+        <button id="btn-leave" type="button" class="ghost btn-leave">Leave</button>
+      </header>
+
+      <p id="table-status" class="status table-status hidden"></p>
+      <p id="round-message" class="round-message"></p>
+
+      <div id="opponents" class="opponents" aria-label="Other players"></div>
+
+      <div id="felt" class="felt">
+        <div id="lobby-panel" class="lobby-panel hidden"></div>
+        <div id="ended-panel" class="ended-panel hidden"></div>
+        <div id="meta-row" class="meta-row"></div>
+        <div id="trick" class="trick" aria-label="Current trick"></div>
+        <div id="score-strip" class="score-strip hidden"></div>
+      </div>
+
+      <div id="bid-dock" class="bid-dock hidden">
+        <p id="bid-hint" class="bid-hint">Your bid</p>
+        <div id="bid-pad" class="bid-pad"></div>
+      </div>
+
+      <div id="self-bar" class="self-bar"></div>
+
+      <div id="hand-wrap" class="hand-wrap">
+        <p id="hand-hint" class="hand-hint"></p>
+        <div id="hand" class="hand" aria-label="Your hand"></div>
+      </div>
+    </section>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

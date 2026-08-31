@@ -4,6 +4,18 @@ export const MAX_GROUPS = 12;
 export const MAX_ROSTER = 24;
 export const MAX_NAME = 24;
 export const MAX_SETS = 99;
+export const EDITOR_NAMES = ["admjun", "admyasmin", "admlaio", "admgui"];
+
+const EDITOR_SET = new Set(EDITOR_NAMES);
+
+export function isEditorName(name) {
+  return EDITOR_SET.has(normalizeName(name).toLowerCase());
+}
+
+export function canEditBoard(game, playerId) {
+  if (playerId === HOST_ID) return true;
+  return isEditorName(game.players[playerId]?.name);
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -184,9 +196,9 @@ function ensurePlayer(game, name, groupId) {
   return { player, created: true };
 }
 
-function hostOnly(playerId) {
-  if (playerId !== HOST_ID) return { error: "Only the host can edit the board." };
-  return null;
+function hostOnly(game, playerId) {
+  if (canEditBoard(game, playerId)) return null;
+  return { error: "Only an admin can edit the board." };
 }
 
 function addGroup(game, name) {
@@ -368,7 +380,7 @@ export function applyAction(game, playerId, intent) {
     return {};
   }
 
-  const denied = hostOnly(playerId);
+  const denied = hostOnly(game, playerId);
   if (denied) return denied;
 
   if (action === "addGroup") return addGroup(game, intent.name);
@@ -562,6 +574,7 @@ export function snapshotFor(game, viewerId) {
       name: p?.name || "Player",
       connected: Boolean(p?.connected),
       isHost: Boolean(p?.isHost),
+      isEditor: canEditBoard(game, id),
     };
   });
   return {
@@ -569,6 +582,7 @@ export function snapshotFor(game, viewerId) {
     viewerId,
     gameName: "Table tennis",
     youAreHost: viewerId === HOST_ID,
+    youCanEdit: canEditBoard(game, viewerId),
     players: clone(game.players),
     playerOrder: game.playerOrder.slice(),
     watchers,

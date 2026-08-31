@@ -13,7 +13,7 @@ import {
   loadGuestSession,
   clearGuestSession,
 } from "./persist.js";
-import { matchesToCsv } from "./rules.js";
+import { matchesToCsv, isEditorName } from "./rules.js";
 
 const els = {
   configError: document.getElementById("config-error"),
@@ -74,10 +74,12 @@ let selectedGroupId = "";
 let selectedPlayerId = "";
 let editingMatchId = "";
 
-const HOST_NAMES = new Set(["admjun", "admyasmin", "admlaio", "admgui"]);
-
 function canHost() {
-  return HOST_NAMES.has((els.nickname.value || "").trim().toLowerCase());
+  return isEditorName(els.nickname.value);
+}
+
+function canEditUi() {
+  return Boolean(lastState?.youCanEdit);
 }
 
 function syncHostButtons() {
@@ -160,6 +162,11 @@ function renderWatchers(state) {
       const tag = document.createElement("span");
       tag.className = "host-chip";
       tag.textContent = "host";
+      chip.append(tag);
+    } else if (w.isEditor) {
+      const tag = document.createElement("span");
+      tag.className = "host-chip";
+      tag.textContent = "edit";
       chip.append(tag);
     }
     if (!w.connected) chip.append(document.createTextNode(" · away"));
@@ -284,7 +291,7 @@ function renderGrid(board, host) {
 
 function onCell(row, col, cell) {
   selectedPlayerId = row.id;
-  if (role === "host") {
+  if (canEditUi()) {
     fillMatchForm({
       matchId: cell?.matchId || "",
       aName: row.name,
@@ -325,7 +332,7 @@ function renderFocus(board) {
       const cls = m.won ? "win" : m.for < m.against ? "loss" : "";
       li.innerHTML = `<span class="${cls}">${m.for}–${m.against}</span> vs `;
       li.append(document.createTextNode(m.opponentName));
-      if (role === "host") {
+      if (canEditUi()) {
         const edit = document.createElement("button");
         edit.type = "button";
         edit.className = "ghost tiny";
@@ -361,7 +368,7 @@ function renderFocus(board) {
     for (const opp of left) {
       const li = document.createElement("li");
       li.textContent = opp.name;
-      if (role === "host") {
+      if (canEditUi()) {
         const rec = document.createElement("button");
         rec.type = "button";
         rec.className = "ghost tiny";
@@ -410,11 +417,11 @@ function updateEditButtons() {
 }
 
 function renderHost(state, board) {
-  const host = Boolean(state.youAreHost);
+  const editor = Boolean(state.youCanEdit);
   document.querySelectorAll(".host-only").forEach((el) => {
-    el.classList.toggle("hidden", !host);
+    el.classList.toggle("hidden", !editor);
   });
-  if (!host || !board) return;
+  if (!editor || !board) return;
 
   if (document.activeElement !== els.renameGroup) {
     els.renameGroup.value = board.groupName || "";
@@ -508,7 +515,7 @@ function renderState(state) {
   renderWatchers(state);
   renderGroups(state);
   renderRanking(board);
-  renderGrid(board, state.youAreHost);
+  renderGrid(board, state.youCanEdit);
   renderFocus(board);
   renderHost(state, board);
   els.btnExport.disabled = !(state.matches || []).length;
@@ -718,6 +725,7 @@ els.roomCode.addEventListener("click", async () => {
 });
 
 function hostApplied() {
+  if (role !== "host") return () => true;
   const seq = lastState?.seq;
   return () => lastState?.seq !== seq;
 }

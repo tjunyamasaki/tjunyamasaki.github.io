@@ -109,7 +109,7 @@
             <div class="match-row">
               <label class="field grow">
                 Player A
-                <input id="match-a-name" type="text" maxlength="24" list="roster-names" autocomplete="off" />
+                <input id="match-a-name" type="text" maxlength="24" autocomplete="off" />
               </label>
               <label class="field sets">
                 Sets
@@ -120,7 +120,7 @@
             <div class="match-row">
               <label class="field grow">
                 Player B
-                <input id="match-b-name" type="text" maxlength="24" list="roster-names" autocomplete="off" />
+                <input id="match-b-name" type="text" maxlength="24" autocomplete="off" />
               </label>
               <label class="field sets">
                 Sets
@@ -133,7 +133,6 @@
               <button id="btn-cancel-edit" type="button" class="ghost hidden">Cancel</button>
             </div>
           </form>
-          <datalist id="roster-names"></datalist>
 
           <h3>Players in this group</h3>
           <form id="form-player" class="inline-form">
@@ -157,6 +156,7 @@
       </div>
     </section>
 
+    <ul id="player-suggest" class="combo-list hidden" role="listbox"></ul>
     <script type="module" src="table-tennis/app.js"></script>
   </body>
 </html>

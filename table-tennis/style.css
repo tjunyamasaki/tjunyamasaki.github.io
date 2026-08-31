@@ -608,6 +608,35 @@ table.data .num {
   font-size: 0.78rem;
 }
 
+.combo-list {
+  position: fixed;
+  z-index: 40;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: #10241b;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+  overflow: auto;
+}
+
+.combo-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 550;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+}
+
+.combo-item:hover,
+.combo-item.active {
+  background: rgba(255, 122, 60, 0.16);
+}
+
 @media (min-width: 900px) {
   .board-scroll {
     display: grid;

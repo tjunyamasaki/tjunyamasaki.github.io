@@ -53,7 +53,6 @@ const els = {
   btnSaveMatch: document.getElementById("btn-save-match"),
   btnDeleteMatch: document.getElementById("btn-delete-match"),
   btnCancelEdit: document.getElementById("btn-cancel-edit"),
-  rosterNames: document.getElementById("roster-names"),
   formPlayer: document.getElementById("form-player"),
   playerName: document.getElementById("player-name"),
   rosterList: document.getElementById("roster-list"),
@@ -61,6 +60,7 @@ const els = {
   formRenameGroup: document.getElementById("form-rename-group"),
   renameGroup: document.getElementById("rename-group"),
   btnRemoveGroup: document.getElementById("btn-remove-group"),
+  playerSuggest: document.getElementById("player-suggest"),
 };
 
 let session = null;
@@ -415,13 +415,6 @@ function renderHost(state, board) {
   }
   els.btnRemoveGroup.disabled = (state.groups || []).length <= 1;
 
-  els.rosterNames.replaceChildren();
-  for (const p of board.players) {
-    const opt = document.createElement("option");
-    opt.value = p.name;
-    els.rosterNames.append(opt);
-  }
-
   els.rosterList.replaceChildren();
   if (!board.players.length) {
     const empty = document.createElement("p");
@@ -760,6 +753,114 @@ els.btnRemoveGroup.addEventListener("click", () => {
 els.focusClose.addEventListener("click", () => {
   selectedPlayerId = "";
   renderState(lastState);
+});
+
+let comboInput = null;
+let comboIndex = -1;
+
+function playerNames() {
+  return (currentBoard(lastState)?.players || []).map((p) => p.name);
+}
+
+function closeCombo() {
+  comboInput = null;
+  comboIndex = -1;
+  els.playerSuggest.classList.add("hidden");
+  els.playerSuggest.replaceChildren();
+}
+
+function placeCombo(input) {
+  const box = els.playerSuggest;
+  const r = input.getBoundingClientRect();
+  const gap = 4;
+  const maxH = 220;
+  const below = window.innerHeight - r.bottom - 8;
+  box.style.left = `${Math.round(r.left)}px`;
+  box.style.width = `${Math.round(r.width)}px`;
+  box.style.top = `${Math.round(r.bottom + gap)}px`;
+  box.style.bottom = "auto";
+  box.style.maxHeight = `${Math.min(maxH, Math.max(below, 96))}px`;
+}
+
+function setComboActive(items, index) {
+  comboIndex = index;
+  items.forEach((item, i) => {
+    item.classList.toggle("active", i === index);
+    if (i === index) item.scrollIntoView({ block: "nearest" });
+  });
+}
+
+function openCombo(input) {
+  const names = playerNames();
+  const q = (input.value || "").trim().toLowerCase();
+  const matches = names.filter((name) => !q || name.toLowerCase().includes(q));
+  if (!matches.length) {
+    closeCombo();
+    return;
+  }
+  comboInput = input;
+  els.playerSuggest.replaceChildren();
+  matches.forEach((name, i) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "combo-item";
+    item.setAttribute("role", "option");
+    item.textContent = name;
+    item.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      input.value = name;
+      closeCombo();
+      input.focus();
+    });
+    els.playerSuggest.append(item);
+    if (i === 0) item.classList.add("active");
+  });
+  comboIndex = 0;
+  els.playerSuggest.classList.remove("hidden");
+  placeCombo(input);
+}
+
+function bindPlayerCombo(input) {
+  input.addEventListener("focus", () => openCombo(input));
+  input.addEventListener("input", () => openCombo(input));
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (comboInput === input) closeCombo();
+    }, 120);
+  });
+  input.addEventListener("keydown", (event) => {
+    if (els.playerSuggest.classList.contains("hidden") || comboInput !== input) {
+      if (event.key === "ArrowDown") openCombo(input);
+      return;
+    }
+    const items = [...els.playerSuggest.querySelectorAll(".combo-item")];
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setComboActive(items, Math.min(items.length - 1, comboIndex + 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setComboActive(items, Math.max(0, comboIndex - 1));
+    } else if (event.key === "Enter" && comboIndex >= 0 && items[comboIndex]) {
+      event.preventDefault();
+      input.value = items[comboIndex].textContent;
+      closeCombo();
+    } else if (event.key === "Escape") {
+      closeCombo();
+    }
+  });
+}
+
+bindPlayerCombo(els.matchAName);
+bindPlayerCombo(els.matchBName);
+document.querySelector(".board-scroll")?.addEventListener(
+  "scroll",
+  () => {
+    if (comboInput) placeCombo(comboInput);
+  },
+  { passive: true }
+);
+window.addEventListener("resize", () => {
+  if (comboInput) placeCombo(comboInput);
 });
 
 els.nickname.value = loadNickname();

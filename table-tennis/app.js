@@ -1,5 +1,6 @@
 import { isFirebaseConfigured } from "../js/config.js";
 import { initFirebase } from "../js/signaling.js";
+import { BACKUP_APP, loadBackup, writeBackup } from "../js/backup.js";
 import { createGuest } from "../js/guest.js";
 import { createTableTennisHost } from "./host.js";
 import {
@@ -23,11 +24,13 @@ const els = {
   joinCode: document.getElementById("join-code"),
   btnHost: document.getElementById("btn-host"),
   btnJoin: document.getElementById("btn-join"),
+  btnRestore: document.getElementById("btn-restore"),
   btnResume: document.getElementById("btn-resume"),
   btnDiscard: document.getElementById("btn-discard"),
   resumeRow: document.getElementById("resume-row"),
   gateStatus: document.getElementById("gate-status"),
   btnLeave: document.getElementById("btn-leave"),
+  btnSaveCloud: document.getElementById("btn-save-cloud"),
   btnExport: document.getElementById("btn-export"),
   roomCode: document.getElementById("room-code"),
   tableStatus: document.getElementById("table-status"),
@@ -86,11 +89,14 @@ function syncHostButtons() {
   const allow = isFirebaseConfigured() && canHost();
   els.btnHost.disabled = !allow;
   els.btnResume.disabled = !allow;
+  if (els.btnRestore) els.btnRestore.disabled = !allow;
   if (allow) {
     els.btnHost.removeAttribute("disabled");
     els.btnResume.removeAttribute("disabled");
+    els.btnRestore?.removeAttribute("disabled");
   } else {
     els.btnHost.setAttribute("disabled", "");
+    els.btnRestore?.setAttribute("disabled", "");
   }
 }
 
@@ -544,6 +550,37 @@ function stopGuestRetry() {
   }
 }
 
+async function restoreFromCloud() {
+  if (!isFirebaseConfigured() || !canHost()) return;
+  const code = els.joinCode.value.trim().toUpperCase();
+  els.joinCode.value = code;
+  if (!code) {
+    setGateStatus("Enter the old room code to restore.", true);
+    return;
+  }
+  if (els.btnRestore) els.btnRestore.disabled = true;
+  setGateStatus("Loading backup…");
+  try {
+    initFirebase();
+    const packed = await loadBackup(BACKUP_APP, code);
+    if (!packed) {
+      setGateStatus("No cloud backup for that code.", true);
+      return;
+    }
+    saveHostSession({
+      roomCode: code,
+      name: nickname(),
+      game: packed.game,
+    });
+    await beginHost({ resume: true });
+  } catch (err) {
+    console.error(err);
+    setGateStatus(err.message || String(err), true);
+  } finally {
+    syncHostButtons();
+  }
+}
+
 async function beginHost({ resume } = {}) {
   if (!isFirebaseConfigured() || !canHost()) return;
   els.btnHost.disabled = true;
@@ -669,6 +706,25 @@ async function leave() {
   refreshResumeUi();
 }
 
+async function saveToCloud() {
+  if (!canEditUi() || !currentRoom || !lastState) {
+    setTableStatus({ text: "Nothing to save", error: true });
+    return;
+  }
+  if (els.btnSaveCloud) els.btnSaveCloud.disabled = true;
+  try {
+    initFirebase();
+    await writeBackup(BACKUP_APP, currentRoom, lastState);
+    setTableStatus({ text: "Cloud backup saved" });
+    setTimeout(() => setTableStatus({ text: "connected" }), 1600);
+  } catch (err) {
+    console.error(err);
+    setTableStatus({ text: err.message || String(err), error: true });
+  } finally {
+    if (els.btnSaveCloud) els.btnSaveCloud.disabled = false;
+  }
+}
+
 function onNicknameEdit() {
   const name = (els.nickname.value || "").trim();
   if (name) saveNickname(name);
@@ -694,10 +750,12 @@ els.btnJoin.addEventListener("click", () => {
   }
   beginGuest(code);
 });
+els.btnRestore?.addEventListener("click", () => restoreFromCloud());
 els.joinCode.addEventListener("keydown", (event) => {
   if (event.key === "Enter") els.btnJoin.click();
 });
 els.btnLeave.addEventListener("click", () => leave());
+els.btnSaveCloud?.addEventListener("click", () => saveToCloud());
 els.btnExport.addEventListener("click", () => {
   if (!lastState) return;
   const csv = matchesToCsv(lastState.matches, lastState.roster);
@@ -904,4 +962,5 @@ if (!isFirebaseConfigured()) {
   els.btnHost.disabled = true;
   els.btnJoin.disabled = true;
   els.btnResume.disabled = true;
+  if (els.btnRestore) els.btnRestore.disabled = true;
 }

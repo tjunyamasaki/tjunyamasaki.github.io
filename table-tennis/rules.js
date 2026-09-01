@@ -599,12 +599,12 @@ export function snapshotFor(game, viewerId) {
 
 export function restoreGame(saved, hostName) {
   const game = saved ? clone(saved) : createGame(hostName);
-  if (!game.players) return createGame(hostName);
   if (!Array.isArray(game.groups) || !game.groups.length) {
     game.groups = [defaultGroup()];
   }
   if (!Array.isArray(game.roster)) game.roster = [];
   if (!Array.isArray(game.matches)) game.matches = [];
+  if (!game.players || typeof game.players !== "object") game.players = {};
   if (!Array.isArray(game.playerOrder)) game.playerOrder = [HOST_ID];
   markGuestsDisconnected(game);
   if (game.players[HOST_ID]) {

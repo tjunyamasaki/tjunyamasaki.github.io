@@ -48,6 +48,11 @@
           </label>
           <button id="btn-join" type="button">Join</button>
         </div>
+        <div class="actions">
+          <button id="btn-restore" type="button" class="ghost" disabled>
+            Restore cloud backup
+          </button>
+        </div>
 
         <p id="gate-status" class="status"></p>
 
@@ -55,6 +60,10 @@
           <summary>How it works</summary>
           <ul>
             <li>Host keeps this tab open and shares the room code.</li>
+            <li>
+              Admins can Save cloud to checkpoint the board in Firebase (not live play).
+              After a new phone or cleared storage, enter the old code and Restore cloud backup.
+            </li>
             <li>Add players, or just record a result — new names are created.</li>
             <li>Each pair plays once. The grid cell is sets won against that player.</li>
             <li>Ranking: match wins, then set difference, then sets won, then head-to-head.</li>
@@ -70,6 +79,9 @@
       <header class="board-head">
         <h1 class="board-title">Table tennis</h1>
         <button id="room-code" type="button" class="room-code" title="Copy room code">————</button>
+        <button id="btn-save-cloud" type="button" class="ghost btn-leave host-only hidden" title="Write this board to Firebase">
+          Save cloud
+        </button>
         <button id="btn-export" type="button" class="ghost btn-leave" title="Download matches as CSV" disabled>Export</button>
         <button id="btn-leave" type="button" class="ghost btn-leave">Leave</button>
       </header>

@@ -38,6 +38,15 @@ body:has(#view-table:not(.hidden)) {
   padding: 1.25rem;
 }
 
+.kicker {
+  margin: 0 0 0.25rem;
+  color: var(--accent);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .home-card {
   background: var(--card);
   border: 1px solid var(--line);

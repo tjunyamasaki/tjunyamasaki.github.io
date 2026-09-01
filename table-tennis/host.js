@@ -3,6 +3,6 @@ import * as rules from "./rules.js";
 
 export { HOST_ID } from "./rules.js";
 
-export function createFodinhaHost(opts) {
+export function createTableTennisHost(opts) {
   return createStarHost({ ...opts, rules });
 }

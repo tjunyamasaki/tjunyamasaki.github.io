@@ -686,3 +686,9 @@ export function restoreGame(saved, hostName) {
   }
   return game;
 }
+
+export function afterPause(game, kind) {
+  if (kind === "trick") return resolveTrick(game);
+  if (kind === "hand") return completeHand(game);
+  return {};
+}

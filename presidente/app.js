@@ -1,7 +1,8 @@
 import { isFirebaseConfigured } from "../js/config.js";
 import { initFirebase } from "../js/signaling.js";
 import { createGuest } from "../js/guest.js";
-import { createFodinhaHost } from "./host.js";
+import { playingCard, cardBack } from "../js/feltCard.js";
+import { createPresidenteHost } from "./host.js";
 import {
   getOrCreatePlayerId,
   loadNickname,
@@ -13,9 +14,8 @@ import {
   loadGuestSession,
   clearGuestSession,
 } from "./persist.js";
-import { SUIT_GLYPH, cardLabel, playingCard, cardBack } from "../js/feltCard.js";
-import { isManilha, rankName } from "./cards.js";
-import { MIN_PLAYERS, START_LIVES } from "./rules.js";
+import { isLegalSet, comboLabel } from "./cards.js";
+import { MIN_PLAYERS, TITLE_LABEL, WIN_POINTS } from "./rules.js";
 
 const els = {
   configError: document.getElementById("config-error"),
@@ -39,11 +39,11 @@ const els = {
   metaRow: document.getElementById("meta-row"),
   trick: document.getElementById("trick"),
   scoreStrip: document.getElementById("score-strip"),
-  bidDock: document.getElementById("bid-dock"),
-  bidHint: document.getElementById("bid-hint"),
-  bidPad: document.getElementById("bid-pad"),
+  playDock: document.getElementById("play-dock"),
+  playHint: document.getElementById("play-hint"),
+  btnPass: document.getElementById("btn-pass"),
+  btnPlay: document.getElementById("btn-play"),
   selfBar: document.getElementById("self-bar"),
-  handWrap: document.getElementById("hand-wrap"),
   handHint: document.getElementById("hand-hint"),
   hand: document.getElementById("hand"),
   linkHome: document.getElementById("link-home"),
@@ -55,6 +55,8 @@ let currentRoom = "";
 let leaving = false;
 let joiningGuest = false;
 let guestRetryTimer = 0;
+let lastState = null;
+let selected = new Set();
 
 function nickname() {
   const name = (els.nickname.value || "").trim() || "Player";
@@ -98,17 +100,12 @@ function send(action, extra = {}) {
   else session.sendIntent(action, extra);
 }
 
-function lifeRow(lives, max = START_LIVES) {
-  const wrap = document.createElement("div");
-  wrap.className = "lives";
-  wrap.setAttribute("aria-label", `${lives} lives`);
-  const total = Math.max(max, lives, 1);
-  for (let i = 0; i < total; i++) {
-    const d = document.createElement("span");
-    d.className = "life" + (i < lives ? "" : " off");
-    wrap.append(d);
-  }
-  return wrap;
+function selectedCards(state) {
+  return (state.hand || []).filter((c) => selected.has(c.id));
+}
+
+function titleLabel(title) {
+  return TITLE_LABEL[title] || "";
 }
 
 function opponentOrder(state) {
@@ -133,34 +130,34 @@ function renderOpponents(state) {
     const color = Number.isInteger(p.color) ? p.color : 0;
     seat.className = `seat c${color}`;
     if (state.toAct === id) seat.classList.add("to-act");
-    if (p.eliminated) seat.classList.add("eliminated");
 
     const name = document.createElement("div");
     name.className = "seat-name";
     const dot = document.createElement("span");
     dot.className = "dot";
     name.append(dot, document.createTextNode(p.name || "Player"));
-    if (state.dealerId === id) {
-      const tag = document.createElement("span");
-      tag.className = "dealer-tag";
-      tag.textContent = "D";
-      tag.title = "Dealer";
-      name.append(tag);
-    }
     seat.append(name);
-    seat.append(lifeRow(p.lives));
+
+    if (p.title) {
+      const chip = document.createElement("div");
+      chip.className = `title-chip ${p.title}`;
+      chip.textContent = titleLabel(p.title);
+      seat.append(chip);
+    }
+
+    const pts = document.createElement("div");
+    pts.className = "seat-points";
+    pts.textContent = `${p.points} pts`;
+    seat.append(pts);
 
     const bid = document.createElement("div");
     bid.className = "seat-bid";
-    if (p.eliminated) bid.textContent = "out";
-    else if (state.phase === "lobby") bid.textContent = p.ready ? "ready" : "…";
-    else if (state.phase === "bidding") {
-      bid.textContent = p.hasBid ? (p.bid == null ? "bid" : `bid ${p.bid}`) : "bidding";
-    } else if (["playing", "reveal", "ended"].includes(state.phase)) {
-      const shown = p.bid == null ? "—" : p.bid;
-      bid.textContent = `${p.tricks}/${shown}`;
-    } else bid.textContent = "";
-    if (!p.connected) bid.textContent = (bid.textContent ? bid.textContent + " · " : "") + "away";
+    if (state.phase === "lobby") bid.textContent = p.ready ? "ready" : "…";
+    else if (state.passed?.[id]) bid.textContent = "pass";
+    else if ((state.handCounts?.[id] || 0) === 0 && state.phase === "playing") {
+      bid.textContent = "out";
+    } else bid.textContent = `${state.handCounts?.[id] || 0} cards`;
+    if (!p.connected) bid.textContent += " · away";
     seat.append(bid);
 
     const mini = document.createElement("div");
@@ -179,55 +176,43 @@ function renderMeta(state) {
     return;
   }
   els.metaRow.classList.remove("hidden");
-
-  if (state.vira) {
-    const badge = document.createElement("div");
-    badge.className = "badge";
-    const vira = playingCard(state.vira, {
-      size: "tiny-vira",
-      manilha: false,
-    });
-    vira.style.pointerEvents = "none";
-    const lab = document.createElement("span");
-    lab.innerHTML = `Vira &nbsp;<strong>${cardLabel(state.vira)}</strong>`;
-    badge.append(vira, lab);
-    els.metaRow.append(badge);
+  const goal = document.createElement("div");
+  goal.className = "badge";
+  goal.innerHTML = `First to <strong>${WIN_POINTS}</strong>`;
+  els.metaRow.append(goal);
+  if (state.pile) {
+    const pile = document.createElement("div");
+    pile.className = "badge";
+    pile.innerHTML = `Pile &nbsp;<strong>${comboLabel(state.pile.cards)}</strong>`;
+    els.metaRow.append(pile);
+  } else if (state.phase === "playing") {
+    const lead = document.createElement("div");
+    lead.className = "badge";
+    lead.innerHTML = "<strong>Lead</strong> any set";
+    els.metaRow.append(lead);
   }
-
-  if (state.manilhaRank) {
-    const badge = document.createElement("div");
-    badge.className = "badge";
-    badge.innerHTML = `Manilha &nbsp;<strong>${rankName(state.manilhaRank)}s ${SUIT_GLYPH.clubs} high</strong>`;
-    els.metaRow.append(badge);
-  }
-
-  const hand = document.createElement("div");
-  hand.className = "badge";
-  hand.innerHTML = `<strong>${state.handSize}</strong> ${state.handSize === 1 ? "card" : "cards"}${
-    state.suddenDeath ? " · sudden death" : ""
-  }`;
-  els.metaRow.append(hand);
 }
 
-function renderTrick(state) {
+function renderPile(state) {
   els.trick.replaceChildren();
-  const plays = state.trick || [];
-  els.trick.classList.toggle("hidden", !plays.length);
-  for (const play of plays) {
+  const cards = state.pile?.cards || [];
+  els.trick.classList.toggle("hidden", !cards.length && state.phase !== "playing");
+  if (!cards.length) {
+    if (state.phase === "playing") {
+      const empty = document.createElement("p");
+      empty.className = "pile-empty";
+      empty.textContent = "Empty pile — lead any number of the same rank.";
+      els.trick.append(empty);
+    }
+    return;
+  }
+  for (const card of cards) {
     const wrap = document.createElement("div");
     wrap.className = "trick-seat";
-    if (state.pendingTrickWinner === play.playerId) wrap.classList.add("winner");
-    const card = playingCard(play.card, {
-      manilha: isManilha(play.card, state.manilhaRank),
-    });
-    const who = document.createElement("span");
-    who.className = "who";
-    const name =
-      play.playerId === state.viewerId
-        ? "You"
-        : state.players[play.playerId]?.name || "Player";
-    who.textContent = name;
-    wrap.append(card, who);
+    if (state.lastPlayId && state.pile.playerId === state.lastPlayId) {
+      wrap.classList.add("winner");
+    }
+    wrap.append(playingCard(card));
     els.trick.append(wrap);
   }
 }
@@ -243,8 +228,8 @@ function renderScore(state) {
   els.scoreStrip.replaceChildren();
   for (const row of rows) {
     const chip = document.createElement("span");
-    chip.className = "score-chip" + (row.delta ? " miss" : "");
-    chip.textContent = `${row.name} ${row.tricks}/${row.bid}` + (row.delta ? ` −${row.delta}` : " ✓");
+    chip.className = "score-chip";
+    chip.textContent = `${row.name} ${titleLabel(row.title)} ${row.points} pts`;
     els.scoreStrip.append(chip);
   }
 }
@@ -275,7 +260,7 @@ function renderLobby(state) {
     dot.style.borderRadius = "50%";
     dot.style.background = `var(--seat-${p.color ?? 0})`;
     const name = document.createElement("span");
-    name.textContent = p.name + (id === state.viewerId ? "" : "");
+    name.textContent = p.name;
     row.append(dot, name);
     if (id === state.viewerId) {
       const you = document.createElement("span");
@@ -338,7 +323,7 @@ function renderEnded(state) {
   title.textContent = winner ? `${winner.name} wins` : "Game over";
   const blurb = document.createElement("p");
   blurb.className = "muted";
-  blurb.textContent = "Last player with lives. Host can deal a rematch.";
+  blurb.textContent = `First to ${WIN_POINTS} points. Host can deal a rematch.`;
   els.endedPanel.replaceChildren(title, blurb);
   if (state.youAreHost) {
     const actions = document.createElement("div");
@@ -359,85 +344,106 @@ function renderSelf(state) {
   els.selfBar.classList.toggle("to-act", state.toAct === state.viewerId);
   const name = document.createElement("span");
   name.className = "name";
-  name.textContent = me.name + (state.dealerId === state.viewerId ? " · dealer" : "");
+  name.textContent = me.name;
   els.selfBar.append(name);
-  els.selfBar.append(lifeRow(me.lives));
-  const meta = document.createElement("span");
-  if (state.phase === "lobby") meta.textContent = me.ready ? "ready" : "not ready";
-  else if (state.phase === "bidding") {
-    meta.textContent = me.hasBid ? `bid ${me.bid}` : "your bid";
-  } else if (["playing", "reveal", "ended"].includes(state.phase)) {
-    meta.textContent = me.eliminated ? "out" : `tricks ${me.tricks}/${me.bid ?? "—"}`;
+  if (me.title) {
+    const chip = document.createElement("span");
+    chip.className = `title-chip ${me.title}`;
+    chip.textContent = titleLabel(me.title);
+    els.selfBar.append(chip);
   }
-  els.selfBar.append(meta);
+  const pts = document.createElement("span");
+  pts.textContent = `${me.points} pts`;
+  els.selfBar.append(pts);
 }
 
-function renderBids(state) {
-  const myTurn = state.phase === "bidding" && state.toAct === state.viewerId;
-  const me = state.players[state.viewerId];
-  if (!myTurn || me?.eliminated) {
-    els.bidDock.classList.add("hidden");
-    els.bidPad.replaceChildren();
+function renderDock(state) {
+  const myTurn = state.toAct === state.viewerId && !state.frozen;
+  const tax = state.phase === "tax" && myTurn && state.tax;
+  const play = state.phase === "playing" && myTurn;
+  if (!tax && !play) {
+    els.playDock.classList.add("hidden");
     return;
   }
-  els.bidDock.classList.remove("hidden");
-  const forbid = state.hookForbidden;
-  els.bidHint.textContent =
-    forbid == null
-      ? `Bid tricks (0–${state.handSize})`
-      : `Bid tricks — hook: you cannot bid ${forbid}`;
-  els.bidPad.replaceChildren();
-  for (let n = 0; n <= state.handSize; n++) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = String(n);
-    if (n === forbid) {
-      btn.disabled = true;
-      btn.className = "hook";
-      btn.title = "Hook: bids cannot add up to the hand size";
-    }
-    btn.addEventListener("click", () => send("bid", { n }));
-    els.bidPad.append(btn);
+  els.playDock.classList.remove("hidden");
+  const pick = selectedCards(state);
+  if (tax) {
+    els.playHint.textContent = `Give ${state.tax.count} card${
+      state.tax.count > 1 ? "s" : ""
+    } to ${state.players[state.tax.receiver]?.name || "them"}`;
+    els.btnPass.classList.add("hidden");
+    els.btnPlay.textContent = "Give";
+    els.btnPlay.disabled = pick.length !== state.tax.count;
+    return;
   }
+  els.btnPass.classList.toggle("hidden", !state.canPass);
+  els.btnPass.disabled = !state.canPass;
+  els.btnPlay.textContent = "Play";
+  const legal = isLegalSet(pick, state.pile);
+  els.btnPlay.disabled = !legal;
+  if (!state.pile) {
+    els.playHint.textContent = pick.length
+      ? `Lead ${comboLabel(pick)}`
+      : "Select cards of one rank, then Play";
+  } else {
+    els.playHint.textContent = `Beat ${comboLabel(state.pile.cards)} with ${state.pile.count} higher`;
+  }
+}
+
+function rankPlayable(state, rank) {
+  const ofRank = (state.hand || []).filter((c) => c.rank === rank);
+  if (!state.pile) return ofRank.length > 0;
+  return ofRank.length >= state.pile.count && isLegalSet(ofRank.slice(0, state.pile.count), state.pile);
 }
 
 function renderHand(state) {
-  const inPlay = ["bidding", "playing", "reveal"].includes(state.phase);
+  const inPlay = ["playing", "tax", "reveal"].includes(state.phase);
   if (!inPlay) {
     els.hand.replaceChildren();
     els.handHint.textContent = "";
+    els.hand.style.removeProperty("--hand-overlap");
     return;
   }
-  const legal = new Set(state.legalCardIds || []);
-  const canPlay =
-    state.phase === "playing" &&
-    !state.trickFrozen &&
-    state.toAct === state.viewerId;
+  const n = (state.hand || []).length;
+  const overlap = n > 22 ? "2.2rem" : n > 16 ? "1.8rem" : n > 11 ? "1.45rem" : "1.15rem";
+  els.hand.style.setProperty("--hand-overlap", overlap);
+  const scrollX = els.hand.scrollLeft;
+  const myTurn =
+    state.toAct === state.viewerId &&
+    !state.frozen &&
+    (state.phase === "playing" || state.phase === "tax");
   els.hand.replaceChildren();
   for (const card of state.hand || []) {
-    const isLegal = canPlay && legal.has(card.id);
+    const playable = state.phase === "playing" && rankPlayable(state, card.rank);
     const el = playingCard(card, {
-      interactive: canPlay,
-      legal: isLegal,
-      dim: canPlay && !isLegal,
-      manilha: isManilha(card, state.manilhaRank),
+      interactive: myTurn,
+      legal: myTurn && (state.phase === "tax" || playable),
+      dim: myTurn && state.phase === "playing" && !playable,
+      selected: selected.has(card.id),
     });
-    if (canPlay && isLegal) {
-      el.addEventListener("click", () => send("playCard", { cardId: card.id }));
-    } else if (canPlay) {
-      el.disabled = true;
+    if (myTurn) {
+      el.addEventListener("click", () => {
+        const cur = selectedCards(state);
+        if (cur.length && cur[0].rank !== card.rank && !selected.has(card.id)) {
+          selected = new Set();
+        }
+        if (selected.has(card.id)) selected.delete(card.id);
+        else selected.add(card.id);
+        renderHand(state);
+        renderDock(state);
+      });
     }
     els.hand.append(el);
   }
-  if (state.phase === "playing" && canPlay) {
-    els.handHint.textContent = state.ledSuit
-      ? `Follow ${SUIT_GLYPH[state.ledSuit]} if you can`
-      : "Your lead — play any card";
-  } else if (state.phase === "playing" && state.toAct && state.toAct !== state.viewerId) {
-    const name = state.players[state.toAct]?.name || "Player";
-    els.handHint.textContent = `Waiting for ${name}`;
-  } else if (state.phase === "bidding") {
-    els.handHint.textContent = "Look at your hand, then bid";
+  els.hand.scrollLeft = scrollX;
+  if (state.phase === "tax" && myTurn) {
+    els.handHint.textContent = "Tax: pick the cards you want to dump";
+  } else if (state.phase === "playing" && myTurn) {
+    els.handHint.textContent = state.pile
+      ? "Same count, higher rank — or pass (you're out of this pile)"
+      : "Lead singles, pairs, trips, or quads";
+  } else if (state.toAct && state.toAct !== state.viewerId) {
+    els.handHint.textContent = `Waiting for ${state.players[state.toAct]?.name || "Player"}`;
   } else {
     els.handHint.textContent = "";
   }
@@ -445,17 +451,19 @@ function renderHand(state) {
 
 function renderState(state) {
   if (!state) return;
+  if (!lastState || lastState.seq !== state.seq) selected = new Set();
+  lastState = state;
   showTable(currentRoom);
   els.roundMessage.textContent = state.message || "";
   renderOpponents(state);
   renderLobby(state);
   renderEnded(state);
   renderMeta(state);
-  renderTrick(state);
+  renderPile(state);
   renderScore(state);
   renderSelf(state);
-  renderBids(state);
   renderHand(state);
+  renderDock(state);
 }
 
 function refreshResumeUi() {
@@ -490,7 +498,7 @@ async function beginHost({ resume } = {}) {
   const name = nickname();
   try {
     initFirebase();
-    const host = createFodinhaHost({
+    const host = createPresidenteHost({
       name,
       initialGame: saved?.game,
       onState: renderState,
@@ -568,9 +576,7 @@ async function beginGuest(code, { fromRetry = false } = {}) {
 function onGuestStatus(status) {
   setTableStatus(status);
   if (leaving) return;
-  if (status.error && status.text === "host gone") {
-    scheduleGuestRetry();
-  }
+  if (status.error && status.text === "host gone") scheduleGuestRetry();
 }
 
 function scheduleGuestRetry() {
@@ -595,6 +601,8 @@ async function leave() {
   if (role === "host") clearHostSession();
   if (role === "guest") clearGuestSession();
   role = null;
+  lastState = null;
+  selected = new Set();
   currentRoom = "";
   leaving = false;
   showGate();
@@ -638,6 +646,14 @@ els.roomCode.addEventListener("click", async () => {
   } catch {
     setTableStatus({ text: currentRoom });
   }
+});
+els.btnPass.addEventListener("click", () => send("pass"));
+els.btnPlay.addEventListener("click", () => {
+  if (!lastState) return;
+  const ids = selectedCards(lastState).map((c) => c.id);
+  if (lastState.phase === "tax") send("giveTax", { cardIds: ids });
+  else send("playCards", { cardIds: ids });
+  selected = new Set();
 });
 
 els.nickname.value = loadNickname();

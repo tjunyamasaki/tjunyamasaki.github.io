@@ -1,0 +1,76 @@
+:root {
+  --seat-6: #6ee0d8;
+  --seat-7: #f08ac4;
+  --seat-8: #b8e05e;
+  --seat-9: #c9a27a;
+  --hand-overlap: 1.15rem;
+}
+
+.play-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.play-actions button {
+  min-width: 6.5rem;
+}
+
+.title-chip {
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.title-chip.bobo,
+.title-chip.vice-bobo {
+  color: var(--muted);
+}
+
+.seat-points {
+  font-size: 0.72rem;
+  color: var(--cream);
+}
+
+.seat.c6 .dot { background: var(--seat-6); }
+.seat.c7 .dot { background: var(--seat-7); }
+.seat.c8 .dot { background: var(--seat-8); }
+.seat.c9 .dot { background: var(--seat-9); }
+
+.pile-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hand {
+  justify-content: flex-start;
+  scroll-padding-inline: 0.75rem;
+}
+
+.hand::before,
+.hand::after {
+  content: "";
+  flex: 1 0 0.7rem;
+  min-width: 0.7rem;
+  pointer-events: none;
+}
+
+.hand .playing-card {
+  margin-left: 0;
+}
+
+.hand .playing-card + .playing-card {
+  margin-left: calc(-1 * var(--hand-overlap));
+}
+
+@media (min-width: 720px) {
+  .hand .playing-card {
+    margin-left: 0;
+  }
+
+  .hand .playing-card + .playing-card {
+    margin-left: calc(-1 * var(--hand-overlap));
+  }
+}

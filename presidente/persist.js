@@ -1,6 +1,6 @@
 import { createSessionStore } from "../js/sessionStore.js";
 
-const store = createSessionStore("fodinha");
+const store = createSessionStore("presidente");
 
 export const getOrCreatePlayerId = store.getOrCreatePlayerId;
 export const loadNickname = store.loadNickname;

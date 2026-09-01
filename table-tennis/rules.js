@@ -1,20 +1,15 @@
+import { verifyEditorCredentials } from "./editorAuth.js";
+
 export const HOST_ID = "host";
 export const MAX_PLAYERS = 15;
 export const MAX_GROUPS = 12;
 export const MAX_ROSTER = 24;
 export const MAX_NAME = 24;
 export const MAX_SETS = 99;
-export const EDITOR_NAMES = ["admjun", "admyasmin", "admlaio", "admgui"];
-
-const EDITOR_SET = new Set(EDITOR_NAMES);
-
-export function isEditorName(name) {
-  return EDITOR_SET.has(normalizeName(name).toLowerCase());
-}
 
 export function canEditBoard(game, playerId) {
   if (playerId === HOST_ID) return true;
-  return isEditorName(game.players[playerId]?.name);
+  return Boolean(game.players[playerId]?.isEditor);
 }
 
 function clone(value) {
@@ -47,10 +42,11 @@ function parseSets(value) {
   return n;
 }
 
-function makeWatcher(name, { isHost = false } = {}) {
+function makeWatcher(name, { isHost = false, isEditor = false } = {}) {
   return {
     name: normalizeName(name) || "Player",
     isHost: Boolean(isHost),
+    isEditor: Boolean(isEditor) || Boolean(isHost),
     connected: true,
   };
 }
@@ -198,7 +194,7 @@ function ensurePlayer(game, name, groupId) {
 
 function hostOnly(game, playerId) {
   if (canEditBoard(game, playerId)) return null;
-  return { error: "Only an admin can edit the board." };
+  return { error: "Only an editor can edit the board." };
 }
 
 function addGroup(game, name) {
@@ -373,12 +369,39 @@ function deleteMatch(game, matchId) {
   return {};
 }
 
+async function claimEditor(game, playerId, intent) {
+  const p = game.players[playerId];
+  if (!p) return { error: "Unknown player." };
+  if (playerId === HOST_ID) {
+    p.isEditor = true;
+    return {};
+  }
+  const ok = await verifyEditorCredentials(intent.user, intent.password);
+  if (!ok) return { error: "Wrong editor user or password." };
+  p.isEditor = true;
+  bump(game);
+  game.message = `${p.name} can edit the board.`;
+  return {};
+}
+
+function dropEditor(game, playerId) {
+  if (playerId === HOST_ID) return { error: "The host stays an editor." };
+  const p = game.players[playerId];
+  if (!p) return { error: "Unknown player." };
+  p.isEditor = false;
+  bump(game);
+  game.message = `${p.name} stopped editing.`;
+  return {};
+}
+
 export function applyAction(game, playerId, intent) {
   const action = intent?.action;
   if (action === "leaveSeat") {
     leaveSeat(game, playerId);
     return {};
   }
+  if (action === "claimEditor") return claimEditor(game, playerId, intent);
+  if (action === "dropEditor") return dropEditor(game, playerId);
 
   const denied = hostOnly(game, playerId);
   if (denied) return denied;
@@ -611,6 +634,7 @@ export function restoreGame(saved, hostName) {
     game.players[HOST_ID].name = hostName || game.players[HOST_ID].name;
     game.players[HOST_ID].connected = true;
     game.players[HOST_ID].isHost = true;
+    game.players[HOST_ID].isEditor = true;
   } else {
     game.players[HOST_ID] = makeWatcher(hostName || "Host", { isHost: true });
     if (!game.playerOrder.includes(HOST_ID)) game.playerOrder.unshift(HOST_ID);

@@ -13,8 +13,12 @@ import {
   saveGuestSession,
   loadGuestSession,
   clearGuestSession,
+  saveEditorSession,
+  loadEditorSession,
+  clearEditorSession,
 } from "./persist.js";
-import { matchesToCsv, isEditorName } from "./rules.js";
+import { matchesToCsv } from "./rules.js";
+import { EDITOR_USER, verifyEditorCredentials } from "./editorAuth.js";
 
 const els = {
   configError: document.getElementById("config-error"),
@@ -64,6 +68,19 @@ const els = {
   renameGroup: document.getElementById("rename-group"),
   btnRemoveGroup: document.getElementById("btn-remove-group"),
   playerSuggest: document.getElementById("player-suggest"),
+  editorUser: document.getElementById("editor-user"),
+  editorPass: document.getElementById("editor-pass"),
+  btnEditorLogin: document.getElementById("btn-editor-login"),
+  btnEditorLogout: document.getElementById("btn-editor-logout"),
+  editorStatus: document.getElementById("editor-status"),
+  editorGate: document.getElementById("editor-gate"),
+  btnBoardEditor: document.getElementById("btn-board-editor"),
+  editorDialog: document.getElementById("editor-dialog"),
+  dlgEditorUser: document.getElementById("dlg-editor-user"),
+  dlgEditorPass: document.getElementById("dlg-editor-pass"),
+  dlgEditorStatus: document.getElementById("dlg-editor-status"),
+  formEditorDialog: document.getElementById("form-editor-dialog"),
+  btnDialogCancel: document.getElementById("btn-dialog-cancel"),
 };
 
 let session = null;
@@ -76,9 +93,133 @@ let lastState = null;
 let selectedGroupId = "";
 let selectedPlayerId = "";
 let editingMatchId = "";
+let editorCreds = null;
+let editorClaimSent = false;
 
 function canHost() {
-  return isEditorName(els.nickname.value);
+  return Boolean(editorCreds);
+}
+
+function fillEditorUserFields(user) {
+  const value = user || EDITOR_USER;
+  if (els.editorUser) els.editorUser.value = value;
+  if (els.dlgEditorUser) els.dlgEditorUser.value = value;
+}
+
+function syncEditorUi() {
+  const signedIn = Boolean(editorCreds);
+  const editing = Boolean(lastState?.youCanEdit);
+  if (els.editorStatus) {
+    els.editorStatus.textContent = signedIn
+      ? "Signed in. You can host, restore, and edit."
+      : "Shared account. Sign in to host or to edit a live board.";
+  }
+  if (els.btnEditorLogin) els.btnEditorLogin.classList.toggle("hidden", signedIn);
+  if (els.btnEditorLogout) els.btnEditorLogout.classList.toggle("hidden", !signedIn);
+  if (els.editorUser) els.editorUser.disabled = signedIn;
+  if (els.editorPass) {
+    els.editorPass.disabled = signedIn;
+    if (signedIn) els.editorPass.value = "";
+  }
+  if (els.btnBoardEditor) {
+    const onBoard = Boolean(role && lastState);
+    const showUnlock = onBoard && !editing;
+    const showStop = onBoard && editing && role === "guest";
+    els.btnBoardEditor.classList.toggle("hidden", !showUnlock && !showStop);
+    if (showStop) els.btnBoardEditor.textContent = "Stop editing";
+    else if (showUnlock) els.btnBoardEditor.textContent = "Editor login";
+  }
+  syncHostButtons();
+}
+
+function maybeClaimEditor(state) {
+  if (
+    role !== "guest" ||
+    !session ||
+    !editorCreds ||
+    !state ||
+    state.youCanEdit ||
+    editorClaimSent
+  ) {
+    return;
+  }
+  editorClaimSent = true;
+  send("claimEditor", {
+    user: editorCreds.user,
+    password: editorCreds.password,
+  });
+}
+
+async function signInEditor(user, password, { silent = false, statusEl = null } = {}) {
+  const name = (user || "").trim() || EDITOR_USER;
+  const pass = String(password || "");
+  const setStatus = (text, error) => {
+    if (statusEl) {
+      statusEl.textContent = text || "";
+      statusEl.style.color = error ? "var(--loss)" : "";
+      return;
+    }
+    if (role && lastState) setTableStatus({ text, error });
+    else setGateStatus(text, error);
+  };
+  if (!pass) {
+    if (!silent) setStatus("Enter the editor password.", true);
+    return false;
+  }
+  if (!isFirebaseConfigured()) {
+    if (!silent) setStatus("Firebase is not configured.", true);
+    return false;
+  }
+  try {
+    initFirebase();
+    const ok = await verifyEditorCredentials(name, pass);
+    if (!ok) {
+      if (!silent) setStatus("Wrong editor user or password.", true);
+      return false;
+    }
+  } catch (err) {
+    console.error(err);
+    if (!silent) setStatus(err.message || String(err), true);
+    return false;
+  }
+  editorCreds = { user: name, password: pass };
+  editorClaimSent = false;
+  saveEditorSession(editorCreds);
+  fillEditorUserFields(name);
+  syncEditorUi();
+  if (role === "guest" && lastState) maybeClaimEditor(lastState);
+  if (!silent) setStatus("Editor signed in.");
+  return true;
+}
+
+function signOutEditor() {
+  editorCreds = null;
+  editorClaimSent = false;
+  clearEditorSession();
+  if (els.editorPass) els.editorPass.value = "";
+  if (els.dlgEditorPass) els.dlgEditorPass.value = "";
+  if (role === "guest") send("dropEditor");
+  syncEditorUi();
+  setGateStatus("");
+}
+
+function openEditorDialog() {
+  if (!els.editorDialog) return;
+  fillEditorUserFields(editorCreds?.user || EDITOR_USER);
+  if (els.dlgEditorUser) els.dlgEditorUser.value = editorCreds?.user || EDITOR_USER;
+  if (els.dlgEditorPass) els.dlgEditorPass.value = "";
+  if (els.dlgEditorStatus) els.dlgEditorStatus.textContent = "";
+  if (typeof els.editorDialog.showModal === "function") els.editorDialog.showModal();
+  else els.editorDialog.classList.remove("hidden");
+}
+
+function closeEditorDialog() {
+  if (!els.editorDialog) return;
+  if (typeof els.editorDialog.close === "function" && els.editorDialog.open) {
+    els.editorDialog.close();
+  } else {
+    els.editorDialog.classList.add("hidden");
+  }
 }
 
 function canEditUi() {
@@ -525,6 +666,8 @@ function renderState(state) {
   renderFocus(board);
   renderHost(state, board);
   els.btnExport.disabled = !(state.matches || []).length;
+  syncEditorUi();
+  maybeClaimEditor(state);
 }
 
 function refreshResumeUi() {
@@ -641,6 +784,7 @@ async function beginGuest(code, { fromRetry = false } = {}) {
     await guest.join(code);
     saveGuestSession({ roomCode: code, name: nickname(), playerId });
     showBoard(code);
+    editorClaimSent = false;
     setTableStatus({ text: "connected" });
     setGateStatus("");
     stopGuestRetry();
@@ -700,10 +844,12 @@ async function leave() {
   selectedGroupId = "";
   selectedPlayerId = "";
   editingMatchId = "";
+  editorClaimSent = false;
   leaving = false;
   showGate();
   setGateStatus("");
   refreshResumeUi();
+  syncEditorUi();
 }
 
 async function saveToCloud() {
@@ -756,6 +902,34 @@ els.joinCode.addEventListener("keydown", (event) => {
 });
 els.btnLeave.addEventListener("click", () => leave());
 els.btnSaveCloud?.addEventListener("click", () => saveToCloud());
+els.btnEditorLogin?.addEventListener("click", () => {
+  signInEditor(els.editorUser?.value, els.editorPass?.value);
+});
+els.btnEditorLogout?.addEventListener("click", () => signOutEditor());
+els.editorPass?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    els.btnEditorLogin?.click();
+  }
+});
+els.btnBoardEditor?.addEventListener("click", () => {
+  if (lastState?.youCanEdit && role === "guest") {
+    signOutEditor();
+    return;
+  }
+  openEditorDialog();
+});
+els.formEditorDialog?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const ok = await signInEditor(els.dlgEditorUser?.value, els.dlgEditorPass?.value, {
+    statusEl: els.dlgEditorStatus,
+  });
+  if (ok) closeEditorDialog();
+});
+els.btnDialogCancel?.addEventListener("click", (event) => {
+  event.preventDefault();
+  closeEditorDialog();
+});
 els.btnExport.addEventListener("click", () => {
   if (!lastState) return;
   const csv = matchesToCsv(lastState.matches, lastState.roster);
@@ -947,13 +1121,28 @@ window.addEventListener("resize", () => {
 function hydrateNickname() {
   const saved = loadNickname();
   if (saved) els.nickname.value = saved;
+  fillEditorUserFields(EDITOR_USER);
   refreshResumeUi();
-  syncHostButtons();
+  syncEditorUi();
+}
+
+async function hydrateEditor() {
+  const saved = loadEditorSession();
+  fillEditorUserFields(saved?.user || EDITOR_USER);
+  if (!saved || !isFirebaseConfigured()) {
+    syncEditorUi();
+    return;
+  }
+  await signInEditor(saved.user, saved.password, { silent: true });
 }
 
 hydrateNickname();
-window.addEventListener("pageshow", hydrateNickname);
-[50, 200, 500, 1000].forEach((ms) => setTimeout(syncHostButtons, ms));
+hydrateEditor();
+window.addEventListener("pageshow", () => {
+  hydrateNickname();
+  hydrateEditor();
+});
+[50, 200, 500, 1000].forEach((ms) => setTimeout(syncEditorUi, ms));
 
 if (!isFirebaseConfigured()) {
   els.configError.classList.remove("hidden");

@@ -110,6 +110,43 @@ h3 {
   color: var(--ink);
 }
 
+.editor-box {
+  margin-top: 1.1rem;
+  padding: 0.85rem 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.editor-box .kicker {
+  margin-bottom: 0.15rem;
+}
+
+.editor-box .muted {
+  margin: 0.15rem 0 0;
+}
+
+.editor-dialog {
+  width: min(22rem, calc(100vw - 1.5rem));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.1rem 1rem 1rem;
+  background: #12241c;
+  color: var(--ink);
+}
+
+.editor-dialog::backdrop {
+  background: rgba(4, 10, 8, 0.72);
+}
+
+.editor-dialog h2 {
+  margin: 0 0 0.35rem;
+}
+
+.editor-dialog .muted {
+  margin: 0 0 0.5rem;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -211,8 +248,8 @@ button:disabled {
 }
 
 .board-head {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.45rem 0.65rem;
   align-items: center;
   padding: 0.55rem 0.75rem 0.2rem;
@@ -223,6 +260,7 @@ button:disabled {
 }
 
 .board-title {
+  flex: 1 1 7rem;
   margin: 0;
   font-size: 1.05rem;
 }

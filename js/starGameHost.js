@@ -94,14 +94,31 @@ export function createStarHost({
     }, ms || 0);
   }
 
-  function applyIntent(peerId, intent) {
-    const result = rules.applyAction(game, peerId, intent) || {};
-    if (result.error) {
-      game.message = result.error;
-      setStatus(result.error, true);
+  function finishIntent(result) {
+    const next = result || {};
+    if (next.error) {
+      game.message = next.error;
+      setStatus(next.error, true);
     }
-    if (result.pause) schedulePause(result.pause, result.ms);
+    if (next.pause) schedulePause(next.pause, next.ms);
     broadcast();
+  }
+
+  function applyIntent(peerId, intent) {
+    let result;
+    try {
+      result = rules.applyAction(game, peerId, intent) || {};
+    } catch (err) {
+      finishIntent({ error: err.message || String(err) });
+      return;
+    }
+    if (typeof result.then === "function") {
+      Promise.resolve(result)
+        .then((value) => finishIntent(value || {}))
+        .catch((err) => finishIntent({ error: err.message || String(err) }));
+      return;
+    }
+    finishIntent(result);
   }
 
   function closeGuestLink(guestId) {

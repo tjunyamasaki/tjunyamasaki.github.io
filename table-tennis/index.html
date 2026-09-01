@@ -2,13 +2,253 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="refresh" content="0; url=../" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Table tennis</title>
-    <script>
-      location.replace("../");
-    </script>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <p><a href="../">Table tennis</a></p>
+    <p id="config-error" class="banner banner-error hidden"></p>
+
+    <section id="view-gate" class="page-gate">
+      <div class="gate-card">
+        <p class="hub-back"><a href="/links/">Games</a></p>
+        <p class="kicker">Round-robin</p>
+        <h1>Table tennis</h1>
+        <p class="lede">
+          Join a room to watch the grid, ranking, and remaining matches.
+          Editors who know the shared login can host, edit results, and save to
+          the cloud.
+        </p>
+
+        <label class="field">
+          Your name
+          <input
+            id="nickname"
+            type="text"
+            maxlength="24"
+            placeholder="Host or watcher"
+            name="tt-watcher-name"
+            autocomplete="nickname"
+            autocapitalize="words"
+            autocorrect="off"
+            spellcheck="false"
+          />
+        </label>
+
+        <div id="editor-gate" class="editor-box">
+          <p class="kicker">Editor login</p>
+          <p id="editor-status" class="muted">
+            Shared account. Sign in to host or to edit a live board.
+          </p>
+          <label class="field">
+            User
+            <input
+              id="editor-user"
+              type="text"
+              maxlength="24"
+              value="host"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+            />
+          </label>
+          <label class="field">
+            Password
+            <input
+              id="editor-pass"
+              type="password"
+              maxlength="64"
+              autocomplete="current-password"
+            />
+          </label>
+          <div class="actions">
+            <button id="btn-editor-login" type="button">Sign in</button>
+            <button id="btn-editor-logout" type="button" class="ghost hidden">Sign out</button>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="btn-host" type="button" disabled>Host board</button>
+        </div>
+        <div id="resume-row" class="actions hidden">
+          <button id="btn-resume" type="button">Resume room</button>
+          <button id="btn-discard" type="button" class="ghost">Discard saved</button>
+        </div>
+
+        <div class="join-row">
+          <label class="field grow">
+            Room code
+            <input id="join-code" type="text" maxlength="6" placeholder="ABC12" autocomplete="off" />
+          </label>
+          <button id="btn-join" type="button">Join</button>
+        </div>
+        <div class="actions">
+          <button id="btn-restore" type="button" class="ghost" disabled>
+            Restore cloud backup
+          </button>
+        </div>
+
+        <p id="gate-status" class="status"></p>
+
+        <details class="rules-fold">
+          <summary>How it works</summary>
+          <ul>
+            <li>Anyone can join a room to watch. Hosting and edits need the shared editor login.</li>
+            <li>Host keeps this tab open and shares the room code.</li>
+            <li>
+              Editors can Save cloud to checkpoint the board in Firebase (not live play).
+              After a new phone or cleared storage, enter the old code and Restore cloud backup.
+            </li>
+            <li>Add players, or just record a result — new names are created.</li>
+            <li>Each pair plays once. The grid cell is sets won against that player.</li>
+            <li>Ranking: match wins, then set difference, then sets won, then head-to-head.</li>
+            <li>Tap a name to see who they beat and who they still need to play.</li>
+            <li>Editors can add groups, edit any match, or remove a player.</li>
+            <li>Export CSV downloads every recorded match as <code>name,sets,name,sets</code>.</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <section id="view-board" class="page-board hidden">
+      <header class="board-head">
+        <h1 class="board-title">Table tennis</h1>
+        <button id="room-code" type="button" class="room-code" title="Copy room code">————</button>
+        <button id="btn-save-cloud" type="button" class="ghost btn-leave host-only hidden" title="Write this board to Firebase">
+          Save cloud
+        </button>
+        <button id="btn-board-editor" type="button" class="ghost btn-leave hidden">Editor login</button>
+        <button id="btn-export" type="button" class="ghost btn-leave" title="Download matches as CSV" disabled>Export</button>
+        <button id="btn-leave" type="button" class="ghost btn-leave">Leave</button>
+      </header>
+
+      <p id="table-status" class="status table-status hidden"></p>
+      <p id="round-message" class="round-message"></p>
+      <div id="watchers" class="watchers" aria-label="People watching"></div>
+
+      <div class="board-scroll">
+        <div class="group-bar">
+          <div id="group-tabs" class="group-tabs" role="tablist"></div>
+          <form id="form-group" class="inline-form host-only hidden">
+            <input id="group-name" type="text" maxlength="24" placeholder="New group" autocomplete="off" />
+            <button type="submit">Add</button>
+          </form>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Ranking</h2>
+            <p id="group-meta" class="muted"></p>
+          </div>
+          <div id="ranking" class="table-wrap"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Results</h2>
+            <p class="muted">Sets won vs that player. Tap a name for remaining games.</p>
+          </div>
+          <div id="grid-wrap" class="grid-wrap"></div>
+        </section>
+
+        <section id="focus-panel" class="panel hidden">
+          <div class="panel-head">
+            <h2 id="focus-title">Player</h2>
+            <button id="focus-close" type="button" class="ghost tiny">Close</button>
+          </div>
+          <div id="focus-body"></div>
+        </section>
+
+        <section id="host-panel" class="panel host-panel host-only hidden">
+          <h2>Record a result</h2>
+          <p class="muted">Type two names and the sets each won. New names join this group.</p>
+          <form id="form-match" class="match-form">
+            <input type="hidden" id="match-id" value="" />
+            <div class="match-row">
+              <label class="field grow">
+                Player A
+                <input id="match-a-name" type="text" maxlength="24" autocomplete="off" />
+              </label>
+              <label class="field sets">
+                Sets
+                <input id="match-a-sets" type="number" min="0" max="99" inputmode="numeric" />
+              </label>
+            </div>
+            <p class="vs">vs</p>
+            <div class="match-row">
+              <label class="field grow">
+                Player B
+                <input id="match-b-name" type="text" maxlength="24" autocomplete="off" />
+              </label>
+              <label class="field sets">
+                Sets
+                <input id="match-b-sets" type="number" min="0" max="99" inputmode="numeric" />
+              </label>
+            </div>
+            <div class="actions">
+              <button id="btn-save-match" type="submit">Save result</button>
+              <button id="btn-delete-match" type="button" class="ghost danger hidden">Delete match</button>
+              <button id="btn-cancel-edit" type="button" class="ghost hidden">Cancel</button>
+            </div>
+          </form>
+
+          <h3>Players in this group</h3>
+          <form id="form-player" class="inline-form">
+            <input id="player-name" type="text" maxlength="24" placeholder="Add player" autocomplete="off" />
+            <button type="submit">Add</button>
+          </form>
+          <div id="roster-list" class="roster-list"></div>
+
+          <h3>Matches</h3>
+          <div id="match-list" class="match-list"></div>
+
+          <h3>Group</h3>
+          <form id="form-rename-group" class="inline-form">
+            <input id="rename-group" type="text" maxlength="24" autocomplete="off" />
+            <button type="submit">Rename</button>
+          </form>
+          <div class="actions">
+            <button id="btn-remove-group" type="button" class="ghost danger">Remove group</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <ul id="player-suggest" class="combo-list hidden" role="listbox"></ul>
+
+    <dialog id="editor-dialog" class="editor-dialog">
+      <form id="form-editor-dialog">
+        <h2>Editor login</h2>
+        <p class="muted">Same shared account as hosting. Anyone with it can edit.</p>
+        <label class="field">
+          User
+          <input
+            id="dlg-editor-user"
+            type="text"
+            maxlength="24"
+            value="host"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+          />
+        </label>
+        <label class="field">
+          Password
+          <input
+            id="dlg-editor-pass"
+            type="password"
+            maxlength="64"
+            autocomplete="current-password"
+          />
+        </label>
+        <p id="dlg-editor-status" class="status"></p>
+        <div class="actions">
+          <button type="submit">Sign in</button>
+          <button id="btn-dialog-cancel" type="button" class="ghost">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="app.js"></script>
   </body>
 </html>

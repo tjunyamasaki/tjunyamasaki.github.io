@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Count</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <p id="config-error" class="banner banner-error hidden"></p>
+
+    <section id="view-gate" class="page-gate">
+      <div class="gate-card">
+        <p class="hub-back"><a href="/links/">Games</a></p>
+        <p class="kicker">Party</p>
+        <h1>Count</h1>
+        <p class="lede">
+          Watch the stage. Count what appears. First correct wins a race;
+          timed flashes can have many winners.
+        </p>
+
+        <label class="field">
+          Nickname
+          <input id="nickname" type="text" maxlength="24" placeholder="Your name" autocomplete="nickname" />
+        </label>
+
+        <div class="actions">
+          <button id="btn-host" type="button">Host room</button>
+        </div>
+        <div id="resume-row" class="actions hidden">
+          <button id="btn-resume" type="button">Resume room</button>
+          <button id="btn-discard" type="button" class="ghost">Discard saved</button>
+        </div>
+
+        <div class="join-row">
+          <label class="field grow">
+            Room code
+            <input id="join-code" type="text" maxlength="6" placeholder="ABC12" autocomplete="off" />
+          </label>
+          <button id="btn-join" type="button">Join</button>
+        </div>
+
+        <p id="gate-status" class="status"></p>
+
+        <details class="rules-fold">
+          <summary>How to play</summary>
+          <ul>
+            <li>2–15 players. Host picks rounds, Easy / Normal / Hard, and Mix or one mini-game.</li>
+            <li>Mix is random each round at that difficulty. One mini-game starts easy and gets harder.</li>
+            <li>Each round is a short counting scene. One guess each.</li>
+            <li>Timed: the picture hides, then everyone answers. All correct scores count.</li>
+            <li>Race: guess while things move. First correct score wins the round.</li>
+            <li>Highest score after the last round wins. Ties share the win.</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <section id="view-table" class="page-table hidden">
+      <header class="table-head">
+        <p class="hub-back head-back"><a href="/links/" id="link-home">Games</a></p>
+        <h1 class="table-title">Count</h1>
+        <button id="room-code" type="button" class="room-code" title="Copy room code">————</button>
+        <button id="btn-leave" type="button" class="ghost btn-leave">Leave</button>
+      </header>
+
+      <p id="table-status" class="status table-status hidden"></p>
+      <p id="round-message" class="round-message"></p>
+      <div id="score-strip" class="score-strip"></div>
+
+      <div id="stage-wrap" class="stage-wrap">
+        <canvas id="stage" class="stage" aria-label="Counting stage"></canvas>
+        <p id="stage-caption" class="stage-caption"></p>
+        <div id="lobby-panel" class="lobby-panel hidden"></div>
+        <div id="ended-panel" class="ended-panel hidden"></div>
+      </div>
+
+      <div id="guess-dock" class="guess-dock hidden">
+        <p id="guess-hint" class="guess-hint">Your guess</p>
+        <p id="guess-readout" class="guess-readout">—</p>
+        <div id="guess-pad" class="guess-pad"></div>
+      </div>
+    </section>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

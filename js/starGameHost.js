@@ -17,7 +17,8 @@ function clone(value) {
 }
 
 /**
- * Host-authoritative WebRTC star. `rules` is a Fodinha-style module:
+ * Host-authoritative WebRTC star. `rules` is a Fodinha-style module
+ * (Fodinha / Presidente / table tennis / Count):
  * createGame, restoreGame, addPlayer, reconnectPlayer, setConnected,
  * canAdmit, applyAction, snapshotFor, optional afterPause(game, kind).
  */

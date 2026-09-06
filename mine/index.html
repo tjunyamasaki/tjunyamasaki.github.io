@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Vein</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <svg class="svg-defs" aria-hidden="true" focusable="false">
+      <filter id="heat" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="2" seed="2" result="n">
+          <animate attributeName="baseFrequency" values="0.02;0.04;0.02" dur="1.6s" repeatCount="indefinite" />
+        </feTurbulence>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="7" />
+      </filter>
+      <linearGradient id="wood" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#3a2012" />
+        <stop offset="0.45" stop-color="#8a542c" />
+        <stop offset="1" stop-color="#2a160c" />
+      </linearGradient>
+      <linearGradient id="head-wood" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#c8c4bc" />
+        <stop offset="0.5" stop-color="#7a7670" />
+        <stop offset="1" stop-color="#4a4a46" />
+      </linearGradient>
+      <linearGradient id="head-iron" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#e8f0f8" />
+        <stop offset="0.4" stop-color="#8aa0b4" />
+        <stop offset="1" stop-color="#3a4a58" />
+      </linearGradient>
+      <linearGradient id="head-gold" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff4c8" />
+        <stop offset="0.45" stop-color="#e0b030" />
+        <stop offset="1" stop-color="#8a5a10" />
+      </linearGradient>
+    </svg>
+
+    <div class="scene" id="scene">
+      <div class="cave" aria-hidden="true">
+        <div class="cave-deep"></div>
+        <div class="cave-walls"></div>
+        <div class="stalactites"></div>
+        <div class="fog fog-a"></div>
+        <div class="fog fog-b"></div>
+        <div class="lantern">
+          <span class="lantern-hook"></span>
+          <span class="lantern-cage"></span>
+          <span class="lantern-flame"></span>
+        </div>
+        <div class="lantern-bloom"></div>
+        <div class="dust">
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <a class="hub-back" href="/links/">Games</a>
+
+      <header class="hud" id="hud">
+        <div class="ore" data-ore="stone" id="ore-stone">
+          <span class="gem" aria-hidden="true"></span>
+          <span class="count" id="count-stone">0</span>
+          <span class="label">Stone</span>
+        </div>
+        <div class="ore" data-ore="iron" id="ore-iron">
+          <span class="gem" aria-hidden="true"></span>
+          <span class="count" id="count-iron">0</span>
+          <span class="label">Iron</span>
+        </div>
+        <div class="ore" data-ore="gold" id="ore-gold">
+          <span class="gem" aria-hidden="true"></span>
+          <span class="count" id="count-gold">0</span>
+          <span class="label">Gold</span>
+        </div>
+        <div class="ore" data-ore="diamond" id="ore-diamond">
+          <span class="gem" aria-hidden="true"></span>
+          <span class="count" id="count-diamond">0</span>
+          <span class="label">Diamond</span>
+        </div>
+      </header>
+
+      <div class="found" id="found" hidden>
+        <p class="found-kicker" id="found-kicker"></p>
+        <p class="found-name" id="found-name"></p>
+      </div>
+
+      <div class="shake" id="shake">
+        <div class="stage">
+          <p class="title">
+            <span class="kicker">the</span>
+            Vein
+          </p>
+          <div class="grid-fit">
+            <div class="ground" aria-hidden="true"></div>
+            <div class="grid" id="grid" aria-label="Ore vein"></div>
+          </div>
+        </div>
+      </div>
+
+      <svg class="pickaxe tier-wood" id="pickaxe" viewBox="0 0 80 88" aria-hidden="true">
+        <g class="pick-spin" stroke="#211e20" stroke-width="2.4" stroke-linejoin="round">
+          <path class="pick-handle" d="M43 20 49 23 31 80 25 78Z" />
+          <path class="pick-wrap" d="m30 62 7 2-5 14-7-2Z" />
+          <path class="pick-head" d="M9 33 Q24 10 47 15 L66 22 73 34 55 27 43 25 26 26Z" />
+          <path class="pick-edge" d="M13 29Q29 15 46 19L62 24" />
+          <path class="pick-rivet" d="m42 19 6 2-2 7-6-2Z" />
+        </g>
+      </svg>
+
+      <canvas id="fx" aria-hidden="true"></canvas>
+
+      <footer class="dock">
+        <div class="anvil-stage" id="anvil" aria-hidden="true">
+          <svg class="anvil-svg" viewBox="0 0 72 48">
+            <path class="anvil-body" d="M8 16 H64 L58 22 H50 L48 38 H24 L22 22 H14 Z" />
+            <path class="anvil-horn" d="M8 16 L2 12 H18 L8 16" />
+            <rect class="anvil-base" x="26" y="38" width="20" height="6" rx="1" />
+          </svg>
+          <svg class="hammer" viewBox="0 0 40 48">
+            <rect x="17" y="14" width="6" height="30" rx="1.5" fill="url(#wood)" />
+            <path d="M8 8 H32 L30 16 H10 Z" />
+          </svg>
+          <div class="heat"></div>
+        </div>
+        <button type="button" class="forge" id="forge" disabled>
+          <span class="forge-label" id="forge-label">Need iron</span>
+          <span class="forge-cost" id="forge-cost">6 iron</span>
+        </button>
+      </footer>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

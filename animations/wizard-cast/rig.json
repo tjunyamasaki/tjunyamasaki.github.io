@@ -1,0 +1,31 @@
+{
+  "character": "wizard",
+  "source": {
+    "png": "source/wizard.png",
+    "logicalPng": "source/wizard-logical.png",
+    "map": "source/wizard.json",
+    "palette": "source/palette.json",
+    "logical": [45, 38],
+    "scale": 6
+  },
+  "canvas": { "width": 64, "height": 48, "origin": { "x": 8, "y": 8 } },
+  "layers": {
+    "star": "Gold charm on the flopped hat tip: G/Y/L pixels with x<=8 and y<=9. Nine pixels. Pendulum pivot (7,7).",
+    "hat": "y<=11 except star pixels. Translates with the body. Hat rotation (ha) is implemented but kept at 0; small rotations punched holes in the flopped brim.",
+    "feet": "y>=34. Anchored; never translated or rotated.",
+    "staff": "x>=26 and y>=15. Isolated right-hand cluster: wooden shaft, cyan orb, and the OPPO/OSSO grip. Pivot (27,25) sits on the grip.",
+    "body": "Remainder: face, cowl, robe, belt, idle left arm. Translates with the cast but does not rotate."
+  },
+  "pivots": {
+    "staff": [27, 25],
+    "hat": [15, 11],
+    "star": [7, 7]
+  },
+  "orb": [30, 18],
+  "notes": [
+    "Do not reuse the cleric rectangle mask. Flood-filling from the orb with x>=22 leaked into the right robe wall.",
+    "x>=26 is the first clean cut: hat maxX is 25, and the staff/grip cluster begins at x=26.",
+    "Positive staff angle uses the cleric convention and swings the orb forward (right).",
+    "Spell pixels use only colors already in the wizard sprite: cyan C, orb highlight Q, cream L, gold Y/G."
+  ]
+}

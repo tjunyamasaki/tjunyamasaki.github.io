@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wizard · casting attack</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#181a1d;color:#eee;font:15px system-ui;padding:24px}
+main{max-width:850px;margin:auto}
+h1{font-size:20px;font-weight:550}
+#stage{height:360px;display:grid;place-items:center;background:#26292e;border:1px solid #444;position:relative}
+img{image-rendering:pixelated;image-rendering:crisp-edges}
+#sprite,#onion{width:384px;height:288px;max-width:100%;object-fit:contain}
+#onion{position:absolute;opacity:0;pointer-events:none}
+#stage.onion #onion{opacity:.35}
+button,select{font:inherit;color:inherit;background:#34383e;border:1px solid #626770;border-radius:4px;padding:8px 12px;cursor:pointer}
+button:focus-visible,select:focus-visible{outline:2px solid #24becf}
+nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0}
+#frames{display:grid;grid-template-columns:repeat(8,1fr);gap:5px}
+#frames button{padding:4px 0}
+#frames img{width:100%;display:block}
+#frames .active{border-color:#24becf;background:#1d3a40}
+p{color:#b9bec5;line-height:1.5}
+label{display:flex;gap:8px;align-items:center}
+small{font-size:11px}
+@media(max-width:600px){#frames{grid-template-columns:repeat(4,1fr)}body{padding:12px}}
+</style>
+<main>
+<h1>Wizard · casting attack</h1>
+<div id="stage">
+  <img id="onion" alt="">
+  <img id="sprite" alt="Wizard thrusting a cyan spell from the staff orb">
+</div>
+<nav>
+  <button id="play">Pause</button>
+  <button id="step">Next frame</button>
+  <label>Speed <select id="speed"><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label>
+  <label>Background <select id="bg"><option value="#26292e">Slate</option><option value="#000000">Black</option><option value="#d6d1c6">Light</option></select></label>
+  <label><input type="checkbox" id="onionToggle"> Onion skin</label>
+  <span id="status"></span>
+</nav>
+<div id="frames"></div>
+<p>8 frames · 64 × 48 logical pixels · wizard source palette only.<br>
+Feet stay planted. Staff, hat, and hanging star are separate layers. Space plays or pauses; arrow keys step.</p>
+</main>
+<script>
+const frames=["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAB2UlEQVRoge2YMU7EQAxFfYhp6YAmlFSzN4COljsgCkoajoHEBVai4gBcgTpbIbbhEIuCjMbIMZ5k0DZrx0+ydpNJpPw/jscTgCAIgiAIgiDYm3SaBxmwBFIR213e/Qn3JqSKcIyLm0ffBiQl5RdjQP90NmzXq1+BizKgL+K/Pl8G/D/1Org1YbtejcTPFUOXBbGvGDBnhBszUqNYl0YkZQXYJ8A6+SQNPHbP92rgGHgkM/Gbh+uqAW5NyEU4NwAARsLp2L0BOyH4vwbwbAJrBmwq6c/PTwnDgnj8+jbcfrz//JopkLnx/Z8zgMRjl0kmmMiEXCmCMivmxFAGUODxwRuQSiM0txK0vNs4dnV+NDLBjAFd6exkT6AF3VMzgEw4ePEIPiSJ522uJpybBApkgAnhBBdHArX9gTwvRZoUj3DxMhO0HaKWKaYN6IQYKVDOvJYhJL40THZIIqU1A+aygmqCyb1CYksgPbz2nYCnv7yGzlHPYM6ALLa/fCnDoG+I+CuXQm6Auf4fkY2PNrsyI3jRo+tNFj+iNqtTNYCLNVv9OVPitaWP7/LIALBKbph9rSjK+8EquVH8VBdontywAZIB3shs+av1+bVxF+Qys5pIOebWhCAIwBLfuFG0SJc0CrEAAAAASUVORK5CYII=","data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAB0klEQVRoge2YMU4DQQxFfYhp6QjNpqQyN4COljsgCkoajoGUCyBRcQCuQJ1UCBoOEbRoovXqYzy7I6XyrL9kRZvNrPLfeMaeJQqFQqFQKBQKhULHKJ1xr4OWoDSY7a7u/0XzEFLBeI7L26e2ASQj5RcD4Ov5os+x3awPBhcJ4Of7dQRQWg5NQthu1uPsawBTe0JzILIsAHMgmoGRKs02CSIZFeCYIO/iVeox9i8PZuR71KIYzO8eb4oAmoXAg3EEQER/jMt18wD2ynANAMke8g5gV0h//F4bFfOnb++HDdElCK5c/xpANpyN567y7vPDLwQubII6K7QxASDmJVwBSEMjNFcJ8L4ej+bdAuiGzk73BFbImDw+X1+fn4yRAZAn8SqN5rHNtYwjJP2MbN7VzIvQnBi0zgf6ezSLANxBYDCvM8E6IZYyxS2ATpnRBvXMWxnidgkkldIWgLmscJ0BCUqglDrrPQGmv/4NQnB3VkjDn9f1HssavkLTpRABSNPkCgCrxseaXZ0RYhBB4DV5ExdmdWoP0CUwf7rcBEVT5q3Sh6/B0LRLCFwx+9amiOMRAHkTV5ovdYHW88ibuOIAZAW1JoamRq9nfc/leg+FQtSafgHVWLC0n1U1ogAAAABJRU5ErkJggg==","data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAB1klEQVRoge2YMU4DQQxFfQi3dIQmlFTODaCjzR0QBSVNjoHEBSJRcQCuQL2pEGlyiKBFE40jx3hmV9DgWX/JQknYSO+Nd8ZZgEgkEolEIpFI5M/BC+p1wRSCGXZ+8/CjmpeABfBU13dPbQtAo+UnI6B7vuy368URcHICtutF/7V77ZOI2u3QpIQur76EH9oMm90QO9UBpf2gSRk4EnZIBM2wb+IEwF9Ugk91/vbuV0YKg3DtXx7N0oAJ/P7z41CuJZCA36yWRQFSQoJlAekvl1sBm9XyRAAAnIDzawnIEpoSsFfANQF87e3V2aGSAPAYygJK7S/fLwngWwg8hkbe/5YAeb17AaQk6K4oAbruAMyD0NBJUFtleRuAt6CYBOVwUyu+hr+D4Wtd8m9DMzzCyzHXAi+Nv7JzXAqgDMeA1u8D/b4EdS9grkA1tIQf6hTwlrmC0YB65a0OkcOQKwmoWtoSMNQVEtitABI7uPWcQLa//h/9cCRJAC/BDKTPe27nVPIRmj4KLQGuOoDU4GOtru4IBpQiwHOosKq1PUAfgeA9VIG3jj656u4F0IjVtzZFeT14Do2EL02BTYRG/AByP/ENpTbN6aOxWQFUkKA/a1ZCJBIBT/kGHIe0UyNlSToAAAAASUVORK5CYII=","data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAB50lEQVRoge2ZMU4DQQxFfYhp6QhNKKmcG0BHyx0QBSUNx0DiApGoOABXoN5UiDQcImiR0ThyjGd3UJr1rL9kZbObrPKfPeOZDUAoFAqFQqFQKHS00hn2OmAOStns8ur+TzQPIRWMU1zePrUNIBklPxsA3fN5v12v9gZnBaDL5r+/Xns6HhoOzULYrlcH5scmw/9OiPrek1RXADAGYgjG6dv79I2zas0OBQ0jaZ5j8sMmGR3gmGDjd58fv0HHuEjThiBFP1bG7uXBDMuUNE8VwQBcDQcU5jePN0UANRD4mD5Hky14EGbjEgAAHBjn96XSlnOAyyGwyQC04VoAdN6dcQ2gVP7y/BCA64sTvwCwYvyXAEjzrgGggqCrosnsp7wQGusE8npTFZDESpCO9ZrACv4O30OuH9wBwEXam5fLXMu4hKTvITsJeBIKc2zQ2h/o89KoBgWehMK8rgRrh1iqFLeT4FKZ0QZ15kuV4BJAUkYsAGNVIQGA5xa4yzO49ZxAlr/+DO/93WWfxIZ0v6dscvAzRHrVrdD9HyioFj5WdnVFcKYlCPAsLGR1aA7QLRC8CwfMW61PZt09AKzIvjUpyu+DZ2Gl+dIqsAlhxQbI9XK3RrL9WZsd2RqbBYAFCPpasxBCoRB40g+HzMwHjNc5KgAAAABJRU5ErkJggg==","data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAB80lEQVRoge2YPU7DQBCF9xDb0hEaKKk2N4COljsgCkoajoHEBSJRcQCuQJ1UiDQ5hJHRRJ5o8hjbS0BidzxPGuXHzkbf2/HM2CG4XC6Xy+VyuVx/oniSWowwBcUO9vTy7luYNyH2gFNc3DzaNiAqKT8JA5ZPZy3FejHfAU7KABLBf25etkYMXQ5mTVgv5nvwY8XQXEFcAjxpqB6YNCNmwpo0Iiod4DcRaleaxVZG83yvBh0LFpUE/OrhutcAsyakDlwaEELYA+fP5g1oAHhSBqx60l9+b9aAlHH9H2rA8etbW2URXEFW/BSeWiTBc8hjNIqHEhS7QWisE8jjuWsT9O3H+zY0E4pQFJMgvceZQAv+zdC6cufZBM6IUJLSLO7g5ZirgUuThtZEcEr3YjMhCTgG1O4P8Ps+E3g9grw6P9oZwcYVBU+S8JgJ2h2ililyLYLmkJlQJDwJYRAQd17LEN51gqZnDbJY9nWBIhQhpTUDxrJCqxX4PwivPY/49xbYdK1Oe04g0x/PwSmyqkkxdgDY7+V1zA9Q6RVbIZ9zyIxQhBIMPri7WhFkSDaqOmgU7qpW5PqGJRMGkIbgtdYnh6HqDUgZu68VRfn7ULNSJnzOFFitUsYN0Fivr1pJtD6Ew7ZoDp4kqzpC4jGzJrhcrlCTvgDvIeFnF9dWAwAAAABJRU5ErkJggg==","data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAB6ElEQVRoge2YPU7DQBCF5xDb0hEaUlINN4COljsgCkoajoGUCyBRcQCuQG1XCBoOEWQ0licahll7Q+Iku54njeKfrKXveXZ21gAul8vlcrlcLpdrGwon2OiAKSh0sKeXd3+ieBNCBJzi4uaxbAOCkfKTMKBazJvPp/NV0LVJGUAi8O+vl4bM6JsOxZpQLeYtvDagryYUZUQlwFl99aBIM0IibJFGBGMF2CQgd+EsNDKWz/dm0D0oUSjg64frqAHFmoAduDQAAH6B83nxBiwV8KQMqCPpL69v0wDuRPcuTJz/Y2bA8etb03e+lyJYq6zYBH6dsQy/ExNC1wgNrQTy/jrPJwgKGnf78d4eD/3SPoWCx8OYCqITpGPdE1jBY1KereEOLgNwFlbwss21wKVJKc+lkPCxztEC3VkNQAHHgNb+QF/vM4GfeXV21ILLOLhlFAW8zgRrh2hligUu42DhSRpGA+o3b2WIBpfThsH/U0BHV1ApbRkwlBWxQgk5KIglkJc66zuBTH/9H91FZgNPYgC93sv5yx9R6VcvhTrds4In6cZHv12rCDKknO+Qs1C9VavIxZolHg+5C3vgraVPNjPZG4AJb98qinI85CxMhE/tArMUJmyAsq72Q7I6udi9Iiq/y+WC3PUDSkHiavvpw9YAAAAASUVORK5CYII=","data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAB8UlEQVRoge2YMU7DUAyGfQivbJQFRib3BrCxcgfEwMjCMZC4QCUmDsAVmNMJ0aWHKAqyFEeucZIXKqq8F3/SU9ok76n//xzbKUAQBEEQBEEQHAyeUW0HzAFsxJ5fP/waxZuAHcJ5XN09l20AOiE/GwOql4t6s1q2AmdlQNWI/96+1fy573Eo1oTNarknfigZFpkQqw4DhowoxgxMFFukEehUgEMG5A4tsNZj9/roDr4GJUJK/PrpttOAYk2gRrg2AAD2hMv34g3YGcGzMmDdEf76/BgD9KOVOuf+6/P4BlPi859qAFeG0/ePmsXwcUw/MqkkuDZRkbqTIp7bbT7+tVTyfPhvsGmEhirBmHCWCNBjsrkDVSfIn21P4A2Z460n99xcnrTiZV2YIrTAVrxucz3h2qS+9Vi8NmDMowPHhpQ4Eei9H9jznigtXq5PducFLd5GgveG6EWKXkvET164YMVYgXbnvQgR4TpZQg6gCWnPgKGosHkCcgJVCZTd8/4n0OFv75Fz0jNkZQI2P97We0lkPOQ/RD7aUmgjgNfMygAyjY+3uzYitFCd9CBXyNlVLxHaZknmZ28A0yfeK33S20sEQM5Qwu57SVHPh5yhRPFDXWDWUMILUNb1PgWvj/euFZH0PHRZsyLttWJNCIIAcuIHJ5C6Fs7gTJMAAAAASUVORK5CYII=","data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAYAAAChS3wfAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAB2UlEQVRoge2YMU7EQAxFfYhp6YAmlFSzN4COljsgCkoajoHEBVai4gBcgTpbIbbhEIuCjMbIMZ5k0DZrx0+ydpNJpPw/jscTgCAIgiAIgiDYm3SaBxmwBFIR213e/Qn3JqSKcIyLm0ffBiQl5RdjQP90NmzXq1+BizKgL+K/Pl8G/D/1Org1YbtejcTPFUOXBbGvGDBnhBszUqNYl0YkZQXYJ8A6+SQNPHbP92rgGHgkM/Gbh+uqAW5NyEU4NwAARsLp2L0BOyH4vwbwbAJrBmwq6c/PTwnDgnj8+jbcfrz//JopkLnx/Z8zgMRjl0kmmMiEXCmCMivmxFAGUODxwRuQSiM0txK0vNs4dnV+NDLBjAFd6exkT6AF3VMzgEw4ePEIPiSJ522uJpybBApkgAnhBBdHArX9gTwvRZoUj3DxMhO0HaKWKaYN6IQYKVDOvJYhJL40THZIIqU1A+aygmqCyb1CYksgPbz2nYCnv7yGzlHPYM6ALLa/fCnDoG+I+CuXQm6Auf4fkY2PNrsyI3jRo+tNFj+iNqtTNYCLNVv9OVPitaWP7/LIALBKbph9rSjK+8EquVH8VBdontywAZIB3shs+av1+bVxF+Qys5pIOebWhCAIwBLfuFG0SJc0CrEAAAAASUVORK5CYII="];
+const poses=[{"name":"Ready","ms":480,"a":0,"dx":0,"dy":0,"ay":0,"ha":0,"sa":0},{"name":"Brace","ms":150,"a":-24,"dx":-1,"dy":1,"ay":1,"ha":0,"sa":-28},{"name":"Lift","ms":140,"a":-30,"dx":0,"dy":0,"ay":-4,"ha":0,"sa":-18},{"name":"Charge","ms":230,"a":-14,"dx":0,"dy":0,"ay":-5,"ha":0,"sa":-10,"fx":1},{"name":"Release","ms":80,"a":32,"dx":1,"dy":0,"ay":0,"ha":0,"sa":20,"fx":2},{"name":"Follow through","ms":130,"a":38,"dx":1,"dy":1,"ay":0,"ha":0,"sa":26,"fx":3},{"name":"Recover","ms":150,"a":16,"dx":0,"dy":0,"ay":0,"ha":0,"sa":12,"fx":4},{"name":"Settle","ms":160,"a":0,"dx":0,"dy":0,"ay":0,"ha":0,"sa":0}];
+let index=0,playing=true,timer;
+const sprite=document.getElementById('sprite');
+const onion=document.getElementById('onion');
+const status=document.getElementById('status');
+const play=document.getElementById('play');
+const speed=document.getElementById('speed');
+function show(){
+  sprite.src=frames[index];
+  onion.src=frames[(index+7)%8];
+  status.textContent=(index+1)+' / 8 · '+poses[index].name;
+  document.querySelectorAll('#frames button').forEach((b,i)=>{
+    b.classList.toggle('active',i===index);
+    b.setAttribute('aria-pressed',String(i===index));
+  });
+}
+function schedule(){
+  clearTimeout(timer);
+  if(playing) timer=setTimeout(()=>{index=(index+1)%8;show();schedule()},poses[index].ms/Number(speed.value));
+}
+function pause(){playing=false;play.textContent='Play';clearTimeout(timer)}
+function step(n){pause();index=(index+n+8)%8;show()}
+frames.forEach((src,i)=>{
+  const b=document.createElement('button');
+  b.title=poses[i].name;
+  b.setAttribute('aria-label','Frame '+(i+1)+': '+poses[i].name);
+  b.innerHTML='<img alt="" src="'+src+'"><small>'+(i+1)+'</small>';
+  b.onclick=()=>{pause();index=i;show()};
+  document.getElementById('frames').append(b);
+});
+play.onclick=()=>{playing=!playing;play.textContent=playing?'Pause':'Play';schedule()};
+document.getElementById('step').onclick=()=>step(1);
+speed.onchange=schedule;
+document.getElementById('bg').onchange=e=>document.getElementById('stage').style.background=e.target.value;
+document.getElementById('onionToggle').onchange=e=>document.getElementById('stage').classList.toggle('onion',e.target.checked);
+document.addEventListener('keydown',e=>{
+  if(['SELECT','BUTTON','INPUT'].includes(e.target.tagName)) return;
+  if(e.code==='Space'){e.preventDefault();play.click()}
+  if(e.code==='ArrowRight') step(1);
+  if(e.code==='ArrowLeft') step(-1);
+});
+show();schedule();
+</script>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "cleric-pixel-animation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reproducible source-pixel cleric casting animation and offline viewer",
+  "scripts": { "build": "node build.cjs" },
+  "engines": { "node": ">=20.9.0" },
+  "dependencies": { "sharp": "0.35.4" }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "pixel-animation-agent-handoff",
+  "version": "2.0.0",
+  "private": true,
+  "engines": { "node": ">=20.9.0" },
+  "dependencies": { "sharp": "0.35.4" },
+  "scripts": {
+    "example": "node legacy-cleric-build.cjs",
+    "validate-example": "node tools/validate-animation.cjs example/manifest.json"
+  }
+}

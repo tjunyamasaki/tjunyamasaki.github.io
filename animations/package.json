@@ -1,0 +1,13 @@
+{
+  "name": "wizard-cast-animation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reproducible source-pixel wizard cast/attack animation and offline viewer",
+  "scripts": {
+    "build": "node wizard-cast/build.cjs",
+    "validate": "node tools/validate-animation.cjs wizard-cast/generated/manifest.json",
+    "serve": "node serve.cjs"
+  },
+  "engines": { "node": ">=20.9.0" },
+  "dependencies": { "sharp": "0.35.4" }
+}

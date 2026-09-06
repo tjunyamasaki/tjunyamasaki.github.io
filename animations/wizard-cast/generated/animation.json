@@ -1,0 +1,88 @@
+{
+  "width": 64,
+  "height": 48,
+  "columns": 4,
+  "rows": 2,
+  "palette": [
+    "20,38,58,255",
+    "43,75,116,255",
+    "74,110,153,255",
+    "217,156,44,255",
+    "227,169,59,255",
+    "253,232,178,255",
+    "58,37,20,255",
+    "252,172,124,255",
+    "218,129,91,255",
+    "0,0,0,255",
+    "36,190,207,255",
+    "112,226,224,255",
+    "82,52,29,255"
+  ],
+  "layers": {
+    "star": 9,
+    "hat": 106,
+    "body": 315,
+    "staff": 60,
+    "feet": 20
+  },
+  "pivots": {
+    "staff": {
+      "x": 27,
+      "y": 25
+    },
+    "hat": {
+      "x": 15,
+      "y": 11
+    },
+    "star": {
+      "x": 7,
+      "y": 7
+    },
+    "orb": {
+      "x": 30,
+      "y": 18
+    }
+  },
+  "frames": [
+    {
+      "file": "frame-1.png",
+      "name": "Ready",
+      "duration": 480
+    },
+    {
+      "file": "frame-2.png",
+      "name": "Brace",
+      "duration": 150
+    },
+    {
+      "file": "frame-3.png",
+      "name": "Lift",
+      "duration": 140
+    },
+    {
+      "file": "frame-4.png",
+      "name": "Charge",
+      "duration": 230
+    },
+    {
+      "file": "frame-5.png",
+      "name": "Release",
+      "duration": 80
+    },
+    {
+      "file": "frame-6.png",
+      "name": "Follow through",
+      "duration": 130
+    },
+    {
+      "file": "frame-7.png",
+      "name": "Recover",
+      "duration": 150
+    },
+    {
+      "file": "frame-8.png",
+      "name": "Settle",
+      "duration": 160
+    }
+  ]
+}

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Pixel editor</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <a class="hub-back" href="/links/">Games</a>
+        <div class="title">
+          <p class="kicker">local tool</p>
+          <h1>Pixel editor</h1>
+        </div>
+        <p class="lede">
+          Load a reference, align a grid over it, paint pixels, export PNG or a
+          project file. Nothing leaves this tab.
+        </p>
+      </header>
+
+      <div class="toolbar" role="toolbar" aria-label="Tools">
+        <button type="button" id="tool-pencil" aria-pressed="true">Pixel</button>
+        <button type="button" id="tool-trace" aria-pressed="false">Trace</button>
+        <button type="button" id="tool-area" aria-pressed="false">Trace area</button>
+        <button type="button" id="tool-eraser" aria-pressed="false">Eraser</button>
+        <button type="button" id="tool-fill" aria-pressed="false">Fill</button>
+        <button type="button" id="tool-eyedrop" aria-pressed="false">Eyedrop</button>
+        <button type="button" id="tool-move" aria-pressed="false">Move grid</button>
+        <button type="button" id="tool-pan" aria-pressed="false">Pan</button>
+        <span class="sep"></span>
+        <button type="button" id="btn-undo">Undo</button>
+        <span class="sep"></span>
+        <label class="color-pick">
+          Color
+          <input type="color" id="color" value="#e8e4d9" />
+          <span id="color-meta">#e8e4d9</span>
+        </label>
+        <span class="sep"></span>
+        <label class="check">
+          <input type="checkbox" id="show-bg" checked />
+          Background
+        </label>
+        <label class="check">
+          <input type="checkbox" id="show-art" checked />
+          Drawing
+        </label>
+        <label class="check">
+          <input type="checkbox" id="show-grid" checked />
+          Grid
+        </label>
+        <label class="zoom">
+          Art
+          <input type="range" id="ink" min="10" max="100" value="100" />
+          <span id="ink-val">100%</span>
+        </label>
+        <label class="zoom">
+          Zoom
+          <input type="range" id="zoom" min="1" max="32" value="4" />
+          <span id="zoom-val">4×</span>
+        </label>
+      </div>
+
+      <div class="workspace">
+        <aside class="rail">
+          <h2>References</h2>
+          <div class="row-btns">
+            <label class="file-btn">
+              Add images
+              <input type="file" id="file-images" accept="image/*" multiple />
+            </label>
+          </div>
+          <ul class="frames" id="image-list"></ul>
+          <p class="hint" id="drop-hint">
+            Drop or paste images. Click a name to use it as the background. The
+            pixel layer stays put when you switch. Drop a .pixel.json project to
+            restore drawing, grid, and references.
+          </p>
+
+          <h2>Shortcuts</h2>
+          <dl class="keys">
+            <dt>B</dt>
+            <dd>Pixel</dd>
+            <dt>T</dt>
+            <dd>Trace</dd>
+            <dt>R</dt>
+            <dd>Trace area</dd>
+            <dt>E</dt>
+            <dd>Eraser</dd>
+            <dt>G</dt>
+            <dd>Fill</dd>
+            <dt>I</dt>
+            <dd>Eyedrop</dd>
+            <dt>M</dt>
+            <dd>Move grid</dd>
+            <dt>H</dt>
+            <dd>Pan</dd>
+            <dt>Space</dt>
+            <dd>Pan (hold)</dd>
+            <dt>V</dt>
+            <dd>Background</dd>
+            <dt>D</dt>
+            <dd>Drawing</dd>
+            <dt>Ctrl+S</dt>
+            <dd>Save project</dd>
+            <dt>Ctrl+O</dt>
+            <dd>Open project</dd>
+            <dt>Ctrl+Z</dt>
+            <dd>Undo</dd>
+            <dt>[ ]</dt>
+            <dd>Cell size</dd>
+            <dt>Arrows</dt>
+            <dd>Nudge grid</dd>
+            <dt>Shift+arrows</dt>
+            <dd>Nudge ×10</dd>
+            <dt>Alt-drag</dt>
+            <dd>Move grid</dd>
+            <dt>Right-click</dt>
+            <dd>Eyedrop</dd>
+            <dt>Ctrl+wheel</dt>
+            <dd>Zoom</dd>
+          </dl>
+        </aside>
+
+        <section class="stage">
+          <div class="view-wrap" id="view-wrap">
+            <div class="view-stack" id="view-stack">
+              <canvas id="bg-view" width="256" height="256" aria-hidden="true"></canvas>
+              <canvas id="art-view" width="256" height="256" aria-label="Pixel canvas"></canvas>
+            </div>
+          </div>
+          <p class="status" id="status">Add a reference image, then align the grid over it.</p>
+        </section>
+
+        <aside class="rail rail-right">
+          <h2>Grid</h2>
+          <label class="field">
+            Cell size (source px)
+            <input type="number" id="cell-size" min="1" max="128" value="8" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              Columns
+              <input type="number" id="cols" min="1" max="1024" value="32" />
+            </label>
+            <label class="field">
+              Rows
+              <input type="number" id="rows" min="1" max="1024" value="32" />
+            </label>
+          </div>
+          <div class="field-row">
+            <label class="field">
+              Offset X
+              <input type="number" id="grid-x" value="0" />
+            </label>
+            <label class="field">
+              Offset Y
+              <input type="number" id="grid-y" value="0" />
+            </label>
+          </div>
+          <div class="row-btns">
+            <button type="button" id="btn-cover">Cover image</button>
+            <button type="button" id="btn-match">Match pixels</button>
+            <button type="button" id="btn-center">Center</button>
+            <button type="button" id="btn-trace-all">Trace all</button>
+          </div>
+          <p class="hint">
+            Drag the grid or use Move grid (Alt-drag also works). Drag the corner
+            handle to change cell size. Arrows nudge; [ ] change cell size.
+            Trace paints a cell with the average background color under it.
+            Trace area: drag a rectangle, then each cell in it is traced.
+            Trace all does the whole grid. Magenta chroma is skipped.
+          </p>
+
+          <h2>Colors</h2>
+          <div class="palette" id="palette"></div>
+          <p class="swatch-meta">Used in this drawing. Eyedrop or click a swatch.</p>
+
+          <h2>Export</h2>
+          <label class="field">
+            PNG scale
+            <input type="number" id="export-scale" min="1" max="32" value="1" />
+          </label>
+          <div class="row-btns">
+            <button type="button" class="primary" id="btn-save-project">Save project</button>
+            <label class="file-btn">
+              Open project
+              <input type="file" id="file-project" accept="application/json,.json" />
+            </label>
+            <button type="button" id="btn-export">Export PNG</button>
+            <button type="button" id="btn-clear">Clear pixels</button>
+          </div>
+          <p class="hint">
+            Project JSON reloads this drawing, grid size and offset, colors, and
+            reference images. PNG is the pixel layer only.
+          </p>
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

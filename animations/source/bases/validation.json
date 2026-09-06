@@ -1,0 +1,88 @@
+{
+  "logicalSize": [
+    45,
+    38
+  ],
+  "exportSize": [
+    270,
+    228
+  ],
+  "scale": 6,
+  "characters": {
+    "paladin": {
+      "opaquePixels": 669,
+      "opaqueColors": 12,
+      "paletteKeys": [
+        "A",
+        "B",
+        "E",
+        "G",
+        "H",
+        "I",
+        "K",
+        "O",
+        "P",
+        "S",
+        "T",
+        "Y"
+      ],
+      "bounds": [
+        3,
+        2,
+        33,
+        35
+      ],
+      "validated": true
+    },
+    "wizard": {
+      "opaquePixels": 510,
+      "opaqueColors": 13,
+      "paletteKeys": [
+        "B",
+        "C",
+        "G",
+        "K",
+        "L",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "S",
+        "U",
+        "V",
+        "Y"
+      ],
+      "bounds": [
+        5,
+        2,
+        33,
+        35
+      ],
+      "validated": true
+    },
+    "knight": {
+      "opaquePixels": 524,
+      "opaqueColors": 11,
+      "paletteKeys": [
+        "A",
+        "B",
+        "D",
+        "E",
+        "F",
+        "H",
+        "K",
+        "O",
+        "P",
+        "R",
+        "S"
+      ],
+      "bounds": [
+        3,
+        2,
+        33,
+        35
+      ],
+      "validated": true
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "width": 64,
+  "height": 48,
+  "columns": 4,
+  "rows": 2,
+  "palette": [
+    "217,156,44,255",
+    "82,52,29,255",
+    "58,37,20,255",
+    "253,232,178,255",
+    "227,169,59,255",
+    "252,172,124,255",
+    "218,129,91,255",
+    "0,0,0,255",
+    "250,174,127,255",
+    "250,174,129,255",
+    "176,160,137,255",
+    "234,220,196,255",
+    "50,77,100,255"
+  ],
+  "frames": [
+    {
+      "file": "frame-1.png",
+      "name": "Ready",
+      "duration": 500
+    },
+    {
+      "file": "frame-2.png",
+      "name": "Brace",
+      "duration": 130
+    },
+    {
+      "file": "frame-3.png",
+      "name": "Lift",
+      "duration": 130
+    },
+    {
+      "file": "frame-4.png",
+      "name": "Charge",
+      "duration": 190
+    },
+    {
+      "file": "frame-5.png",
+      "name": "Release",
+      "duration": 90
+    },
+    {
+      "file": "frame-6.png",
+      "name": "Follow through",
+      "duration": 130
+    },
+    {
+      "file": "frame-7.png",
+      "name": "Recover",
+      "duration": 140
+    },
+    {
+      "file": "frame-8.png",
+      "name": "Settle",
+      "duration": 150
+    }
+  ]
+}

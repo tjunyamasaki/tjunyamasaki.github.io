@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "name": "original-cleric-cast-example",
+  "source": { "file": "../cleric-original.png", "scale": 6 },
+  "canvas": { "width": 64, "height": 48, "origin": { "x": 8, "y": 8 } },
+  "restFrameIndices": [0, 7],
+  "frames": [
+    { "file": "frame-1.png", "durationMs": 500, "phase": "ready" },
+    { "file": "frame-2.png", "durationMs": 130, "phase": "brace" },
+    { "file": "frame-3.png", "durationMs": 130, "phase": "lift" },
+    { "file": "frame-4.png", "durationMs": 190, "phase": "charge" },
+    { "file": "frame-5.png", "durationMs": 90, "phase": "release" },
+    { "file": "frame-6.png", "durationMs": 130, "phase": "follow-through" },
+    { "file": "frame-7.png", "durationMs": 140, "phase": "recover" },
+    { "file": "frame-8.png", "durationMs": 150, "phase": "settle" }
+  ],
+  "sheet": { "file": "cleric-cast-sheet.png", "columns": 4, "rows": 2 },
+  "gif": { "file": "cleric-cast.gif", "scale": 6, "loop": 0 }
+}

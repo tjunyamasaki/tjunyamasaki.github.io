@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080f20">
+  <meta name="description" content="A little light changes everything. Explore a floating night garden and awaken its three sleeping shrines in this small 3D game.">
+  <title>Hushlight · A little night garden</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="game" aria-label="Hushlight game">
+    <canvas id="world" tabindex="0" aria-label="Night garden. Move with WASD or arrow keys, or tap the ground. Gather three lights, then hold Space or E beside a shrine."></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <header class="masthead">
+      <a class="back" href="/links/" aria-label="Back to games">↖ <span>Games</span></a>
+      <div class="wordmark">hushlight<span>A LITTLE NIGHT GARDEN</span></div>
+    </header>
+    <nav class="tools" aria-label="Game settings">
+      <button id="sound" class="quiet" aria-pressed="false">Sound <span>off</span></button>
+      <button id="help" class="quiet" aria-label="Pause and view controls">Ⅱ <span>Pause</span></button>
+    </nav>
+    <div id="zoom-controls" class="zoom-controls" role="group" aria-label="Game camera zoom" hidden>
+      <button id="zoom-out" aria-label="Zoom out">−</button>
+      <button id="zoom-fit" aria-label="Reset zoom to see the whole island">1.0×</button>
+      <button id="zoom-in" aria-label="Zoom in">+</button>
+    </div>
+    <section id="progress" class="progress" aria-label="Shrines awakened" hidden>
+      <div class="shrine-marks" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p id="progress-label">0 / 3 awakened</p>
+    </section>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <footer id="hud" hidden>
+      <div class="objective">
+        <div class="eyebrow" id="chapter">01 — THE WANDERING LIGHTS</div>
+        <p id="objective">Find three wandering lights.</p>
+        <div class="carried" aria-label="0 of 3 lights following"><i></i><i></i><i></i><span id="carried-label">0 / 3 following</span></div>
+      </div>
+      <div class="interaction">
+        <button id="kindle" class="kindle" disabled><span id="kindle-label">Find three lights</span><span class="charge" aria-hidden="true"></span></button>
+        <button id="new-night" class="kindle" hidden>Another night ↗</button>
+        <p class="controls"><span class="desktop-hint">WASD / arrows · </span>Tap to wander · Pinch to zoom</p>
+      </div>
+    </footer>
+    <div id="loading" class="loading" role="status"><span class="loading-star">✧</span><p>Finding a quiet corner of the sky…</p></div>
+    <section id="error" class="error" hidden role="alert"><h1>A little trouble in the sky.</h1><p id="error-message">The garden could not load. Please try again in a browser with WebGL2 enabled.</p><button onclick="location.reload()">Try again</button><a href="/links/">Back to games</a></section>
+    <noscript><div class="error"><h1>The garden needs JavaScript.</h1><p>Enable JavaScript to play Hushlight.</p><a href="/links/">Back to games</a></div></noscript>
+    <dialog id="intro" class="intro">
+      <p class="eyebrow">A SMALL GAME ABOUT A LITTLE LIGHT</p>
+      <h1>Bring the night<br>to <em>life.</em></h1>
+      <p id="intro-description" class="description">Nine wandering lights. Three sleeping shrines.<br>A quiet world waiting for you.</p>
+      <div class="garden-options">
+        <label>Journey<select id="mode"><option value="journey">Three sleeping shrines</option><option value="endless">Endless offerings</option></select></label>
+        <label>Atmosphere<select id="palette"><option value="moonlit">Moonlit garden</option><option value="ember">Ember night · spooky</option></select></label>
+      </div>
+      <button id="start" class="primary">Enter the garden <span>↗</span></button>
+      <p class="intro-note">A few unhurried minutes · Best with sound</p>
+    </dialog>
+    <dialog id="pause" class="panel">
+      <p class="eyebrow">TAKE YOUR TIME</p><h2>A moment of quiet.</h2>
+      <div class="instructions"><p><b>Wander</b><span>WASD, arrow keys, or tap the ground. Pinch or use + / − to zoom. The closer camera follows you; tap the zoom number to see the whole island.</span></p><p><b>Gather</b><span>Walk near wandering lights. Three will follow you.</span></p><p><b>Offer your light</b><span id="ritual-help">Stand beside a sleeping shrine. Hold Space, E, or the kindle button until it fills.</span></p></div>
+      <div class="garden-options"><label>Atmosphere<select id="pause-palette"><option value="moonlit">Moonlit garden</option><option value="ember">Ember night · spooky</option></select></label></div>
+      <p class="small">There is no wrong turn. You cannot fall.</p>
+      <button id="resume" class="primary">Back to the garden <span>↗</span></button>
+      <button id="change-garden" class="text-button">Start a different garden</button>
+    </dialog>
+    <dialog id="ending" class="panel ending">
+      <p class="eyebrow">THE GARDEN REMEMBERS</p><h2>You brought the<br>night to <em>life.</em></h2>
+      <p class="description">Sometimes, a little light is enough.</p><p id="elapsed" class="small"></p>
+      <button id="stay" class="primary">Stay a little <span>↗</span></button>
+      <button id="replay" class="text-button">Begin another night</button>
+    </dialog>
+  </main>
+  <script type="module">
+    import('./main.js').catch(error => {
+      console.error('Hushlight could not start', error);
+      document.getElementById('loading').hidden = true;
+      document.getElementById('error').hidden = false;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slime garden</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main id="game" aria-label="Slime garden">
+    <header class="page-note">
+      <p class="kicker"><a href="/links/">Games</a></p>
+      <h1>Slime garden</h1>
+      <p>Isolated skeleton. Local Three.js only; economy and habitat come later.</p>
+      <p><a href="./reference/original-preview.html">Open the original slime preview</a></p>
+    </header>
+    <div id="loading" role="status">Loading local modules…</div>
+    <section id="error" hidden role="alert">
+      <h1>Could not start</h1>
+      <p id="error-message"></p>
+    </section>
+    <noscript>
+      <section class="noscript" role="alert">
+        <h1>JavaScript is required</h1>
+        <p>Enable JavaScript to load this game from local modules.</p>
+      </section>
+    </noscript>
+  </main>
+  <script type="module">
+    import('./src/main.mjs').catch((error) => {
+      const loading = document.getElementById('loading');
+      const region = document.getElementById('error');
+      const message = document.getElementById('error-message');
+      if (loading) loading.hidden = true;
+      if (region) region.hidden = false;
+      if (message) {
+        message.textContent = error && error.message ? String(error.message) : String(error);
+      }
+    });
+  </script>
+</body>
+</html>

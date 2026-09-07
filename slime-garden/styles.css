@@ -1,0 +1,82 @@
+html {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+  color: #24352f;
+  background: #eaf0d6;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+#game {
+  min-height: 100svh;
+  padding: 24px 20px;
+}
+
+.page-note {
+  max-width: 40rem;
+  margin: 0 0 20px;
+}
+
+.page-note .kicker {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
+
+.page-note h1 {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+  font-weight: 650;
+}
+
+.page-note p {
+  margin: 0 0 8px;
+  line-height: 1.45;
+}
+
+.page-note a {
+  color: #1f4f43;
+}
+
+#loading,
+#error,
+.noscript,
+#boot-status {
+  max-width: 40rem;
+}
+
+#loading,
+#boot-status {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+#error,
+.noscript {
+  color: #8b2e2e;
+}
+
+#error h1,
+.noscript h1 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+#error p,
+.noscript p,
+#boot-status p {
+  margin: 0;
+  line-height: 1.5;
+}

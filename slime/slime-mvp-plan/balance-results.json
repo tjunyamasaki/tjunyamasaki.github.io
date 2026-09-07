@@ -1,0 +1,366 @@
+{
+  "kind": "design-estimate",
+  "timestepSec": 1,
+  "caveats": [
+    "Not a real playtest.",
+    "Short-visits stays logically open; it models behavior, not browser suspension.",
+    "Visits every 30 minutes last 60 seconds.",
+    "No human reaction or animation delay."
+  ],
+  "balance": {
+    "berryIntervalsSec": [
+      15,
+      12,
+      10,
+      8
+    ],
+    "berryCaps": [
+      12,
+      18,
+      24
+    ],
+    "costs": {
+      "shrub": [
+        15,
+        60,
+        180
+      ],
+      "pantry": [
+        30,
+        100
+      ],
+      "bloom": [
+        20,
+        70,
+        220,
+        650,
+        1800
+      ],
+      "beds": [
+        40,
+        140,
+        400,
+        1000
+      ]
+    },
+    "milestones": [
+      {
+        "count": 2,
+        "feeds": 6,
+        "lifetimeGlow": 12
+      },
+      {
+        "count": 3,
+        "feeds": 24,
+        "lifetimeGlow": 90
+      },
+      {
+        "count": 4,
+        "feeds": 60,
+        "lifetimeGlow": 300
+      },
+      {
+        "count": 5,
+        "feeds": 120,
+        "lifetimeGlow": 900
+      },
+      {
+        "count": 6,
+        "feeds": 200,
+        "lifetimeGlow": 2200
+      }
+    ]
+  },
+  "results": [
+    {
+      "policy": "attentive",
+      "durationSec": 7200,
+      "visitEverySec": 0,
+      "visitLengthSec": 0,
+      "summary": {
+        "slimes": 6,
+        "feeds": 875,
+        "glow": 11480.4,
+        "lifetimeGlow": 16205.4,
+        "berries": 0,
+        "upgrades": {
+          "shrub": 3,
+          "pantry": 2,
+          "bloom": 5,
+          "beds": 4
+        }
+      },
+      "log": [
+        {
+          "atSec": 60,
+          "event": "slime 2 welcomed",
+          "glow": 12,
+          "totalFeeds": 10
+        },
+        {
+          "atSec": 70,
+          "event": "shrub level 1",
+          "glow": 0,
+          "totalFeeds": 10
+        },
+        {
+          "atSec": 123,
+          "event": "bloom level 1",
+          "glow": 0,
+          "totalFeeds": 14
+        },
+        {
+          "atSec": 183,
+          "event": "pantry level 1",
+          "glow": 0,
+          "totalFeeds": 19
+        },
+        {
+          "atSec": 263,
+          "event": "beds level 1",
+          "glow": 0,
+          "totalFeeds": 26
+        },
+        {
+          "atSec": 264,
+          "event": "slime 3 welcomed",
+          "glow": 0.5,
+          "totalFeeds": 26
+        },
+        {
+          "atSec": 345,
+          "event": "shrub level 2",
+          "glow": 0,
+          "totalFeeds": 32
+        },
+        {
+          "atSec": 439,
+          "event": "bloom level 2",
+          "glow": 0.5,
+          "totalFeeds": 41
+        },
+        {
+          "atSec": 550,
+          "event": "pantry level 2",
+          "glow": 0.4,
+          "totalFeeds": 52
+        },
+        {
+          "atSec": 706,
+          "event": "beds level 2",
+          "glow": 0.8,
+          "totalFeeds": 68
+        },
+        {
+          "atSec": 707,
+          "event": "slime 4 welcomed",
+          "glow": 1.7,
+          "totalFeeds": 68
+        },
+        {
+          "atSec": 857,
+          "event": "shrub level 3",
+          "glow": 0.5,
+          "totalFeeds": 83
+        },
+        {
+          "atSec": 1040,
+          "event": "bloom level 3",
+          "glow": 0.1,
+          "totalFeeds": 105
+        },
+        {
+          "atSec": 1326,
+          "event": "beds level 3",
+          "glow": 0.5,
+          "totalFeeds": 141
+        },
+        {
+          "atSec": 1327,
+          "event": "slime 5 welcomed",
+          "glow": 1.9,
+          "totalFeeds": 141
+        },
+        {
+          "atSec": 1698,
+          "event": "bloom level 4",
+          "glow": 0.8,
+          "totalFeeds": 188
+        },
+        {
+          "atSec": 2198,
+          "event": "beds level 4",
+          "glow": 0.8,
+          "totalFeeds": 250
+        },
+        {
+          "atSec": 2199,
+          "event": "slime 6 welcomed",
+          "glow": 2.8,
+          "totalFeeds": 250
+        },
+        {
+          "atSec": 2948,
+          "event": "bloom level 5",
+          "glow": 0,
+          "totalFeeds": 344
+        }
+      ]
+    },
+    {
+      "policy": "short-visits",
+      "durationSec": 86400,
+      "visitEverySec": 1800,
+      "visitLengthSec": 60,
+      "summary": {
+        "slimes": 6,
+        "feeds": 715,
+        "glow": 117485,
+        "lifetimeGlow": 122210,
+        "berries": 23,
+        "upgrades": {
+          "shrub": 3,
+          "pantry": 2,
+          "bloom": 5,
+          "beds": 4
+        }
+      },
+      "log": [
+        {
+          "atSec": 1800,
+          "event": "slime 2 welcomed",
+          "glow": 214.5,
+          "totalFeeds": 10
+        },
+        {
+          "atSec": 1800,
+          "event": "shrub level 1",
+          "glow": 199.5,
+          "totalFeeds": 10
+        },
+        {
+          "atSec": 1801,
+          "event": "shrub level 2",
+          "glow": 139.8,
+          "totalFeeds": 10
+        },
+        {
+          "atSec": 1802,
+          "event": "bloom level 1",
+          "glow": 120.1,
+          "totalFeeds": 10
+        },
+        {
+          "atSec": 1803,
+          "event": "bloom level 2",
+          "glow": 50.475,
+          "totalFeeds": 10
+        },
+        {
+          "atSec": 1804,
+          "event": "pantry level 1",
+          "glow": 20.925,
+          "totalFeeds": 11
+        },
+        {
+          "atSec": 1856,
+          "event": "beds level 1",
+          "glow": 12.125,
+          "totalFeeds": 24
+        },
+        {
+          "atSec": 1857,
+          "event": "slime 3 welcomed",
+          "glow": 12.725,
+          "totalFeeds": 24
+        },
+        {
+          "atSec": 3600,
+          "event": "shrub level 3",
+          "glow": 706.175,
+          "totalFeeds": 25
+        },
+        {
+          "atSec": 3601,
+          "event": "bloom level 3",
+          "glow": 486.775,
+          "totalFeeds": 25
+        },
+        {
+          "atSec": 3602,
+          "event": "pantry level 2",
+          "glow": 387.475,
+          "totalFeeds": 25
+        },
+        {
+          "atSec": 5400,
+          "event": "bloom level 4",
+          "glow": 863.775,
+          "totalFeeds": 40
+        },
+        {
+          "atSec": 7200,
+          "event": "bloom level 5",
+          "glow": 352.575,
+          "totalFeeds": 55
+        },
+        {
+          "atSec": 7220,
+          "event": "beds level 2",
+          "glow": 236.875,
+          "totalFeeds": 60
+        },
+        {
+          "atSec": 7221,
+          "event": "slime 4 welcomed",
+          "glow": 238.225,
+          "totalFeeds": 60
+        },
+        {
+          "atSec": 14420,
+          "event": "beds level 3",
+          "glow": 7554.15,
+          "totalFeeds": 120
+        },
+        {
+          "atSec": 14421,
+          "event": "slime 5 welcomed",
+          "glow": 7555.95,
+          "totalFeeds": 120
+        },
+        {
+          "atSec": 23440,
+          "event": "beds level 4",
+          "glow": 18635.525,
+          "totalFeeds": 200
+        },
+        {
+          "atSec": 23441,
+          "event": "slime 6 welcomed",
+          "glow": 18637.775,
+          "totalFeeds": 200
+        }
+      ]
+    },
+    {
+      "policy": "never-interacts",
+      "durationSec": 28800,
+      "visitEverySec": 0,
+      "visitLengthSec": 0,
+      "summary": {
+        "slimes": 1,
+        "feeds": 0,
+        "glow": 2880,
+        "lifetimeGlow": 2880,
+        "berries": 12,
+        "upgrades": {
+          "shrub": 0,
+          "pantry": 0,
+          "bloom": 0,
+          "beds": 0
+        }
+      },
+      "log": []
+    }
+  ]
+}

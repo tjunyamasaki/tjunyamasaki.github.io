@@ -77,3 +77,40 @@ export function createInitialState() {
     arrivalStyleId: ARRIVAL_STYLE_ID,
   };
 }
+
+/**
+ * Deep clone of a game state. Nested upgrades, slimes, and tutorial IDs are new.
+ * Does not mutate `state`. Used by time integration so frozen inputs stay intact.
+ *
+ * @param {GameState} state
+ * @returns {GameState}
+ */
+export function cloneState(state) {
+  return {
+    simTimeMs: state.simTimeMs,
+    glowMicro: state.glowMicro,
+    lifetimeGlowMicro: state.lifetimeGlowMicro,
+    incomeRemainder: state.incomeRemainder,
+    berries: state.berries,
+    nextBerryAtMs: state.nextBerryAtMs,
+    nextFeedAllowedAtMs: state.nextFeedAllowedAtMs,
+    totalFeeds: state.totalFeeds,
+    upgrades: {
+      shrub: state.upgrades.shrub,
+      pantry: state.upgrades.pantry,
+      bloom: state.upgrades.bloom,
+      beds: state.upgrades.beds,
+    },
+    slimes: state.slimes.map((slime) => ({
+      id: slime.id,
+      name: slime.name,
+      createdAtMs: slime.createdAtMs,
+      boostUntilMs: slime.boostUntilMs,
+      feedCount: slime.feedCount,
+      homeSlot: slime.homeSlot,
+    })),
+    tutorialCompleted: [...state.tutorialCompleted],
+    habitatId: state.habitatId,
+    arrivalStyleId: state.arrivalStyleId,
+  };
+}

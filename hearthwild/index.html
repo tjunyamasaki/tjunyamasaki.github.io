@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080f20">
+  <meta name="description" content="A little home above the clouds. Wander a floating island in this small 3D sandbox.">
+  <title>Hearthwild · A little home above the clouds</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="game" aria-label="Hearthwild game">
+    <canvas id="world" tabindex="0" aria-label="Floating island. Move with WASD or arrow keys, or tap the ground. Press E for the selected Gather, Till, or Plant action. Press B to build."></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <header class="masthead">
+      <a class="back" href="/links/" aria-label="Back to games">↖ <span>Games</span></a>
+      <div class="wordmark">hearthwild<span>A LITTLE HOME ABOVE THE CLOUDS</span></div>
+    </header>
+    <nav class="tools" aria-label="Game settings">
+      <p id="save-status" class="save-status" aria-live="polite" hidden>Unsaved</p>
+      <button id="sound" class="quiet" aria-pressed="false">Sound <span>off</span></button>
+      <button id="help" class="quiet" aria-label="Pause and view controls">Ⅱ <span>Pause</span></button>
+    </nav>
+    <div id="zoom-controls" class="zoom-controls" role="group" aria-label="Game camera zoom" hidden>
+      <button id="zoom-out" aria-label="Zoom out">−</button>
+      <button id="zoom-fit" aria-label="Reset zoom to see the whole island">1.0×</button>
+      <button id="zoom-in" aria-label="Zoom in">+</button>
+      <button id="camera-inspect" aria-label="Inspect keeper and gathering at close zoom">Inspect</button>
+      <button id="camera-toggle" aria-label="Camera controls" aria-expanded="false" aria-controls="camera-options">Camera</button>
+      <div id="camera-options" class="camera-options" hidden>
+        <label for="camera-mode">Drag on the island</label>
+        <select id="camera-mode"><option value="walk">Walk / select</option><option value="orbit">Orbit camera</option><option value="pan">Pan camera</option></select>
+        <div class="camera-row"><span>Orbit</span><button data-orbit="-90,0" aria-label="Orbit left">↶</button><button data-orbit="90,0" aria-label="Orbit right">↷</button><button data-orbit="0,-35" aria-label="Lower camera">−</button><button data-orbit="0,35" aria-label="Raise camera">+</button></div>
+        <div class="camera-row"><span>Pan</span><button data-pan="70,0" aria-label="Pan left">←</button><button data-pan="-70,0" aria-label="Pan right">→</button><button data-pan="0,70" aria-label="Pan up">↑</button><button data-pan="0,-70" aria-label="Pan down">↓</button></div>
+        <button id="camera-center">Center on keeper</button>
+        <p>Right-drag orbits · Shift + right-drag pans. Two fingers pan and pinch. Tap the zoom number to reset.</p>
+      </div>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="picked" class="picked-label" hidden></div>
+    <footer id="hud" hidden>
+      <p id="world-meta" class="world-meta"></p>
+      <p id="bag-summary" class="bag-summary">Wood 0 · Stone 0 · Ore 0 · Ingots 0 · Seeds 0</p>
+      <p id="station-activity" class="station-activity" hidden></p>
+      <p id="garden-activity" class="station-activity" hidden></p>
+      <p id="selection" class="selection" hidden></p>
+      <p id="selection-detail" class="selection-detail" hidden></p>
+      <div id="action-progress" class="progress-track" hidden>
+        <div id="action-progress-fill" class="progress-fill"></div>
+      </div>
+      <p class="controls"><span class="desktop-hint">WASD / arrows · E act · B build · R rotate · I bag · </span>Tap to wander · Pinch to zoom</p>
+    </footer>
+    <div id="action-dock" class="action-dock" hidden>
+      <div id="field-modes" class="field-modes" role="group" aria-label="Field tools">
+        <button id="field-mode-gather" class="quiet" type="button" aria-pressed="true">Gather</button>
+        <button id="field-mode-hoe" class="quiet" type="button" aria-pressed="false">Hoe</button>
+        <button id="field-mode-seeds" class="quiet" type="button" aria-pressed="false">Seeds</button>
+      </div>
+      <p id="field-mode-label" class="field-mode-label">Gather</p>
+      <div id="seed-strip" class="seed-strip" hidden role="group" aria-label="Seed choices"></div>
+      <button id="inventory-open" class="quiet" type="button">Bag</button>
+      <button id="build-open" class="quiet" type="button">Build</button>
+      <button id="gather" class="gather" type="button" disabled>Gather</button>
+      <button id="field-secondary" class="quiet" type="button" hidden>Uproot</button>
+      <button id="structure-use" class="gather" type="button" hidden>Use</button>
+      <button id="structure-move" class="quiet" type="button" hidden>Move</button>
+      <button id="structure-remove" class="quiet" type="button" hidden>Dismantle</button>
+      <button id="build-cancel" class="quiet" type="button" hidden>Cancel</button>
+      <button id="build-rotate" class="quiet" type="button" hidden>Rotate</button>
+      <button id="build-confirm" class="gather" type="button" hidden>Confirm</button>
+    </div>
+    <div id="build-catalog" class="build-catalog" hidden>
+      <p class="eyebrow">BUILD</p>
+      <h2>Place a piece.</h2>
+      <p class="small">Pay when you confirm. Ghosts, rotation and moving cost nothing. Dismantling returns the original materials.</p>
+      <div id="build-catalog-list" class="build-catalog-list"></div>
+      <button id="build-catalog-close" class="text-button" type="button">Close catalog</button>
+    </div>
+    <div id="loading" class="loading" role="status"><span class="loading-star">✧</span><p>Finding a quiet corner of the sky…</p></div>
+    <section id="error" class="error" hidden role="alert">
+      <h1>A little trouble in the sky.</h1>
+      <p id="error-message">The island could not load. Please try again in a browser with WebGL2 enabled.</p>
+      <button onclick="location.reload()">Try again</button>
+      <a href="/links/">Back to games</a>
+    </section>
+    <noscript>
+      <div class="error">
+        <h1>The island needs JavaScript.</h1>
+        <p>Enable JavaScript to play Hearthwild.</p>
+        <a href="/links/">Back to games</a>
+      </div>
+    </noscript>
+    <dialog id="intro" class="intro">
+      <form id="new-world-form">
+        <p class="eyebrow">A SMALL PLACE ABOVE THE CLOUDS</p>
+        <h1>Come home to a<br><em>quiet island.</em></h1>
+        <p class="description">Gather wood, stone and copper, plant a garden, then smelt ingots at a furnace. One island is saved in this browser.</p>
+        <button id="continue" class="primary" type="button" hidden>Continue this island <span>↗</span></button>
+        <p id="continue-note" class="intro-note" hidden></p>
+        <div class="world-fields">
+          <label>Island name
+            <input id="world-name" name="world-name" maxlength="32" placeholder="A quiet clearing" autocomplete="off">
+          </label>
+          <label>Seed
+            <input id="world-seed" name="world-seed" maxlength="64" value="hearthwild-review-a" placeholder="Leave blank for a surprise" autocomplete="off" spellcheck="false">
+          </label>
+        </div>
+        <div class="garden-options">
+          <label>Atmosphere
+            <select id="palette">
+              <option value="moonlit">Moonlit dusk</option>
+              <option value="ember">Ember sunset</option>
+            </select>
+          </label>
+          <label>Keeper
+            <select id="avatar">
+              <option value="cloak">Hooded cloak</option>
+              <option value="brim">Garden brim</option>
+            </select>
+          </label>
+        </div>
+        <button id="start" class="primary" type="submit">Enter the clearing <span>↗</span></button>
+        <button id="intro-cancel" class="text-button" type="button" hidden>Keep this island</button>
+        <p class="intro-note">A quiet walk · Best with sound · Save keeps this island here</p>
+      </form>
+    </dialog>
+    <dialog id="confirm-new" class="panel">
+      <p class="eyebrow">START ANEW</p>
+      <h2>Leave this island?</h2>
+      <p class="small" id="confirm-new-copy">Starting a new world replaces the current walk. Your saved island is replaced when the new one saves.</p>
+      <button id="confirm-new-yes" class="primary" type="button">Start a new island <span>↗</span></button>
+      <button id="confirm-new-no" class="text-button" type="button">Keep walking</button>
+    </dialog>
+    <dialog id="inventory" class="panel">
+      <p class="eyebrow">SATCHEL</p>
+      <h2>What you carry.</h2>
+      <p class="small">Ordinary materials have no bag limit. Tools are unique equipment. Copper upgrades keep your stone tools. Plant saplings from the sapling row. Leftover moonflowers can still become fiber here.</p>
+      <div id="inventory-body" class="inventory-body"></div>
+      <button id="inventory-close" class="primary" type="button">Close bag <span>↗</span></button>
+    </dialog>
+    <dialog id="pause" class="panel">
+      <p class="eyebrow">TAKE YOUR TIME</p>
+      <h2>A moment of quiet.</h2>
+      <div class="instructions">
+        <p><b>Wander</b><span>WASD, arrow keys, or tap the ground. Walk around trees, rocks and workbenches; you cannot fall. Tap a plant, outcrop or placed piece to see its name, then walk to a nearby clearing.</span></p>
+        <p><b>Gather</b><span>The dock has Gather, Hoe, and Seeds. Default is Gather: chop, mine, pick, and pull mature wild or garden crops with empty hands. Hold the action button or E / Space while in reach. An immature garden crop shows its growth and will not uproot from Harvest. Pause, blur, moving, or walking out of range cancels with no reward. Inventory (I) pauses the island. Protected gold-ring patches cannot be removed. Reduced motion keeps a still pose and the usual progress ring.</span></p>
+        <p><b>Build</b><span>B or Build opens the catalog. Choosing a piece shows a ghost; the island keeps moving. Tap a cell, R or Rotate turns it, Confirm pays once. Soil is not in Build: till grass with a hoe. A furnace needs a workbench within five paces. Escape cancels the ghost first. Pinch zooms and never places.</span></p>
+        <p><b>Garden</b><span>New islands start with no crop seeds: pull wild orange carrots and yellowish potatoes to find them. Craft a hoe (5 wood + 2 stone) in Bag, choose Hoe to hold it, and tap grass. An irregular earth outline and a hoe or reject icon show where Till will land; the HUD names Till or the reason it will not work. Hold Till. The scrape kicks up brown earth chips and a few dry grass flecks; earth still appears only when Till finishes. Seeds shows carrot and potato counts; pick one, tap empty earth, hold Plant. Planting kneels, drops a few seed specks, and pats the earth; canceling before it finishes spends nothing and the specks vanish. Harvest a ready garden crop in Gather: the keeper bends, grips the leaves, and pulls the root up; canceling restores the plant. Uproot is a shorter 0.6s pull on a garden crop: one seed returns, no produce, and a small seed cue at the end. Smooth earth is a short hoe rake on empty earth; grass returns when it finishes. With Sound on, tilling thuds quietly at the scrape, planting rustles, and harvest or uproot makes a soft root pull; Sound off, Pause, and reduced motion keep those contact ticks silent. Plant saplings from Bag. There is no plot sheet or Soil catalog. Growth pauses in Bag, stations, Pause and hidden tabs.</span></p>
+        <p><b>Stations</b><span>Select a workbench or furnace, then Use or E. Station panels pause the island, like Bag. Close them to resume smelting even if you walk away. Activity still shows in the HUD. Reach is two paces with a clear approach. Recipes use the bag.</span></p>
+        <p><b>Look</b><span>Inspect gives a close view of the keeper and tools. Pause or the title screen can switch between the hooded cloak and the garden-brim look. Wheel, pinch or + / − zoom up to 14×. Right-drag orbits; Shift + right-drag or middle-drag pans. On touch, use Camera → Orbit / Pan or two-finger pan/pinch; return to Walk / select to interact. WASD stays relative to the camera. Tap the zoom number to reset the whole view.</span></p>
+        <p><b>Pause</b><span>Escape or Pause stops time and cancels gathering. Switching tabs does the same. Bag and station panels also freeze timers. Build preview is not a pause menu.</span></p>
+      </div>
+      <div class="garden-options">
+        <label>Atmosphere
+          <select id="pause-palette">
+            <option value="moonlit">Moonlit dusk</option>
+            <option value="ember">Ember sunset</option>
+          </select>
+        </label>
+        <label>Keeper
+          <select id="pause-avatar">
+            <option value="cloak">Hooded cloak</option>
+            <option value="brim">Garden brim</option>
+          </select>
+        </label>
+      </div>
+      <button id="gather-mode" class="quiet gather-mode" type="button" aria-pressed="false">Gather <span>hold</span></button>
+      <p class="small" id="pause-seed">The rim is safe. One island is saved in this browser.</p>
+      <p class="small" id="pause-save-status">Unsaved</p>
+      <button id="resume" class="primary">Resume walking <span>↗</span></button>
+      <button id="save-now" class="text-button" type="button">Save island</button>
+      <button id="return-clearing" class="text-button">Return to clearing</button>
+      <button id="new-world" class="text-button">Start a new island</button>
+    </dialog>
+    <dialog id="station" class="panel">
+      <p class="eyebrow">STATION</p>
+      <h2 id="station-title">Station</h2>
+      <p class="small" id="station-copy">Recipes use the bag. This panel pauses the island. Close it to resume smelting even if you walk away.</p>
+      <div id="station-body" class="station-body"></div>
+      <button id="station-close" class="primary" type="button">Close station <span>↗</span></button>
+    </dialog>
+  </main>
+  <script type="module">
+    import('./main.js').catch(error => {
+      console.error('Hearthwild could not start', error);
+      document.getElementById('loading').hidden = true;
+      document.getElementById('error').hidden = false;
+    });
+  </script>
+</body>
+</html>

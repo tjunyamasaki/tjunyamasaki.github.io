@@ -1,0 +1,18 @@
+---
+description: Hearthwild implementation boundaries and user review gates
+globs: hearthwild/**,docs/hearthwild/**
+alwaysApply: false
+---
+
+# Hearthwild
+
+- Read `docs/hearthwild/README.md`, `docs/hearthwild/RULES.md`, and the user-dispatched step before editing game code.
+- The full specification is `docs/COZY_SANDBOX_PLAN.md`; execution order and explicit clarifications are in the packet pack.
+- Implement only the dispatched step or requested repairs. Prerequisite steps require explicit user approval.
+- Finish at READY_FOR_REVIEW with reproducible manual tests. Only the user may approve a step; passing automated tests is not approval.
+- Never automatically start the next step, spawn another implementation agent, push, or deploy.
+- Preserve unrelated edits and Hushlight. Vanilla ES modules, local Three.js, no engine/bundler/backend.
+- Keep simulation independent of browser/rendering; all gameplay mutations use validated commands.
+- Every step must be reachable and testable through the browser UI without console commands or gifted resources.
+- Update `docs/hearthwild/STATUS.md` and the step's report with evidence and outstanding issues.
+- Handoff documents are gitignored. Include them when moving work to another workspace or agent.

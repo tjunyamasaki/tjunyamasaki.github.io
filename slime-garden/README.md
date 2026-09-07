@@ -1,6 +1,6 @@
 # Slime garden
 
-A small, peaceful habitat for the approved mint anime slime. This folder is an early local skeleton: the game entry boots from local ES modules, and the original slime comparison preview is preserved. Economy, habitat, and actor extraction are not here yet.
+A small, peaceful habitat for the approved mint anime slime. This folder currently has the isolated game entry, the original comparison preview, an extracted reusable slime actor (inspection page), and a pure in-memory economy (no habitat UI yet).
 
 ## Play locally
 
@@ -14,6 +14,7 @@ Then open:
 
 - Game entry: http://localhost:3000/slime-garden/
 - Original comparison preview: http://localhost:3000/slime-garden/reference/original-preview.html
+- Extracted actor inspection: http://localhost:3000/slime-garden/dev/inspection.html
 
 `serve` defaults to port 3000. If the terminal prints a different Local URL, use that host and port with the same `/slime-garden/` path.
 

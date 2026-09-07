@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slime six-actor stress</title>
+  <style>
+html { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: inherit; }
+html, body {
+  touch-action: pan-y;
+}
+body {
+  margin: 0;
+  padding: 16px;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+  color: #24352f;
+  background: #f6f4ea;
+}
+.page-note { max-width: 1100px; margin: 0 auto 12px; }
+.page-note h1 { font-size: 1.15rem; font-weight: 650; margin: 0 0 6px; }
+.page-note p { margin: 0 0 6px; font-size: 0.92rem; line-height: 1.45; color: #3d534a; }
+.page-note a { color: #1f4f43; }
+#stress-root { max-width: 1100px; margin: 0 auto; }
+.slime-stage {
+  width: 100%;
+  height: min(62vh, 640px);
+  min-height: 360px;
+  background: #eaf0d6;
+  touch-action: pan-y;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.slime-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+}
+@media (max-width: 500px) {
+  .slime-stage { height: min(52vh, 420px); min-height: 280px; }
+}
+.viz-controls, .control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+.btn, select.btn {
+  font: inherit;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+  border: 1px solid #3d5a52;
+  border-radius: 8px;
+  background: #fff;
+  color: #24352f;
+  cursor: pointer;
+}
+.btn:hover { background: #eef6ef; }
+.btn[aria-pressed="true"] {
+  background: #8fe6c9;
+  border-color: #33655b;
+}
+.btn:focus-visible {
+  outline: 2px solid #33655b;
+  outline-offset: 2px;
+}
+.text-small { font-size: 0.85rem; color: #3d534a; }
+.status, .diag {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #c5d3c4;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.status[data-ok="true"] { border-color: #33655b; background: #eef8f2; }
+.status[data-ok="false"] { border-color: #8b2e2e; background: #fbeeee; }
+.diag { color: #3d534a; }
+[data-error] { margin-top: 12px; color: #8b2e2e; }
+.fieldset-lite {
+  border: 1px solid #c5d3c4;
+  border-radius: 8px;
+  padding: 8px;
+  margin-top: 12px;
+}
+.fieldset-lite legend { padding: 0 6px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <header class="page-note">
+    <h1>Six-actor rendering spike</h1>
+    <p>Diagnostics page, not product UI. Six independent residents at home slots on the approved floor. Comparison travel is off. Camera fits all six slots with a 1.4-unit margin and 10% padding (horizontal and vertical FOV). Tap a slime to select it (body meshes only). Page scrolling stays enabled (<code>touch-action: pan-y</code>).</p>
+    <p>
+      <a href="/slime-garden/">Back to slime garden</a>
+      ·
+      <a href="/slime-garden/dev/inspection.html">Actor inspection</a>
+    </p>
+  </header>
+  <div id="stress-root">
+    <div class="slime-stage" role="img" aria-label="Six mint slimes in a habitat. Tap a slime to select it. The page still scrolls."></div>
+    <div class="viz-controls">
+      <button type="button" class="btn" data-motion="idle" aria-pressed="true">Idle all</button>
+      <button type="button" class="btn" data-motion="walk" aria-pressed="false">Walk all</button>
+      <button type="button" class="btn" data-pause aria-pressed="false">Pause</button>
+    </div>
+    <div class="control-row">
+      <button type="button" class="btn" data-quality="high" aria-pressed="false">High</button>
+      <button type="button" class="btn" data-quality="low" aria-pressed="false">Low</button>
+      <button type="button" class="btn" data-quality="auto" aria-pressed="true">Auto</button>
+      <button type="button" class="btn" data-reset-view>Reset view</button>
+    </div>
+    <div class="control-row">
+      <button type="button" class="btn" data-snap-stretch>Snap max stretch</button>
+      <button type="button" class="btn" data-selection-test>Selection test</button>
+      <button type="button" class="btn" data-dispose>Dispose all</button>
+      <button type="button" class="btn" data-remount>Remount</button>
+    </div>
+    <p class="text-small">Snap max stretch freezes every resident at walk phase 0.29, blend 1. Selection test raycasts body meshes only (faces, outline, ring, and contact shadow are skipped). Mouse drag after 6 CSS pixels orbits a little; touch uses pan-y so the page still scrolls.</p>
+    <p class="status" data-selection role="status" aria-live="polite">Selection: none. Click a slime or run the selection test.</p>
+    <p class="status" data-dispose-status role="status" aria-live="polite">Dispose: not yet tested.</p>
+    <pre class="diag" data-diag>Diagnostics will appear after the first frame.</pre>
+    <div data-error role="alert" hidden></div>
+  </div>
+  <script type="module" src="./stress.mjs"></script>
+</body>
+</html>

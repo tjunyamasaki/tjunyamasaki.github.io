@@ -15,6 +15,7 @@ Then open:
 - Game entry: http://localhost:3000/slime-garden/
 - Original comparison preview: http://localhost:3000/slime-garden/reference/original-preview.html
 - Extracted actor inspection: http://localhost:3000/slime-garden/dev/inspection.html
+- Six-actor stress: http://localhost:3000/slime-garden/dev/stress.html
 
 `serve` defaults to port 3000. If the terminal prints a different Local URL, use that host and port with the same `/slime-garden/` path.
 

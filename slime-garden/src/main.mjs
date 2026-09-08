@@ -1,6 +1,6 @@
 /**
- * Application controller: locks, load/reconcile, visible clock, commands, save.
- * No Three.js. The habitat is a DOM placeholder until P08.
+ * Application controller: locks, load/reconcile, visible clock, commands, save,
+ * and the 3D habitat. Scene code never writes Glow or save keys.
  */
 
 import { advance } from './core/advance.mjs';
@@ -87,6 +87,19 @@ const OFFLINE_SUMMARY_MS = 60_000;
  * @property {number} lastDomPerfMs
  * @property {number} lastSavePerfMs
  * @property {boolean} companionWasReady
+ * @property {{
+ *   sync: Function,
+ *   play: Function,
+ *   select: Function,
+ *   setOptions: Function,
+ *   setVisible: Function,
+ *   resize: Function,
+ *   update: Function,
+ *   render: Function,
+ *   dispose: Function,
+ * } | null} scene
+ * @property {boolean} sceneFailed
+ * @property {number | null} lastScenePerfMs
  */
 
 /** @type {App} */
@@ -118,6 +131,9 @@ const app = {
   lastDomPerfMs: 0,
   lastSavePerfMs: 0,
   companionWasReady: false,
+  scene: null,
+  sceneFailed: false,
+  lastScenePerfMs: null,
 };
 
 const gameRoot = document.getElementById('game');
@@ -246,6 +262,109 @@ function canMutateSettings() {
   return canCommand();
 }
 
+function sceneOptions() {
+  const settings = app.settings ?? createDefaultSettings();
+  return {
+    reducedMotion: effectiveReducedMotion(settings),
+    animationsPaused: settings.animationsPaused,
+    quality: settings.quality,
+  };
+}
+
+/**
+ * @param {string} text
+ * @param {boolean} ready
+ */
+function setSceneStatus(text, ready) {
+  const node = document.getElementById('scene-status');
+  if (!node) return;
+  node.textContent = text;
+  node.hidden = ready;
+}
+
+/**
+ * @param {string} [message]
+ */
+function onSceneError(message) {
+  app.sceneFailed = true;
+  const detail = message ? ` ${message}` : '';
+  setSceneStatus(
+    `The 3D garden is unavailable.${detail} Feeding and saving still work.`,
+    false,
+  );
+}
+
+function disposeScene() {
+  if (app.scene && typeof app.scene.dispose === 'function') {
+    try {
+      app.scene.dispose();
+    } catch {
+      // Renderer disposal must not break save/export.
+    }
+  }
+  app.scene = null;
+}
+
+/**
+ * @param {GameEvent[]} [events]
+ * @param {{ resetPositions?: boolean }} [extra]
+ */
+function syncScene(events = [], extra = {}) {
+  if (!app.scene || !app.state) return;
+  app.scene.setOptions(sceneOptions());
+  app.scene.sync(app.state, extra);
+  app.scene.select(app.selectedSlimeId);
+  if (events.length) app.scene.play(events);
+}
+
+/**
+ * @param {ReconcileSummary | null | undefined} summary
+ */
+function syncAfterReconcile(summary) {
+  const reset =
+    !!summary && (summary.awayMs > SLEEP_GAP_MS || summary.creditedMs > SLEEP_GAP_MS);
+  syncScene([], { resetPositions: reset });
+}
+
+/**
+ * @param {number} perfNow
+ * @param {number} dtMs
+ */
+function presentScene(perfNow, dtMs) {
+  if (!app.scene) return;
+  const show = !app.sessionHidden && app.phase !== 'recovery';
+  app.scene.setVisible(show);
+  if (!show) return;
+  app.scene.update(perfNow, dtMs);
+  app.scene.render();
+}
+
+async function mountScene() {
+  if (app.scene || app.sceneFailed) return;
+  if (app.phase === 'recovery') return;
+  const host = document.getElementById('scene-host');
+  if (!host) return;
+  setSceneStatus('Loading garden…', false);
+  try {
+    const { createScene } = await import('./scene/scene.mjs');
+    if (app.scene || app.phase === 'recovery' || app.sceneFailed) return;
+    app.scene = createScene(host, sceneOptions(), {
+      onSelect: selectSlime,
+      onError: onSceneError,
+    });
+    if (app.sceneFailed) {
+      disposeScene();
+      return;
+    }
+    syncScene([], { resetPositions: true });
+    setSceneStatus('', true);
+    presentScene(performance.now(), 0);
+  } catch (error) {
+    const text = error && error.message ? String(error.message) : String(error);
+    onSceneError(text);
+  }
+}
+
 /**
  * @returns {boolean}
  */
@@ -285,6 +404,7 @@ function resetClockBaselines(wallNow, perfNow = performance.now()) {
   app.carryMs = 0;
   app.lastSettlePerfMs = perfNow;
   app.lastDomPerfMs = perfNow;
+  app.lastScenePerfMs = perfNow;
 }
 
 function stopLoop() {
@@ -329,6 +449,7 @@ function paint() {
     reducedMotion: effectiveReducedMotion(settings),
     animationsPaused: settings.animationsPaused,
   });
+  if (app.scene) app.scene.setOptions(sceneOptions());
 }
 
 function saveNow() {
@@ -458,6 +579,7 @@ function settleNow(perfNow = performance.now()) {
       applyReconciled(result);
       maybeOfflineSummary(result.summary);
       saveNow();
+      syncAfterReconcile(result.summary);
     }
     resetClockBaselines(wallNow, perfNow);
     return;
@@ -478,11 +600,19 @@ function settleNow(perfNow = performance.now()) {
 function onFrame(perfNow) {
   if (!app.looping) return;
   app.rafId = requestAnimationFrame(onFrame);
-  if (!canAdvance()) return;
+  const prevScene = app.lastScenePerfMs;
+  const dtMs = prevScene == null ? 0 : Math.max(0, perfNow - prevScene);
+  app.lastScenePerfMs = perfNow;
+
+  if (!canAdvance()) {
+    presentScene(perfNow, dtMs);
+    return;
+  }
 
   const wallNow = Date.now();
   if (app.lastWallMs != null && wallNow < app.lastWallMs) {
     handleBackwardClock(wallNow);
+    presentScene(perfNow, dtMs);
     return;
   }
   const wallGap = app.lastWallMs == null ? 0 : wallNow - app.lastWallMs;
@@ -490,6 +620,7 @@ function onFrame(perfNow) {
     settleNow(perfNow);
     paint();
     app.lastDomPerfMs = perfNow;
+    presentScene(perfNow, dtMs);
     return;
   }
 
@@ -516,6 +647,8 @@ function onFrame(perfNow) {
     saveNow();
     app.lastSavePerfMs = perfNow;
   }
+
+  presentScene(perfNow, dtMs);
 }
 
 function handleHidden() {
@@ -528,13 +661,20 @@ function handleHidden() {
     saveNow();
   }
   app.sessionHidden = true;
+  if (app.scene) app.scene.setVisible(false);
   stopLoop();
 }
 
 function handleVisible() {
   if (!app.sessionHidden) return;
   app.sessionHidden = false;
-  if (app.phase !== 'playable' || !app.state || app.lockStatus === 'blocked') {
+  if (app.lockStatus === 'blocked') {
+    paint();
+    void mountScene();
+    startLoop();
+    return;
+  }
+  if (app.phase !== 'playable' || !app.state) {
     return;
   }
   const wallNow = Date.now();
@@ -544,6 +684,7 @@ function handleVisible() {
     applyReconciled(result);
     maybeOfflineSummary(result.summary);
     saveNow();
+    syncAfterReconcile(result.summary);
   }
   resetClockBaselines(wallNow);
   paint();
@@ -589,6 +730,7 @@ function dispatch(command) {
   if (result.ok) {
     handleEvents(result.events, { fromAdvance: false });
     saveNow();
+    syncScene(result.events);
   }
   paint();
 }
@@ -634,6 +776,7 @@ function selectSlime(id) {
   if (!app.state) return;
   if (!app.state.slimes.some((slime) => slime.id === id)) return;
   app.selectedSlimeId = id;
+  if (app.scene) app.scene.select(id);
   paint();
 }
 
@@ -855,6 +998,7 @@ function installPlayable(save, options) {
   app.companionWasReady = getCompanionEligibility(app.state).ready;
   app.recoveryReason = null;
   if (options.persist) saveNow();
+  if (app.scene) syncScene([], { resetPositions: true });
 }
 
 /**
@@ -876,8 +1020,10 @@ function beginPlay() {
   const wallNow = Date.now();
   resetClockBaselines(wallNow);
   paint();
+  void mountScene();
   if (document.visibilityState === 'hidden') {
     app.sessionHidden = true;
+    if (app.scene) app.scene.setVisible(false);
     if (canWrite()) saveNow();
     stopLoop();
     return;
@@ -912,6 +1058,9 @@ function enterBlocked() {
   ui.showPlay();
   paint();
   ui.announce('This game is active in another tab');
+  void mountScene();
+  app.sessionHidden = document.visibilityState === 'hidden';
+  if (!app.sessionHidden) startLoop();
 }
 
 /**
@@ -922,6 +1071,7 @@ function enterRecovery(loaded) {
   app.recoveryReason = loaded.reason === 'FUTURE_VERSION' ? 'FUTURE_VERSION' : 'CORRUPT';
   app.primaryRaw = loaded.primaryRaw;
   app.backupRaw = loaded.backupRaw;
+  disposeScene();
   stopLoop();
   ui.showRecovery({
     reason: app.recoveryReason,
@@ -1008,5 +1158,6 @@ async function boot() {
 void boot().catch((error) => {
   console.error(error);
   const text = error && error.message ? String(error.message) : String(error);
+  disposeScene();
   ui.showError(text);
 });

@@ -75,13 +75,9 @@
       <p id="action-status" class="action-status" role="status"></p>
 
       <div class="play-layout">
-        <section
-          id="scene-placeholder"
-          class="scene-placeholder"
-          aria-label="Garden (3D later)"
-        >
-          <p class="scene-label">Garden (3D later)</p>
-          <p class="scene-caption">The habitat is a placeholder. Feeding, upgrades, and companions use the controls.</p>
+        <section id="scene-stage" class="scene-stage" aria-label="Garden">
+          <div id="scene-host" class="scene-host"></div>
+          <p id="scene-status" class="scene-caption" role="status">Loading garden…</p>
         </section>
 
         <div id="play-controls" class="control-panel">
@@ -141,7 +137,7 @@
         <label><input type="radio" name="quality" value="auto" checked> Auto</label>
         <label><input type="radio" name="quality" value="high"> High</label>
         <label><input type="radio" name="quality" value="low"> Low</label>
-        <p class="field-note">Stored for the 3D habitat. The placeholder garden does not change.</p>
+        <p class="field-note">Auto starts high, then may drop to low. Low keeps the same slime and uses contact shadows only.</p>
       </fieldset>
       <p id="settings-feedback" class="reason" role="status"></p>
       <div class="stack-actions">

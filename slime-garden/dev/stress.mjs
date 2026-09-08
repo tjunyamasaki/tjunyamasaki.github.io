@@ -2,6 +2,19 @@ import * as THREE from '../vendor/three/three.module.js';
 import { createSlimeActor } from '../src/scene/slime-actor.mjs';
 import { BODY_BOUNDS_CENTER, BODY_BOUNDS_RADIUS } from '../src/scene/slime-pose.mjs';
 import {
+  CAMERA_PITCH,
+  CAMERA_TARGET,
+  CAMERA_YAW,
+  DRAG_THRESHOLD_PX,
+  fitDistanceForSlots,
+  FRAME_PADDING,
+  HOME_SLOTS,
+  placeCamera,
+  setGameplayFog,
+  SLOT_MARGIN,
+  VFOV_DEG,
+} from '../src/scene/layout.mjs';
+import {
   applyQuality,
   createAutoQualityGovernor,
   dprFor,
@@ -14,22 +27,10 @@ import {
 } from '../src/scene/quality.mjs';
 
 /** Scene spec §4 home slots. Population cap stays at six. */
-const HOME_SLOTS = Object.freeze([
-  { x: 0.0, z: 1.8 },
-  { x: -2.8, z: 1.8 },
-  { x: 2.8, z: 1.8 },
-  { x: -2.8, z: -1.0 },
-  { x: 0.0, z: -1.0 },
-  { x: 2.8, z: -1.0 },
-]);
 const POPULATION = HOME_SLOTS.length;
-const SLOT_MARGIN = 1.4;
-const FRAME_PADDING = 1.10;
-const LOOK_AT = Object.freeze({ x: 0, y: 0.65, z: 0 });
-const DEFAULT_YAW = 0;
-const DEFAULT_PITCH = 0.65;
-const VFOV_DEG = 35;
-const DRAG_THRESHOLD_PX = 6;
+const LOOK_AT = CAMERA_TARGET;
+const DEFAULT_YAW = CAMERA_YAW;
+const DEFAULT_PITCH = CAMERA_PITCH;
 const ORBIT_YAW_LIMIT = 0.4;
 const IDLE_PHASES = Object.freeze([0, 0.85, 1.7, 2.55, 3.4, 4.25]);
 const MAX_STRETCH = Object.freeze({ timeSec: 0.29 * 1.25, walkPhase: 0.29, walkBlend: 1 });
@@ -69,72 +70,6 @@ function gpuInfo(renderer) {
   }
 }
 
-/**
- * Fit distance so every home slot plus `margin` sits in both the vertical FOV
- * and the aspect-derived horizontal FOV. Does not scale distance by width alone.
- *
- * @param {number} aspect
- * @param {number} fovDeg
- * @param {number} yaw
- * @param {number} pitch
- * @param {{x:number,y:number,z:number}} target
- * @param {readonly {x:number,z:number}[]} slots
- * @param {number} margin
- * @param {number} padding
- */
-export function fitDistanceForSlots(aspect, fovDeg, yaw, pitch, target, slots, margin, padding) {
-  const vFov = (fovDeg * Math.PI) / 180;
-  const tanV = Math.tan(vFov / 2);
-  const tanH = tanV * Math.max(1e-6, aspect);
-  const dirX = Math.sin(yaw) * Math.cos(pitch);
-  const dirY = Math.sin(pitch);
-  const dirZ = Math.cos(yaw) * Math.cos(pitch);
-  let rx = dirZ;
-  let ry = 0;
-  let rz = -dirX;
-  const rLen = Math.hypot(rx, ry, rz) || 1;
-  rx /= rLen;
-  ry /= rLen;
-  rz /= rLen;
-  const ux = dirY * rz - dirZ * ry;
-  const uy = dirZ * rx - dirX * rz;
-  const uz = dirX * ry - dirY * rx;
-  const yMin = 0;
-  const yMax = BODY_BOUNDS_CENTER[1] + BODY_BOUNDS_RADIUS;
-  let dMin = 0.5;
-  for (let s = 0; s < slots.length; s++) {
-    const slot = slots[s];
-    for (const dx of [-margin, margin]) {
-      for (const dz of [-margin, margin]) {
-        for (const y of [yMin, yMax]) {
-          const qx = slot.x + dx - target.x;
-          const qy = y - target.y;
-          const qz = slot.z + dz - target.z;
-          const rightComp = qx * rx + qy * ry + qz * rz;
-          const upComp = qx * ux + qy * uy + qz * uz;
-          const alongDir = qx * dirX + qy * dirY + qz * dirZ;
-          dMin = Math.max(dMin, alongDir + Math.abs(rightComp) / tanH);
-          dMin = Math.max(dMin, alongDir + Math.abs(upComp) / tanV);
-        }
-      }
-    }
-  }
-  return dMin * padding;
-}
-
-function placeCamera(camera, yaw, pitch, distance, target) {
-  camera.position.set(
-    target.x + Math.sin(yaw) * Math.cos(pitch) * distance,
-    target.y + Math.sin(pitch) * distance,
-    target.z + Math.cos(yaw) * Math.cos(pitch) * distance,
-  );
-  camera.lookAt(target.x, target.y, target.z);
-}
-
-function setGameplayFog(fog, distance) {
-  fog.near = Math.max(20, distance * 1.5);
-  fog.far = Math.max(45, distance * 3);
-}
 
 function bodyWorldCenter(actor, out) {
   out.set(BODY_BOUNDS_CENTER[0], BODY_BOUNDS_CENTER[1], BODY_BOUNDS_CENTER[2]);

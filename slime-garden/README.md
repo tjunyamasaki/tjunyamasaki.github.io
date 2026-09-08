@@ -1,6 +1,6 @@
 # Slime garden
 
-A small, peaceful habitat for the approved mint anime slime. The `/slime-garden/` entry is a playable DOM garden: feed berries, collect Glow, buy upgrades, welcome companions, and keep a local save. The 3D habitat is still a placeholder; comparison, inspection, and six-actor stress pages remain for the approved slime.
+A small, peaceful habitat for the approved mint anime slime. The `/slime-garden/` entry is a playable garden: feed berries, collect Glow, buy upgrades, welcome companions, keep a local save, and watch residents in a small 3D habitat. Comparison, inspection, and six-actor stress pages remain for the approved slime.
 
 ## Play locally
 
@@ -39,13 +39,13 @@ The original handoff fragment imported Three from jsDelivr:
 
 The unchanged handoff markdown is at `reference/anime-slime-handoff.md`.
 
-Requires a modern browser with JavaScript. The comparison preview also needs WebGL2.
+Requires a modern browser with JavaScript and WebGL2 for the garden scene. If 3D cannot start, the feed/upgrade/save controls still work.
 
-## Playable garden (DOM)
+## Playable garden
 
-The main page loads a local save (or starts fresh), runs Glow and berry timers while the tab is visible, and writes checkpoints after commands. Settings cover reduced motion, animation pause, quality (stored for the later 3D habitat), export, import, and reset. A second tab that cannot take the writer lock stays read-only.
+The main page loads a local save (or starts fresh), runs Glow and berry timers while the tab is visible, and writes checkpoints after commands. Settings cover reduced motion, animation pause, quality, export, import, and reset. A second tab that cannot take the writer lock stays read-only.
 
-Economy tests (no DOM or WebGL):
+Economy and layout tests (no WebGL):
 
 ```bash
 node --test slime-garden/tests/*.test.mjs

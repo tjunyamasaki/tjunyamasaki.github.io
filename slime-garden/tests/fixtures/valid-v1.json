@@ -1,0 +1,42 @@
+{
+  "gameId": "cozy-slime-mvp",
+  "schemaVersion": 1,
+  "balanceVersion": 1,
+  "revision": 1,
+  "savedWallMs": 1700000000000,
+  "settings": {
+    "soundEnabled": false,
+    "reducedMotion": null,
+    "animationsPaused": false,
+    "quality": "auto"
+  },
+  "state": {
+    "simTimeMs": 0,
+    "glowMicro": 0,
+    "lifetimeGlowMicro": 0,
+    "incomeRemainder": 0,
+    "berries": 6,
+    "nextBerryAtMs": 15000,
+    "nextFeedAllowedAtMs": 0,
+    "totalFeeds": 0,
+    "upgrades": {
+      "shrub": 0,
+      "pantry": 0,
+      "bloom": 0,
+      "beds": 0
+    },
+    "slimes": [
+      {
+        "id": "slime-1",
+        "name": "Slime 1",
+        "createdAtMs": 0,
+        "boostUntilMs": 0,
+        "feedCount": 0,
+        "homeSlot": 0
+      }
+    ],
+    "tutorialCompleted": [],
+    "habitatId": "garden-prototype-v1",
+    "arrivalStyleId": "visitor-v1"
+  }
+}

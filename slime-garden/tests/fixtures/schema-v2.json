@@ -1,0 +1,15 @@
+{
+  "gameId": "cozy-slime-mvp",
+  "schemaVersion": 2,
+  "balanceVersion": 2,
+  "revision": 9,
+  "savedWallMs": 1800000000000,
+  "futureField": "do-not-migrate",
+  "settings": {
+    "soundEnabled": true
+  },
+  "state": {
+    "simTimeMs": 0,
+    "newWalletUnit": "nano"
+  }
+}

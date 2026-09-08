@@ -1,0 +1,87 @@
+{
+  "gameId": "cozy-slime-mvp",
+  "schemaVersion": 1,
+  "balanceVersion": 1,
+  "revision": 1,
+  "savedWallMs": 1700000000000,
+  "settings": {
+    "soundEnabled": false,
+    "reducedMotion": null,
+    "animationsPaused": false,
+    "quality": "auto"
+  },
+  "state": {
+    "simTimeMs": 3435000,
+    "glowMicro": 5200000,
+    "lifetimeGlowMicro": 2930200000,
+    "incomeRemainder": 0,
+    "berries": 0,
+    "nextBerryAtMs": 3443000,
+    "nextFeedAllowedAtMs": 3439000,
+    "totalFeeds": 396,
+    "upgrades": {
+      "shrub": 3,
+      "pantry": 2,
+      "bloom": 4,
+      "beds": 4
+    },
+    "slimes": [
+      {
+        "id": "slime-1",
+        "name": "Slime 1",
+        "createdAtMs": 0,
+        "boostUntilMs": 3735000,
+        "feedCount": 396,
+        "homeSlot": 0
+      },
+      {
+        "id": "slime-2",
+        "name": "Slime 2",
+        "createdAtMs": 60000,
+        "boostUntilMs": 0,
+        "feedCount": 0,
+        "homeSlot": 1
+      },
+      {
+        "id": "slime-3",
+        "name": "Slime 3",
+        "createdAtMs": 327000,
+        "boostUntilMs": 0,
+        "feedCount": 0,
+        "homeSlot": 2
+      },
+      {
+        "id": "slime-4",
+        "name": "Slime 4",
+        "createdAtMs": 987000,
+        "boostUntilMs": 0,
+        "feedCount": 0,
+        "homeSlot": 3
+      },
+      {
+        "id": "slime-5",
+        "name": "Slime 5",
+        "createdAtMs": 1979000,
+        "boostUntilMs": 0,
+        "feedCount": 0,
+        "homeSlot": 4
+      },
+      {
+        "id": "slime-6",
+        "name": "Slime 6",
+        "createdAtMs": 3435000,
+        "boostUntilMs": 0,
+        "feedCount": 0,
+        "homeSlot": 5
+      }
+    ],
+    "tutorialCompleted": [
+      "feed",
+      "berry",
+      "welcome",
+      "upgrade"
+    ],
+    "habitatId": "garden-prototype-v1",
+    "arrivalStyleId": "visitor-v1"
+  }
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Slime six-actor stress</title>
+  <title>Slime actor stress (1 / 6 / 10)</title>
   <style>
 html { box-sizing: border-box; }
 *, *::before, *::after { box-sizing: inherit; }
@@ -94,8 +94,9 @@ body {
 </head>
 <body>
   <header class="page-note">
-    <h1>Six-actor rendering spike</h1>
-    <p>Diagnostics page, not product UI. Six independent residents at home slots on the approved floor. Comparison travel is off. Camera fits all six slots with a 1.4-unit margin and 10% padding (horizontal and vertical FOV). Tap a slime to select it (body meshes only). Page scrolling stays enabled (<code>touch-action: pan-y</code>).</p>
+    <h1>Actor rendering stress (1 / 6 / 10)</h1>
+    <p>Diagnostics page, not product UI. Default population is <strong>10</strong> on phase-2 pad spacing (copied locally; <code>layout.mjs</code> is unchanged). <code>n=6</code> keeps the v1 six-slot comparison at the same physical positions as the original spike. Comparison travel is off. Camera fits the <em>active</em> slot list. Tap a slime to select it (body meshes only). Page scrolling stays enabled (<code>touch-action: pan-y</code>).</p>
+    <p>Use extensionless query strings with <code>serve</code> (a <code>.html?…</code> redirect drops the query): <code>/slime-garden/dev/stress?n=10&amp;quality=high&amp;autotest=1</code> and <code>/slime-garden/dev/stress?n=10&amp;quality=high&amp;sample=60</code>. Graybox fence and markers are inert diagnostics — not food, claims, eating, economy, or THROW_FOOD.</p>
     <p>
       <a href="/slime-garden/">Back to slime garden</a>
       ·
@@ -103,10 +104,19 @@ body {
     </p>
   </header>
   <div id="stress-root">
-    <div class="slime-stage" role="img" aria-label="Six mint slimes in a habitat. Tap a slime to select it. The page still scrolls."></div>
+    <div class="slime-stage" role="img" aria-label="Mint slimes in a habitat. Tap a slime to select it. The page still scrolls."></div>
+    <fieldset class="fieldset-lite">
+      <legend>Population</legend>
+      <div class="control-row">
+        <button type="button" class="btn" data-n="1" aria-pressed="false">1</button>
+        <button type="button" class="btn" data-n="6" aria-pressed="false">6 (v1 slots)</button>
+        <button type="button" class="btn" data-n="10" aria-pressed="true">10 (phase-2 slots)</button>
+      </div>
+    </fieldset>
     <div class="viz-controls">
       <button type="button" class="btn" data-motion="idle" aria-pressed="true">Idle all</button>
       <button type="button" class="btn" data-motion="walk" aria-pressed="false">Walk all</button>
+      <button type="button" class="btn" data-motion="mixed" aria-pressed="false">Mixed</button>
       <button type="button" class="btn" data-pause aria-pressed="false">Pause</button>
     </div>
     <div class="control-row">
@@ -121,7 +131,16 @@ body {
       <button type="button" class="btn" data-dispose>Dispose all</button>
       <button type="button" class="btn" data-remount>Remount</button>
     </div>
-    <p class="text-small">Snap max stretch freezes every resident at walk phase 0.29, blend 1. Selection test raycasts body meshes only (faces, outline, ring, and contact shadow are skipped). Mouse drag after 6 CSS pixels orbits a little; touch uses pan-y so the page still scrolls.</p>
+    <fieldset class="fieldset-lite">
+      <legend>Later crowded-food / farm (diagnostics only)</legend>
+      <div class="control-row">
+        <button type="button" class="btn" data-scenario="actors-only" aria-pressed="true">Actors only</button>
+        <button type="button" class="btn" data-scenario="graybox-farm" aria-pressed="false">Graybox farm</button>
+        <button type="button" class="btn" data-scenario="crowded-placeholders" aria-pressed="false">Crowded placeholders</button>
+      </div>
+      <p class="text-small">Graybox is a 24×20 fence rectangle (centerlines x=±12, z=±10). Crowded mode adds up to 12 inert labeled markers. Nothing here throws, claims, or eats food. Default remains actors-only.</p>
+    </fieldset>
+    <p class="text-small">Snap max stretch freezes every resident at walk phase 0.29, blend 1. Selection test raycasts body meshes only (faces, outline, ring, and contact shadow are skipped). Mixed keeps some actors idle and some walking in place (travel still off). Mouse drag after 6 CSS pixels orbits a little; touch uses pan-y so the page still scrolls.</p>
     <p class="status" data-selection role="status" aria-live="polite">Selection: none. Click a slime or run the selection test.</p>
     <p class="status" data-dispose-status role="status" aria-live="polite">Dispose: not yet tested.</p>
     <pre class="diag" data-diag>Diagnostics will appear after the first frame.</pre>

@@ -33,11 +33,11 @@ Then open:
 - Game: http://localhost:3000/slime-garden/
 - Original slime preview: http://localhost:3000/slime-garden/reference/original-preview
 - Actor inspection: http://localhost:3000/slime-garden/dev/inspection
-- Six-slime stress: http://localhost:3000/slime-garden/dev/stress
+- Actor stress (1 / 6 / 10): http://localhost:3000/slime-garden/dev/stress
 
 `serve` defaults to port 3000. If the terminal prints a different Local URL, use that host with the same `/slime-garden/` path.
 
-That local server may 301 `*.html` to the extensionless path and **drop query strings**. For autotests use `/slime-garden/dev/stress?autotest=1` and `/slime-garden/dev/inspection?autotest=1` (no `.html`). GitHub Pages serves the `.html` files directly.
+That local server may 301 `*.html` to the extensionless path and **drop query strings**. For autotests use `/slime-garden/dev/stress?n=10&autotest=1` (default n=10), `?n=6&autotest=1` for the v1 six-slot comparison, `/slime-garden/dev/inspection?autotest=1`, and `?n=10&quality=high&sample=60` for a 60s warmed record (no `.html`). GitHub Pages serves the `.html` files directly.
 
 Opening the HTML files as `file://` is not supported.
 

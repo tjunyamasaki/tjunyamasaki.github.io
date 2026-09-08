@@ -330,6 +330,9 @@ export function restAtHome(motion, visualSec) {
  *   interruptWalk: (id: string, faceYaw: number) => void,
  *   setWanderSuspended: (value: boolean) => void,
  *   restAll: () => void,
+ *   placeAt: (id: string, x: number, z: number, yaw?: number) => void,
+ *   setMode: (id: string, mode: 'idle' | 'walking' | 'feeding' | 'arriving') => void,
+ *   beginDirectedWalk: (id: string, toX: number, toZ: number, mode?: 'walking' | 'arriving') => boolean,
  *   step: (dt: number, view: { cameraX: number, cameraZ: number, reducedMotion: boolean, animationsPaused: boolean }) => void,
  *   occupantsExcept: (id: string) => Occupant[],
  *   dispose: () => void,
@@ -412,6 +415,65 @@ export function createMotionWorld() {
   function restAll() {
     walkerId = null;
     for (const motion of residents.values()) restAtHome(motion, visualSec);
+  }
+
+  /**
+   * @param {string} id
+   * @param {number} x
+   * @param {number} z
+   * @param {number} [yaw]
+   */
+  function placeAt(id, x, z, yaw) {
+    const motion = residents.get(id);
+    if (!motion) return;
+    if (walkerId === id) walkerId = null;
+    releaseWalk(motion);
+    motion.x = x;
+    motion.z = z;
+    if (yaw !== undefined) motion.yaw = yaw;
+  }
+
+  /**
+   * @param {string} id
+   * @param {'idle' | 'walking' | 'feeding' | 'arriving'} mode
+   */
+  function setMode(id, mode) {
+    const motion = residents.get(id);
+    if (!motion) return;
+    motion.mode = mode;
+  }
+
+  /**
+   * Reserve a straight gait-matched walk. Interrupts any other walker in place.
+   * @param {string} id
+   * @param {number} toX
+   * @param {number} toZ
+   * @param {'walking' | 'arriving'} [mode]
+   * @returns {boolean}
+   */
+  function beginDirectedWalk(id, toX, toZ, mode = 'walking') {
+    const motion = residents.get(id);
+    if (!motion) return false;
+    const dx = toX - motion.x;
+    const dz = toZ - motion.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < MIN_WANDER_DISTANCE) return false;
+    if (walkerId && walkerId !== id) {
+      const other = residents.get(walkerId);
+      if (other) interruptWalk(walkerId, other.yaw);
+    }
+    motion.mode = mode;
+    motion.walk = {
+      fromX: motion.x,
+      fromZ: motion.z,
+      toX,
+      toZ,
+      cycles: gaitCycleCount(dist),
+      startedSec: visualSec,
+      targetYaw: yawFromDirection(dx, dz),
+    };
+    walkerId = id;
+    return true;
   }
 
   /**
@@ -500,6 +562,9 @@ export function createMotionWorld() {
       wanderSuspended = !!value;
     },
     restAll,
+    placeAt,
+    setMode,
+    beginDirectedWalk,
     step,
     occupantsExcept,
     dispose() {

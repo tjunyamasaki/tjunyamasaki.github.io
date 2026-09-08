@@ -27,6 +27,11 @@ export const LATHE_SEGMENTS = 80;
 /** Rest height used by `deform` as `y/1.34`. */
 export const PROFILE_HEIGHT = 1.34;
 
+/** Undeformed mouth tube center from the original handoff (`y`, then surface + depth). */
+export const MOUTH_REST_X = 0;
+export const MOUTH_REST_Y = 0.468;
+export const MOUTH_DEPTH = 0.018;
+
 /**
  * Walking keys: `[phase, sy, lift, lean]`.
  * Cycle is 1.25s with smoothstep interpolation between keys.
@@ -117,6 +122,22 @@ let profilePointsCache = null;
 export function getProfilePoints(THREE) {
   if (!profilePointsCache) profilePointsCache = createProfilePoints(THREE);
   return profilePointsCache;
+}
+
+/**
+ * Rest-pose mouth attachment in actor-local space, before `deform`.
+ * @param {{ x: number, y: number }[]} profilePoints
+ * @returns {{ x: number, y: number, z: number }}
+ */
+export function mouthRestLocal(profilePoints) {
+  const y = MOUTH_REST_Y;
+  const x = MOUTH_REST_X;
+  const r = radius(y, profilePoints);
+  return {
+    x,
+    y,
+    z: Math.sqrt(Math.max(0, r * r - x * x)) + MOUTH_DEPTH,
+  };
 }
 
 /**

@@ -43,7 +43,7 @@ Requires a modern browser with JavaScript and WebGL2 for the garden scene. If 3D
 
 ## Playable garden
 
-The main page loads a local save (or starts fresh), runs Glow and berry timers while the tab is visible, and writes checkpoints after commands. Settings cover reduced motion, animation pause, quality, export, import, and reset. A second tab that cannot take the writer lock stays read-only.
+The main page loads a local save (or starts fresh), runs Glow and berry timers while the tab is visible, and writes checkpoints after commands. Offering a berry plays a short scene reaction; welcoming a companion uses a visitor approach or a pad reveal if the path is blocked. Settings cover reduced motion, animation pause, optional sound, quality, export, import, and reset. A second tab that cannot take the writer lock stays read-only.
 
 Economy and layout tests (no WebGL):
 

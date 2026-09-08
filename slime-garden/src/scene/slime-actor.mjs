@@ -19,6 +19,7 @@ import {
   idleSway,
   radius,
   WALK_CYCLE_SEC,
+  mouthRestLocal,
 } from './slime-pose.mjs';
 
 /**
@@ -416,6 +417,44 @@ export function createSlimeActor(THREE, options = {}) {
     return target;
   }
 
+  const mouthLocal = mouthRestLocal(profilePoints);
+
+  /**
+   * Deformed mouth attachment in world space. Caller owns `target`.
+   * @param {import('../../vendor/three/three.module.js').Vector3} target
+   */
+  function getMouthWorldPosition(target) {
+    deform(pose, mouthLocal.x, mouthLocal.y, mouthLocal.z);
+    target.set(pose.out.x, pose.out.y, pose.out.z);
+    actor.updateMatrixWorld(true);
+    actor.localToWorld(target);
+    return target;
+  }
+
+  /**
+   * Face looks toward local +Z.
+   * @param {import('../../vendor/three/three.module.js').Vector3} target
+   */
+  function getFaceForward(target) {
+    worldRoot.updateMatrixWorld(true);
+    target.set(0, 0, 1).transformDirection(worldRoot.matrixWorld);
+    return target;
+  }
+
+  /**
+   * Restrained squash using the existing walk compression key (phase 0.17).
+   * Amount 0 leaves the current pose alone so blink/idle can continue.
+   * @param {number} amount 0..1
+   */
+  function setFeedSquash(amount) {
+    if (disposed) return;
+    const a = Math.max(0, Math.min(1, amount));
+    if (a <= 1e-4) return;
+    pose.walkPhase = 0.17;
+    pose.walkBlend = a * 0.48;
+    applyCurrentPose();
+  }
+
   function dispose() {
     if (disposed) return;
     disposed = true;
@@ -445,6 +484,9 @@ export function createSlimeActor(THREE, options = {}) {
     getPose,
     getBodyPositionArray,
     copyBodyPositions,
+    getMouthWorldPosition,
+    getFaceForward,
+    setFeedSquash,
     dispose,
   };
 }

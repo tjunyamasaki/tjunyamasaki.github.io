@@ -3,6 +3,7 @@
  * and the 3D habitat. Scene code never writes Glow or save keys.
  */
 
+import { createAudio } from './audio/audio.mjs';
 import { advance } from './core/advance.mjs';
 import { OFFLINE_CAP_MS } from './core/balance.mjs';
 import { applyCommand } from './core/commands.mjs';
@@ -57,6 +58,8 @@ const DOM_INTERVAL_MS = 250;
 const PERIODIC_SAVE_MS = 10_000;
 const SLEEP_GAP_MS = 5_000;
 const OFFLINE_SUMMARY_MS = 60_000;
+
+const audio = createAudio();
 
 /**
  * @typedef {object} App
@@ -362,6 +365,22 @@ async function mountScene() {
   } catch (error) {
     const text = error && error.message ? String(error.message) : String(error);
     onSceneError(text);
+  }
+}
+
+/**
+ * @param {GameEvent[]} events
+ */
+function cuePresentationAudio(events) {
+  if (app.sessionHidden || !events.length) return;
+  const enabled = app.settings?.soundEnabled === true;
+  audio.setEnabled(enabled);
+  if (!enabled) return;
+  audio.unlock();
+  for (const event of events) {
+    if (event.type === 'FED') audio.playFeed();
+    else if (event.type === 'UPGRADE_BOUGHT') audio.playUpgrade();
+    else if (event.type === 'COMPANION_ADDED') audio.playWelcome();
   }
 }
 
@@ -731,6 +750,7 @@ function dispatch(command) {
     handleEvents(result.events, { fromAdvance: false });
     saveNow();
     syncScene(result.events);
+    cuePresentationAudio(result.events);
   }
   paint();
 }
@@ -835,6 +855,7 @@ function patchSettings(patch) {
   if (!canMutateSettings() || !app.settings) return;
   settleNow();
   app.settings = { ...app.settings, ...patch };
+  audio.setEnabled(app.settings.soundEnabled === true);
   saveNow();
   paint();
 }

@@ -33,6 +33,14 @@ import {
   yawFromDirection,
 } from './motion.mjs';
 import {
+  ARRIVAL_REVEAL_SEC,
+  createPresentationPool,
+  feedPresentationAt,
+  planArrival,
+  quadraticBezier,
+  STILL_BERRY_SEC,
+} from './arrivals.mjs';
+import {
   applyQuality,
   createAutoQualityGovernor,
   posePeriodSec,
@@ -155,6 +163,9 @@ export function createScene(container, initialOptions, callbacks) {
   });
 
   const motion = createMotionWorld();
+  const fx = createPresentationPool(THREE, threeScene);
+  const mouthWorld = new THREE.Vector3();
+  const faceForward = new THREE.Vector3();
   /** @type {Map<string, ReturnType<typeof createSlimeActor>>} */
   const actors = new Map();
   const raycaster = new THREE.Raycaster();
@@ -190,6 +201,10 @@ export function createScene(container, initialOptions, callbacks) {
   let targetDistance = 8;
   let lastCssW = 0;
   let lastCssH = 0;
+  /** @type {{ slimeId: string, elapsed: number, still: boolean, startX: number, startY: number, startZ: number, controlX: number, controlY: number, controlZ: number } | null} */
+  let feedFx = null;
+  /** @type {{ slimeId: string, style: 'walk' | 'reveal', elapsed: number, duration: number } | null} */
+  let arrivalFx = null;
 
   /** @type {number | null} */
   let pointerId = null;
@@ -268,6 +283,103 @@ export function createScene(container, initialOptions, callbacks) {
   function faceCameraYaw(x, z) {
     const cam = cameraXZ();
     return yawFromDirection(cam.x - x, cam.z - z);
+  }
+
+  function resetActorScale(id) {
+    const actor = actors.get(id);
+    if (actor) actor.worldRoot.scale.set(1, 1, 1);
+  }
+
+  function clearPresentation() {
+    if (feedFx) {
+      const feeding = motion.residents.get(feedFx.slimeId);
+      if (feeding && feeding.mode === 'feeding') motion.setMode(feedFx.slimeId, 'idle');
+    }
+    if (arrivalFx) {
+      resetActorScale(arrivalFx.slimeId);
+      motion.setWanderSuspended(false);
+    }
+    feedFx = null;
+    arrivalFx = null;
+    fx.hideAll();
+  }
+
+  /**
+   * @param {string} slimeId
+   * @param {{ still: boolean }} how
+   */
+  function startFeed(slimeId, how) {
+    const actor = actors.get(slimeId);
+    const resident = motion.residents.get(slimeId);
+    if (!actor || !resident) return;
+    actor.getMouthWorldPosition(mouthWorld);
+    actor.getFaceForward(faceForward);
+    const startX = mouthWorld.x + faceForward.x * 0.38;
+    const startY = mouthWorld.y + 0.1;
+    const startZ = mouthWorld.z + faceForward.z * 0.38;
+    feedFx = {
+      slimeId,
+      elapsed: 0,
+      still: how.still,
+      startX,
+      startY,
+      startZ,
+      controlX: (startX + mouthWorld.x) * 0.5,
+      controlY: Math.max(startY, mouthWorld.y) + 0.28,
+      controlZ: (startZ + mouthWorld.z) * 0.5,
+    };
+    motion.setMode(slimeId, 'feeding');
+    needsPresent = true;
+  }
+
+  /**
+   * @param {string} slimeId
+   * @param {number} homeSlot
+   */
+  function startArrival(slimeId, homeSlot) {
+    const actor = actors.get(slimeId);
+    const resident = motion.residents.get(slimeId);
+    if (!actor || !resident) return;
+    const frozen = poseFrozen();
+    const plan = planArrival({
+      home: { x: resident.homeX, z: resident.homeZ },
+      occupants: motion.occupantsExcept(slimeId),
+      reducedMotion: options.reducedMotion,
+      animationsPaused: options.animationsPaused,
+    });
+    motion.setWanderSuspended(true);
+    if (motion.walkerId && motion.walkerId !== slimeId) {
+      const other = motion.residents.get(motion.walkerId);
+      if (other) motion.interruptWalk(motion.walkerId, other.yaw);
+    }
+    void homeSlot;
+    if (plan.style === 'walk' && !frozen) {
+      const yaw = yawFromDirection(plan.toX - plan.fromX, plan.toZ - plan.fromZ);
+      motion.placeAt(slimeId, plan.fromX, plan.fromZ, yaw);
+      placeActor(actor, motion.residents.get(slimeId));
+      motion.beginDirectedWalk(slimeId, plan.toX, plan.toZ, 'arriving');
+      arrivalFx = {
+        slimeId,
+        style: 'walk',
+        elapsed: 0,
+        duration: plan.durationSec,
+      };
+    } else {
+      motion.placeAt(slimeId, resident.homeX, resident.homeZ, faceCameraYaw(resident.homeX, resident.homeZ));
+      motion.setMode(slimeId, 'idle');
+      placeActor(actor, motion.residents.get(slimeId));
+      arrivalFx = {
+        slimeId,
+        style: 'reveal',
+        elapsed: 0,
+        duration: frozen ? 0 : ARRIVAL_REVEAL_SEC,
+      };
+      if (frozen || arrivalFx.duration === 0) {
+        motion.setWanderSuspended(false);
+        arrivalFx = null;
+      }
+    }
+    needsPresent = true;
   }
 
   function retargetCamera(capacity, cssW, cssH) {
@@ -364,6 +476,7 @@ export function createScene(container, initialOptions, callbacks) {
         placeActor(actor, resident);
       }
     }
+    if (resetPositions) clearPresentation();
     needsPresent = true;
   }
 
@@ -372,21 +485,26 @@ export function createScene(container, initialOptions, callbacks) {
    */
   function play(events) {
     if (disposed || !events) return;
+    if (!visible) return;
     for (const event of events) {
       if (event.type === 'FED' && event.slimeId) {
         const resident = motion.residents.get(event.slimeId);
-        const yaw = resident
-          ? faceCameraYaw(resident.x, resident.z)
-          : 0;
+        const yaw = resident ? faceCameraYaw(resident.x, resident.z) : 0;
         motion.interruptWalk(event.slimeId, yaw);
+        if (arrivalFx && arrivalFx.slimeId === event.slimeId) {
+          resetActorScale(event.slimeId);
+          arrivalFx = null;
+          motion.setWanderSuspended(false);
+        }
         const actor = actors.get(event.slimeId);
         if (actor && resident) {
           const next = motion.residents.get(event.slimeId);
           if (next) placeActor(actor, next);
         }
+        startFeed(event.slimeId, { still: poseFrozen() });
       }
-      if (event.type === 'COMPANION_ADDED') {
-        motion.setWanderSuspended(false);
+      if (event.type === 'COMPANION_ADDED' && event.slimeId) {
+        startArrival(event.slimeId, event.homeSlot);
       }
     }
     needsPresent = true;
@@ -430,10 +548,12 @@ export function createScene(container, initialOptions, callbacks) {
     ) {
       if (options.reducedMotion || options.animationsPaused) {
         motion.restAll();
+        clearPresentation();
         for (const [id, actor] of actors) {
           const resident = motion.residents.get(id);
           if (!resident) continue;
           actor.setPose({ walkBlend: 0, paused: true });
+          actor.worldRoot.scale.set(1, 1, 1);
           placeActor(actor, resident);
         }
       }
@@ -446,6 +566,7 @@ export function createScene(container, initialOptions, callbacks) {
    */
   function setVisible(nextVisible) {
     visible = !!nextVisible;
+    if (!visible) clearPresentation();
     if (visible) needsPresent = true;
   }
 
@@ -471,11 +592,103 @@ export function createScene(container, initialOptions, callbacks) {
       const resident = motion.residents.get(id);
       if (!resident) continue;
       actor.setWorldPose({ x: resident.x, z: resident.z, yaw: resident.yaw });
+      const walking = resident.mode === 'walking' || resident.mode === 'arriving';
       actor.update(dt, {
-        mode: resident.mode === 'walking' ? 'walk' : 'idle',
+        mode: walking ? 'walk' : 'idle',
         paused: frozen,
       });
     }
+    tickPresentation(dt);
+  }
+
+  /**
+   * @param {number} dt
+   */
+  function tickPresentation(dt) {
+    if (feedFx) {
+      const actor = actors.get(feedFx.slimeId);
+      if (!actor) {
+        fx.hideAll();
+        feedFx = null;
+      } else {
+        actor.getMouthWorldPosition(mouthWorld);
+        feedFx.elapsed += dt;
+        if (feedFx.still) {
+          fx.placeBerry({ x: mouthWorld.x, y: mouthWorld.y, z: mouthWorld.z }, 0.1);
+          fx.placeParticles(mouthWorld, 0, feedFx.slimeId);
+          if (feedFx.elapsed >= STILL_BERRY_SEC) {
+            motion.setMode(feedFx.slimeId, 'idle');
+            fx.hideAll();
+            feedFx = null;
+          }
+        } else {
+          const phase = feedPresentationAt(feedFx.elapsed);
+          if (phase.berryVisible) {
+            const pos = quadraticBezier(
+              feedFx.startX,
+              feedFx.startY,
+              feedFx.startZ,
+              feedFx.controlX,
+              feedFx.controlY,
+              feedFx.controlZ,
+              mouthWorld.x,
+              mouthWorld.y,
+              mouthWorld.z,
+              phase.berryT,
+            );
+            fx.placeBerry(pos, phase.berryScale);
+          } else {
+            fx.placeBerry(mouthWorld, 0);
+          }
+          fx.placeParticles(mouthWorld, phase.particleT, feedFx.slimeId);
+          actor.setFeedSquash(phase.squash);
+          if (phase.done) {
+            motion.setMode(feedFx.slimeId, 'idle');
+            fx.hideAll();
+            feedFx = null;
+          }
+        }
+      }
+    }
+
+    if (arrivalFx) {
+      const actor = actors.get(arrivalFx.slimeId);
+      arrivalFx.elapsed += dt;
+      if (!actor) {
+        motion.setWanderSuspended(false);
+        arrivalFx = null;
+      } else if (arrivalFx.style === 'walk') {
+        const walking = motion.residents.get(arrivalFx.slimeId);
+        const done =
+          arrivalFx.elapsed >= arrivalFx.duration ||
+          !walking ||
+          walking.mode !== 'arriving';
+        if (done) {
+          if (walking) {
+            motion.placeAt(
+              arrivalFx.slimeId,
+              walking.homeX,
+              walking.homeZ,
+              walking.yaw,
+            );
+            motion.setMode(arrivalFx.slimeId, 'idle');
+            placeActor(actor, motion.residents.get(arrivalFx.slimeId));
+          }
+          motion.setWanderSuspended(false);
+          arrivalFx = null;
+        }
+      } else {
+        const u = arrivalFx.duration <= 0 ? 1 : Math.min(1, arrivalFx.elapsed / arrivalFx.duration);
+        const s = 0.82 + 0.18 * u;
+        actor.worldRoot.scale.set(s, s, s);
+        if (u >= 1) {
+          actor.worldRoot.scale.set(1, 1, 1);
+          motion.setWanderSuspended(false);
+          arrivalFx = null;
+        }
+      }
+    }
+    if (feedFx || arrivalFx) needsPresent = true;
   }
 
   /**
@@ -614,6 +827,7 @@ export function createScene(container, initialOptions, callbacks) {
     canvas.removeEventListener('webglcontextrestored', onContextRestored, false);
     disposeActors();
     motion.dispose();
+    fx.dispose();
     habitat.dispose();
     if (renderer) {
       renderer.dispose();

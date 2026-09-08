@@ -179,4 +179,30 @@ describe('motion world', () => {
     assert.equal(born.z, HOME_SLOTS[2].z);
     assert.equal(born.mode, 'idle');
   });
+
+  test('directed arrival walk is exclusive and can be interrupted', () => {
+    const world = createMotionWorld();
+    world.syncRoster([
+      { id: 'slime-1', homeSlot: 0 },
+      { id: 'slime-2', homeSlot: 1 },
+    ]);
+    world.placeAt('slime-2', 0, -2.2, 0);
+    const started = world.beginDirectedWalk('slime-2', HOME_SLOTS[1].x, HOME_SLOTS[1].z, 'arriving');
+    assert.equal(started, true);
+    assert.equal(world.walkerId, 'slime-2');
+    assert.equal(world.residents.get('slime-2').mode, 'arriving');
+    world.placeAt('slime-1', HOME_SLOTS[0].x, HOME_SLOTS[0].z);
+    world.residents.get('slime-1').waitUntilSec = 0;
+    world.step(0.05, {
+      cameraX: 0,
+      cameraZ: 10,
+      reducedMotion: false,
+      animationsPaused: false,
+    });
+    assert.equal(world.walkerId, 'slime-2');
+    world.interruptWalk('slime-2', 0);
+    assert.equal(world.walkerId, null);
+    assert.equal(world.residents.get('slime-2').walk, null);
+    world.dispose();
+  });
 });

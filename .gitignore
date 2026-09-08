@@ -1,5 +1,5 @@
 js/config.js
-docs/
+/docs/
 node_modules/
 .DS_Store
 temp

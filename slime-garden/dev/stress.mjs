@@ -602,13 +602,27 @@ async function runPacketChecks() {
     step('mount-six', true, `actors=${session.actors.length}`);
     const travelOff = session.actors.every((a) => a.getPose().comparisonTravelEnabled === false);
     step('travel-off', travelOff, travelOff ? 'all false' : 'someone still travelling');
-    const before = countStageCanvases();
-    root.querySelector('[data-dispose]').click();
-    const afterDispose = countStageCanvases();
-    step('dispose', afterDispose === 0 && !session, `canvases ${before} → ${afterDispose}`);
-    root.querySelector('[data-remount]').click();
-    await waitFrames(3);
-    step('remount', !!(session && session.actors.length === POPULATION), `actors=${session ? session.actors.length : 0}`);
+    const remountLog = [];
+    let remountTenOk = true;
+    for (let cycle = 0; cycle < 10; cycle += 1) {
+      const before = countStageCanvases();
+      root.querySelector('[data-dispose]').click();
+      const afterDispose = countStageCanvases();
+      const disposeOk = afterDispose === 0 && !session;
+      root.querySelector('[data-remount]').click();
+      await waitFrames(2);
+      const afterRemount = countStageCanvases();
+      const remountOk = !!(session && session.actors.length === POPULATION && afterRemount === 1);
+      remountLog.push({
+        cycle,
+        before,
+        afterDispose,
+        afterRemount,
+        actors: session ? session.actors.length : 0,
+      });
+      if (!disposeOk || !remountOk) remountTenOk = false;
+    }
+    step('remount-10', remountTenOk, JSON.stringify(remountLog));
     if (!session) return report;
     const a0 = session.actors[0].getBodyPositionArray();
     const a1 = session.actors[1].getBodyPositionArray();
@@ -644,8 +658,9 @@ async function runPacketChecks() {
     }
     step('click-each-at-stretch', clicksOk, JSON.stringify(clickHits));
     const waitStart = performance.now();
-    while (performance.now() - waitStart < STATS_WARMUP_MS + 1200) {
+    while (performance.now() - waitStart < 20_000) {
       await waitFrames(2);
+      if (session.diagSnapshot().sampleCount >= 30) break;
     }
     report.diag = session.diagSnapshot();
     report.ok = report.steps.every((s) => s.ok);

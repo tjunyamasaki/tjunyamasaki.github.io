@@ -216,6 +216,16 @@ export function bindDom(_root, callbacks) {
   recoveryDownload.addEventListener('click', () => callbacks.onRecoveryDownload());
   settingsOpen.addEventListener('click', () => callbacks.onOpenSettings());
 
+  const skipLink = document.querySelector('.skip-link');
+  if (skipLink instanceof HTMLAnchorElement) {
+    skipLink.addEventListener('click', (event) => {
+      const target = document.getElementById('play-controls');
+      if (!(target instanceof HTMLElement)) return;
+      event.preventDefault();
+      target.focus();
+    });
+  }
+
   /** @type {Map<string, { level: HTMLElement, effect: HTMLElement, cost: HTMLElement, shortfall: HTMLElement, buy: HTMLButtonElement }>} */
   const upgradeRows = new Map();
   for (const id of UPGRADE_IDS) {

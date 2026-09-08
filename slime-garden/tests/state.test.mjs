@@ -376,7 +376,7 @@ describe('selector purity', () => {
 
 describe('core module isolation', () => {
   test('core files do not import DOM, Three, performance, Date, or randomness', () => {
-    const files = ['balance.mjs', 'state.mjs', 'selectors.mjs'];
+    const files = ['balance.mjs', 'state.mjs', 'selectors.mjs', 'clock-carry.mjs'];
     const forbidden = [
       /\bdocument\b/,
       /\bwindow\b/,

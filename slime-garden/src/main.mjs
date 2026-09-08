@@ -6,6 +6,7 @@
 import { createAudio } from './audio/audio.mjs';
 import { advance } from './core/advance.mjs';
 import { OFFLINE_CAP_MS } from './core/balance.mjs';
+import { absorbFrameDelta, flushWholeMs } from './core/clock-carry.mjs';
 import { applyCommand } from './core/commands.mjs';
 import {
   getCompanionEligibility,
@@ -512,10 +513,10 @@ function advanceBy(elapsedMs) {
 }
 
 function flushCarryAdvance() {
-  const integerMs = Math.floor(app.carryMs);
-  if (integerMs <= 0) return;
-  app.carryMs -= integerMs;
-  advanceBy(integerMs);
+  const flushed = flushWholeMs(app.carryMs);
+  app.carryMs = flushed.carryMs;
+  if (flushed.elapsedMs <= 0) return;
+  advanceBy(flushed.elapsedMs);
 }
 
 /**
@@ -589,7 +590,7 @@ function settleNow(perfNow = performance.now()) {
   const pendingMs =
     app.lastMonotonicMs == null
       ? app.carryMs
-      : app.carryMs + Math.max(0, perfNow - app.lastMonotonicMs);
+      : absorbFrameDelta(app.carryMs, perfNow - app.lastMonotonicMs);
 
   if (wallGap > SLEEP_GAP_MS || pendingMs > SLEEP_GAP_MS) {
     const checkpoint = app.lastCheckpoint ?? memoryEnvelope(app.lastWallMs ?? wallNow);
@@ -605,7 +606,7 @@ function settleNow(perfNow = performance.now()) {
   }
 
   if (app.lastMonotonicMs != null) {
-    app.carryMs += Math.max(0, perfNow - app.lastMonotonicMs);
+    app.carryMs = absorbFrameDelta(app.carryMs, perfNow - app.lastMonotonicMs);
   }
   app.lastMonotonicMs = perfNow;
   app.lastWallMs = wallNow;
@@ -644,7 +645,7 @@ function onFrame(perfNow) {
   }
 
   if (app.lastMonotonicMs != null) {
-    app.carryMs += Math.max(0, perfNow - app.lastMonotonicMs);
+    app.carryMs = absorbFrameDelta(app.carryMs, perfNow - app.lastMonotonicMs);
   }
   app.lastMonotonicMs = perfNow;
   app.lastWallMs = wallNow;

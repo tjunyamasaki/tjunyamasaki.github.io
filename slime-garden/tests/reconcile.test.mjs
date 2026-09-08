@@ -84,6 +84,19 @@ describe('reconcileAway', () => {
     assert.equal(result.save.state.world.timeMs, save.state.world.timeMs);
   });
 
+  test('remainder jump clamps throw cooldown on the shared integer', () => {
+    const now = 2_000_000_000_000;
+    const save = createFreshEnvelope({ nowWallMs: now - TEN_HOURS_MS, revision: 3 });
+    save.state.nextFeedAllowedAtMs = 500;
+    const result = reconcileAway(save, now);
+    assert.equal(result.save.state.simTimeMs, TEN_HOURS_MS);
+    assert.ok(result.save.state.nextThrowAllowedAtMs <= result.save.state.simTimeMs);
+    assert.equal(
+      result.save.state.nextThrowAllowedAtMs,
+      result.save.state.nextFeedAllowedAtMs,
+    );
+  });
+
   test('backward clock grants nothing, rebases, then a later minute earns normally', () => {
     const now = 2_000_000_000_000;
     const state = createInitialState();

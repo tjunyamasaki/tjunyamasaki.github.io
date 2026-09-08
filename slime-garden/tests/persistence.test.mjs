@@ -5,7 +5,11 @@ import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { MICRO_PER_GLOW } from '../src/core/balance.mjs';
-import { createFreshEnvelope, serializeEnvelope } from '../src/core/validate.mjs';
+import {
+  createFreshEnvelope,
+  serializeEnvelope,
+  validateSave,
+} from '../src/core/validate.mjs';
 import {
   BACKUP_KEY,
   PRIMARY_KEY,
@@ -295,6 +299,27 @@ describe('writeCheckpoint', () => {
     if (!backupLoaded.ok) return;
     assert.equal(backupLoaded.save.revision, 5);
     assert.equal(backupLoaded.save.state.glowMicro, 50 * MICRO_PER_GLOW);
+  });
+
+  test('first v2 write copies the original v1 primary onto backup', () => {
+    const storage = createMemoryStorage();
+    storage.setItem(PRIMARY_KEY, validFixtureText);
+    const written = writeCheckpoint(storage, envelope({ revision: 0 }));
+    assert.equal(written.saved, true);
+    assert.equal(written.envelope.schemaVersion, 2);
+    assert.equal(storage.getItem(BACKUP_KEY), validFixtureText);
+    const primaryParsed = validateSave(storage.getItem(PRIMARY_KEY));
+    assert.equal(primaryParsed.ok, true);
+    if (primaryParsed.ok) {
+      assert.equal(primaryParsed.kind, 'current');
+      assert.equal(primaryParsed.save.schemaVersion, 2);
+    }
+    const backupParsed = validateSave(storage.getItem(BACKUP_KEY));
+    assert.equal(backupParsed.ok, true);
+    if (backupParsed.ok) {
+      assert.equal(backupParsed.kind, 'legacy-v1');
+      assert.equal(backupParsed.save.schemaVersion, 1);
+    }
   });
 
   test('increments revision from the caller envelope and serializes a loadable primary', () => {

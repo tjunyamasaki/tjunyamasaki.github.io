@@ -81,6 +81,7 @@ describe('reconcileAway', () => {
     assert.equal(result.save.revision, 3);
     assert.equal(result.save.savedWallMs, now);
     assert.equal('events' in result, false);
+    assert.equal(result.save.state.world.timeMs, save.state.world.timeMs);
   });
 
   test('backward clock grants nothing, rebases, then a later minute earns normally', () => {

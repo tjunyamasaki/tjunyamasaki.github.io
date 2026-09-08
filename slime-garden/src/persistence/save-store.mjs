@@ -142,6 +142,20 @@ export function loadBest(storage) {
   const primaryOk = primaryParsed.ok === true;
   const backupOk = backupParsed.ok === true;
 
+  // A FUTURE primary must not be overwritten by an older valid backup.
+  if (
+    primaryRaw !== null &&
+    !primaryParsed.ok &&
+    primaryParsed.reason === 'FUTURE_VERSION'
+  ) {
+    return {
+      ok: false,
+      reason: 'FUTURE_VERSION',
+      primaryRaw,
+      backupRaw,
+    };
+  }
+
   if (primaryOk && backupOk) {
     const source = preferSource(primaryParsed.save, backupParsed.save);
     return {
@@ -173,11 +187,9 @@ export function loadBest(storage) {
     };
   }
 
-  const primaryFuture =
-    !primaryParsed.ok && primaryParsed.reason === 'FUTURE_VERSION';
   const backupFuture =
     !backupParsed.ok && backupParsed.reason === 'FUTURE_VERSION';
-  if (primaryFuture || backupFuture) {
+  if (backupFuture) {
     return {
       ok: false,
       reason: 'FUTURE_VERSION',

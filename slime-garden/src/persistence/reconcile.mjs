@@ -1,15 +1,23 @@
 /**
  * Capped absence reconciliation. Pure given an injected wall timestamp.
  * Does not read wall clocks, DOM, Three, or storage.
+ *
+ * Schema 1 / legacy envelopes run `migrateV1` (legacy absence then convert).
+ * Native schema 2 credits economy with `advance` and freezes the world
+ * snapshot (world clock, food, and paths do not progress while away).
  */
 
 import { advance } from '../core/advance.mjs';
 import {
   LOGICAL_TIME_MAX_MS,
   OFFLINE_CAP_MS,
+  SCHEMA_VERSION,
+  SCHEMA_VERSION_V2,
 } from '../core/balance.mjs';
+import { migrateV1 } from '../core/migrate.mjs';
 import { getBerryCapacity } from '../core/selectors.mjs';
 import { cloneState } from '../core/state.mjs';
+import { cloneWorld } from '../world/state.mjs';
 
 /**
  * @typedef {import('../core/state.mjs').GameState} GameState
@@ -62,7 +70,8 @@ function cloneEnvelope(save) {
 /**
  * After the eight-hour earning cap, remaining wall time only ages logical
  * clocks. Berries are full, the berry timer is null, and bonuses/cooldown are
- * no later than `newSimTimeMs`.
+ * no later than `newSimTimeMs`. Clamping `nextFeedAllowedAtMs` also ages the
+ * throw clock (one integer, two names).
  *
  * @param {GameState} state
  * @param {number} newSimTimeMs
@@ -82,21 +91,41 @@ function applyRemainderJump(state, newSimTimeMs) {
 }
 
 /**
- * Credit absence from a checkpoint to `nowWallMs`. Never mutates `save`.
- * Revision is left unchanged; the save store increments on install.
+ * @param {SaveEnvelope} save
+ * @returns {boolean}
+ */
+function isLegacyEnvelope(save) {
+  if (save.schemaVersion === SCHEMA_VERSION) return true;
+  const habitatId = save.state && save.state.habitatId;
+  if (
+    habitatId === 'garden-prototype-v1' &&
+    save.schemaVersion !== SCHEMA_VERSION_V2
+  ) {
+    return true;
+  }
+  if (
+    save.schemaVersion !== SCHEMA_VERSION_V2 &&
+    save.state &&
+    !save.state.world
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Native v2 absence: credit economy, freeze world snapshot, keep carry.
  *
  * @param {SaveEnvelope} save
  * @param {number} nowWallMs
  * @returns {ReconcileResult}
  */
-export function reconcileAway(save, nowWallMs) {
-  if (!Number.isSafeInteger(nowWallMs)) {
-    throw new TypeError('reconcileAway: nowWallMs must be a safe integer');
-  }
-
+function reconcileNativeV2(save, nowWallMs) {
+  const frozenWorld = save.state.world ? cloneWorld(save.state.world) : null;
   const base = cloneEnvelope(save);
 
   if (nowWallMs < base.savedWallMs) {
+    if (frozenWorld) base.state.world = cloneWorld(frozenWorld);
     base.savedWallMs = nowWallMs;
     return {
       save: base,
@@ -129,10 +158,14 @@ export function reconcileAway(save, nowWallMs) {
     nextState = applyRemainderJump(nextState, jumped);
   }
 
+  if (frozenWorld) {
+    nextState.world = cloneWorld(frozenWorld);
+  }
+
   return {
     save: {
       gameId: base.gameId,
-      schemaVersion: base.schemaVersion,
+      schemaVersion: SCHEMA_VERSION_V2,
       balanceVersion: base.balanceVersion,
       revision: base.revision,
       savedWallMs: nowWallMs,
@@ -149,4 +182,32 @@ export function reconcileAway(save, nowWallMs) {
       clockWentBackward: false,
     },
   };
+}
+
+/**
+ * Credit absence from a checkpoint to `nowWallMs`. Never mutates `save`.
+ * Revision is left unchanged; the save store increments on install.
+ *
+ * Schema 1 runs migrateV1 (legacy absence + convert) so main's existing
+ * `reconcileAway(loaded.save, now)` migrates a browser v1 save once.
+ *
+ * @param {SaveEnvelope} save
+ * @param {number} nowWallMs
+ * @returns {ReconcileResult}
+ */
+export function reconcileAway(save, nowWallMs) {
+  if (!Number.isSafeInteger(nowWallMs)) {
+    throw new TypeError('reconcileAway: nowWallMs must be a safe integer');
+  }
+
+  if (isLegacyEnvelope(save)) {
+    return migrateV1(
+      /** @type {import('../core/validate-legacy.mjs').LegacyV1Envelope} */ (
+        save
+      ),
+      nowWallMs,
+    );
+  }
+
+  return reconcileNativeV2(save, nowWallMs);
 }

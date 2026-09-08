@@ -4,8 +4,8 @@ import { dirname, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { NAME_MAX_LENGTH } from '../src/core/balance.mjs';
-import { createInitialState } from '../src/core/state.mjs';
+import { NAME_MAX_LENGTH, SLIME_NAMES } from '../src/core/balance.mjs';
+import { cloneState, createInitialState, syncWorldRoster } from '../src/core/state.mjs';
 import {
   SAVE_TEXT_MAX_LENGTH,
   createDefaultSettings,
@@ -13,13 +13,15 @@ import {
   serializeEnvelope,
   validateSave,
 } from '../src/core/validate.mjs';
+import { isValidFoodTarget } from '../src/world/layout.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const coreDir = join(here, '../src/core');
 const fixturesDir = join(here, 'fixtures');
 
 const validFixtureText = readFileSync(join(fixturesDir, 'valid-v1.json'), 'utf8');
-const futureFixtureText = readFileSync(join(fixturesDir, 'schema-v2.json'), 'utf8');
+const invalidV2FixtureText = readFileSync(join(fixturesDir, 'schema-v2.json'), 'utf8');
+const futureSchema3Text = readFileSync(join(fixturesDir, 'future-schema3.json'), 'utf8');
 
 /**
  * @param {object} [patch]
@@ -30,21 +32,33 @@ function makeEnvelope(patch = {}) {
     revision: 1,
   });
   const statePatch = patch.state ?? {};
+  const state = cloneState(base.state);
+  const {
+    upgrades: upgradePatch,
+    slimes: slimePatch,
+    tutorialCompleted: tutorialPatch,
+    world: worldPatch,
+    ...restState
+  } = statePatch;
+  Object.assign(state, restState);
+  if (upgradePatch) {
+    state.upgrades = { ...state.upgrades, ...upgradePatch };
+  }
+  if (slimePatch) {
+    state.slimes = slimePatch.map((slime) => ({ ...slime }));
+  }
+  if (tutorialPatch) {
+    state.tutorialCompleted = [...tutorialPatch];
+  }
+  if (worldPatch) {
+    state.world = worldPatch;
+  }
+  const { state: _state, settings: settingsPatch, ...rest } = patch;
   return {
     ...base,
-    ...patch,
-    settings: { ...base.settings, ...(patch.settings ?? {}) },
-    state: {
-      ...base.state,
-      ...statePatch,
-      upgrades: { ...base.state.upgrades, ...(statePatch.upgrades ?? {}) },
-      slimes: statePatch.slimes
-        ? statePatch.slimes.map((slime) => ({ ...slime }))
-        : base.state.slimes.map((slime) => ({ ...slime })),
-      tutorialCompleted: statePatch.tutorialCompleted
-        ? [...statePatch.tutorialCompleted]
-        : [...base.state.tutorialCompleted],
-    },
+    ...rest,
+    settings: { ...base.settings, ...(settingsPatch ?? {}) },
+    state,
   };
 }
 
@@ -52,7 +66,20 @@ function makeEnvelope(patch = {}) {
  * @param {object} [patch]
  */
 function envelopeText(patch = {}) {
-  return JSON.stringify(makeEnvelope(patch));
+  return serializeEnvelope(makeEnvelope(patch));
+}
+
+/**
+ * @param {(raw: Record<string, unknown>) => void} [mutate]
+ */
+function currentJson(mutate) {
+  const raw = JSON.parse(
+    serializeEnvelope(
+      createFreshEnvelope({ nowWallMs: 1_700_000_000_000, revision: 1 }),
+    ),
+  );
+  if (mutate) mutate(raw);
+  return JSON.stringify(raw);
 }
 
 describe('validateSave', () => {
@@ -61,27 +88,44 @@ describe('validateSave', () => {
     const fromFresh = validateSave(serializeEnvelope(fresh));
     assert.equal(fromFresh.ok, true);
     if (fromFresh.ok) {
+      assert.equal(fromFresh.kind, 'current');
       assert.equal(fromFresh.save.gameId, 'cozy-slime-mvp');
-      assert.equal(fromFresh.save.schemaVersion, 1);
-      assert.equal(fromFresh.save.balanceVersion, 1);
+      assert.equal(fromFresh.save.schemaVersion, 2);
+      assert.equal(fromFresh.save.balanceVersion, 2);
       assert.equal(fromFresh.save.revision, 0);
       assert.equal(fromFresh.save.savedWallMs, 1_700_000_000_000);
       assert.deepEqual(fromFresh.save.settings, createDefaultSettings());
-      assert.deepEqual(fromFresh.save.state, createInitialState());
+      assert.equal(fromFresh.save.state.habitatId, 'farm-v2');
+      assert.ok(fromFresh.save.state.world);
+      assert.deepEqual(fromFresh.save.state.world.foods, []);
+      assert.equal(fromFresh.save.state.world.timeMs, 0);
+      assert.equal(fromFresh.save.state.world.carryMs, 0);
+      assert.equal(fromFresh.save.state.world.nextFoodSequence, 1);
+      assert.equal(fromFresh.save.state.world.residents.length, 1);
+      assert.deepEqual(fromFresh.save.state.world.residents[0].position, {
+        x: 0,
+        z: 2,
+      });
+      assert.equal(fromFresh.save.state.nextThrowAllowedAtMs, 0);
+      assert.equal(fromFresh.save.state.nextFeedAllowedAtMs, 0);
+      assert.equal(fromFresh.save.state.slimes[0].id, 'slime-1');
     }
 
     const fromFixture = validateSave(validFixtureText);
     assert.equal(fromFixture.ok, true);
     if (fromFixture.ok) {
+      assert.equal(fromFixture.kind, 'legacy-v1');
+      assert.equal(fromFixture.save.schemaVersion, 1);
       assert.equal(fromFixture.save.revision, 1);
       assert.equal(fromFixture.save.state.slimes[0].id, 'slime-1');
       assert.equal(fromFixture.save.state.berries, 6);
       assert.equal(fromFixture.save.state.nextBerryAtMs, 15_000);
+      assert.equal(fromFixture.save.state.habitatId, 'garden-prototype-v1');
     }
   });
 
   test('strips extra enumerable fields from the reconstructed envelope', () => {
-    const base = makeEnvelope();
+    const base = JSON.parse(serializeEnvelope(makeEnvelope()));
     const dirty = {
       ...base,
       extraTop: 'nope',
@@ -129,10 +173,10 @@ describe('validateSave', () => {
     assert.equal(validateSave('').reason, 'INVALID_JSON');
   });
 
-  test('schemaVersion 2 is FUTURE_VERSION, not INVALID_STATE', () => {
-    const fromFixture = validateSave(futureFixtureText);
+  test('schema-v2.json junk and bare schema-2 shells are INVALID_STATE, not FUTURE', () => {
+    const fromFixture = validateSave(invalidV2FixtureText);
     assert.equal(fromFixture.ok, false);
-    assert.equal(fromFixture.reason, 'FUTURE_VERSION');
+    assert.equal(fromFixture.reason, 'INVALID_STATE');
 
     const fromMinimal = validateSave(
       JSON.stringify({
@@ -140,7 +184,48 @@ describe('validateSave', () => {
         schemaVersion: 2,
       }),
     );
-    assert.equal(fromMinimal.reason, 'FUTURE_VERSION');
+    assert.equal(fromMinimal.ok, false);
+    assert.equal(fromMinimal.reason, 'INVALID_STATE');
+  });
+
+  test('future-schema3.json is FUTURE_VERSION', () => {
+    const fromFixture = validateSave(futureSchema3Text);
+    assert.equal(fromFixture.ok, false);
+    assert.equal(fromFixture.reason, 'FUTURE_VERSION');
+  });
+
+  test('schema 2 with balance 3 is FUTURE_VERSION; schema 2 + balance 1 is INVALID_STATE', () => {
+    assert.equal(
+      validateSave(
+        JSON.stringify({
+          gameId: 'cozy-slime-mvp',
+          schemaVersion: 2,
+          balanceVersion: 3,
+        }),
+      ).reason,
+      'FUTURE_VERSION',
+    );
+    assert.equal(
+      validateSave(envelopeText({ balanceVersion: 1 })).reason,
+      'INVALID_STATE',
+    );
+  });
+
+  test('claimed v1 with 10 slimes or beds 8 is INVALID_STATE', () => {
+    const ten = JSON.parse(validFixtureText);
+    ten.state.slimes = Array.from({ length: 10 }, (_, index) => ({
+      id: `slime-${index + 1}`,
+      name: SLIME_NAMES[index],
+      createdAtMs: 0,
+      boostUntilMs: 0,
+      feedCount: 0,
+      homeSlot: index,
+    }));
+    assert.equal(validateSave(JSON.stringify(ten)).reason, 'INVALID_STATE');
+
+    const beds8 = JSON.parse(validFixtureText);
+    beds8.state.upgrades.beds = 8;
+    assert.equal(validateSave(JSON.stringify(beds8)).reason, 'INVALID_STATE');
   });
 
   test('wallet greater than lifetime is INVALID_STATE', () => {
@@ -262,7 +347,7 @@ describe('validateSave', () => {
       'INVALID_STATE',
     );
     assert.equal(
-      validateSave(envelopeText({ balanceVersion: 2 })).reason,
+      validateSave(envelopeText({ balanceVersion: 1 })).reason,
       'INVALID_STATE',
     );
     assert.equal(
@@ -270,6 +355,122 @@ describe('validateSave', () => {
         .reason,
       'INVALID_STATE',
     );
+  });
+
+  test('malformed v2 world is INVALID_STATE and is not repaired', () => {
+    const nanPos = currentJson((raw) => {
+      raw.state.world.residents[0].position.x = Number.NaN;
+    });
+    assert.equal(validateSave(nanPos).reason, 'INVALID_STATE');
+
+    const dupFood = currentJson((raw) => {
+      const food = {
+        id: 'food-1',
+        target: { x: 0, z: 0 },
+        createdWorldMs: 0,
+        landAtWorldMs: 600,
+        stage: 'landed',
+        claimedBy: null,
+        eatUntilWorldMs: null,
+      };
+      raw.state.world.foods = [food, { ...food }];
+      raw.state.world.nextFoodSequence = 2;
+    });
+    assert.equal(validateSave(dupFood).reason, 'INVALID_STATE');
+
+    const thirteen = currentJson((raw) => {
+      raw.state.world.nextFoodSequence = 14;
+      raw.state.world.foods = Array.from({ length: 13 }, (_, index) => ({
+        id: `food-${index + 1}`,
+        target: { x: 0, z: 0 },
+        createdWorldMs: 0,
+        landAtWorldMs: 600,
+        stage: 'landed',
+        claimedBy: null,
+        eatUntilWorldMs: null,
+      }));
+    });
+    assert.equal(validateSave(thirteen).reason, 'INVALID_STATE');
+
+    const badClaim = currentJson((raw) => {
+      raw.state.world.nextFoodSequence = 2;
+      raw.state.world.foods = [
+        {
+          id: 'food-1',
+          target: { x: 0, z: 0 },
+          createdWorldMs: 0,
+          landAtWorldMs: 600,
+          stage: 'claimed',
+          claimedBy: 'slime-99',
+          eatUntilWorldMs: null,
+        },
+      ];
+    });
+    assert.equal(validateSave(badClaim).reason, 'INVALID_STATE');
+  });
+
+  test('ten-resident twelve-food long-path save stays within 64 KiB', () => {
+    const state = createInitialState();
+    state.upgrades.beds = 8;
+    state.slimes = Array.from({ length: 10 }, (_, index) => ({
+      id: `slime-${index + 1}`,
+      name: SLIME_NAMES[index],
+      createdAtMs: 0,
+      boostUntilMs: 0,
+      feedCount: 0,
+      homeSlot: index,
+    }));
+    const synced = syncWorldRoster(state);
+    const targets = [];
+    for (let x = -8; x <= 8 && targets.length < 12; x += 1) {
+      for (let z = -4; z <= 4 && targets.length < 12; z += 1) {
+        const point = { x, z };
+        if (isValidFoodTarget(point)) targets.push(point);
+      }
+    }
+    assert.equal(targets.length, 12);
+    synced.world.foods = targets.map((target, index) => ({
+      id: `food-${index + 1}`,
+      target,
+      createdWorldMs: 0,
+      landAtWorldMs: 600,
+      stage: 'landed',
+      claimedBy: null,
+      eatUntilWorldMs: null,
+    }));
+    synced.world.nextFoodSequence = 13;
+    const points = [];
+    for (let i = 0; i < 128; i += 1) {
+      points.push({ x: 0, z: 2 - i * 0.04 });
+    }
+    let length = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      length += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
+    }
+    synced.world.residents[0].activity = 'wandering';
+    synced.world.residents[0].route = {
+      points,
+      length,
+      startedWorldMs: 0,
+      cycleCount: 6,
+      distanceAlong: 0,
+    };
+    const text = serializeEnvelope(
+      createFreshEnvelope({
+        nowWallMs: 1_700_000_000_000,
+        revision: 1,
+        state: synced,
+      }),
+    );
+    assert.ok(text.length <= SAVE_TEXT_MAX_LENGTH, `serialized ${text.length} bytes`);
+    const parsed = validateSave(text);
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) {
+      assert.equal(parsed.kind, 'current');
+      assert.equal(parsed.save.state.slimes.length, 10);
+      assert.equal(parsed.save.state.world.foods.length, 12);
+      assert.equal(parsed.save.state.world.residents[0].route.points.length, 128);
+    }
   });
 });
 
@@ -290,6 +491,14 @@ describe('validate module isolation', () => {
         pattern.test(source),
         false,
         `validate.mjs must not contain ${pattern}`,
+      );
+    }
+    const legacySource = readFileSync(join(coreDir, 'validate-legacy.mjs'), 'utf8');
+    for (const pattern of forbidden) {
+      assert.equal(
+        pattern.test(legacySource),
+        false,
+        `validate-legacy.mjs must not contain ${pattern}`,
       );
     }
   });

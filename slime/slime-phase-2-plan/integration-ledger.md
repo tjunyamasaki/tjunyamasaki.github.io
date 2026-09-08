@@ -215,7 +215,7 @@ Storage keys stay `cozy-slime-mvp:primary:v1` / `cozy-slime-mvp:backup:v1` until
 | Later packet | Must consume this ledger |
 | --- | --- |
 | P2-02 | Six-cap / four-bed / `HOME_SLOTS` / `SLIME_NAMES` (section 3). Publish new exports here when they land. |
-| P2-03 | Keep `valid-v1.json` + new v1 fixtures; treat `schema-v2.json` as historical FUTURE sample; new current schema is 2; `future-schema3.json` is the unsupported envelope. |
+| P2-03 | Keep `valid-v1.json` + new v1 fixtures; `schema-v2.json` is invalid-v2 (`INVALID_STATE`); `future-schema3.json` is the unsupported envelope (`FUTURE_VERSION`); current schema is 2. |
 | P2-04 | WELCOME callers (section 2). Leave UI removal to P2-13. |
 | P2-07 | FEED command (section 1). |
 | P2-09 | Camera/pointer (section 5). Scene API edits logged here for P2-13. |
@@ -332,3 +332,52 @@ World does **not** import `core/state.mjs` or scene.
 - **Scene still has six pads** (`scene/layout.mjs`). UI will show eight bed levels and ten names. Welcome can add past six into a six-pad scene until P2-10/P2-13.
 - Live garden can still FEED / WELCOME in memory this visit (commands unchanged except the cap is 10). THROW_FOOD is not implemented.
 - The playable farm is **not** done. No navigation A*, no camera HUD, no automatic arrivals.
+
+## 10. P2-03 persistence dispatcher, migrateV1 seam, serialize world
+
+Landed on `feat/slime` after P2-02. `SCHEMA_VERSION` in `balance.mjs` remains 1 (legacy identity). Current writes use `SCHEMA_VERSION_V2` / `BALANCE_VERSION_V2` / `HABITAT_ID_V2`. `main.mjs` is unchanged.
+
+### 10.1 Dispatcher (`validateSave`)
+
+Returns `{ ok:true, kind:'legacy-v1'|'current', save }` or `{ ok:false, reason }`. Parse JSON + `gameId` first.
+
+| Combo | Result |
+| --- | --- |
+| schema 1 + balance 1 | Frozen v1 validate (`validate-legacy.mjs`). Cap 6, beds 0–4, habitat `garden-prototype-v1`, `nextFeedAllowedAtMs`, cooldown 4000, tutorial feed/berry/welcome/upgrade only, no `world`. Claimed 10 slimes or beds 8 → `INVALID_STATE`. |
+| schema 2 + balance 2 | Strict v2 (world required, habitat `farm-v2`, `nextThrowAllowedAtMs`). |
+| schema > 2, or schema ≥ 1 with balance > 2 | `FUTURE_VERSION` (`future-schema3.json`). |
+| `schema-v2.json` (schema 2 + balance 2, junk body) | `INVALID_STATE`, not FUTURE. |
+| Other combos | `INVALID_STATE`. |
+
+Frozen P2-00 v1 fixtures parse as `kind: 'legacy-v1'`.
+
+### 10.2 `createFreshEnvelope` / `serializeEnvelope`
+
+Fresh/reset envelopes are schema 2, balance 2, habitat `farm-v2`. Constructor copies economic fields from `createInitialState()` (still `garden-prototype-v1` in memory), attaches/creates world, sets farm-v2. After `validateSave(serializeEnvelope(fresh))`, kind is `current`.
+
+`serializeEnvelope` **explicitly** writes `world` and `nextThrowAllowedAtMs` for schema 2. It does not rely on `JSON.stringify` of non-enumerable `state.world`. V2 JSON omits `nextFeedAllowedAtMs`; reconstruct aliases it from `nextThrowAllowedAtMs` via `attachThrowCooldownAlias` so FEED still reads the clock. Schema 1 serialize still omits world (frozen v1 fixtures).
+
+### 10.3 `migrateV1` / `reconcileAway` (no double-credit)
+
+`migrateV1(legacy, nowWallMs)`: strict v1 → legacy `advance` absence to `nowWallMs` → convert (schema/balance 2, farm-v2, `nextThrowAllowedAtMs = simTimeMs + min(1000, remaining feed cooldown)`, `createWorld` idle at homes) → `applyPostMigrationProgression` (P2-03 **typed no-op identity**; P2-04 will call `resolveCompanionsNow` here; do not auto-welcome) → strict v2 validate. Returns `{ save, summary }` including away credit from the legacy reconcile.
+
+`reconcileAway`:
+- schema 1 → `migrateV1` (so main’s existing `reconcileAway(loaded.save, now)` migrates a browser v1 save once).
+- schema 2 → existing economy `advance`; **freeze** world snapshot (time/carry/foods/paths unchanged). Remainder jump clamps `nextFeedAllowedAtMs` (same integer as throw).
+
+`loadBest` stays pure (no `Date.now`, no auto-migrate). It returns the raw validated checkpoint (v1 or v2).
+
+**Secondary tab leftover:** `enterBlocked` uses `loadBest` without `reconcileAway`, so a blocked tab can still show v1-shaped state. Acceptable until P2-13.
+
+### 10.4 `loadBest` FUTURE primary
+
+If **primary** is `FUTURE_VERSION`, return `FUTURE_VERSION` even when backup is a valid older save. Do not install/rotate older backup over newer-schema data. Corrupt (non-FUTURE) primary + valid backup still recovers backup.
+
+Storage keys and lock name unchanged: `cozy-slime-mvp:primary:v1` / `cozy-slime-mvp:backup:v1` / existing writer lock. First v2 `writeCheckpoint` still `promotePrimaryToBackup` (original v1 raw becomes backup) then writes v2 primary.
+
+### 10.5 P2-04 seam still pending
+
+`applyPostMigrationProgression` does not join companions. A v1 save that is currently Welcome-ready will not gain a resident at migration NOW until P2-04. Native v2 `reconcileAway` likewise does not auto-join.
+
+`createInitialState().habitatId` remains `garden-prototype-v1`. Scene still has six pads. FEED/WELCOME still live in main/UI.
+

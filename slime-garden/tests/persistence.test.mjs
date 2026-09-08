@@ -28,7 +28,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(here, 'fixtures');
 
 const validFixtureText = readFileSync(join(fixturesDir, 'valid-v1.json'), 'utf8');
-const futureFixtureText = readFileSync(join(fixturesDir, 'schema-v2.json'), 'utf8');
+const futureFixtureText = readFileSync(join(fixturesDir, 'future-schema3.json'), 'utf8');
+const invalidV2FixtureText = readFileSync(join(fixturesDir, 'schema-v2.json'), 'utf8');
 
 const HOUR_MS = 3_600_000;
 const SITE_KEY = 'unrelated-site-key';
@@ -143,6 +144,54 @@ describe('loadBest', () => {
     assert.equal(loaded.primaryRaw, futureFixtureText);
     assert.deepEqual(writes, []);
     assert.equal(storage.getItem(PRIMARY_KEY), futureFixtureText);
+  });
+
+  test('future primary plus valid backup is FUTURE_VERSION and does not write', () => {
+    const storage = createMemoryStorage();
+    const backup = envelope({ revision: 4 });
+    backup.state.glowMicro = 90 * MICRO_PER_GLOW;
+    backup.state.lifetimeGlowMicro = 90 * MICRO_PER_GLOW;
+    const backupText = serializeEnvelope(backup);
+    storage.setItem(PRIMARY_KEY, futureFixtureText);
+    storage.setItem(BACKUP_KEY, backupText);
+    const writes = [];
+    const watched = {
+      getItem(key) {
+        return storage.getItem(key);
+      },
+      setItem(key, value) {
+        writes.push(['set', key]);
+        storage.setItem(key, value);
+      },
+      removeItem(key) {
+        writes.push(['remove', key]);
+        storage.removeItem(key);
+      },
+    };
+
+    const loaded = loadBest(watched);
+    assert.equal(loaded.ok, false);
+    assert.equal(loaded.reason, 'FUTURE_VERSION');
+    assert.equal(loaded.primaryRaw, futureFixtureText);
+    assert.equal(loaded.backupRaw, backupText);
+    assert.deepEqual(writes, []);
+    assert.equal(storage.getItem(PRIMARY_KEY), futureFixtureText);
+    assert.equal(storage.getItem(BACKUP_KEY), backupText);
+  });
+
+  test('invalid-v2 primary plus valid backup still recovers the backup', () => {
+    const storage = createMemoryStorage();
+    const backup = envelope({ revision: 3 });
+    backup.state.glowMicro = 40 * MICRO_PER_GLOW;
+    backup.state.lifetimeGlowMicro = 40 * MICRO_PER_GLOW;
+    storage.setItem(PRIMARY_KEY, invalidV2FixtureText);
+    storage.setItem(BACKUP_KEY, serializeEnvelope(backup));
+    const loaded = loadBest(storage);
+    assert.equal(loaded.ok, true);
+    if (!loaded.ok) return;
+    assert.equal(loaded.source, 'backup');
+    assert.equal(loaded.save.revision, 3);
+    assert.equal(loaded.primaryRaw, invalidV2FixtureText);
   });
 
   test('empty storage is EMPTY, not CORRUPT', () => {
@@ -296,6 +345,16 @@ describe('import and reset', () => {
       assert.equal(preview.preview.savedWallMs, now - HOUR_MS);
       assert.equal(typeof preview.preview.savedAt, 'string');
     }
+    assert.equal(storage.getItem(PRIMARY_KEY), beforePrimary);
+    assert.equal(storage.getItem(BACKUP_KEY), beforeBackup);
+
+    const v1Preview = previewImport(validFixtureText);
+    assert.equal(v1Preview.ok, true);
+    if (v1Preview.ok) {
+      assert.equal(v1Preview.save.schemaVersion, 1);
+      assert.equal(v1Preview.preview.glowMicro, 0);
+    }
+    assert.equal(storage.getItem(PRIMARY_KEY), beforePrimary);
 
     const imported = importSave(storage, incoming, now);
     assert.equal(imported.ok, true);

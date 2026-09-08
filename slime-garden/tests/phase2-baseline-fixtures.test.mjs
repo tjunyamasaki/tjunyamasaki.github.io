@@ -20,7 +20,7 @@ import {
 } from '../src/core/selectors.mjs';
 import { createInitialState } from '../src/core/state.mjs';
 import {
-  createFreshEnvelope,
+  createDefaultSettings,
   serializeEnvelope,
   validateSave,
 } from '../src/core/validate.mjs';
@@ -189,11 +189,20 @@ function prettyJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+function wrapV1Envelope(state, revision) {
+  return {
+    gameId: 'cozy-slime-mvp',
+    schemaVersion: 1,
+    balanceVersion: 1,
+    revision,
+    savedWallMs: V1_WALL_MS,
+    settings: createDefaultSettings(),
+    state,
+  };
+}
+
 function buildFreshEnvelope() {
-  return createFreshEnvelope({
-    nowWallMs: V1_WALL_MS,
-    revision: 0,
-  });
+  return wrapV1Envelope(createInitialState(), 0);
 }
 
 function buildCooldownEnvelope() {
@@ -201,27 +210,15 @@ function buildCooldownEnvelope() {
     type: 'FEED',
     slimeId: 'slime-1',
   });
-  return createFreshEnvelope({
-    nowWallMs: V1_WALL_MS,
-    revision: 1,
-    state: fed,
-  });
+  return wrapV1Envelope(fed, 1);
 }
 
 function buildThreeResidentEnvelope() {
-  return createFreshEnvelope({
-    nowWallMs: V1_WALL_MS,
-    revision: 1,
-    state: playUntilPopulation(3),
-  });
+  return wrapV1Envelope(playUntilPopulation(3), 1);
 }
 
 function buildSixResidentBeds4Envelope() {
-  return createFreshEnvelope({
-    nowWallMs: V1_WALL_MS,
-    revision: 1,
-    state: playUntilPopulation(6),
-  });
+  return wrapV1Envelope(playUntilPopulation(6), 1);
 }
 
 function buildFutureSchema3() {
@@ -279,12 +276,13 @@ describe('P2-00 frozen baseline fixtures', () => {
     const v1 = validateSave(readFixture('valid-v1.json'));
     assert.equal(v1.ok, true);
     if (v1.ok) {
+      assert.equal(v1.kind, 'legacy-v1');
       assert.equal(v1.save.schemaVersion, 1);
       assert.equal(v1.save.state.slimes.length, 1);
     }
     const v2 = validateSave(readFixture('schema-v2.json'));
     assert.equal(v2.ok, false);
-    assert.equal(v2.reason, 'FUTURE_VERSION');
+    assert.equal(v2.reason, 'INVALID_STATE');
   });
 
   test('v1-fresh.json is a valid schema-1 fresh save', () => {
@@ -292,6 +290,7 @@ describe('P2-00 frozen baseline fixtures', () => {
     const parsed = validateSave(text);
     assert.equal(parsed.ok, true);
     if (!parsed.ok) return;
+    assert.equal(parsed.kind, 'legacy-v1');
     assert.equal(parsed.save.schemaVersion, 1);
     assert.equal(parsed.save.balanceVersion, 1);
     assert.equal(parsed.save.revision, 0);
@@ -307,6 +306,7 @@ describe('P2-00 frozen baseline fixtures', () => {
     const parsed = validateSave(text);
     assert.equal(parsed.ok, true);
     if (!parsed.ok) return;
+    assert.equal(parsed.kind, 'legacy-v1');
     assert.equal(parsed.save.schemaVersion, 1);
     assert.equal(parsed.save.state.slimes.length, 3);
     assert.equal(parsed.save.state.slimes[2].id, 'slime-3');
@@ -323,6 +323,7 @@ describe('P2-00 frozen baseline fixtures', () => {
     const parsed = validateSave(text);
     assert.equal(parsed.ok, true);
     if (!parsed.ok) return;
+    assert.equal(parsed.kind, 'legacy-v1');
     assert.equal(parsed.save.schemaVersion, 1);
     assert.equal(parsed.save.state.slimes.length, 6);
     assert.equal(parsed.save.state.upgrades.beds, 4);
@@ -342,6 +343,7 @@ describe('P2-00 frozen baseline fixtures', () => {
     const parsed = validateSave(text);
     assert.equal(parsed.ok, true);
     if (!parsed.ok) return;
+    assert.equal(parsed.kind, 'legacy-v1');
     assert.equal(parsed.save.schemaVersion, 1);
     assert.ok(parsed.save.state.nextFeedAllowedAtMs > parsed.save.state.simTimeMs);
     assert.equal(parsed.save.state.totalFeeds, 1);

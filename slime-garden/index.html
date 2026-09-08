@@ -7,31 +7,191 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <a class="skip-link" href="#play-controls">Skip to garden controls</a>
+  <div id="live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
   <main id="game" aria-label="Slime garden">
-    <header class="page-note">
-      <p class="kicker"><a href="/links/">Games</a></p>
-      <h1>Slime garden</h1>
-      <p>Isolated skeleton. Local Three.js only; economy and habitat come later.</p>
-      <p>
-        <a href="./reference/original-preview.html">Original slime preview</a>
-        ·
-        <a href="./dev/inspection.html">Extracted actor inspection</a>
-        ·
-        <a href="./dev/stress.html">Six-slime stress</a>
-      </p>
-    </header>
     <div id="loading" role="status">Loading local modules…</div>
+
     <section id="error" hidden role="alert">
       <h1>Could not start</h1>
       <p id="error-message"></p>
     </section>
+
     <noscript>
       <section class="noscript" role="alert">
         <h1>JavaScript is required</h1>
         <p>Enable JavaScript to load this game from local modules.</p>
       </section>
     </noscript>
+
+    <section id="recovery" hidden>
+      <h1 id="recovery-title">Could not read the saved garden</h1>
+      <p id="recovery-body">The stored save is unreadable. It has not been overwritten.</p>
+      <p id="recovery-feedback" class="reason" role="status"></p>
+      <div class="stack-actions">
+        <button type="button" id="recovery-new" class="btn">Start new game</button>
+        <button type="button" id="recovery-import" class="btn">Import save</button>
+        <button type="button" id="recovery-download" class="btn">Download unreadable save</button>
+      </div>
+    </section>
+
+    <div id="play" hidden>
+      <header class="top-bar">
+        <div class="top-bar-lead">
+          <h1 class="game-title">Slime garden</h1>
+          <p id="persist-status" class="persist-status">Saved</p>
+        </div>
+        <dl class="resources" aria-label="Resources">
+          <div>
+            <dt>Berries</dt>
+            <dd>
+              <span id="berries-value">6/12</span>
+              <span id="berry-eta" class="resource-meta">next 0:15</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Glow</dt>
+            <dd id="glow-value">0.0</dd>
+          </div>
+          <div>
+            <dt>Glow/s</dt>
+            <dd id="rate-value">0.1/s</dd>
+          </div>
+        </dl>
+        <button type="button" id="settings-open" class="btn btn-quiet">Settings</button>
+      </header>
+
+      <p id="tab-banner" class="banner" hidden>
+        <span>This game is active in another tab.</span>
+        <button type="button" id="try-again" class="btn">Try again</button>
+      </p>
+      <aside id="offline-summary" class="banner banner-info" hidden>
+        <div id="offline-summary-body"></div>
+        <button type="button" id="offline-summary-dismiss" class="btn btn-quiet">Close</button>
+      </aside>
+      <p id="notice" class="banner banner-info" hidden></p>
+      <p id="tutorial-hint" class="tutorial-hint"></p>
+      <p id="action-status" class="action-status" role="status"></p>
+
+      <div class="play-layout">
+        <section
+          id="scene-placeholder"
+          class="scene-placeholder"
+          aria-label="Garden (3D later)"
+        >
+          <p class="scene-label">Garden (3D later)</p>
+          <p class="scene-caption">The habitat is a placeholder. Feeding, upgrades, and companions use the controls.</p>
+        </section>
+
+        <div id="play-controls" class="control-panel">
+          <section class="panel" aria-labelledby="residents-heading">
+            <h2 id="residents-heading">Residents</h2>
+            <div id="resident-list" class="resident-list" role="group" aria-label="Choose a slime"></div>
+            <div class="selected-panel">
+              <h3 id="selected-name">Slime 1</h3>
+              <p id="selected-feeds">Fed 0 times</p>
+              <p id="selected-bonus">No cozy bonus</p>
+              <button type="button" id="feed-button" class="btn btn-primary">Offer berry</button>
+              <p id="feed-reason" class="reason"></p>
+            </div>
+          </section>
+
+          <section class="panel" aria-labelledby="upgrades-heading">
+            <h2 id="upgrades-heading">Upgrades</h2>
+            <ul id="upgrade-list" class="upgrade-list"></ul>
+          </section>
+
+          <section class="panel" aria-labelledby="companion-heading">
+            <h2 id="companion-heading">Companion</h2>
+            <p id="companion-status" class="companion-status"></p>
+            <ul id="companion-progress" class="companion-progress"></ul>
+            <button type="button" id="welcome-button" class="btn btn-primary" hidden>Welcome companion</button>
+          </section>
+        </div>
+      </div>
+    </div>
   </main>
+
+  <dialog id="settings-dialog" class="dialog">
+    <form id="settings-form" method="dialog">
+      <h2>Settings</h2>
+      <div class="field">
+        <label>
+          <input type="checkbox" id="setting-sound" name="soundEnabled">
+          Sound
+        </label>
+        <p class="field-note">Off by default. No sounds play in this version besides saving the flag.</p>
+      </div>
+      <fieldset class="field">
+        <legend>Reduced motion</legend>
+        <label><input type="radio" name="reducedMotion" value="os" checked> Follow device</label>
+        <label><input type="radio" name="reducedMotion" value="on"> Reduce motion</label>
+        <label><input type="radio" name="reducedMotion" value="off"> Allow motion</label>
+      </fieldset>
+      <div class="field">
+        <label>
+          <input type="checkbox" id="setting-pause" name="animationsPaused">
+          Pause animations
+        </label>
+        <p class="field-note">Presentation only. Glow still grows.</p>
+      </div>
+      <fieldset class="field">
+        <legend>Quality</legend>
+        <label><input type="radio" name="quality" value="auto" checked> Auto</label>
+        <label><input type="radio" name="quality" value="high"> High</label>
+        <label><input type="radio" name="quality" value="low"> Low</label>
+        <p class="field-note">Stored for the 3D habitat. The placeholder garden does not change.</p>
+      </fieldset>
+      <p id="settings-feedback" class="reason" role="status"></p>
+      <div class="stack-actions">
+        <button type="button" id="settings-export" class="btn">Export save</button>
+        <button type="button" id="settings-import" class="btn">Import save</button>
+        <button type="button" id="settings-reset" class="btn">Reset garden</button>
+        <button type="submit" id="settings-close" class="btn btn-quiet" value="close">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="import-dialog" class="dialog">
+    <form method="dialog">
+      <h2>Import this save?</h2>
+      <p id="import-summary"></p>
+      <p>This replaces the garden in this tab after a confirmed import.</p>
+      <div class="stack-actions">
+        <button type="submit" id="import-cancel" class="btn btn-quiet" value="cancel">Cancel</button>
+        <button type="button" id="import-confirm" class="btn btn-primary">Import</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="reset-dialog" class="dialog">
+    <form method="dialog">
+      <h2>Reset this garden?</h2>
+      <p>This removes only this game’s save keys. Other site data is left alone.</p>
+      <p>Export first if you might want this garden back.</p>
+      <div class="stack-actions">
+        <button type="button" id="reset-export" class="btn">Export save</button>
+        <button type="submit" id="reset-cancel" class="btn btn-quiet" value="cancel">Cancel</button>
+        <button type="button" id="reset-confirm" class="btn">Reset garden</button>
+      </div>
+    </form>
+  </dialog>
+
+  <input id="import-file" type="file" accept="application/json,.json" hidden>
+
+  <footer class="site-footer">
+    <p>
+      <a href="/links/">Games</a>
+      ·
+      <a href="./reference/original-preview.html">Original slime preview</a>
+      ·
+      <a href="./dev/inspection.html">Extracted actor inspection</a>
+      ·
+      <a href="./dev/stress.html">Six-slime stress</a>
+    </p>
+  </footer>
+
   <script type="module">
     import('./src/main.mjs').catch((error) => {
       const loading = document.getElementById('loading');

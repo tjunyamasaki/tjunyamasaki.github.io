@@ -12,7 +12,7 @@ import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { advance } from '../src/core/advance.mjs';
-import { FEED_BERRY_COST, POPULATION_CAP } from '../src/core/balance.mjs';
+import { FEED_BERRY_COST } from '../src/core/balance.mjs';
 import { applyCommand } from '../src/core/commands.mjs';
 import {
   getCompanionEligibility,
@@ -220,7 +220,7 @@ function buildSixResidentBeds4Envelope() {
   return createFreshEnvelope({
     nowWallMs: V1_WALL_MS,
     revision: 1,
-    state: playUntilPopulation(POPULATION_CAP),
+    state: playUntilPopulation(6),
   });
 }
 

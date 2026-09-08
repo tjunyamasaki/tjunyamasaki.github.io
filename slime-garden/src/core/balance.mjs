@@ -1,12 +1,18 @@
 /**
- * Centralized v1 economy constants. Integer micro-Glow and milliseconds.
+ * Centralized economy and world constants. Integer micro-Glow and milliseconds.
+ * Phase-2 numbers (cap 10, eight bed purchases, throw/world clocks).
+ * Persistence/legacy validate.mjs still uses SCHEMA_VERSION 1 / BALANCE_VERSION 1
+ * / HABITAT_ID garden-prototype-v1. Do not bump those here (P2-03).
  * Core must not import DOM, Three, wall-clock APIs, or randomness.
  */
 
 export const MICRO_PER_GLOW = 1_000_000;
 export const MAX_GLOW_MICRO = 9_000_000_000_000;
 export const OFFLINE_CAP_MS = 28_800_000;
+/** v1 FEED / validate cooldown. Do not change; v1 fixtures depend on 4000. */
 export const FEED_COOLDOWN_MS = 4_000;
+/** Phase-2 throw cooldown (P2-07). Separate from FEED_COOLDOWN_MS. */
+export const THROW_COOLDOWN_MS = 1_000;
 export const BONUS_EXTEND_MS = 120_000;
 export const BONUS_MAX_REMAINING_MS = 300_000;
 export const BONUS_MULTIPLIER = 2;
@@ -19,7 +25,7 @@ export const BASE_BERRY_CAPACITY = 12;
 export const BASE_BERRY_INTERVAL_MS = 15_000;
 export const BASE_RESIDENT_CAPACITY = 2;
 export const STARTING_POPULATION = 1;
-export const POPULATION_CAP = 6;
+export const POPULATION_CAP = 10;
 export const FEED_BERRY_COST = 1;
 export const FEED_COUNTER_CAP = 1_000_000_000;
 export const LOGICAL_TIME_MAX_MS = 1_000_000_000_000;
@@ -30,17 +36,32 @@ export const STARTING_GLOW_MICRO = 0;
 export const STARTING_LIFETIME_GLOW_MICRO = 0;
 export const STARTING_INCOME_REMAINDER = 0;
 export const STARTING_NEXT_FEED_ALLOWED_AT_MS = 0;
+export const STARTING_NEXT_THROW_ALLOWED_AT_MS = 0;
 export const INITIAL_HOME_SLOT = 0;
 export const NAME_MAX_LENGTH = 32;
 
+/** Persistence/legacy constants consumed by validate.mjs. Still v1. */
 export const SCHEMA_VERSION = 1;
 export const BALANCE_VERSION = 1;
 export const GAME_ID = 'cozy-slime-mvp';
 export const HABITAT_ID = 'garden-prototype-v1';
 export const ARRIVAL_STYLE_ID = 'visitor-v1';
 
+/** Future envelope identity (P2-03). Not written by createInitialState this packet. */
+export const SCHEMA_VERSION_V2 = 2;
+export const BALANCE_VERSION_V2 = 2;
+export const HABITAT_ID_V2 = 'farm-v2';
+
 export const TUTORIAL_STEPS = Object.freeze(
-  /** @type {const} */ (['feed', 'berry', 'welcome', 'upgrade']),
+  /** @type {const} */ ([
+    'feed',
+    'berry',
+    'welcome',
+    'upgrade',
+    'throw',
+    'pet',
+    'camera',
+  ]),
 );
 
 export const SLIME_NAMES = Object.freeze([
@@ -50,6 +71,10 @@ export const SLIME_NAMES = Object.freeze([
   'Slime 4',
   'Slime 5',
   'Slime 6',
+  'Slime 7',
+  'Slime 8',
+  'Slime 9',
+  'Slime 10',
 ]);
 
 export const UPGRADE_IDS = Object.freeze(
@@ -60,7 +85,7 @@ export const UPGRADE_MAX_LEVEL = Object.freeze({
   shrub: 3,
   pantry: 2,
   bloom: 5,
-  beds: 4,
+  beds: 8,
 });
 
 /** Glow prices to buy shrub levels 1, 2, and 3. */
@@ -74,9 +99,12 @@ export const PANTRY_CAPACITIES = Object.freeze([12, 18, 24]);
 
 export const BLOOM_COSTS_GLOW = Object.freeze([20, 70, 220, 650, 1800]);
 
-export const BEDS_COSTS_GLOW = Object.freeze([40, 140, 400, 1000]);
-/** Resident capacity by beds level 0–4. */
-export const BEDS_CAPACITIES = Object.freeze([2, 3, 4, 5, 6]);
+/** Glow prices to buy beds levels 1–8. First four prices unchanged from v1. */
+export const BEDS_COSTS_GLOW = Object.freeze([
+  40, 140, 400, 1000, 1800, 3000, 5000, 8000,
+]);
+/** Resident capacity by beds level 0–8. */
+export const BEDS_CAPACITIES = Object.freeze([2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 export const SHRUB_COSTS_MICRO = Object.freeze(
   SHRUB_COSTS_GLOW.map((glow) => glow * MICRO_PER_GLOW),
@@ -111,8 +139,8 @@ export const BLOOM_RATE_MICRO_PER_SECOND_BY_LEVEL = Object.freeze(
 );
 
 /**
- * Cumulative requirements to welcome the next resident (population 2…6).
- * Glow gates use lifetime earned micro-Glow, never the spendable wallet.
+ * Cumulative requirements to welcome the next resident (population 2…10).
+ * Gates 2–6 are unchanged from v1. Glow gates use lifetime earned micro-Glow.
  */
 export const COMPANION_MILESTONES = Object.freeze([
   Object.freeze({
@@ -145,13 +173,57 @@ export const COMPANION_MILESTONES = Object.freeze([
     requiredLifetimeGlowMicro: 2200 * MICRO_PER_GLOW,
     requiredCapacity: 6,
   }),
+  Object.freeze({
+    nextPopulation: 7,
+    requiredFeeds: 260,
+    requiredLifetimeGlowMicro: 4000 * MICRO_PER_GLOW,
+    requiredCapacity: 7,
+  }),
+  Object.freeze({
+    nextPopulation: 8,
+    requiredFeeds: 330,
+    requiredLifetimeGlowMicro: 7000 * MICRO_PER_GLOW,
+    requiredCapacity: 8,
+  }),
+  Object.freeze({
+    nextPopulation: 9,
+    requiredFeeds: 410,
+    requiredLifetimeGlowMicro: 11000 * MICRO_PER_GLOW,
+    requiredCapacity: 9,
+  }),
+  Object.freeze({
+    nextPopulation: 10,
+    requiredFeeds: 500,
+    requiredLifetimeGlowMicro: 16000 * MICRO_PER_GLOW,
+    requiredCapacity: 10,
+  }),
 ]);
+
+/** Active world fixed step (20 Hz). */
+export const WORLD_STEP_MS = 50;
+/** Persistent unstepped active carry is an integer in 0..49. */
+export const WORLD_CARRY_MAX_MS = 49;
+export const FOOD_FLIGHT_MS = 600;
+export const EAT_DURATION_MS = 800;
+export const POST_MEAL_REST_MS = 1500;
+export const MAX_FOOD = 12;
+export const MAX_WORLD_STEPS_PER_ADVANCE = 100;
+/** Geometric tolerance for finite world-unit floats. Do not integer-round positions. */
+export const GEOM_EPS = 1e-6;
+export const MAX_ACTIVE_ROUTES = 3;
+export const GAIT_CYCLE_MS = 1250;
+export const STRIDE_UNITS = 1;
+export const EAT_APPROACH_MIN = 1.0;
+export const EAT_APPROACH_MAX = 1.25;
+/** Presentation-only pet cooldown (constant this packet; no pet command). */
+export const PET_FEEDBACK_COOLDOWN_MS = 2000;
 
 export const BALANCE = Object.freeze({
   MICRO_PER_GLOW,
   MAX_GLOW_MICRO,
   OFFLINE_CAP_MS,
   FEED_COOLDOWN_MS,
+  THROW_COOLDOWN_MS,
   BONUS_EXTEND_MS,
   BONUS_MAX_REMAINING_MS,
   BONUS_MULTIPLIER,
@@ -167,10 +239,15 @@ export const BALANCE = Object.freeze({
   FEED_COUNTER_CAP,
   LOGICAL_TIME_MAX_MS,
   INCOME_REMAINDER_MOD,
+  STARTING_NEXT_FEED_ALLOWED_AT_MS,
+  STARTING_NEXT_THROW_ALLOWED_AT_MS,
   SCHEMA_VERSION,
   BALANCE_VERSION,
+  SCHEMA_VERSION_V2,
+  BALANCE_VERSION_V2,
   GAME_ID,
   HABITAT_ID,
+  HABITAT_ID_V2,
   ARRIVAL_STYLE_ID,
   TUTORIAL_STEPS,
   SLIME_NAMES,
@@ -190,4 +267,18 @@ export const BALANCE = Object.freeze({
   BEDS_CAPACITIES,
   UPGRADE_COSTS_MICRO,
   COMPANION_MILESTONES,
+  WORLD_STEP_MS,
+  WORLD_CARRY_MAX_MS,
+  FOOD_FLIGHT_MS,
+  EAT_DURATION_MS,
+  POST_MEAL_REST_MS,
+  MAX_FOOD,
+  MAX_WORLD_STEPS_PER_ADVANCE,
+  GEOM_EPS,
+  MAX_ACTIVE_ROUTES,
+  GAIT_CYCLE_MS,
+  STRIDE_UNITS,
+  EAT_APPROACH_MIN,
+  EAT_APPROACH_MAX,
+  PET_FEEDBACK_COOLDOWN_MS,
 });

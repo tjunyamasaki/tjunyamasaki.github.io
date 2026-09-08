@@ -523,7 +523,7 @@ describe('WELCOME_COMPANION', () => {
         totalFeeds: 200,
         lifetimeGlowMicro: 2200 * MICRO_PER_GLOW,
         glowMicro: 2200 * MICRO_PER_GLOW,
-        upgrades: { beds: 4 },
+        upgrades: { beds: 8 },
         slimes: makeSlimes(POPULATION_CAP),
       }),
     );
@@ -536,7 +536,7 @@ describe('WELCOME_COMPANION', () => {
     assert.equal(seventh.reason, 'POPULATION_CAP');
     assert.equal(seventh.state, atCap);
     assert.deepEqual(atCap, capSnapshot);
-    assert.equal(atCap.slimes.length, 6);
+    assert.equal(atCap.slimes.length, POPULATION_CAP);
     assert.equal(atCap.glowMicro, 2200 * MICRO_PER_GLOW);
     assert.deepEqual(seventh.events, []);
   });

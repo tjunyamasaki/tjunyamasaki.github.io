@@ -7,12 +7,14 @@ import { fileURLToPath } from 'node:url';
 import {
   ARRIVAL_STYLE_ID,
   BEDS_CAPACITIES,
+  BEDS_COSTS_GLOW,
   BEDS_COSTS_MICRO,
   BLOOM_COSTS_MICRO,
   COMPANION_MILESTONES,
   GAME_ID,
   HABITAT_ID,
   MICRO_PER_GLOW,
+  OFFLINE_CAP_MS,
   PANTRY_CAPACITIES,
   PANTRY_COSTS_MICRO,
   POPULATION_CAP,
@@ -29,11 +31,14 @@ import {
   getNextUpgradeCostMicro,
   getRateMicroPerSecond,
   getResidentCapacity,
+  isAffordable,
+  resolveNearSelectedTarget,
 } from '../src/core/selectors.mjs';
-import { createInitialState } from '../src/core/state.mjs';
+import { cloneState, createInitialState } from '../src/core/state.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const coreDir = join(here, '../src/core');
+const worldDir = join(here, '../src/world');
 
 /**
  * @param {object} [patch]
@@ -94,6 +99,8 @@ describe('createInitialState', () => {
     assert.equal(state.berries, 6);
     assert.equal(state.nextBerryAtMs, 15_000);
     assert.equal(state.nextFeedAllowedAtMs, 0);
+    assert.equal(state.nextThrowAllowedAtMs, 0);
+    assert.equal(state.nextThrowAllowedAtMs, state.nextFeedAllowedAtMs);
     assert.equal(state.totalFeeds, 0);
     assert.deepEqual(state.upgrades, {
       shrub: 0,
@@ -120,15 +127,59 @@ describe('createInitialState', () => {
     assert.equal(getResidentCapacity(state), 2);
     assert.equal(getRateMicroPerSecond(state), 100_000);
     assert.equal(GAME_ID, 'cozy-slime-mvp');
-    assert.deepEqual([...TUTORIAL_STEPS], ['feed', 'berry', 'welcome', 'upgrade']);
-    assert.deepEqual([...SLIME_NAMES], [
-      'Slime 1',
-      'Slime 2',
-      'Slime 3',
-      'Slime 4',
-      'Slime 5',
-      'Slime 6',
+    assert.deepEqual(
+      [...TUTORIAL_STEPS],
+      ['feed', 'berry', 'welcome', 'upgrade', 'throw', 'pet', 'camera'],
+    );
+    assert.deepEqual(
+      [...SLIME_NAMES],
+      [
+        'Slime 1',
+        'Slime 2',
+        'Slime 3',
+        'Slime 4',
+        'Slime 5',
+        'Slime 6',
+        'Slime 7',
+        'Slime 8',
+        'Slime 9',
+        'Slime 10',
+      ],
+    );
+    assert.equal(POPULATION_CAP, 10);
+    assert.equal(state.world.timeMs, 0);
+    assert.equal(state.world.carryMs, 0);
+    assert.equal(state.world.nextFoodSequence, 1);
+    assert.deepEqual(state.world.foods, []);
+    assert.equal(state.world.residents.length, 1);
+    assert.equal(state.world.residents[0].activity, 'idle');
+    assert.deepEqual(state.world.residents[0].position, { x: 0, z: 2 });
+    assert.equal(state.world.residents[0].route, null);
+    assert.equal(state.world.residents[0].nextDecisionWorldMs, 2000);
+  });
+
+  test('v1 enumerable save shape omits in-memory world/throw until P2-03', () => {
+    const state = createInitialState();
+    assert.deepEqual(Object.keys(state).sort(), [
+      'arrivalStyleId',
+      'berries',
+      'glowMicro',
+      'habitatId',
+      'incomeRemainder',
+      'lifetimeGlowMicro',
+      'nextBerryAtMs',
+      'nextFeedAllowedAtMs',
+      'simTimeMs',
+      'slimes',
+      'totalFeeds',
+      'tutorialCompleted',
+      'upgrades',
     ]);
+    const json = JSON.parse(JSON.stringify(state));
+    assert.equal('world' in json, false);
+    assert.equal('nextThrowAllowedAtMs' in json, false);
+    assert.ok(state.world);
+    assert.equal(state.nextThrowAllowedAtMs, 0);
   });
 
   test('returns a new object tree every call', () => {
@@ -199,6 +250,10 @@ describe('upgrade selectors (table-driven)', () => {
       [2, 4],
       [3, 5],
       [4, 6],
+      [5, 7],
+      [6, 8],
+      [7, 9],
+      [8, 10],
     ];
     assert.equal(table.length, UPGRADE_MAX_LEVEL.beds + 1);
     assert.deepEqual(
@@ -258,6 +313,30 @@ describe('colony production at Bloom 5', () => {
     });
     assert.equal(getRateMicroPerSecond(state), 2_700_000);
   });
+
+  test('ten unboosted Bloom5 residents produce 2_250_000 micro/s', () => {
+    const state = makeState({
+      simTimeMs: 10_000,
+      upgrades: { bloom: 5, beds: 8 },
+      slimes: makeSlimes(10, { boostUntilMs: 0 }),
+    });
+    assert.equal(getRateMicroPerSecond(state), 2_250_000);
+  });
+
+  test('ten boosted Bloom5 residents produce 4_500_000 micro/s', () => {
+    const state = makeState({
+      simTimeMs: 10_000,
+      upgrades: { bloom: 5, beds: 8 },
+      slimes: makeSlimes(10, { boostUntilMs: 10_001 }),
+    });
+    assert.equal(getRateMicroPerSecond(state), 4_500_000);
+  });
+
+  test('max boosted ten-resident rate times eight-hour ms is a safe integer', () => {
+    const product = 4_500_000 * OFFLINE_CAP_MS;
+    assert.equal(product, 129_600_000_000_000);
+    assert.equal(Number.isSafeInteger(product), true);
+  });
 });
 
 describe('getCompanionEligibility', () => {
@@ -309,16 +388,63 @@ describe('getCompanionEligibility', () => {
     assert.equal(eligibility.ready, false);
   });
 
+  test('at six residents the next gate is resident 7, not the cap', () => {
+    const state = makeState({
+      glowMicro: 0,
+      lifetimeGlowMicro: 2200 * MICRO_PER_GLOW,
+      totalFeeds: 200,
+      upgrades: { beds: 4 },
+      slimes: makeSlimes(6),
+    });
+    const eligibility = getCompanionEligibility(state);
+    assert.equal(eligibility.nextPopulation, 7);
+    assert.equal(eligibility.requiredFeeds, 260);
+    assert.equal(eligibility.requiredLifetimeGlowMicro, 4000 * MICRO_PER_GLOW);
+    assert.equal(eligibility.requiredCapacity, 7);
+    assert.equal(eligibility.feedsMet, false);
+    assert.equal(eligibility.glowMet, false);
+    assert.equal(eligibility.capacityMet, false);
+    assert.equal(eligibility.ready, false);
+  });
+
+  test('resident-7 gates are 260 feeds, 4000 lifetime Glow, capacity 7', () => {
+    const almost = makeState({
+      lifetimeGlowMicro: 4000 * MICRO_PER_GLOW,
+      totalFeeds: 259,
+      upgrades: { beds: 5 },
+      slimes: makeSlimes(6),
+    });
+    const almostEl = getCompanionEligibility(almost);
+    assert.equal(almostEl.nextPopulation, 7);
+    assert.equal(almostEl.feedsMet, false);
+    assert.equal(almostEl.glowMet, true);
+    assert.equal(almostEl.capacityMet, true);
+    assert.equal(almostEl.ready, false);
+
+    const ready = makeState({
+      lifetimeGlowMicro: 4000 * MICRO_PER_GLOW,
+      totalFeeds: 260,
+      upgrades: { beds: 5 },
+      slimes: makeSlimes(6),
+    });
+    const readyEl = getCompanionEligibility(ready);
+    assert.equal(readyEl.ready, true);
+    assert.equal(readyEl.requiredFeeds, 260);
+    assert.equal(readyEl.requiredLifetimeGlowMicro, 4000 * MICRO_PER_GLOW);
+    assert.equal(readyEl.requiredCapacity, 7);
+  });
+
   test('at the population cap nextPopulation is null and ready is false', () => {
     const last = COMPANION_MILESTONES[COMPANION_MILESTONES.length - 1];
     const state = makeState({
       glowMicro: 0,
       lifetimeGlowMicro: last.requiredLifetimeGlowMicro,
       totalFeeds: last.requiredFeeds,
-      upgrades: { beds: 4 },
-      slimes: makeSlimes(6),
+      upgrades: { beds: 8 },
+      slimes: makeSlimes(10),
     });
     const eligibility = getCompanionEligibility(state);
+    assert.equal(last.nextPopulation, 10);
     assert.equal(eligibility.nextPopulation, null);
     assert.equal(eligibility.ready, false);
     assert.equal(eligibility.requiredFeeds, last.requiredFeeds);
@@ -327,6 +453,9 @@ describe('getCompanionEligibility', () => {
       last.requiredLifetimeGlowMicro,
     );
     assert.equal(eligibility.requiredCapacity, last.requiredCapacity);
+    assert.equal(eligibility.requiredFeeds, 500);
+    assert.equal(eligibility.requiredLifetimeGlowMicro, 16000 * MICRO_PER_GLOW);
+    assert.equal(eligibility.requiredCapacity, 10);
   });
 });
 
@@ -356,6 +485,14 @@ describe('getNextUpgradeCostMicro', () => {
     assert.equal(getNextUpgradeCostMicro(fresh, 'pantry'), 30 * MICRO_PER_GLOW);
     assert.equal(getNextUpgradeCostMicro(fresh, 'bloom'), 20 * MICRO_PER_GLOW);
     assert.equal(getNextUpgradeCostMicro(fresh, 'beds'), 40 * MICRO_PER_GLOW);
+    const beds7 = makeState({ upgrades: { beds: 7 } });
+    assert.equal(getNextUpgradeCostMicro(beds7, 'beds'), 8000 * MICRO_PER_GLOW);
+    const beds8 = makeState({ upgrades: { beds: 8 } });
+    assert.equal(getNextUpgradeCostMicro(beds8, 'beds'), null);
+    assert.equal(BEDS_COSTS_GLOW[BEDS_COSTS_GLOW.length - 1], 8000);
+    assert.equal(isAffordable(makeState({ glowMicro: 40 * MICRO_PER_GLOW }), 'beds'), true);
+    assert.equal(isAffordable(makeState({ glowMicro: 40 * MICRO_PER_GLOW - 1 }), 'beds'), false);
+    assert.equal(isAffordable(beds8, 'beds'), false);
   });
 });
 
@@ -370,7 +507,68 @@ describe('selector purity', () => {
     assert.equal(getNextUpgradeCostMicro(state, 'shrub'), 15 * MICRO_PER_GLOW);
     const eligibility = getCompanionEligibility(state);
     assert.equal(eligibility.ready, false);
+    assert.equal(isAffordable(state, 'shrub'), false);
     assert.deepEqual(state, before);
+  });
+});
+
+describe('cloneState world independence', () => {
+  test('mutating cloned world position, foods, and route.points leaves the original', () => {
+    const original = createInitialState();
+    original.world.foods.push({
+      id: 'food-1',
+      target: { x: 1.1, z: 2 },
+      createdWorldMs: 0,
+      landAtWorldMs: 600,
+      stage: 'flying',
+      claimedBy: null,
+      eatUntilWorldMs: null,
+    });
+    original.world.residents[0].route = {
+      points: [
+        { x: 0, z: 2 },
+        { x: 1, z: 2 },
+      ],
+      length: 1,
+      startedWorldMs: 0,
+      cycleCount: 1,
+      distanceAlong: 0,
+    };
+    const cloned = cloneState(original);
+    cloned.world.residents[0].position.x = 99;
+    cloned.world.residents[0].position.z = 99;
+    cloned.world.foods[0].target.x = 50;
+    cloned.world.foods.push({
+      id: 'food-2',
+      target: { x: 0, z: 0 },
+      createdWorldMs: 0,
+      landAtWorldMs: 600,
+      stage: 'landed',
+      claimedBy: null,
+      eatUntilWorldMs: null,
+    });
+    cloned.world.residents[0].route.points[0].x = -7;
+    cloned.world.residents[0].route.points.push({ x: 2, z: 2 });
+    cloned.nextFeedAllowedAtMs = 4000;
+    assert.equal(original.world.residents[0].position.x, 0);
+    assert.equal(original.world.residents[0].position.z, 2);
+    assert.equal(original.world.foods.length, 1);
+    assert.equal(original.world.foods[0].target.x, 1.1);
+    assert.equal(original.world.residents[0].route.points.length, 2);
+    assert.equal(original.world.residents[0].route.points[0].x, 0);
+    assert.equal(original.nextFeedAllowedAtMs, 0);
+    assert.equal(original.nextThrowAllowedAtMs, 0);
+    assert.equal(cloned.nextThrowAllowedAtMs, 4000);
+    assert.equal(cloned.nextFeedAllowedAtMs, cloned.nextThrowAllowedAtMs);
+  });
+
+  test('resolveNearSelectedTarget returns a legal point in front of slime-1', () => {
+    const state = createInitialState();
+    const point = resolveNearSelectedTarget(state, 'slime-1');
+    assert.ok(point);
+    assert.equal(point.x, 0);
+    assert.equal(point.z, 3.5);
+    assert.equal(resolveNearSelectedTarget(state, 'slime-99'), null);
   });
 });
 
@@ -396,5 +594,35 @@ describe('core module isolation', () => {
         );
       }
     }
+  });
+
+  test('world files do not import DOM, Three, performance, Date, or randomness', () => {
+    const files = ['layout.mjs', 'state.mjs'];
+    const forbidden = [
+      /\bdocument\b/,
+      /\bwindow\b/,
+      /\blocalStorage\b/,
+      /from\s+['"][^'"]*three/i,
+      /from\s+['"][^'"]*scene\//,
+      /performance\s*\./,
+      /\bDate\s*\./,
+      /Math\s*\.\s*random/,
+    ];
+    for (const file of files) {
+      const source = readFileSync(join(worldDir, file), 'utf8');
+      for (const pattern of forbidden) {
+        assert.equal(
+          pattern.test(source),
+          false,
+          `world/${file} must not contain ${pattern}`,
+        );
+      }
+    }
+    const worldState = readFileSync(join(worldDir, 'state.mjs'), 'utf8');
+    assert.equal(
+      /from\s+['"][^'"]*core\/state\.mjs['"]/.test(worldState),
+      false,
+      'world/state.mjs must not import core/state.mjs',
+    );
   });
 });

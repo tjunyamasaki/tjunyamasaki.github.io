@@ -224,3 +224,111 @@ Storage keys stay `cozy-slime-mvp:primary:v1` / `cozy-slime-mvp:backup:v1` until
 | P2-13 | All of the above plus `advanceBy` vs `dispatch` commit split and positional resets (section 6). |
 
 Until P2-13, old `main.mjs` / DOM still speak FEED and WELCOME. That incompatibility is expected after P2-02+; do not add a compatibility instant-feed control.
+
+## 9. P2-02 published exports and temporary incompatibilities
+
+Landed on `feat/slime` after P2-01 (`825d200`). In-memory GameState is v2-shaped (`world`, `nextThrowAllowedAtMs`); persistence is still schema 1.
+
+### 9.1 `slime-garden/src/core/balance.mjs`
+
+Use these named exports (also frozen on `BALANCE`):
+
+| Export | Value / note |
+| --- | --- |
+| `POPULATION_CAP` | `10` |
+| `SLIME_NAMES` | `'Slime 1'` … `'Slime 10'` |
+| `UPGRADE_MAX_LEVEL.beds` | `8` |
+| `BEDS_COSTS_GLOW` | `[40, 140, 400, 1000, 1800, 3000, 5000, 8000]` |
+| `BEDS_CAPACITIES` | `[2, 3, 4, 5, 6, 7, 8, 9, 10]` (index = beds level 0–8) |
+| `COMPANION_MILESTONES` | nine gates; 2–6 unchanged; 7: 260 / 4000 Glow / cap 7; 8: 330 / 7000 / 8; 9: 410 / 11000 / 9; 10: 500 / 16000 / 10 |
+| `FEED_COOLDOWN_MS` | still `4000` (v1 FEED + validate) |
+| `THROW_COOLDOWN_MS` | `1000` (P2-07; do not alias onto `FEED_COOLDOWN_MS`) |
+| `STARTING_NEXT_FEED_ALLOWED_AT_MS` | `0` |
+| `STARTING_NEXT_THROW_ALLOWED_AT_MS` | `0` |
+| `SCHEMA_VERSION` / `BALANCE_VERSION` | still `1` (validate.mjs) |
+| `HABITAT_ID` | still `'garden-prototype-v1'` (validate.mjs + `createInitialState().habitatId`) |
+| `SCHEMA_VERSION_V2` | `2` |
+| `BALANCE_VERSION_V2` | `2` |
+| `HABITAT_ID_V2` | `'farm-v2'` (layout identity only this packet) |
+| `TUTORIAL_STEPS` | `feed`, `berry`, `welcome`, `upgrade`, `throw`, `pet`, `camera` |
+| `WORLD_STEP_MS` | `50` |
+| `WORLD_CARRY_MAX_MS` | `49` |
+| `FOOD_FLIGHT_MS` | `600` |
+| `EAT_DURATION_MS` | `800` |
+| `POST_MEAL_REST_MS` | `1500` |
+| `MAX_FOOD` | `12` |
+| `MAX_WORLD_STEPS_PER_ADVANCE` | `100` |
+| `GEOM_EPS` | `1e-6` |
+| `MAX_ACTIVE_ROUTES` | `3` |
+| `GAIT_CYCLE_MS` | `1250` |
+| `STRIDE_UNITS` | `1` |
+| `EAT_APPROACH_MIN` / `EAT_APPROACH_MAX` | `1.0` / `1.25` |
+| `PET_FEEDBACK_COOLDOWN_MS` | `2000` (constant only) |
+
+Shrub / pantry / bloom prices and intervals are unchanged.
+
+### 9.2 `slime-garden/src/world/layout.mjs` (authority for farm geometry)
+
+Do not duplicate these numbers in scene or selectors. `scene/layout.mjs` remains six-slot v1.
+
+| Export | Role |
+| --- | --- |
+| `FARM_LAYOUT` | `{ id: HABITAT_ID_V2 ('farm-v2'), homeSlots, staticProps, fence, gate, footprint }` |
+| `HOME_SLOTS` | ten pads; slot 0 is `(0, 2)` |
+| `homePosition(slot)` | copy of that pad, or `null` |
+| `STATIC_PROPS` | shrub `(-10.8,-5.5)`, pantry `(-10.8,5.5)`, bloom `(10.8,-4.5)`, r=`0.5` |
+| `isFinitePoint(point)` | finite `x`/`z`; no integer rounding |
+| `isValidFoodTarget(point)` | food rect, not gate lane / arrival corridor / prop food-exclusion; ≥1 of 16×3 approach samples in `[1.0,1.25]` is a valid slime center. Does not clamp. Ignores dynamic actors. |
+| `isValidResidentCenter(point)` | resident domain, outside movement-inflated props (r+1.2) |
+| `isInFoodRect` / `isInProtectedGateLane` / `isInArrivalCorridor` / `isInResidentDomain` | predicates |
+| `freePositionCandidates()` | homes first, then bounded grid |
+| `findFreePosition({ occupied, reserved })` | first candidate ≥ `MIN_SEPARATION` (2.4) from blockers |
+| `isSeparatedFrom(point, others, minSep?)` | |
+| `pairDistance` / `minHomeSlotSeparation` | min pair is 3 as designed (≥ 2.4 required) |
+| `GATE_STAGING` `(0,-12)` / `GATE_INSIDE_WAYPOINT` `(0,-7)` | |
+| `NEAR_SELECTED_TARGET_RADIUS` | `1.5` |
+| Fence | centerlines `x=±12`, `z=±10` |
+
+No A*, no Three.
+
+### 9.3 `slime-garden/src/world/state.mjs`
+
+| Export | Role |
+| --- | --- |
+| `createWorld(slimes)` | `timeMs` 0, `carryMs` 0, `nextFoodSequence` 1, `foods` `[]`, idle residents at homes in numeric id order; `nextDecisionWorldMs = 2000 + homeSlot*250` |
+| `cloneWorld(world)` | field-by-field; new foods/residents/route.points |
+| `createIdleResident(slime, position?)` | default idle record |
+| `reconcileWorldResidents(world, slimes)` | add at home/free point, drop extras, keep survivor poses |
+| `syncWorldRoster(state)` | cloned GameState + reconciled world (canonical roster helper) |
+| `cloneGameState(state)` | used by `core/state.cloneState` |
+| `attachThrowCooldownAlias` / `attachWorld` / `preferredCooldownMs` | in-memory v1 JSON compatibility |
+| `decisionTimeForSlot` / `slimeNumericId` | |
+
+World does **not** import `core/state.mjs` or scene.
+
+### 9.4 `slime-garden/src/core/state.mjs` / `selectors.mjs`
+
+| Export | Role |
+| --- | --- |
+| `createInitialState()` | one slime at slot 0; `world` via `createWorld`; both cooldown names `0`; **`habitatId` remains `garden-prototype-v1`** |
+| `cloneState(state)` | deep clone including world; synthesizes `createWorld(slimes)` if `world` is missing (v1 load); copies both cooldown names to one integer (prefers `nextThrowAllowedAtMs`) |
+| `syncWorldRoster` / `createWorld` | re-exported from `world/state.mjs` |
+| `getRateMicroPerSecond` / `getResidentCapacity` / `getCompanionEligibility` / `getNextUpgradeCostMicro` | work for 1–10 residents and beds 0–8 |
+| `isAffordable(state, upgradeId)` | `glowMicro >= getNextUpgradeCostMicro` |
+| `resolveNearSelectedTarget(state, slimeId)` | eight points, radius 1.5, `k*π/4` with k=0 = local +Z; first `isValidFoodTarget` or `null` |
+| `isValidFoodTarget` / `isFinitePoint` | thin re-exports; **layout.mjs is the authority** |
+
+### 9.5 Cooldown alias (until P2-07)
+
+`GameState.nextThrowAllowedAtMs` is a **non-enumerable getter/setter** for the same integer as enumerable `nextFeedAllowedAtMs`. FEED still writes `nextFeedAllowedAtMs = t + 4000`; the throw name follows. Do not keep two clocks. `THROW_COOLDOWN_MS` is 1000 and is unused until P2-07.
+
+### 9.6 Save / UI incompatibilities this packet
+
+- **`SCHEMA_VERSION` stays 1.** Do not bump it here (every current save would become FUTURE).
+- **In-memory habitat remains `garden-prototype-v1` until P2-03 writes `farm-v2`.** `HABITAT_ID_V2` is exported and used as `FARM_LAYOUT.id` only. Prefer working v1 save/load over putting `farm-v2` on `createInitialState().habitatId`.
+- **`world` is non-enumerable** on GameState so `serializeEnvelope` → `JSON.stringify(cloneState(...))` still matches frozen v1 fixtures. Property access `state.world` works this visit. Reloading a save **drops** world (validate reconstruct is still v1); `cloneState` after load synthesizes idle residents at homes.
+- **`nextThrowAllowedAtMs` is likewise omitted from JSON** until P2-03.
+- **P2-03 must freeze legacy validation independently** because `POPULATION_CAP` is now 10 and `UPGRADE_MAX_LEVEL.beds` is 8. Current `validate.mjs` would accept a claimed-v1 ten-slime / beds-8 envelope.
+- **Scene still has six pads** (`scene/layout.mjs`). UI will show eight bed levels and ten names. Welcome can add past six into a six-pad scene until P2-10/P2-13.
+- Live garden can still FEED / WELCOME in memory this visit (commands unchanged except the cap is 10). THROW_FOOD is not implemented.
+- The playable farm is **not** done. No navigation A*, no camera HUD, no automatic arrivals.

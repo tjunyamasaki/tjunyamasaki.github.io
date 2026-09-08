@@ -1,0 +1,694 @@
+{
+  "kind": "phase-2-design-estimate",
+  "timestepSec": 1,
+  "balance": {
+    "cap": 10,
+    "berryIntervals": [
+      15,
+      12,
+      10,
+      8
+    ],
+    "berryCaps": [
+      12,
+      18,
+      24
+    ],
+    "costs": {
+      "shrub": [
+        15,
+        60,
+        180
+      ],
+      "pantry": [
+        30,
+        100
+      ],
+      "bloom": [
+        20,
+        70,
+        220,
+        650,
+        1800
+      ],
+      "beds": [
+        40,
+        140,
+        400,
+        1000,
+        1800,
+        3000,
+        5000,
+        8000
+      ]
+    },
+    "milestones": [
+      [
+        2,
+        6,
+        12
+      ],
+      [
+        3,
+        24,
+        90
+      ],
+      [
+        4,
+        60,
+        300
+      ],
+      [
+        5,
+        120,
+        900
+      ],
+      [
+        6,
+        200,
+        2200
+      ],
+      [
+        7,
+        260,
+        4000
+      ],
+      [
+        8,
+        330,
+        7000
+      ],
+      [
+        9,
+        410,
+        11000
+      ],
+      [
+        10,
+        500,
+        16000
+      ]
+    ],
+    "throwCooldownSec": 1,
+    "mealDelaySec": 2,
+    "pendingLimit": 12
+  },
+  "caveats": [
+    "No spatial routes/collisions. Assumes a favorable near-slime throw and fixed 2-active-second throw-to-meal delay.",
+    "Throws deliberately target the least-boosted available resident; real spatial allocation is nearest feasible.",
+    "One-second economy crossings approximate millisecond production requirements.",
+    "Short visits freeze pending meal delay outside visits but leave economy logically running. No actual checkpoint/cap/lock validation.",
+    "Buying policy prioritizes needed beds after meal gate, otherwise shrub, Bloom, pantry. Not a recommended human click schedule.",
+    "Meal/boost results are policy estimates, not proof that repeated feeding is enjoyable."
+  ],
+  "results": [
+    {
+      "policy": "attentive",
+      "durationSec": 14400,
+      "throwEverySec": 1,
+      "visitEverySec": 0,
+      "visitLengthSec": 0,
+      "summary": {
+        "population": 10,
+        "completedMeals": 1776,
+        "thrown": 1776,
+        "pending": 0,
+        "glow": 27639.625,
+        "lifetimeGlow": 50164.625,
+        "berries": 0,
+        "upgrades": {
+          "shrub": 3,
+          "pantry": 2,
+          "bloom": 5,
+          "beds": 8
+        }
+      },
+      "arrivals": [
+        {
+          "atSec": 61,
+          "population": 2,
+          "feeds": 9,
+          "lifetimeGlow": 12
+        },
+        {
+          "atSec": 265,
+          "population": 3,
+          "feeds": 26,
+          "lifetimeGlow": 105.2
+        },
+        {
+          "atSec": 707,
+          "population": 4,
+          "feeds": 68,
+          "lifetimeGlow": 475.1
+        },
+        {
+          "atSec": 1328,
+          "population": 5,
+          "feeds": 142,
+          "lifetimeGlow": 1275.7
+        },
+        {
+          "atSec": 2200,
+          "population": 6,
+          "feeds": 251,
+          "lifetimeGlow": 2925.825
+        },
+        {
+          "atSec": 2951,
+          "population": 7,
+          "feeds": 345,
+          "lifetimeGlow": 4727.225
+        },
+        {
+          "atSec": 4023,
+          "population": 8,
+          "feeds": 479,
+          "lifetimeGlow": 7727.625
+        },
+        {
+          "atSec": 5586,
+          "population": 9,
+          "feeds": 674,
+          "lifetimeGlow": 12728.025
+        },
+        {
+          "atSec": 7808,
+          "population": 10,
+          "feeds": 952,
+          "lifetimeGlow": 20726.625
+        }
+      ],
+      "purchases": [
+        {
+          "atSec": 71,
+          "id": "shrub",
+          "level": 1,
+          "priceGlow": 15
+        },
+        {
+          "atSec": 125,
+          "id": "bloom",
+          "level": 1,
+          "priceGlow": 20
+        },
+        {
+          "atSec": 185,
+          "id": "pantry",
+          "level": 1,
+          "priceGlow": 30
+        },
+        {
+          "atSec": 265,
+          "id": "beds",
+          "level": 1,
+          "priceGlow": 40
+        },
+        {
+          "atSec": 347,
+          "id": "shrub",
+          "level": 2,
+          "priceGlow": 60
+        },
+        {
+          "atSec": 441,
+          "id": "bloom",
+          "level": 2,
+          "priceGlow": 70
+        },
+        {
+          "atSec": 552,
+          "id": "pantry",
+          "level": 2,
+          "priceGlow": 100
+        },
+        {
+          "atSec": 707,
+          "id": "beds",
+          "level": 2,
+          "priceGlow": 140
+        },
+        {
+          "atSec": 859,
+          "id": "shrub",
+          "level": 3,
+          "priceGlow": 180
+        },
+        {
+          "atSec": 1042,
+          "id": "bloom",
+          "level": 3,
+          "priceGlow": 220
+        },
+        {
+          "atSec": 1328,
+          "id": "beds",
+          "level": 3,
+          "priceGlow": 400
+        },
+        {
+          "atSec": 1700,
+          "id": "bloom",
+          "level": 4,
+          "priceGlow": 650
+        },
+        {
+          "atSec": 2200,
+          "id": "beds",
+          "level": 4,
+          "priceGlow": 1000
+        },
+        {
+          "atSec": 2951,
+          "id": "beds",
+          "level": 5,
+          "priceGlow": 1800
+        },
+        {
+          "atSec": 4023,
+          "id": "beds",
+          "level": 6,
+          "priceGlow": 3000
+        },
+        {
+          "atSec": 5586,
+          "id": "beds",
+          "level": 7,
+          "priceGlow": 5000
+        },
+        {
+          "atSec": 7808,
+          "id": "beds",
+          "level": 8,
+          "priceGlow": 8000
+        },
+        {
+          "atSec": 8258,
+          "id": "bloom",
+          "level": 5,
+          "priceGlow": 1800
+        }
+      ]
+    },
+    {
+      "policy": "leisurely",
+      "durationSec": 14400,
+      "throwEverySec": 10,
+      "visitEverySec": 0,
+      "visitLengthSec": 0,
+      "summary": {
+        "population": 10,
+        "completedMeals": 1437,
+        "thrown": 1437,
+        "pending": 0,
+        "glow": 27654.3,
+        "lifetimeGlow": 50179.3,
+        "berries": 23,
+        "upgrades": {
+          "shrub": 3,
+          "pantry": 2,
+          "bloom": 5,
+          "beds": 8
+        }
+      },
+      "arrivals": [
+        {
+          "atSec": 61,
+          "population": 2,
+          "feeds": 6,
+          "lifetimeGlow": 12
+        },
+        {
+          "atSec": 262,
+          "population": 3,
+          "feeds": 25,
+          "lifetimeGlow": 105.3
+        },
+        {
+          "atSec": 703,
+          "population": 4,
+          "feeds": 67,
+          "lifetimeGlow": 475.725
+        },
+        {
+          "atSec": 1324,
+          "population": 5,
+          "feeds": 129,
+          "lifetimeGlow": 1276.325
+        },
+        {
+          "atSec": 2196,
+          "population": 6,
+          "feeds": 217,
+          "lifetimeGlow": 2925.4
+        },
+        {
+          "atSec": 2947,
+          "population": 7,
+          "feeds": 292,
+          "lifetimeGlow": 4726
+        },
+        {
+          "atSec": 4019,
+          "population": 8,
+          "feeds": 399,
+          "lifetimeGlow": 7726
+        },
+        {
+          "atSec": 5582,
+          "population": 9,
+          "feeds": 555,
+          "lifetimeGlow": 12726.4
+        },
+        {
+          "atSec": 7804,
+          "population": 10,
+          "feeds": 777,
+          "lifetimeGlow": 20725
+        }
+      ],
+      "purchases": [
+        {
+          "atSec": 71,
+          "id": "shrub",
+          "level": 1,
+          "priceGlow": 15
+        },
+        {
+          "atSec": 122,
+          "id": "bloom",
+          "level": 1,
+          "priceGlow": 20
+        },
+        {
+          "atSec": 182,
+          "id": "pantry",
+          "level": 1,
+          "priceGlow": 30
+        },
+        {
+          "atSec": 262,
+          "id": "beds",
+          "level": 1,
+          "priceGlow": 40
+        },
+        {
+          "atSec": 343,
+          "id": "shrub",
+          "level": 2,
+          "priceGlow": 60
+        },
+        {
+          "atSec": 436,
+          "id": "bloom",
+          "level": 2,
+          "priceGlow": 70
+        },
+        {
+          "atSec": 547,
+          "id": "pantry",
+          "level": 2,
+          "priceGlow": 100
+        },
+        {
+          "atSec": 703,
+          "id": "beds",
+          "level": 2,
+          "priceGlow": 140
+        },
+        {
+          "atSec": 854,
+          "id": "shrub",
+          "level": 3,
+          "priceGlow": 180
+        },
+        {
+          "atSec": 1038,
+          "id": "bloom",
+          "level": 3,
+          "priceGlow": 220
+        },
+        {
+          "atSec": 1324,
+          "id": "beds",
+          "level": 3,
+          "priceGlow": 400
+        },
+        {
+          "atSec": 1696,
+          "id": "bloom",
+          "level": 4,
+          "priceGlow": 650
+        },
+        {
+          "atSec": 2196,
+          "id": "beds",
+          "level": 4,
+          "priceGlow": 1000
+        },
+        {
+          "atSec": 2947,
+          "id": "beds",
+          "level": 5,
+          "priceGlow": 1800
+        },
+        {
+          "atSec": 4019,
+          "id": "beds",
+          "level": 6,
+          "priceGlow": 3000
+        },
+        {
+          "atSec": 5582,
+          "id": "beds",
+          "level": 7,
+          "priceGlow": 5000
+        },
+        {
+          "atSec": 7804,
+          "id": "beds",
+          "level": 8,
+          "priceGlow": 8000
+        },
+        {
+          "atSec": 8255,
+          "id": "bloom",
+          "level": 5,
+          "priceGlow": 1800
+        }
+      ]
+    },
+    {
+      "policy": "short-visits",
+      "durationSec": 86400,
+      "throwEverySec": 1,
+      "visitEverySec": 1800,
+      "visitLengthSec": 60,
+      "summary": {
+        "population": 10,
+        "completedMeals": 1442,
+        "thrown": 1443,
+        "pending": 1,
+        "glow": 173260.75,
+        "lifetimeGlow": 195785.75,
+        "berries": 23,
+        "upgrades": {
+          "shrub": 3,
+          "pantry": 2,
+          "bloom": 5,
+          "beds": 8
+        }
+      },
+      "arrivals": [
+        {
+          "atSec": 61,
+          "population": 2,
+          "feeds": 9,
+          "lifetimeGlow": 12
+        },
+        {
+          "atSec": 1847,
+          "population": 3,
+          "feeds": 26,
+          "lifetimeGlow": 415.4
+        },
+        {
+          "atSec": 5408,
+          "population": 4,
+          "feeds": 60,
+          "lifetimeGlow": 2606.675
+        },
+        {
+          "atSec": 9012,
+          "population": 5,
+          "feeds": 120,
+          "lifetimeGlow": 6256.775
+        },
+        {
+          "atSec": 12642,
+          "population": 6,
+          "feeds": 200,
+          "lifetimeGlow": 11135
+        },
+        {
+          "atSec": 16228,
+          "population": 7,
+          "feeds": 260,
+          "lifetimeGlow": 16840.1
+        },
+        {
+          "atSec": 21605,
+          "population": 8,
+          "feeds": 330,
+          "lifetimeGlow": 26839.325
+        },
+        {
+          "atSec": 25223,
+          "population": 9,
+          "feeds": 410,
+          "lifetimeGlow": 34572.575
+        },
+        {
+          "atSec": 30620,
+          "population": 10,
+          "feeds": 500,
+          "lifetimeGlow": 47490.725
+        }
+      ],
+      "purchases": [
+        {
+          "atSec": 1800,
+          "id": "shrub",
+          "level": 1,
+          "priceGlow": 15
+        },
+        {
+          "atSec": 1801,
+          "id": "shrub",
+          "level": 2,
+          "priceGlow": 60
+        },
+        {
+          "atSec": 1802,
+          "id": "shrub",
+          "level": 3,
+          "priceGlow": 180
+        },
+        {
+          "atSec": 1803,
+          "id": "bloom",
+          "level": 1,
+          "priceGlow": 20
+        },
+        {
+          "atSec": 1804,
+          "id": "bloom",
+          "level": 2,
+          "priceGlow": 70
+        },
+        {
+          "atSec": 1805,
+          "id": "pantry",
+          "level": 1,
+          "priceGlow": 30
+        },
+        {
+          "atSec": 1847,
+          "id": "beds",
+          "level": 1,
+          "priceGlow": 40
+        },
+        {
+          "atSec": 3600,
+          "id": "bloom",
+          "level": 3,
+          "priceGlow": 220
+        },
+        {
+          "atSec": 3601,
+          "id": "bloom",
+          "level": 4,
+          "priceGlow": 650
+        },
+        {
+          "atSec": 5400,
+          "id": "pantry",
+          "level": 2,
+          "priceGlow": 100
+        },
+        {
+          "atSec": 5408,
+          "id": "beds",
+          "level": 2,
+          "priceGlow": 140
+        },
+        {
+          "atSec": 7200,
+          "id": "bloom",
+          "level": 5,
+          "priceGlow": 1800
+        },
+        {
+          "atSec": 9012,
+          "id": "beds",
+          "level": 3,
+          "priceGlow": 400
+        },
+        {
+          "atSec": 12642,
+          "id": "beds",
+          "level": 4,
+          "priceGlow": 1000
+        },
+        {
+          "atSec": 16228,
+          "id": "beds",
+          "level": 5,
+          "priceGlow": 1800
+        },
+        {
+          "atSec": 21605,
+          "id": "beds",
+          "level": 6,
+          "priceGlow": 3000
+        },
+        {
+          "atSec": 25223,
+          "id": "beds",
+          "level": 7,
+          "priceGlow": 5000
+        },
+        {
+          "atSec": 30620,
+          "id": "beds",
+          "level": 8,
+          "priceGlow": 8000
+        }
+      ]
+    },
+    {
+      "policy": "never-interacts",
+      "durationSec": 28800,
+      "throwEverySec": 1,
+      "visitEverySec": 0,
+      "visitLengthSec": 0,
+      "summary": {
+        "population": 1,
+        "completedMeals": 0,
+        "thrown": 0,
+        "pending": 0,
+        "glow": 2880,
+        "lifetimeGlow": 2880,
+        "berries": 12,
+        "upgrades": {
+          "shrub": 0,
+          "pantry": 0,
+          "bloom": 0,
+          "beds": 0
+        }
+      },
+      "arrivals": [],
+      "purchases": []
+    }
+  ]
+}

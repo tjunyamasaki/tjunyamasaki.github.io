@@ -136,7 +136,7 @@ export function createScene(container, initialOptions, callbacks) {
   renderer.domElement.style.width = '100%';
   renderer.domElement.style.height = '100%';
   renderer.domElement.setAttribute('aria-hidden', 'true');
-  renderer.domElement.tabIndex = -1;
+  renderer.domElement.setAttribute('role', 'presentation');
   container.appendChild(renderer.domElement);
 
   const threeScene = new THREE.Scene();

@@ -1,13 +1,14 @@
 /**
  * Strict v1 → v2 migration. Pure: no DOM, Three, storage, or wall-clock APIs.
  *
- * Legacy absence is credited first with the existing analytic `advance`
- * (no automatic companions, no world food). Conversion then writes schema 2.
- * `applyPostMigrationProgression` is the P2-04 seam; this packet leaves it
- * as a typed no-op identity (no auto-welcome).
+ * Legacy absence is credited first with analytic `advanceEconomy`
+ * (no automatic companions, no world food). Conversion then writes schema 2
+ * and `applyPostMigrationProgression` joins currently eligible residents once
+ * at NOW.
  */
 
-import { advance } from './advance.mjs';
+import { advanceEconomy } from './advance.mjs';
+import { resolveCompanionsNow } from './progression.mjs';
 import {
   BALANCE_VERSION_V2,
   GAME_ID,
@@ -58,21 +59,22 @@ function cloneSettings(settings) {
 }
 
 /**
- * P2-04 will invoke `resolveCompanionsNow` here so eligible residents join
- * once at migration NOW. P2-03 must not auto-welcome or add members.
+ * Join currently eligible residents once at migration NOW. Does not credit
+ * absence or invent Glow; `creditLegacyAbsence` must stay on `advanceEconomy`.
  *
  * @param {GameState} state
  * @returns {ProgressionResult}
  */
 export function applyPostMigrationProgression(state) {
-  return { state: cloneState(state), events: [] };
+  return resolveCompanionsNow(state);
 }
 
 /**
- * Legacy absence credit (current `advance`, no auto companions, no world
- * food). Same arithmetic as native reconcileAway. Do not call
- * `reconcileAway` from here — that function routes schema 1 back into
- * `migrateV1` and would recurse.
+ * Legacy absence credit (`advanceEconomy`, no auto companions, no world
+ * food). Must not call `advance` / `advancePassive` — a Welcome-ready v1
+ * would otherwise join at the lifetime crossing during the old interval.
+ * Do not call `reconcileAway` from here — that function routes schema 1
+ * back into `migrateV1` and would recurse.
  *
  * @param {LegacyV1Envelope} save
  * @param {number} nowWallMs
@@ -97,6 +99,8 @@ function creditLegacyAbsence(save, nowWallMs) {
         elapsedMs: 0,
         glowEarnedMicro: 0,
         berriesGained: 0,
+        mealsCompleted: 0,
+        companionsAdded: [],
         awayMs: 0,
         creditedMs: 0,
         capped: false,
@@ -110,7 +114,7 @@ function creditLegacyAbsence(save, nowWallMs) {
   const capped = awayMs > creditedMs;
   const logicalRoom = Math.max(0, LOGICAL_TIME_MAX_MS - baseState.simTimeMs);
   const advanceMs = Math.min(creditedMs, logicalRoom);
-  const advanced = advance(baseState, advanceMs);
+  const advanced = advanceEconomy(baseState, advanceMs);
 
   let nextState = advanced.state;
   const remaining = awayMs - creditedMs;
@@ -136,6 +140,8 @@ function creditLegacyAbsence(save, nowWallMs) {
       elapsedMs: advanced.summary.elapsedMs,
       glowEarnedMicro: advanced.summary.glowEarnedMicro,
       berriesGained: advanced.summary.berriesGained,
+      mealsCompleted: advanced.summary.mealsCompleted,
+      companionsAdded: [...advanced.summary.companionsAdded],
       awayMs,
       creditedMs,
       capped,
@@ -175,8 +181,8 @@ function requireLegacyEnvelope(save) {
 }
 
 /**
- * Strict v1 validate → legacy absence to `nowWallMs` → convert to v2.
- * Six residents / beds 4 stay six / capacity 6. Does not auto-welcome.
+ * Strict v1 validate → legacy absence to `nowWallMs` → convert to v2
+ * → join currently eligible residents at NOW.
  *
  * @param {LegacyV1Envelope} save
  * @param {number} nowWallMs
@@ -218,8 +224,19 @@ export function migrateV1(save, nowWallMs) {
     throw new Error('migrateV1: converted envelope failed strict v2 validation');
   }
 
+  /** @type {import('./state.mjs').SlimeId[]} */
+  const companionsAdded = [];
+  for (const event of progressed.events) {
+    if (event.type === 'COMPANION_ADDED' && event.slimeId) {
+      companionsAdded.push(event.slimeId);
+    }
+  }
+
   return {
     save: parsed.save,
-    summary: credited.summary,
+    summary: {
+      ...credited.summary,
+      companionsAdded,
+    },
   };
 }

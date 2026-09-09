@@ -1,7 +1,7 @@
 /**
  * P2-00: frozen v1 / future envelopes must validate as real old saves.
  * Construction uses only test-only constructors (createInitialState,
- * applyCommand, advance, createFreshEnvelope / serializeEnvelope).
+ * applyCommand, advanceEconomy, createFreshEnvelope / serializeEnvelope).
  * Does not change game behavior or add player-facing debug controls.
  */
 
@@ -11,14 +11,14 @@ import { dirname, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { advance } from '../src/core/advance.mjs';
-import { FEED_BERRY_COST } from '../src/core/balance.mjs';
+import { advanceEconomy } from '../src/core/advance.mjs';
+import { FEED_BERRY_COST, SLIME_NAMES } from '../src/core/balance.mjs';
 import { applyCommand } from '../src/core/commands.mjs';
 import {
   getCompanionEligibility,
   getNextUpgradeCostMicro,
 } from '../src/core/selectors.mjs';
-import { createInitialState } from '../src/core/state.mjs';
+import { cloneState, createInitialState } from '../src/core/state.mjs';
 import {
   createDefaultSettings,
   serializeEnvelope,
@@ -42,7 +42,7 @@ const UPGRADE_BUY_ORDER = Object.freeze(
  */
 function wait(state, elapsedMs) {
   if (elapsedMs <= 0) return state;
-  const result = advance(state, elapsedMs);
+  const result = advanceEconomy(state, elapsedMs);
   return result.state;
 }
 
@@ -112,8 +112,8 @@ function tryBuy(state, upgradeId) {
 }
 
 /**
- * Spend wallet on upgrades whenever affordable. Beds first so later WELCOME
- * commands are not blocked by greedy Bloom purchases.
+ * Spend wallet on upgrades whenever affordable. Beds first so later companion
+ * joins are not blocked by greedy Bloom purchases.
  *
  * @param {import('../src/core/state.mjs').GameState} state
  */
@@ -135,22 +135,34 @@ function buyAffordable(state) {
 }
 
 /**
+ * Construct the same resident `applyWelcome` used to push. Does not go through
+ * the removed WELCOME command (P2-04 rejects it).
+ *
  * @param {import('../src/core/state.mjs').GameState} state
  */
 function tryWelcome(state) {
   if (!getCompanionEligibility(state).ready) return { state, welcomed: false };
-  return {
-    state: mustApply(state, {
-      type: 'WELCOME_COMPANION',
-      expectedPopulation: state.slimes.length,
-    }),
-    welcomed: true,
-  };
+  const next = cloneState(state);
+  const n = next.slimes.length + 1;
+  const t = next.simTimeMs;
+  next.slimes.push({
+    id: `slime-${n}`,
+    name: SLIME_NAMES[n - 1],
+    createdAtMs: t,
+    boostUntilMs: 0,
+    feedCount: 0,
+    homeSlot: n - 1,
+  });
+  if (!next.tutorialCompleted.includes('welcome')) {
+    next.tutorialCompleted.push('welcome');
+  }
+  return { state: next, welcomed: true };
 }
 
 /**
  * Play a legal v1 command/time sequence until `targetPopulation` residents
- * exist, then stop at that WELCOME instant (no extra feeds).
+ * exist, then stop at that join instant (no extra feeds). Time waits use
+ * `advanceEconomy` so rebuilds cannot auto-join mid-wait.
  *
  * @param {number} targetPopulation
  */
@@ -165,6 +177,9 @@ function playUntilPopulation(targetPopulation) {
       );
     }
     state = buyAffordable(state);
+    if (state.slimes.length >= targetPopulation) {
+      break;
+    }
     const welcome = tryWelcome(state);
     if (welcome.welcomed) {
       state = welcome.state;

@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { advance } from '../src/core/advance.mjs';
+import { advanceEconomy as advance } from '../src/core/advance.mjs';
 import {
   INCOME_REMAINDER_MOD,
   MAX_GLOW_MICRO,
@@ -369,6 +369,8 @@ describe('zero elapsed and immutability', () => {
       elapsedMs: 0,
       glowEarnedMicro: 0,
       berriesGained: 0,
+      mealsCompleted: 0,
+      companionsAdded: [],
     });
   });
 

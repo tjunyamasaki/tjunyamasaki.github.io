@@ -9,7 +9,7 @@ import {
   applyPostMigrationProgression,
   migrateV1,
 } from '../src/core/migrate.mjs';
-import { createInitialState } from '../src/core/state.mjs';
+import { cloneState, createInitialState } from '../src/core/state.mjs';
 import {
   createFreshEnvelope,
   serializeEnvelope,
@@ -81,6 +81,43 @@ describe('migrateV1', () => {
     assert.equal(result.save.state.world.residents.length, 6);
   });
 
+  test('Welcome-ready v1 one-hour absence earns 360 Glow then joins at simTime 3_600_000', () => {
+    const fresh = parseLegacy('v1-fresh.json');
+    const patched = {
+      ...fresh,
+      state: {
+        ...fresh.state,
+        totalFeeds: 6,
+        lifetimeGlowMicro: 11_900_000,
+        glowMicro: 0,
+        incomeRemainder: 0,
+        slimes: [{ ...fresh.state.slimes[0], feedCount: 6 }],
+      },
+    };
+    const parsed = validateSave(serializeEnvelope(patched));
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.kind, 'legacy-v1');
+    const now = parsed.save.savedWallMs + HOUR_MS;
+    const result = migrateV1(parsed.save, now);
+    assert.equal(result.summary.glowEarnedMicro, 360 * MICRO_PER_GLOW);
+    assert.equal(result.save.state.glowMicro, 360 * MICRO_PER_GLOW);
+    assert.equal(
+      result.save.state.lifetimeGlowMicro,
+      11_900_000 + 360 * MICRO_PER_GLOW,
+    );
+    assert.equal(result.save.state.simTimeMs, HOUR_MS);
+    assert.equal(result.save.state.slimes.length, 2);
+    assert.equal(result.save.state.slimes[1].id, 'slime-2');
+    assert.equal(result.save.state.slimes[1].createdAtMs, HOUR_MS);
+    assert.notEqual(result.save.state.slimes[1].createdAtMs, 1_000);
+    assert.equal(result.save.state.world.timeMs, 0);
+    assert.equal(result.save.state.world.carryMs, 0);
+    assert.deepEqual(result.save.state.world.foods, []);
+    assert.equal(result.save.state.world.residents.length, 2);
+    assert.deepEqual(result.summary.companionsAdded, ['slime-2']);
+    assert.equal(result.save.state.totalFeeds, 6);
+  });
+
   test('byte-independent round-trip preserves ids, counters, and settings', () => {
     const parsed = validateSave(readFixture('v1-three-resident.json'));
     assert.equal(parsed.ok, true);
@@ -109,13 +146,26 @@ describe('migrateV1', () => {
     assert.equal(round.save.state.upgrades.beds, parsed.save.state.upgrades.beds);
   });
 
-  test('applyPostMigrationProgression is an identity (P2-04 seam)', () => {
+  test('applyPostMigrationProgression is identity for a fresh farm and joins a Welcome-ready state', () => {
     const state = createInitialState();
     const progressed = applyPostMigrationProgression(state);
     assert.equal(progressed.events.length, 0);
     assert.equal(progressed.state.slimes.length, 1);
     assert.notEqual(progressed.state, state);
     assert.equal(state.slimes.length, 1);
+
+    const ready = cloneState(createInitialState());
+    ready.totalFeeds = 6;
+    ready.lifetimeGlowMicro = 12 * MICRO_PER_GLOW;
+    ready.glowMicro = 12 * MICRO_PER_GLOW;
+    ready.slimes[0].feedCount = 6;
+    const joined = applyPostMigrationProgression(ready);
+    assert.equal(joined.state.slimes.length, 2);
+    assert.equal(joined.state.slimes[1].id, 'slime-2');
+    assert.equal(joined.state.slimes[1].createdAtMs, 0);
+    assert.equal(joined.state.world.residents.length, 2);
+    assert.ok(joined.events.some((event) => event.type === 'COMPANION_ADDED'));
+    assert.equal(ready.slimes.length, 1);
   });
 
   test('reconcileAway on a v1 checkpoint migrates once without double-credit', () => {
@@ -167,5 +217,8 @@ describe('migrate module isolation', () => {
         `migrate.mjs must not contain ${pattern}`,
       );
     }
+    assert.equal(/advanceEconomy/.test(source), true);
+    assert.equal(/import\s*\{\s*advance\s*\}/.test(source), false);
+    assert.equal(/import\s*\{\s*advancePassive/.test(source), false);
   });
 });

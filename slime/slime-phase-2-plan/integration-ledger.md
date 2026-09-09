@@ -54,8 +54,8 @@ Production:
 | `slime-garden/src/main.mjs` | `handleEvents` companion-ready edge | 786–790 | “A companion is ready”. |
 | `slime-garden/src/main.mjs` | `cuePresentationAudio` `COMPANION_ADDED` | 384 | `audio.playWelcome()`. |
 | `slime-garden/src/core/commands.mjs` | `WelcomeCommand` typedef | 26 | |
-| `slime-garden/src/core/commands.mjs` | `applyWelcome` | 183–216 | Player-commanded membership. Remove from new-core in P2-04. |
-| `slime-garden/src/core/commands.mjs` | `applyCommand` `case 'WELCOME_COMPANION'` | 236–237 | |
+| `slime-garden/src/core/commands.mjs` | `applyWelcome` | 183–216 | Removed in P2-04. `WELCOME_COMPANION` now `INVALID_COMMAND`. |
+| `slime-garden/src/core/commands.mjs` | `applyCommand` `case 'WELCOME_COMPANION'` | 236–237 | Rejects; UI button is a no-op until P2-13. |
 | `slime-garden/src/core/selectors.mjs` | `getCompanionEligibility` | 96–115 | `ready` drives the button. |
 | `slime-garden/src/scene/scene.mjs` | `play` `COMPANION_ADDED` | 507–508 | `startArrival`. |
 | `slime-garden/src/scene/scene.mjs` | `startArrival` | 340–384 | Writes the single `arrivalFx` slot. |
@@ -67,7 +67,7 @@ Tests:
 | `slime-garden/tests/commands.test.mjs` | `describe('WELCOME_COMPANION')`, review-gate slime-2 | 476+, 772+ |
 | `slime-garden/tests/phase2-baseline-fixtures.test.mjs` | constructor WELCOME for frozen v1 saves | (P2-00) |
 
-P2-04: automatic `resolveCompanionsNow`. P2-11/P2-13: delete the Welcome button and this caller chain.
+P2-04: automatic `resolveCompanionsNow` in progression/passive/commands; WELCOME rejected in core. P2-11/P2-13: delete the Welcome button and this caller chain.
 
 ## 3. Six-cap / four-bed / six-name assumptions
 
@@ -359,11 +359,11 @@ Fresh/reset envelopes are schema 2, balance 2, habitat `farm-v2`. Constructor co
 
 ### 10.3 `migrateV1` / `reconcileAway` (no double-credit)
 
-`migrateV1(legacy, nowWallMs)`: strict v1 → legacy `advance` absence to `nowWallMs` → convert (schema/balance 2, farm-v2, `nextThrowAllowedAtMs = simTimeMs + min(1000, remaining feed cooldown)`, `createWorld` idle at homes) → `applyPostMigrationProgression` (P2-03 **typed no-op identity**; P2-04 will call `resolveCompanionsNow` here; do not auto-welcome) → strict v2 validate. Returns `{ save, summary }` including away credit from the legacy reconcile.
+`migrateV1(legacy, nowWallMs)`: strict v1 → legacy `advanceEconomy` absence to `nowWallMs` → convert (schema/balance 2, farm-v2, `nextThrowAllowedAtMs = simTimeMs + min(1000, remaining feed cooldown)`, `createWorld` idle at homes) → `applyPostMigrationProgression` (`resolveCompanionsNow` as of P2-04) → strict v2 validate. Returns `{ save, summary }` including away credit from the legacy reconcile.
 
 `reconcileAway`:
 - schema 1 → `migrateV1` (so main’s existing `reconcileAway(loaded.save, now)` migrates a browser v1 save once).
-- schema 2 → existing economy `advance`; **freeze** world snapshot (time/carry/foods/paths unchanged). Remainder jump clamps `nextFeedAllowedAtMs` (same integer as throw).
+- schema 2 → `advancePassive` (P2-04); do not wholesale-replace world after credit. Remainder jump clamps `nextFeedAllowedAtMs` (same integer as throw). See §10.5.
 
 `loadBest` stays pure (no `Date.now`, no auto-migrate). It returns the raw validated checkpoint (v1 or v2).
 
@@ -375,9 +375,35 @@ If **primary** is `FUTURE_VERSION`, return `FUTURE_VERSION` even when backup is 
 
 Storage keys and lock name unchanged: `cozy-slime-mvp:primary:v1` / `cozy-slime-mvp:backup:v1` / existing writer lock. First v2 `writeCheckpoint` still `promotePrimaryToBackup` (original v1 raw becomes backup) then writes v2 primary.
 
-### 10.5 P2-04 seam still pending
+### 10.5 P2-04 automatic arrivals (closed)
 
-`applyPostMigrationProgression` does not join companions. A v1 save that is currently Welcome-ready will not gain a resident at migration NOW until P2-04. Native v2 `reconcileAway` likewise does not auto-join.
+Landed on `feat/slime` after P2-03. Core membership is automatic; the Welcome button in `main.mjs` / DOM still exists until P2-13 and is harmless because core rejects `WELCOME_COMPANION`.
 
-`createInitialState().habitatId` remains `garden-prototype-v1`. Scene still has six pads. FEED/WELCOME still live in main/UI.
+#### `advance` vs `advanceEconomy`
+
+| Export | Module | Role |
+| --- | --- | --- |
+| `advanceEconomy` | `src/core/advance.mjs` | Analytic Glow/berry/boost-expiry integrator. **No membership changes.** Legacy v1 absence (`migrate.mjs` `creditLegacyAbsence`) **must** use this name. Existing `advance.test.mjs` goldens import it. |
+| `advancePassive` | `src/core/advance.mjs` | Wraps economy with exact lifetime-threshold crossings and `resolveCompanionsNow`. |
+| `advance` | `src/core/advance.mjs` | Alias of `advancePassive` so unchanged `main.mjs` live ticks auto-join. |
+
+`progression.mjs` must not import `advance`. `commands.mjs` may import `progression` and must not import `advance`.
+
+#### WELCOME
+
+`applyCommand` rejects `WELCOME_COMPANION` with `INVALID_COMMAND`. Successful `FEED` and `BUY_UPGRADE` call `resolveCompanionsNow` after the command mutation (FED/UPGRADE events first, then `COMPANION_ADDED`). UI `#welcome-button` remains until P2-13.
+
+#### `applyPostMigrationProgression`
+
+Now `resolveCompanionsNow`. Migrated v1 that is already eligible joins **once at NOW** after legacy earning. `creditLegacyAbsence` stays on `advanceEconomy` so a Welcome-ready v1 one-hour gap earns **360 Glow** under one resident and joins at `simTimeMs === 3_600_000`, not at 1_000.
+
+#### Native v2 absence
+
+`reconcileAway` schema 2 uses `advancePassive` for `creditedMs`. After the eight-hour remainder jump, `resolveCompanionsNow` runs only for already-met gates (no new lifetime crossings). Summaries include `companionsAdded` and `mealsCompleted` (always 0 until P2-08).
+
+#### World freeze merge rule
+
+Do **not** wholesale-replace `nextState.world` with the pre-advance snapshot after passive credit. That deleted newly joined world residents. `advancePassive` / `resolveCompanionsNow` leave `world.timeMs`, `carryMs`, `foods`, and existing resident paths unchanged and only insert idle newcomers (home / `findFreePosition`). Reload at the same wall time is idempotent: no extra Glow, no duplicate IDs.
+
+`createInitialState().habitatId` remains `garden-prototype-v1`. Scene still has six pads. FEED still lives in main/UI; THROW_FOOD is still P2-07.
 

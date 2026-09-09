@@ -4,13 +4,11 @@ import {
   FEED_BERRY_COST,
   FEED_COOLDOWN_MS,
   FEED_COUNTER_CAP,
-  POPULATION_CAP,
-  SLIME_NAMES,
   UPGRADE_IDS,
 } from './balance.mjs';
+import { resolveCompanionsNow } from './progression.mjs';
 import {
   getBerryIntervalMs,
-  getCompanionEligibility,
   getNextUpgradeCostMicro,
 } from './selectors.mjs';
 import { cloneState } from './state.mjs';
@@ -23,8 +21,7 @@ import { cloneState } from './state.mjs';
  *
  * @typedef {{ type: 'FEED', slimeId: SlimeId }} FeedCommand
  * @typedef {{ type: 'BUY_UPGRADE', upgradeId: UpgradeId, expectedLevel: number }} BuyUpgradeCommand
- * @typedef {{ type: 'WELCOME_COMPANION', expectedPopulation: number }} WelcomeCommand
- * @typedef {FeedCommand | BuyUpgradeCommand | WelcomeCommand} Command
+ * @typedef {FeedCommand | BuyUpgradeCommand} Command
  *
  * @typedef {'UNKNOWN_SLIME' | 'NO_BERRIES' | 'FEED_COOLDOWN' | 'UNKNOWN_UPGRADE' | 'MAX_LEVEL' | 'INSUFFICIENT_GLOW' | 'STALE_REQUEST' | 'NOT_READY' | 'POPULATION_CAP' | 'INVALID_COMMAND'} RejectReason
  *
@@ -126,7 +123,8 @@ function applyFeed(state, command) {
     },
   ];
   completeTutorial(next, events, 'feed', t);
-  return { ok: true, state: next, events };
+  const joined = resolveCompanionsNow(next);
+  return { ok: true, state: joined.state, events: [...events, ...joined.events] };
 }
 
 /**
@@ -172,47 +170,8 @@ function applyBuyUpgrade(state, command) {
   /** @type {GameEvent[]} */
   const events = [{ type: 'UPGRADE_BOUGHT', upgradeId, level, atMs: t }];
   completeTutorial(next, events, 'upgrade', t);
-  return { ok: true, state: next, events };
-}
-
-/**
- * @param {GameState} state
- * @param {Record<string, unknown>} command
- * @returns {CommandResult}
- */
-function applyWelcome(state, command) {
-  if (!Number.isInteger(command.expectedPopulation)) {
-    return reject(state, 'INVALID_COMMAND');
-  }
-  if (command.expectedPopulation !== state.slimes.length) {
-    return reject(state, 'STALE_REQUEST');
-  }
-  if (state.slimes.length >= POPULATION_CAP) {
-    return reject(state, 'POPULATION_CAP');
-  }
-  if (!getCompanionEligibility(state).ready) {
-    return reject(state, 'NOT_READY');
-  }
-
-  const t = state.simTimeMs;
-  const next = cloneState(state);
-  const n = next.slimes.length + 1;
-  const slimeId = /** @type {SlimeId} */ (`slime-${n}`);
-  const homeSlot = n - 1;
-  next.slimes.push({
-    id: slimeId,
-    name: SLIME_NAMES[n - 1],
-    createdAtMs: t,
-    boostUntilMs: 0,
-    feedCount: 0,
-    homeSlot,
-  });
-  /** @type {GameEvent[]} */
-  const events = [
-    { type: 'COMPANION_ADDED', slimeId, homeSlot, atMs: t },
-  ];
-  completeTutorial(next, events, 'welcome', t);
-  return { ok: true, state: next, events };
+  const joined = resolveCompanionsNow(next);
+  return { ok: true, state: joined.state, events: [...events, ...joined.events] };
 }
 
 /**
@@ -234,7 +193,7 @@ export function applyCommand(state, command) {
     case 'BUY_UPGRADE':
       return applyBuyUpgrade(state, command);
     case 'WELCOME_COMPANION':
-      return applyWelcome(state, command);
+      return reject(state, 'INVALID_COMMAND');
     default:
       return reject(state, 'INVALID_COMMAND');
   }

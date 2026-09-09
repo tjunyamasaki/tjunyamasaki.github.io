@@ -3,11 +3,12 @@
  * Does not read wall clocks, DOM, Three, or storage.
  *
  * Schema 1 / legacy envelopes run `migrateV1` (legacy absence then convert).
- * Native schema 2 credits economy with `advance` and freezes the world
- * snapshot (world clock, food, and paths do not progress while away).
+ * Native schema 2 credits economy with `advancePassive` (exact crossings)
+ * without wholesale-replacing world after joins.
  */
 
-import { advance } from '../core/advance.mjs';
+import { advancePassive } from '../core/advance.mjs';
+import { resolveCompanionsNow } from '../core/progression.mjs';
 import {
   LOGICAL_TIME_MAX_MS,
   OFFLINE_CAP_MS,
@@ -28,6 +29,8 @@ import { cloneWorld } from '../world/state.mjs';
  * @property {number} elapsedMs
  * @property {number} glowEarnedMicro
  * @property {number} berriesGained
+ * @property {number} mealsCompleted
+ * @property {import('../core/state.mjs').SlimeId[]} companionsAdded
  * @property {number} awayMs
  * @property {number} creditedMs
  * @property {boolean} capped
@@ -114,7 +117,10 @@ function isLegacyEnvelope(save) {
 }
 
 /**
- * Native v2 absence: credit economy, freeze world snapshot, keep carry.
+ * Native v2 absence: credit with `advancePassive` (exact companion crossings).
+ * Do not wholesale-replace `world` afterward — that would drop residents
+ * joined while away. Passive leaves world.timeMs / carryMs / foods / existing
+ * paths unchanged and only adds idle newcomers.
  *
  * @param {SaveEnvelope} save
  * @param {number} nowWallMs
@@ -133,6 +139,8 @@ function reconcileNativeV2(save, nowWallMs) {
         elapsedMs: 0,
         glowEarnedMicro: 0,
         berriesGained: 0,
+        mealsCompleted: 0,
+        companionsAdded: [],
         awayMs: 0,
         creditedMs: 0,
         capped: false,
@@ -146,9 +154,11 @@ function reconcileNativeV2(save, nowWallMs) {
   const capped = awayMs > creditedMs;
   const logicalRoom = Math.max(0, LOGICAL_TIME_MAX_MS - base.state.simTimeMs);
   const advanceMs = Math.min(creditedMs, logicalRoom);
-  const advanced = advance(base.state, advanceMs);
+  const advanced = advancePassive(base.state, advanceMs);
 
   let nextState = advanced.state;
+  /** @type {import('../core/state.mjs').SlimeId[]} */
+  const companionsAdded = [...advanced.summary.companionsAdded];
   const remaining = awayMs - creditedMs;
   if (remaining > 0) {
     const jumped = Math.min(
@@ -156,10 +166,13 @@ function reconcileNativeV2(save, nowWallMs) {
       nextState.simTimeMs + remaining,
     );
     nextState = applyRemainderJump(nextState, jumped);
-  }
-
-  if (frozenWorld) {
-    nextState.world = cloneWorld(frozenWorld);
+    const extra = resolveCompanionsNow(nextState);
+    nextState = extra.state;
+    for (const event of extra.events) {
+      if (event.type === 'COMPANION_ADDED' && event.slimeId) {
+        companionsAdded.push(event.slimeId);
+      }
+    }
   }
 
   return {
@@ -176,6 +189,8 @@ function reconcileNativeV2(save, nowWallMs) {
       elapsedMs: advanced.summary.elapsedMs,
       glowEarnedMicro: advanced.summary.glowEarnedMicro,
       berriesGained: advanced.summary.berriesGained,
+      mealsCompleted: advanced.summary.mealsCompleted,
+      companionsAdded,
       awayMs,
       creditedMs,
       capped,

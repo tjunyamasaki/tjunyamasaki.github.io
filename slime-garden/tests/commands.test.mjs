@@ -13,11 +13,11 @@ import {
   FEED_COUNTER_CAP,
   MICRO_PER_GLOW,
   PANTRY_CAPACITIES,
-  POPULATION_CAP,
   SLIME_NAMES,
   UPGRADE_MAX_LEVEL,
 } from '../src/core/balance.mjs';
 import { applyCommand } from '../src/core/commands.mjs';
+import { resolveCompanionsNow } from '../src/core/progression.mjs';
 import {
   getBerryCapacity,
   getBerryIntervalMs,
@@ -474,31 +474,28 @@ describe('BUY_UPGRADE', () => {
 });
 
 describe('WELCOME_COMPANION', () => {
-  test('stale expectedPopulation, seventh resident, not ready; welcome never charges', () => {
+  test('is rejected as INVALID_COMMAND and never charges or joins', () => {
     const fresh = deepFreeze(createInitialState());
     const freshSnapshot = structuredClone(fresh);
-    const stale = applyCommand(fresh, {
-      type: 'WELCOME_COMPANION',
-      expectedPopulation: 2,
-    });
-    assert.equal(stale.ok, false);
-    assert.equal(stale.reason, 'STALE_REQUEST');
-    assert.equal(stale.state, fresh);
+    const payloads = [
+      { type: 'WELCOME_COMPANION', expectedPopulation: 1 },
+      { type: 'WELCOME_COMPANION', expectedPopulation: 2 },
+      { type: 'WELCOME_COMPANION' },
+    ];
+    for (const command of payloads) {
+      const result = applyCommand(fresh, command);
+      assert.equal(result.ok, false);
+      assert.equal(result.reason, 'INVALID_COMMAND');
+      assert.equal(result.state, fresh);
+      assert.deepEqual(result.events, []);
+    }
     assert.deepEqual(fresh, freshSnapshot);
-    assert.deepEqual(stale.events, []);
     assert.equal(fresh.glowMicro, 0);
     assert.equal(fresh.berries, 6);
     assert.equal(fresh.slimes.length, 1);
+  });
 
-    const notReady = applyCommand(deepFreeze(createInitialState()), {
-      type: 'WELCOME_COMPANION',
-      expectedPopulation: 1,
-    });
-    assert.equal(notReady.ok, false);
-    assert.equal(notReady.reason, 'NOT_READY');
-    assert.equal(notReady.state.slimes.length, 1);
-    assert.deepEqual(notReady.events, []);
-
+  test('capacity blocks until a beds purchase, then joins in that transition', () => {
     const capacityShort = deepFreeze(
       makeState({
         totalFeeds: 24,
@@ -508,37 +505,40 @@ describe('WELCOME_COMPANION', () => {
         slimes: makeSlimes(2),
       }),
     );
-    const capacityResult = applyCommand(capacityShort, {
-      type: 'WELCOME_COMPANION',
-      expectedPopulation: 2,
-    });
-    assert.equal(getCompanionEligibility(capacityShort).capacityMet, false);
-    assert.equal(capacityResult.ok, false);
-    assert.equal(capacityResult.reason, 'NOT_READY');
-    assert.equal(capacityResult.state.glowMicro, 90 * MICRO_PER_GLOW);
-    assert.equal(capacityResult.state.slimes.length, 2);
+    const eligibility = getCompanionEligibility(capacityShort);
+    assert.equal(eligibility.capacityMet, false);
+    assert.equal(eligibility.ready, false);
+    assert.equal(capacityShort.slimes.length, 2);
 
-    const atCap = deepFreeze(
-      makeState({
-        totalFeeds: 200,
-        lifetimeGlowMicro: 2200 * MICRO_PER_GLOW,
-        glowMicro: 2200 * MICRO_PER_GLOW,
-        upgrades: { beds: 8 },
-        slimes: makeSlimes(POPULATION_CAP),
+    const stillBlocked = resolveCompanionsNow(capacityShort);
+    assert.equal(stillBlocked.state.slimes.length, 2);
+    assert.deepEqual(stillBlocked.events, []);
+
+    const bought = assertOk(
+      applyCommand(capacityShort, {
+        type: 'BUY_UPGRADE',
+        upgradeId: 'beds',
+        expectedLevel: 0,
       }),
     );
-    const capSnapshot = structuredClone(atCap);
-    const seventh = applyCommand(atCap, {
-      type: 'WELCOME_COMPANION',
-      expectedPopulation: POPULATION_CAP,
+    assert.equal(bought.state.upgrades.beds, 1);
+    assert.equal(bought.state.slimes.length, 3);
+    assert.equal(bought.state.slimes[2].id, 'slime-3');
+    assert.equal(bought.state.slimes[2].createdAtMs, 0);
+    assert.equal(bought.state.slimes[2].boostUntilMs, 0);
+    assert.equal(bought.events[0].type, 'UPGRADE_BOUGHT');
+    const companion = bought.events.find((event) => event.type === 'COMPANION_ADDED');
+    assert.deepEqual(companion, {
+      type: 'COMPANION_ADDED',
+      slimeId: 'slime-3',
+      homeSlot: 2,
+      atMs: 0,
     });
-    assert.equal(seventh.ok, false);
-    assert.equal(seventh.reason, 'POPULATION_CAP');
-    assert.equal(seventh.state, atCap);
-    assert.deepEqual(atCap, capSnapshot);
-    assert.equal(atCap.slimes.length, POPULATION_CAP);
-    assert.equal(atCap.glowMicro, 2200 * MICRO_PER_GLOW);
-    assert.deepEqual(seventh.events, []);
+    assert.equal(
+      bought.events.findIndex((event) => event.type === 'UPGRADE_BOUGHT') <
+        bought.events.findIndex((event) => event.type === 'COMPANION_ADDED'),
+      true,
+    );
   });
 
   test('lifetime independence: wallet 20 of 100 Glow still ready; spending keeps glowMet', () => {
@@ -565,24 +565,36 @@ describe('WELCOME_COMPANION', () => {
     );
     assert.equal(spent.state.glowMicro, 0);
     assert.equal(spent.state.lifetimeGlowMicro, 100 * MICRO_PER_GLOW);
-    const afterSpend = getCompanionEligibility(spent.state);
-    assert.equal(afterSpend.ready, true);
-    assert.equal(afterSpend.glowMet, true);
+    assert.equal(spent.state.slimes.length, 3);
+    assert.equal(spent.state.slimes[2].id, 'slime-3');
+    assert.equal(spent.state.berries, input.berries);
+    assert.equal(spent.state.totalFeeds, 24);
+    assert.equal(spent.state.slimes[2].boostUntilMs, 0);
+    assert.equal(spent.state.slimes[2].homeSlot, 2);
+  });
 
-    const welcome = assertOk(
-      applyCommand(deepFreeze(spent.state), {
-        type: 'WELCOME_COMPANION',
-        expectedPopulation: 2,
+  test('successful FEED concatenates FED then COMPANION_ADDED', () => {
+    const input = deepFreeze(
+      makeState({
+        totalFeeds: 5,
+        lifetimeGlowMicro: 12 * MICRO_PER_GLOW,
+        glowMicro: 12 * MICRO_PER_GLOW,
+        berries: 6,
+        slimes: [
+          {
+            ...createInitialState().slimes[0],
+            feedCount: 5,
+          },
+        ],
+        tutorialCompleted: ['feed'],
       }),
     );
-    assert.equal(welcome.state.glowMicro, 0);
-    assert.equal(welcome.state.lifetimeGlowMicro, 100 * MICRO_PER_GLOW);
-    assert.equal(welcome.state.berries, input.berries);
-    assert.equal(welcome.state.totalFeeds, 24);
-    assert.equal(welcome.state.slimes.length, 3);
-    assert.equal(welcome.state.slimes[2].id, 'slime-3');
-    assert.equal(welcome.state.slimes[2].boostUntilMs, 0);
-    assert.equal(welcome.state.slimes[2].homeSlot, 2);
+    const fed = assertOk(applyCommand(input, FEED_SLIME_1));
+    assert.equal(fed.state.totalFeeds, 6);
+    assert.equal(fed.state.slimes.length, 2);
+    assert.equal(fed.events[0].type, 'FED');
+    assert.equal(fed.events[1].type, 'COMPANION_ADDED');
+    assert.equal(fed.events[1].slimeId, 'slime-2');
   });
 });
 
@@ -726,33 +738,26 @@ describe('tutorial steps', () => {
         glowMicro: 12 * MICRO_PER_GLOW,
       }),
     );
-    const firstWelcome = assertOk(
-      applyCommand(readyWelcome, {
-        type: 'WELCOME_COMPANION',
-        expectedPopulation: 1,
-      }),
-    );
+    const firstWelcome = resolveCompanionsNow(readyWelcome);
     assert.ok(firstWelcome.state.tutorialCompleted.includes('welcome'));
+    assert.equal(firstWelcome.state.slimes.length, 2);
     assert.deepEqual(firstWelcome.events[1], {
       type: 'TUTORIAL_COMPLETED',
       step: 'welcome',
       atMs: 0,
     });
 
-    const secondWelcome = assertOk(
-      applyCommand(
-        deepFreeze(
-          makeState({
-            simTimeMs: 1_000,
-            totalFeeds: 24,
-            lifetimeGlowMicro: 90 * MICRO_PER_GLOW,
-            glowMicro: 90 * MICRO_PER_GLOW,
-            upgrades: { beds: 1 },
-            slimes: makeSlimes(2),
-            tutorialCompleted: ['feed', 'welcome', 'upgrade'],
-          }),
-        ),
-        { type: 'WELCOME_COMPANION', expectedPopulation: 2 },
+    const secondWelcome = resolveCompanionsNow(
+      deepFreeze(
+        makeState({
+          simTimeMs: 1_000,
+          totalFeeds: 24,
+          lifetimeGlowMicro: 90 * MICRO_PER_GLOW,
+          glowMicro: 90 * MICRO_PER_GLOW,
+          upgrades: { beds: 1 },
+          slimes: makeSlimes(2),
+          tutorialCompleted: ['feed', 'welcome', 'upgrade'],
+        }),
       ),
     );
     assert.deepEqual(secondWelcome.state.tutorialCompleted, [
@@ -765,11 +770,12 @@ describe('tutorial steps', () => {
       false,
     );
     assert.equal(secondWelcome.events[0].type, 'COMPANION_ADDED');
+    assert.equal(secondWelcome.state.slimes.length, 3);
   });
 });
 
 describe('review-gate transcript: fresh state to slime-2', () => {
-  test('only advance + applyCommand reach a successful WELCOME of slime-2', () => {
+  test('only advance + applyCommand reach an automatic slime-2 join', () => {
     /** @type {object[]} */
     const sequence = [];
     let state = createInitialState();
@@ -837,20 +843,10 @@ describe('review-gate transcript: fresh state to slime-2', () => {
     assert.equal(state.simTimeMs, 60_000);
     assert.equal(state.lifetimeGlowMicro, 12 * MICRO_PER_GLOW);
     assert.equal(state.totalFeeds, 6);
-    assert.equal(getCompanionEligibility(state).ready, true);
-    assert.equal(getCompanionEligibility(state).requiredCapacity, 2);
-
-    const beforeWelcome = {
-      glowMicro: state.glowMicro,
-      berries: state.berries,
-      totalFeeds: state.totalFeeds,
-    };
-    const welcome = applyAt({
-      type: 'WELCOME_COMPANION',
-      expectedPopulation: 1,
-    });
-
     assert.equal(state.slimes.length, 2);
+    assert.equal(getCompanionEligibility(state).ready, false);
+    assert.equal(getCompanionEligibility(state).requiredCapacity, 3);
+
     const companion = state.slimes[1];
     assert.equal(companion.id, 'slime-2');
     assert.equal(companion.name, SLIME_NAMES[1]);
@@ -858,15 +854,6 @@ describe('review-gate transcript: fresh state to slime-2', () => {
     assert.equal(companion.feedCount, 0);
     assert.equal(companion.homeSlot, 1);
     assert.equal(companion.createdAtMs, 60_000);
-    assert.equal(state.glowMicro, beforeWelcome.glowMicro);
-    assert.equal(state.berries, beforeWelcome.berries);
-    assert.equal(state.totalFeeds, beforeWelcome.totalFeeds);
-    assert.deepEqual(welcome.events[0], {
-      type: 'COMPANION_ADDED',
-      slimeId: 'slime-2',
-      homeSlot: 1,
-      atMs: 60_000,
-    });
 
     const summary = sequence.map((step) =>
       step.op === 'applyCommand'
@@ -896,15 +883,9 @@ describe('review-gate transcript: fresh state to slime-2', () => {
       { op: 'advance', elapsedMs: 4_000, fromMs: 16_000, toMs: 20_000 },
       { op: 'applyCommand', type: 'FEED', atMs: 20_000, ok: true },
       { op: 'advance', elapsedMs: 40_000, fromMs: 20_000, toMs: 60_000 },
-      {
-        op: 'applyCommand',
-        type: 'WELCOME_COMPANION',
-        atMs: 60_000,
-        ok: true,
-      },
     ]);
     console.log(
-      'P05 review-gate transcript (fresh → slime-2):\n' +
+      'P2-04 review-gate transcript (fresh → slime-2):\n' +
         JSON.stringify(summary, null, 2),
     );
   });

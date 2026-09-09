@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { MICRO_PER_GLOW, OFFLINE_CAP_MS } from '../src/core/balance.mjs';
 import { applyCommand } from '../src/core/commands.mjs';
-import { createInitialState } from '../src/core/state.mjs';
+import { cloneState, createInitialState } from '../src/core/state.mjs';
 import { createFreshEnvelope } from '../src/core/validate.mjs';
 import { reconcileAway } from '../src/persistence/reconcile.mjs';
 import {
@@ -82,6 +82,73 @@ describe('reconcileAway', () => {
     assert.equal(result.save.savedWallMs, now);
     assert.equal('events' in result, false);
     assert.equal(result.save.state.world.timeMs, save.state.world.timeMs);
+  });
+
+  test('native v2 11.9 lifetime fixture: 1h away earns 719.9 Glow and joins slime-2', () => {
+    const now = 2_000_000_000_000;
+    const state = cloneState(createInitialState());
+    state.totalFeeds = 6;
+    state.lifetimeGlowMicro = 11_900_000;
+    state.glowMicro = 0;
+    state.incomeRemainder = 0;
+    state.simTimeMs = 0;
+    state.slimes[0].feedCount = 6;
+    state.berries = 12;
+    state.nextBerryAtMs = null;
+    const save = createFreshEnvelope({ nowWallMs: now - HOUR_MS, revision: 2, state });
+    save.state.world.timeMs = 150;
+    save.state.world.carryMs = 12;
+    const result = reconcileAway(save, now);
+    assert.equal(result.summary.glowEarnedMicro, 719_900_000);
+    assert.equal(result.save.state.glowMicro, 719_900_000);
+    assert.equal(result.save.state.lifetimeGlowMicro, 11_900_000 + 719_900_000);
+    assert.equal(result.save.state.simTimeMs, HOUR_MS);
+    assert.equal(result.save.state.slimes.length, 2);
+    assert.equal(result.save.state.slimes[1].id, 'slime-2');
+    assert.equal(result.save.state.slimes[1].createdAtMs, 1_000);
+    assert.equal(result.save.state.totalFeeds, 6);
+    assert.equal(result.save.state.world.timeMs, 150);
+    assert.equal(result.save.state.world.carryMs, 12);
+    assert.deepEqual(result.save.state.world.foods, []);
+    assert.equal(result.save.state.world.residents.length, 2);
+    assert.ok(result.save.state.world.residents.some((row) => row.id === 'slime-2'));
+    assert.deepEqual(result.summary.companionsAdded, ['slime-2']);
+
+    const again = reconcileAway(result.save, now);
+    assert.equal(again.summary.glowEarnedMicro, 0);
+    assert.equal(again.save.state.slimes.length, 2);
+    assert.equal(again.save.state.glowMicro, result.save.state.glowMicro);
+    assert.deepEqual(
+      again.save.state.slimes.map((slime) => slime.id),
+      ['slime-1', 'slime-2'],
+    );
+  });
+
+  test('native v2 ten-hour absence credits 8h as 5759.9 Glow and does not add a third', () => {
+    const now = 2_000_000_000_000;
+    const state = cloneState(createInitialState());
+    state.totalFeeds = 6;
+    state.lifetimeGlowMicro = 11_900_000;
+    state.glowMicro = 0;
+    state.incomeRemainder = 0;
+    state.simTimeMs = 0;
+    state.slimes[0].feedCount = 6;
+    state.berries = 12;
+    state.nextBerryAtMs = null;
+    const save = createFreshEnvelope({
+      nowWallMs: now - TEN_HOURS_MS,
+      revision: 2,
+      state,
+    });
+    const result = reconcileAway(save, now);
+    assert.equal(result.summary.glowEarnedMicro, 5_759_900_000);
+    assert.equal(result.summary.creditedMs, OFFLINE_CAP_MS);
+    assert.equal(result.save.state.simTimeMs, TEN_HOURS_MS);
+    assert.equal(result.save.state.slimes.length, 2);
+    assert.equal(result.save.state.totalFeeds, 6);
+    assert.equal(result.save.state.slimes[0].feedCount, 6);
+    assert.equal(result.save.state.world.timeMs, 0);
+    assert.deepEqual(result.save.state.world.foods, []);
   });
 
   test('remainder jump clamps throw cooldown on the shared integer', () => {

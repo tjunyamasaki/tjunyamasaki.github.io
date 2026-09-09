@@ -411,3 +411,45 @@ Do **not** wholesale-replace `nextState.world` with the pre-advance snapshot aft
 
 `advanceBy` in `main.mjs` applies `advancePassive` and `handleEvents` (action copy such as “Pip joined”) but does **not** call `syncScene` / `scene.play`. The roster DOM refreshes on the 250 ms paint interval. 3D actors spawn on the next `dispatch` (Offer berry / buy / Welcome click) or `syncAfterReconcile` (load, tab return, sleep). A Glow-crossing while the tab stays open can show two names and one mesh until a command or reload. Offline/migration joins go through reconcile and do appear after load. P2-13 must forward passive `COMPANION_ADDED` on the shared commit path.
 
+## 11. P2-05 static paths and collision-safe reservations
+
+Landed on `feat/slime` after P2-04. Pure planner only: no `main.mjs` / UI / scene / persistence / economy edits. **`layout.mjs` was not changed.** Yielding, wander FSM, active 50 ms clock, and `planActiveArrival` remain P2-06. Scene `motion.mjs` swept helpers stay v1 cosmetic history; world planning does not import them.
+
+### 11.1 Canonical exports (`slime-garden/src/world/navigation.mjs`)
+
+| Export | Role |
+| --- | --- |
+| `planRoute({ world, residentId, destination, permitGate })` | `RouteResult \| null`. `points` are a new array including **exact** start (`resident.position`) and **exact** destination (not grid snaps). `length` is the Euclidean polyline sum. `null` on failure; never throws; never mutates `world`. |
+| `planRouteWithDiag(args)` | `{ route, reason }` where `reason` is `null` on success. `planRoute` is `planRouteWithDiag(...).route`. |
+| `explainRouteBlock(args)` | `string \| null` — the diag reason when planning fails. Not a mutable global. |
+| `rebuildReservations(world)` | Derived corridor list from residents whose `route.points.length >= 2`, in `world.residents` order, **capped at `MAX_ACTIVE_ROUTES` (3)**. Extra saved routes are omitted (non-reservable); they do not create a 4th mover. Full saved polylines are used (no `distanceAlong` trimming; P2-06 may refine). |
+| `segmentClearsStatic(a, b, permitGate)` | Swept static: allowed region along the whole segment plus distance to each prop center ≥ `PROP_MOVEMENT_RADIUS` (1.7). |
+| `corridorsClear(pointsA, pointsB)` | Segment-to-segment distance between polylines ≥ `MIN_SEPARATION` (2.4), including crossings. |
+| `pointClearsStations(point, world, residentId)` | Point vs stationary others (residents not in the rebuilt reservation set, excluding the requester) ≥ 2.4. |
+| `isAllowedCenter(point, permitGate)` | `isValidResidentCenter` or, iff `permitGate`, `isInArrivalCorridor`. |
+| `GRID_SPACING` / `MAX_EXPANDED_NODES` / `MAX_ROUTE_POINTS` | `0.75` / `1024` / `128`. |
+
+Block reasons: `invalid-end`, `gate-denied`, `static`, `stationary`, `reservation`, `capacity`, `search-exhausted`.
+
+### 11.2 Geometry helper (`slime-garden/src/world/geom.mjs`)
+
+`pointToSegmentDistance`, `segmentSegmentDistance`, `polylinePolylineDistance`, `polylineLength`, `copyPoint`, `samePoint`. Continuous swept math; no endpoint-only shortcuts.
+
+### 11.3 Gate vs `isValidResidentCenter`
+
+`isValidResidentCenter` is **unchanged** (resident domain `[-10.8,10.8]×[-8.8,8.8]`, inflated props, **not** staging or the arrival corridor). Wanderers must not treat the gate as floor.
+
+When `permitGate === true`, traversal may use `isInArrivalCorridor` plus explicit corridor/staging nodes and `GATE_INSIDE_WAYPOINT` `(0,-7)`. A segment may cross the portal at `z=-8.8`, `x∈[-0.6,0.6]` (union of interior AABB and corridor AABB; not convex). When `permitGate === false`, start/end/waypoints in the arrival corridor / staging are `gate-denied`. Ordinary interior routes never need the outside corridor.
+
+### 11.4 Planner behavior
+
+1. Start≈end (`GEOM_EPS`) → 1-point route, length 0 (not a stored `RouteState`; does not consume capacity).
+2. Else a single swept-clear direct segment (static + stationary + other reservations + gate).
+3. Else A* on a 0.75 grid in the resident domain plus explicit gate/staging nodes, Euclidean costs/heuristic, expand ≤ 1024, tie-break smaller f then g then row-major **z then x** node index. Eight neighbors only when the full swept link is clear; short diagonals also require both orthogonal corners clear (no corner cutting). Exact start/end attach to nearby clear nodes; actors are not teleported onto the grid.
+4. Smooth by dropping intermediate waypoints iff each resulting swept segment still passes all clearance checks.
+5. At most 3 **other** moving reservations → `capacity` even if geometrically clear. Stationary others are disks (segment-to-point ≥ 2.4). Reserved polylines use segment-to-segment ≥ 2.4.
+
+### 11.5 Still P2-06 / historical
+
+Yielding timers, wander destination FSM, gait/`distanceAlong` stepping, food claims, and `planActiveArrival` are **not** in this packet. `scene/motion.mjs` remains the v1 single-walker cosmetic path. `main.mjs` still does not call `planRoute`.
+

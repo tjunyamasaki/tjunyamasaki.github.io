@@ -572,3 +572,54 @@ Income for the completing 50 ms slice still runs **before** the world step; boos
 - `export { advancePassive as advance }` unchanged.
 - Persistence round-trip in this packet is test-only.
 
+## 15. P2-09 zoom, orbit and gesture ownership
+
+Landed on `feat/slime` after P2-08. New modules only: the playable garden is **not** wired. `scene.mjs` v1 pick-only listeners (`onPointerDown` / `Move` / `Up` / `Cancel` on the garden canvas) remain until P2-13. Do not add OrbitControls or a second router beside them. Live `/slime-garden/` camera is still v1 fixed yaw/pitch (`CAMERA_PITCH` 0.65) fitted to six pads.
+
+### 15.1 `slime-garden/src/scene/camera.mjs`
+
+Session UI math (not saved). Does not import `applyCommand`, GameState, or the pointer router.
+
+| Export | Role |
+| --- | --- |
+| `createCameraRig({ getAspect, reducedMotion, widthCss, heightCss })` | `{ getView, applyTo, applyIntent, orbit, pan, zoom, zoomByFactor, zoomStep, pinch, reset, focus / focusResident, resize, update, setReducedMotion, getFarPlane, getDistanceLimits, dispose }` |
+| `PHASE2_CAMERA_YAW` / `PHASE2_CAMERA_PITCH` | `0` / `0.72` rad (not v1 `CAMERA_PITCH` 0.65) |
+| `PITCH_MIN` / `PITCH_MAX` | `0.35` / `1.15` |
+| `DISTANCE_MIN` | `5.8` |
+| `TARGET_Y_OVERVIEW` | `0.65` |
+| `FOCUS_TARGET_Y` | `BODY_BOUNDS_CENTER[1]` (`0.7`); copied once, no auto-follow |
+| `CAMERA_DAMP` | `4` with `1-exp(-k*dt)`; reduced motion snaps desired→current |
+| `ORBIT_YAW_PER_PX` / `ORBIT_PITCH_PER_PX` | `0.008` / `0.006` (inspection-like) |
+| `fitFarmOverviewDistance(aspect)` | `fitDistanceForSlots` on fence ±12×±10, `GATE_STAGING (0,-12)`, ten homes, existing slot margin + 1.1 padding (both FOVs) |
+| `maxDistanceForAspect(aspect)` | `max(60, 1.5 × overview-fit)`; recomputed on resize |
+| `zoomFactorFromWheel` / `normalizeWheelDeltaY` / `clampWheelDeltaY` | pixel/line/page; clamp ±100 px; `distance *= exp(clamped * 0.001)` |
+| `BUTTON_ZOOM_DELTA_PX` | same ±100 clamp as one bounded wheel tick |
+| Pan clamp | target x/z in `RESIDENT_MIN/MAX_X/Z` `[-10.8,10.8]×[-8.8,8.8]` |
+| Far plane | `max(60, maxDistance + 40, distance + 24)`; 0-size hosts ignored (no NaN) |
+
+`resize` refits only while `framing === 'overview'`. Orbit/zoom/pan/focus set `custom` and preserve yaw/pitch/distance/target aside from clamps. Population/HUD/capacity are not inputs.
+
+### 15.2 `slime-garden/src/input/pointer-router.mjs`
+
+Inject `getMode`, `getTool`, `pick`, `onIntent`, `onCamera`, `isOverPlaySurface`, optional `isHudHit` / `isPlaySurfaceFocused` / `getWindow`. Drive tests with `handlePointer*` on plain event-shaped objects; `attach(el)` is for the harness.
+
+- Drag threshold **6 CSS px** (`DRAG_THRESHOLD_PX` from `scene/layout.mjs`). Classifier uses **cumulative max displacement**; drag-return never clicks.
+- Care primary click → `WORLD_CLICK { hit, tool }`. Router does not throw or spend berries.
+- Orbit primary drag → `ORBIT`; right-drag → `PAN`. No `WORLD_CLICK` in orbit.
+- `setPointerCapture` in Orbit only. Care leaves ordinary scroll (`touch-action` is CSS: Care `pan-y`, Orbit `none`).
+- Two touches: pinch zoom + centroid pan; click candidate cancelled. Leftover one-finger release is not a click. A third pointer cancels until **all** are released.
+- `pointercancel`, `lostpointercapture`, window blur, `notifyModeChange`, `notifyDialogOpen` / `cancelGestures` clear candidates.
+- Wheel: consume (non-passive on the surface) only when Orbit is on **or** the play surface is engaged/focused, and only when over the surface. Ctrl/Meta does not `preventDefault`. No document-level wheel blocker.
+
+### 15.3 Isolated harness
+
+`slime-garden/dev/phase2-camera.html` + `phase2-camera.mjs`. Graybox fence, gate marker, ten home dots. PerspectiveCamera FOV 35. Care/Orbit, +/−, Reset, Focus corner resident (`HOME_SLOTS[3]`), reduced-motion checkbox. Orbit copy: “Drag to orbit · Two fingers to pan/zoom” plus Back-to-care.
+
+Open: `npx serve .` from repo root → `/slime-garden/dev/phase2-camera` (extensionless) or `/slime-garden/dev/phase2-camera.html`. Viewport has no `maximum-scale`.
+
+### 15.4 Leftovers (P2-13)
+
+- `scene.mjs` still owns garden canvas pointer listeners and the v1 fixed camera.
+- `main.mjs` is unchanged; no HUD camera cluster, no production Orbit mode.
+- Do not claim the playable garden now orbits or throws from this router.
+

@@ -413,7 +413,7 @@ Do **not** wholesale-replace `nextState.world` with the pre-advance snapshot aft
 
 ## 11. P2-05 static paths and collision-safe reservations
 
-Landed on `feat/slime` after P2-04. Pure planner only: no `main.mjs` / UI / scene / persistence / economy edits. **`layout.mjs` was not changed.** Yielding, wander FSM, active 50 ms clock, and `planActiveArrival` remain P2-06. Scene `motion.mjs` swept helpers stay v1 cosmetic history; world planning does not import them.
+Landed on `feat/slime` after P2-04. Pure planner only: no `main.mjs` / UI / scene / persistence / economy edits. **`layout.mjs` was not changed.** Scene `motion.mjs` swept helpers stay v1 cosmetic history; world planning does not import them. Wander/yield/active clock/`planActiveArrival` are in §12 (P2-06).
 
 ### 11.1 Canonical exports (`slime-garden/src/world/navigation.mjs`)
 
@@ -449,7 +449,38 @@ When `permitGate === true`, traversal may use `isInArrivalCorridor` plus explici
 4. Smooth by dropping intermediate waypoints iff each resulting swept segment still passes all clearance checks.
 5. At most 3 **other** moving reservations → `capacity` even if geometrically clear. Stationary others are disks (segment-to-point ≥ 2.4). Reserved polylines use segment-to-segment ≥ 2.4.
 
-### 11.5 Still P2-06 / historical
+### 11.5 Closed by P2-06
 
-Yielding timers, wander destination FSM, gait/`distanceAlong` stepping, food claims, and `planActiveArrival` are **not** in this packet. `scene/motion.mjs` remains the v1 single-walker cosmetic path. `main.mjs` still does not call `planRoute`.
+P2-06 landed `advanceActive`, `stepWorld`, wander/yield, world gait (`GAIT_CYCLE_MS=1250`, `STRIDE_UNITS=1`), and `planActiveArrival`. `rebuildReservations` still uses full saved polylines (no `distanceAlong` trim). `layout.mjs` / `navigation.mjs` were not edited. Food claims remain P2-07.
+
+`scene/motion.mjs` remains the v1 single-walker cosmetic path (0.65 stride). `main.mjs` still calls `advance` (`advancePassive`); the browser garden will **not** walk until P2-13.
+
+## 12. P2-06 active world clock and lively movement
+
+Landed on `feat/slime` after P2-05. Pure active clock + world FSM only: no `main.mjs` / UI / scene / persistence / food commands.
+
+### 12.1 Canonical exports
+
+| Export | Module | Role |
+| --- | --- | --- |
+| `advanceActive(state, elapsedMs)` | `src/core/active.mjs` | Integer elapsed `0..5000`. Clone; `resolveCompanionsNow`; slice `min(remaining, 50-carry)`; `advancePassive` for the slice; add carry; on 50: `carry=0`, `timeMs+=50`, `planActiveArrival` for IDs that joined since the previous boundary, then **one** `stepWorld`. Never mutates input. `mealsCompleted` stays 0. |
+| `stepWorld(state)` | `src/world/step.mjs` (re-exported from `active.mjs`) | Precondition: wrapper already added 50 to `world.timeMs`. Progress reserved gait, complete when fraction reaches 1, then wander/yield. `meals: []` while `world.foods` is empty. |
+| `planActiveArrival(state, id)` | `src/world/behavior.mjs` (re-exported from `active.mjs`) | One-time gate plan. Relocates **that id only** to `GATE_STAGING` with `activity:'arriving'` iff `planRoute(..., permitGate:true)` reserves **and** no other arriving/corridor occupant. Else keep roster home/free, no route. |
+| `gaitFraction` / `gaitCycleCount` / `poseAlongPolyline` | `src/world/gait.mjs` | Cycle 1250 ms; travel phase 0.29–0.68 smoothstep01; `cycleCount=max(1,ceil(length/1))`; yaw `atan2(dx,dz)`. Does **not** import scene. |
+| `mixHash` / `hashUnit` / `hashIntInclusive` | `src/world/hash.mjs` | FNV-style keyed mix. No `Math.random`, no mutable global RNG. |
+
+World gait constants already in `balance.mjs`: `GAIT_CYCLE_MS=1250`, `STRIDE_UNITS=1`, `WORLD_STEP_MS=50`, `MAX_WORLD_STEPS_PER_ADVANCE=100`.
+
+### 12.2 Wander / yield
+
+- First idle decisions keep `createWorld` stagger `2000 + homeSlot*250`.
+- After a completed walk, wait 2–5 s from `id` + `behaviorCounter`. Failed reserve: rest 1–2 s, increment counter, `nextReplanWorldMs=+500`. Do not retry every tick.
+- Eight hash candidates 2.5–6 units, `isValidResidentCenter`, not corridor/staging, `permitGate:false`. `planRoute` enforces the 3-mover cap.
+- Blocked ≥2000 world ms: recompute (stations included). At most one yield/tick to a ring point (radius 3 then 4.5, eight headings) if an idle resident is the likely blocker. Yield uses a mover slot; arrivals are planned before wander starts so they take priority.
+- Fair order: `behaviorCounter` then numeric id (slime-1 cannot starve others).
+- Completing a route snaps to the exact destination, `route=null`, `activity='idle'`. No teleport through fence/props.
+
+### 12.3 Integration leftovers (P2-13)
+
+`export { advancePassive as advance }` is unchanged. Visible `main.mjs` still uses passive time; residents will not walk in the browser until P2-13 swaps `advanceBy` to `advanceActive` for visible sessions. THROW_FOOD / eating remain P2-07/P2-08.
 

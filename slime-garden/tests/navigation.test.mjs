@@ -374,6 +374,40 @@ describe('gate permissions', () => {
   });
 });
 
+describe('stationary resident clearance', () => {
+  test('an idle resident on the chord forces a swept detour, not an endpoint-only pass', () => {
+    const world = createWorld(makeSlimes(2));
+    place(world, 'slime-1', { x: -6, z: 0 });
+    place(world, 'slime-2', { x: 0, z: 0 });
+    const destination = { x: 6, z: 0 };
+    const direct = 12;
+    assert.equal(
+      segmentClearsStatic({ x: -6, z: 0 }, destination, false),
+      true,
+    );
+    const frozen = freezeWorld(world);
+    const route = planRoute({
+      world: frozen,
+      residentId: 'slime-1',
+      destination,
+      permitGate: false,
+    });
+    assert.ok(route);
+    assert.deepEqual(route.points[0], { x: -6, z: 0 });
+    assert.deepEqual(route.points[route.points.length - 1], destination);
+    assert.ok(route.points.length > 2);
+    assert.ok(route.length > direct + GEOM_EPS);
+    for (let index = 1; index < route.points.length; index += 1) {
+      const dist = pointToSegmentDistance(
+        frozen.residents[1].position,
+        route.points[index - 1],
+        route.points[index],
+      );
+      assert.ok(dist >= MIN_SEPARATION - GEOM_EPS);
+    }
+  });
+});
+
 describe('exhausted search and invalid ends', () => {
   test('keep-out and out-of-domain destinations return null without throwing', () => {
     const world = freezeWorld(createWorld(makeSlimes(1)));

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f4f1e9"><meta name="description" content="One imaginary week of listening, seen through three experimental, interactive data visualizations.">
+<title>Listening Atlas — data in a different shape</title>
+<link rel="stylesheet" href="style.css"><script type="module" src="app.js"></script>
+</head>
+<body>
+<header><a href="/links/" aria-label="Back to links">↖ Index</a><span>EXPERIMENT Nº 01</span><span class="stamp">4D → 2D</span></header>
+<main>
+<div class="intro"><div><p class="eyebrow">A WEEK IN SOUND / FICTIONAL DATA</p><h1>Listening <em>Atlas.</em></h1></div><p>Eight moments. Four dimensions.<br>Three ways to see the same week.</p></div>
+<nav aria-label="Visualization"><button data-view="orbit" aria-pressed="true"><span>01</span> Orbit</button><button data-view="weave" aria-pressed="false"><span>02</span> Weave</button><button data-view="bloom" aria-pressed="false"><span>03</span> Bloom</button></nav>
+<section class="exhibit" data-theme="orbit" aria-labelledby="view-title">
+<div class="exhibit-heading"><div><p class="eyebrow" id="view-kicker"></p><h2 id="view-title"></h2></div><span class="view-mark" aria-hidden="true" id="view-mark"></span></div>
+<p id="view-description" class="description"></p>
+<div id="chart" class="chart"></div>
+<div class="chart-footer"><span>Tap a moment to explore</span><span>● <span id="selected-name"></span></span></div>
+</section>
+<section class="below"><div class="inspector" aria-live="polite" aria-atomic="true"><p class="eyebrow">SELECTED MOMENT <span id="moment-number"></span></p><h2 id="moment-title"></h2><p id="moment-note"></p><dl id="metrics"></dl></div>
+<div class="legend"><p class="eyebrow">HOW TO READ THIS</p><div id="legend"></div><div class="mood-scale"><span>Reflective</span><div></div><span>Joyful</span></div><p class="scale-note">Mood: 0 → 100. Color follows the same scale in every view.</p></div></section>
+<details class="data"><summary>See the eight source records <span>↗</span></summary><div class="table-wrap"><table><caption>Invented listening sessions · no personal listening history</caption><thead><tr><th>Moment</th><th>Minutes</th><th>Energy / 5</th><th>Discovery / 5</th><th>Mood / 100</th></tr></thead><tbody id="records"></tbody></table></div></details>
+<footer><span>LISTENING ATLAS</span><span>Made-up numbers. Real curiosity.</span></footer>
+<noscript>This interactive atlas requires JavaScript to render the charts and source records.</noscript>
+</main>
+</body>
+</html>

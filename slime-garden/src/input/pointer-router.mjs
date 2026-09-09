@@ -211,7 +211,7 @@ export function createPointerRouter(options = {}) {
     if (pointers.size === 2) {
       multiTouchOccurred = true;
       for (const p of pointers.values()) p.cancelled = true;
-      beginPinch();
+      if (mode === 'orbit') beginPinch();
     }
   }
 
@@ -244,8 +244,12 @@ export function createPointerRouter(options = {}) {
     }
 
     if (pointers.size === 2) {
-      if (pinchLastDist <= 0) beginPinch();
-      updatePinch();
+      // Camera pinch/pan is Orbit-owned. Care two-finger sequences only
+      // cancel the click candidate so the browser can pinch-zoom / scroll.
+      if (rec.startMode === 'orbit' && modeNow() === 'orbit') {
+        if (pinchLastDist <= 0) beginPinch();
+        updatePinch();
+      }
       return;
     }
 

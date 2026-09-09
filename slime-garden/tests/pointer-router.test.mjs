@@ -142,7 +142,27 @@ describe('phase-2 pointer router', () => {
     c.router.handlePointerUp(pointer({ pointerId: 2, pointerType: 'touch', clientX: 140, clientY: 70 }));
     c.router.handlePointerUp(pointer({ pointerId: 1, pointerType: 'touch', clientX: 70, clientY: 90 }));
     assert.deepEqual(c.types(), []);
+    assert.deepEqual(c.camTypes(), []);
     assert.equal(c.economy.foods.length, 1);
+  });
+
+  test('Care two-finger pinch does not emit camera ZOOM/PAN; Orbit pinch does', () => {
+    const care = createCollector({ mode: 'care' });
+    care.router.handlePointerDown(pointer({ pointerId: 1, pointerType: 'touch', clientX: 80, clientY: 80 }));
+    care.router.handlePointerDown(pointer({ pointerId: 2, pointerType: 'touch', clientX: 120, clientY: 80 }));
+    care.router.handlePointerMove(pointer({ pointerId: 1, pointerType: 'touch', clientX: 60, clientY: 80 }));
+    care.router.handlePointerMove(pointer({ pointerId: 2, pointerType: 'touch', clientX: 160, clientY: 80 }));
+    assert.deepEqual(care.camTypes(), []);
+    assert.deepEqual(care.types(), []);
+
+    const orbit = createCollector({ mode: 'orbit' });
+    orbit.router.handlePointerDown(pointer({ pointerId: 1, pointerType: 'touch', clientX: 80, clientY: 80 }));
+    orbit.router.handlePointerDown(pointer({ pointerId: 2, pointerType: 'touch', clientX: 120, clientY: 80 }));
+    orbit.router.handlePointerMove(pointer({ pointerId: 1, pointerType: 'touch', clientX: 60, clientY: 90 }));
+    orbit.router.handlePointerMove(pointer({ pointerId: 2, pointerType: 'touch', clientX: 160, clientY: 70 }));
+    assert.ok(orbit.camTypes().includes('ZOOM') || orbit.camTypes().includes('PAN'));
+    assert.ok(orbit.camTypes().every((t) => t === 'ZOOM' || t === 'PAN'));
+    assert.deepEqual(orbit.types(), []);
   });
 
   test('pointercancel / lostcapture / release-outside / blur / mode switch / dialog-open clear candidates', () => {

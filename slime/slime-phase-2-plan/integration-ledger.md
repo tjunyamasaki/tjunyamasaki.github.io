@@ -607,7 +607,7 @@ Inject `getMode`, `getTool`, `pick`, `onIntent`, `onCamera`, `isOverPlaySurface`
 - Care primary click → `WORLD_CLICK { hit, tool }`. Router does not throw or spend berries.
 - Orbit primary drag → `ORBIT`; right-drag → `PAN`. No `WORLD_CLICK` in orbit.
 - `setPointerCapture` in Orbit only. Care leaves ordinary scroll (`touch-action` is CSS: Care `pan-y`, Orbit `none`).
-- Two touches: pinch zoom + centroid pan; click candidate cancelled. Leftover one-finger release is not a click. A third pointer cancels until **all** are released.
+- Two touches: click candidate cancelled. **Orbit** pinch zoom + centroid pan; leftover one-finger release is not a click. **Care** two-finger sequences emit no camera intents (browser pinch-zoom / `pan-y` scroll stay available). A third pointer cancels until **all** are released.
 - `pointercancel`, `lostpointercapture`, window blur, `notifyModeChange`, `notifyDialogOpen` / `cancelGestures` clear candidates.
 - Wheel: consume (non-passive on the surface) only when Orbit is on **or** the play surface is engaged/focused, and only when over the surface. Ctrl/Meta does not `preventDefault`. No document-level wheel blocker.
 

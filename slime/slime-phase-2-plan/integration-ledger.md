@@ -407,3 +407,7 @@ Do **not** wholesale-replace `nextState.world` with the pre-advance snapshot aft
 
 `createInitialState().habitatId` remains `garden-prototype-v1`. Scene still has six pads. FEED still lives in main/UI; THROW_FOOD is still P2-07.
 
+#### Visible-session 3D lag (P2-13)
+
+`advanceBy` in `main.mjs` applies `advancePassive` and `handleEvents` (action copy such as “Pip joined”) but does **not** call `syncScene` / `scene.play`. The roster DOM refreshes on the 250 ms paint interval. 3D actors spawn on the next `dispatch` (Offer berry / buy / Welcome click) or `syncAfterReconcile` (load, tab return, sleep). A Glow-crossing while the tab stays open can show two names and one mesh until a command or reload. Offline/migration joins go through reconcile and do appear after load. P2-13 must forward passive `COMPANION_ADDED` on the shared commit path.
+

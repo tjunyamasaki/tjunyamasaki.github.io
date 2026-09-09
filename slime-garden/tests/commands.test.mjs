@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { advance } from '../src/core/advance.mjs';
 import {
   BASE_RATE_MICRO_PER_SECOND,
+  BONUS_EXTEND_MS,
+  BONUS_MAX_REMAINING_MS,
   BONUS_MULTIPLIER,
   FEED_BERRY_COST,
   FEED_COOLDOWN_MS,
@@ -30,6 +32,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const coreDir = join(here, '../src/core');
 
 const FEED_SLIME_1 = Object.freeze({ type: 'FEED', slimeId: 'slime-1' });
+const THROW_LEGAL = Object.freeze({ type: 'THROW_FOOD', target: { x: 1.1, z: 2 } });
 
 /**
  * @param {object} [patch]
@@ -106,135 +109,47 @@ function assertOk(result, message) {
 }
 
 describe('FEED', () => {
-  test('double FEED at t=0: second is FEED_COOLDOWN, no extra berry or feed', () => {
+  test('is INVALID_COMMAND and never spends, boosts, or counts a feed', () => {
     const input = deepFreeze(createInitialState());
     const snapshot = structuredClone(input);
-    const first = assertOk(applyCommand(input, FEED_SLIME_1));
-    assert.equal(first.state.berries, 5);
-    assert.equal(first.state.totalFeeds, 1);
-    assert.equal(first.state.slimes[0].feedCount, 1);
-    assert.equal(first.state.nextFeedAllowedAtMs, 4_000);
-    assert.equal(first.state.simTimeMs, 0);
-    assert.equal(first.state.nextBerryAtMs, 15_000);
+    const payloads = [
+      FEED_SLIME_1,
+      { type: 'FEED' },
+      { type: 'FEED', slimeId: 'slime-99' },
+      { type: 'FEED', slimeId: 1 },
+    ];
+    for (const command of payloads) {
+      const result = applyCommand(input, command);
+      assert.equal(result.ok, false, `expected invalid: ${JSON.stringify(command)}`);
+      assert.equal(result.reason, 'INVALID_COMMAND');
+      assert.equal(result.state, input);
+      assert.deepEqual(result.events, []);
+    }
+    assert.equal(input.berries, 6);
+    assert.equal(input.totalFeeds, 0);
+    assert.equal(input.slimes[0].boostUntilMs, 0);
+    assert.equal(input.slimes[0].feedCount, 0);
+    assert.equal(input.world.foods.length, 0);
     assert.deepEqual(input, snapshot);
-
-    const secondInput = deepFreeze(first.state);
-    const secondSnapshot = structuredClone(secondInput);
-    const second = applyCommand(secondInput, FEED_SLIME_1);
-    assert.equal(second.ok, false);
-    assert.equal(second.reason, 'FEED_COOLDOWN');
-    assert.equal(second.state, secondInput);
-    assert.deepEqual(second.events, []);
-    assert.equal(secondInput.berries, 5);
-    assert.equal(secondInput.totalFeeds, 1);
-    assert.deepEqual(secondInput, secondSnapshot);
   });
 
-  test('global cooldown: 3999 ms on another resident fails; 4000 ms succeeds', () => {
-    const first = assertOk(applyCommand(deepFreeze(createInitialState()), FEED_SLIME_1));
-    const withTwo = withSecondResident(first.state);
-    const early = applyCommand(
-      deepFreeze(atTime(withTwo, 3_999)),
-      { type: 'FEED', slimeId: 'slime-2' },
-    );
-    assert.equal(early.ok, false);
-    assert.equal(early.reason, 'FEED_COOLDOWN');
-    assert.equal(early.state.berries, 5);
-    assert.equal(early.state.totalFeeds, 1);
-    assert.equal(early.state.slimes[1].feedCount, 0);
-    assert.deepEqual(early.events, []);
-
-    const ready = assertOk(
-      applyCommand(deepFreeze(atTime(withTwo, 4_000)), {
-        type: 'FEED',
-        slimeId: 'slime-2',
-      }),
-    );
-    assert.equal(ready.state.berries, 4);
-    assert.equal(ready.state.totalFeeds, 2);
-    assert.equal(ready.state.slimes[0].feedCount, 1);
-    assert.equal(ready.state.slimes[1].feedCount, 1);
-    assert.equal(ready.state.slimes[0].boostUntilMs, 120_000);
-    assert.equal(ready.state.slimes[1].boostUntilMs, 124_000);
-    assert.equal(ready.state.nextFeedAllowedAtMs, 8_000);
-    assert.equal(ready.state.simTimeMs, 4_000);
-  });
-
-  test('bonus extension: feeds at 0, 4000, 8000 → 120000, 240000, 308000', () => {
-    const first = assertOk(applyCommand(deepFreeze(createInitialState()), FEED_SLIME_1));
-    assert.equal(first.state.slimes[0].boostUntilMs, 120_000);
-
-    const second = assertOk(
-      applyCommand(deepFreeze(atTime(first.state, 4_000)), FEED_SLIME_1),
-    );
-    assert.equal(second.state.slimes[0].boostUntilMs, 240_000);
-
-    const third = assertOk(
-      applyCommand(deepFreeze(atTime(second.state, 8_000)), FEED_SLIME_1),
-    );
-    assert.equal(third.state.slimes[0].boostUntilMs, 308_000);
-    assert.equal(third.state.berries, 3);
-    assert.equal(third.state.totalFeeds, 3);
-  });
-
-  test('full basket: 12 berries, null timer, feed at 50_000 → 11 berries, nextBerry 65_000', () => {
-    const input = deepFreeze(
-      makeState({
-        simTimeMs: 50_000,
-        berries: 12,
-        nextBerryAtMs: null,
-      }),
-    );
-    const snapshot = structuredClone(input);
-    const result = assertOk(applyCommand(input, FEED_SLIME_1));
+  test('THROW_FOOD full basket: 12 berries, null timer, throw at 50_000 → 11, regen 65_000, no boost', () => {
+    const input = cloneState(createInitialState());
+    input.simTimeMs = 50_000;
+    input.berries = 12;
+    input.nextBerryAtMs = null;
+    const frozen = deepFreeze(input);
+    const snapshot = structuredClone(frozen);
+    const result = assertOk(applyCommand(frozen, THROW_LEGAL));
     assert.equal(result.state.berries, 11);
     assert.equal(result.state.nextBerryAtMs, 65_000);
     assert.equal(getBerryIntervalMs(result.state), 15_000);
     assert.equal(result.state.simTimeMs, 50_000);
-    assert.deepEqual(input, snapshot);
-    assert.notEqual(result.state, input);
-    assert.deepEqual(result.events[0], {
-      type: 'FED',
-      slimeId: 'slime-1',
-      atMs: 50_000,
-      boostUntilMs: 170_000,
-    });
-  });
-
-  test('unknown slime, no berries, and counter cap', () => {
-    const unknown = applyCommand(deepFreeze(createInitialState()), {
-      type: 'FEED',
-      slimeId: 'slime-99',
-    });
-    assert.equal(unknown.ok, false);
-    assert.equal(unknown.reason, 'UNKNOWN_SLIME');
-    assert.equal(unknown.state.berries, 6);
-    assert.deepEqual(unknown.events, []);
-
-    const empty = makeState({ berries: 0, nextBerryAtMs: 15_000 });
-    const frozenEmpty = deepFreeze(empty);
-    const emptySnapshot = structuredClone(frozenEmpty);
-    const noBerries = applyCommand(frozenEmpty, FEED_SLIME_1);
-    assert.equal(noBerries.ok, false);
-    assert.equal(noBerries.reason, 'NO_BERRIES');
-    assert.equal(noBerries.state, frozenEmpty);
-    assert.deepEqual(frozenEmpty, emptySnapshot);
-    assert.deepEqual(noBerries.events, []);
-    assert.deepEqual(frozenEmpty.tutorialCompleted, []);
-
-    const capped = deepFreeze(
-      makeState({
-        berries: 5,
-        totalFeeds: FEED_COUNTER_CAP,
-        slimes: [{ ...createInitialState().slimes[0], feedCount: FEED_COUNTER_CAP }],
-      }),
-    );
-    const cappedResult = assertOk(applyCommand(capped, FEED_SLIME_1));
-    assert.equal(cappedResult.state.berries, 4);
-    assert.equal(cappedResult.state.totalFeeds, FEED_COUNTER_CAP);
-    assert.equal(cappedResult.state.slimes[0].feedCount, FEED_COUNTER_CAP);
-    assert.equal(cappedResult.state.slimes[0].boostUntilMs, 120_000);
-    assert.equal(cappedResult.state.nextFeedAllowedAtMs, FEED_COOLDOWN_MS);
+    assert.equal(result.state.totalFeeds, 0);
+    assert.equal(result.state.slimes[0].boostUntilMs, 0);
+    assert.equal(result.events[0].type, 'FOOD_THROWN');
+    assert.deepEqual(frozen, snapshot);
+    assert.notEqual(result.state, frozen);
   });
 });
 
@@ -573,7 +488,7 @@ describe('WELCOME_COMPANION', () => {
     assert.equal(spent.state.slimes[2].homeSlot, 2);
   });
 
-  test('successful FEED concatenates FED then COMPANION_ADDED', () => {
+  test('FEED does not join; BUY_UPGRADE still concatenates UPGRADE then COMPANION_ADDED', () => {
     const input = deepFreeze(
       makeState({
         totalFeeds: 5,
@@ -589,12 +504,28 @@ describe('WELCOME_COMPANION', () => {
         tutorialCompleted: ['feed'],
       }),
     );
-    const fed = assertOk(applyCommand(input, FEED_SLIME_1));
-    assert.equal(fed.state.totalFeeds, 6);
-    assert.equal(fed.state.slimes.length, 2);
-    assert.equal(fed.events[0].type, 'FED');
-    assert.equal(fed.events[1].type, 'COMPANION_ADDED');
-    assert.equal(fed.events[1].slimeId, 'slime-2');
+    const fed = applyCommand(input, FEED_SLIME_1);
+    assert.equal(fed.ok, false);
+    assert.equal(fed.reason, 'INVALID_COMMAND');
+    assert.equal(fed.state.totalFeeds, 5);
+    assert.equal(fed.state.slimes.length, 1);
+
+    const bought = assertOk(
+      applyCommand(
+        deepFreeze(
+          makeState({
+            totalFeeds: 24,
+            lifetimeGlowMicro: 90 * MICRO_PER_GLOW,
+            glowMicro: 90 * MICRO_PER_GLOW,
+            upgrades: { beds: 0 },
+            slimes: makeSlimes(2),
+          }),
+        ),
+        { type: 'BUY_UPGRADE', upgradeId: 'beds', expectedLevel: 0 },
+      ),
+    );
+    assert.equal(bought.events[0].type, 'UPGRADE_BOUGHT');
+    assert.equal(bought.events.some((event) => event.type === 'COMPANION_ADDED'), true);
   });
 });
 
@@ -615,6 +546,8 @@ describe('invalid payloads and immutability', () => {
       { type: 'FEED' },
       { type: 'FEED', slimeId: 1 },
       { type: 'FEED', slimeId: { id: 'slime-1' } },
+      { type: 'THROW_FOOD' },
+      { type: 'THROW_FOOD', target: null },
       { type: 'BUY_UPGRADE' },
       { type: 'BUY_UPGRADE', upgradeId: 'shrub' },
       { type: 'BUY_UPGRADE', upgradeId: 0, expectedLevel: 0 },
@@ -648,52 +581,54 @@ describe('invalid payloads and immutability', () => {
     assert.deepEqual(fail.events, []);
     assert.equal(fail.state, input);
 
-    const ok = assertOk(applyCommand(input, FEED_SLIME_1));
+    const ok = assertOk(applyCommand(input, THROW_LEGAL));
     assert.notEqual(ok.state, input);
     assert.notEqual(ok.state.slimes, input.slimes);
     assert.notEqual(ok.state.slimes[0], input.slimes[0]);
     assert.equal(ok.state.simTimeMs, input.simTimeMs);
     assert.equal(ok.state.berries, input.berries - FEED_BERRY_COST);
-    assert.ok(ok.events.some((event) => event.type === 'FED'));
+    assert.ok(ok.events.some((event) => event.type === 'FOOD_THROWN'));
+    assert.equal(ok.state.totalFeeds, 0);
+    assert.equal(ok.state.slimes[0].boostUntilMs, 0);
   });
 });
 
 describe('tutorial steps', () => {
-  test('first feed/upgrade/welcome emit their steps once only', () => {
-    const firstFeed = assertOk(
-      applyCommand(deepFreeze(createInitialState()), FEED_SLIME_1),
+  test('first throw/upgrade/welcome emit their steps once only', () => {
+    const firstThrow = assertOk(
+      applyCommand(deepFreeze(createInitialState()), THROW_LEGAL),
     );
-    assert.deepEqual(firstFeed.state.tutorialCompleted, ['feed']);
-    assert.deepEqual(firstFeed.events, [
+    assert.deepEqual(firstThrow.state.tutorialCompleted, ['throw']);
+    assert.deepEqual(firstThrow.events, [
       {
-        type: 'FED',
-        slimeId: 'slime-1',
+        type: 'FOOD_THROWN',
+        foodId: 'food-1',
+        target: { x: 1.1, z: 2 },
         atMs: 0,
-        boostUntilMs: 120_000,
       },
-      { type: 'TUTORIAL_COMPLETED', step: 'feed', atMs: 0 },
+      { type: 'TUTORIAL_COMPLETED', step: 'throw', atMs: 0 },
     ]);
 
-    const secondFeed = assertOk(
-      applyCommand(deepFreeze(atTime(firstFeed.state, 4_000)), FEED_SLIME_1),
+    const secondThrow = assertOk(
+      applyCommand(deepFreeze(atTime(firstThrow.state, 1_000)), THROW_LEGAL),
     );
-    assert.deepEqual(secondFeed.state.tutorialCompleted, ['feed']);
+    assert.deepEqual(secondThrow.state.tutorialCompleted, ['throw']);
     assert.equal(
-      secondFeed.events.some((event) => event.type === 'TUTORIAL_COMPLETED'),
+      secondThrow.events.some((event) => event.type === 'TUTORIAL_COMPLETED'),
       false,
     );
-    assert.equal(secondFeed.events.length, 1);
-    assert.equal(secondFeed.events[0].type, 'FED');
+    assert.equal(secondThrow.events.length, 1);
+    assert.equal(secondThrow.events[0].type, 'FOOD_THROWN');
 
-    const alreadyFed = assertOk(
+    const alreadyThrown = assertOk(
       applyCommand(
-        deepFreeze(makeState({ tutorialCompleted: ['feed'], berries: 6 })),
-        FEED_SLIME_1,
+        deepFreeze(cloneState(makeState({ tutorialCompleted: ['throw'], berries: 6 }))),
+        THROW_LEGAL,
       ),
     );
-    assert.deepEqual(alreadyFed.state.tutorialCompleted, ['feed']);
+    assert.deepEqual(alreadyThrown.state.tutorialCompleted, ['throw']);
     assert.equal(
-      alreadyFed.events.some((event) => event.type === 'TUTORIAL_COMPLETED'),
+      alreadyThrown.events.some((event) => event.type === 'TUTORIAL_COMPLETED'),
       false,
     );
 
@@ -775,30 +710,55 @@ describe('tutorial steps', () => {
 });
 
 describe('review-gate transcript: fresh state to slime-2', () => {
-  test('only advance + applyCommand reach an automatic slime-2 join', () => {
+  test('legacy v1 feed mutation + advance still reach an automatic slime-2 join; FEED command is gone', () => {
+    const rejected = applyCommand(createInitialState(), FEED_SLIME_1);
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.reason, 'INVALID_COMMAND');
+
+    /**
+     * Test-local copy of the removed v1 FEED mutation (berry, 4s cooldown,
+     * boost formula, counters, feed tutorial). Not THROW_FOOD.
+     *
+     * @param {import('../src/core/state.mjs').GameState} state
+     */
+    function applyLegacyFeed(state) {
+      const slimeIndex = state.slimes.findIndex((slime) => slime.id === 'slime-1');
+      const t = state.simTimeMs;
+      const next = cloneState(state);
+      const wasFull = next.nextBerryAtMs === null;
+      next.berries -= FEED_BERRY_COST;
+      if (wasFull) {
+        next.nextBerryAtMs = t + getBerryIntervalMs(next);
+      }
+      const slime = next.slimes[slimeIndex];
+      slime.boostUntilMs = Math.min(
+        t + BONUS_MAX_REMAINING_MS,
+        Math.max(t, slime.boostUntilMs) + BONUS_EXTEND_MS,
+      );
+      next.nextFeedAllowedAtMs = t + FEED_COOLDOWN_MS;
+      if (next.totalFeeds < FEED_COUNTER_CAP) {
+        next.totalFeeds += 1;
+        slime.feedCount += 1;
+      }
+      if (!next.tutorialCompleted.includes('feed')) {
+        next.tutorialCompleted.push('feed');
+      }
+      return resolveCompanionsNow(next).state;
+    }
+
     /** @type {object[]} */
     const sequence = [];
     let state = createInitialState();
 
-    /**
-     * @param {object} command
-     */
-    function applyAt(command) {
+    function feedAt() {
       const atMs = state.simTimeMs;
-      const frozen = deepFreeze(cloneState(state));
-      const result = applyCommand(frozen, command);
+      state = applyLegacyFeed(state);
       sequence.push({
-        op: 'applyCommand',
+        op: 'legacyFeed',
         atMs,
-        command: { ...command },
-        ok: result.ok,
-        reason: result.ok ? undefined : result.reason,
-        berries: result.ok ? result.state.berries : frozen.berries,
-        totalFeeds: result.ok ? result.state.totalFeeds : frozen.totalFeeds,
+        berries: state.berries,
+        totalFeeds: state.totalFeeds,
       });
-      assert.equal(result.ok, true, `command at ${atMs} ms: ${result.reason}`);
-      state = result.state;
-      return result;
     }
 
     /**
@@ -818,7 +778,7 @@ describe('review-gate transcript: fresh state to slime-2', () => {
       });
     }
 
-    applyAt({ type: 'FEED', slimeId: 'slime-1' });
+    feedAt();
     for (let n = 1; n < 6; n += 1) {
       const cooldownWait = state.nextFeedAllowedAtMs - state.simTimeMs;
       if (cooldownWait > 0) wait(cooldownWait);
@@ -827,7 +787,7 @@ describe('review-gate transcript: fresh state to slime-2', () => {
         const berryWait = state.nextBerryAtMs - state.simTimeMs;
         if (berryWait > 0) wait(berryWait);
       }
-      applyAt({ type: 'FEED', slimeId: 'slime-1' });
+      feedAt();
     }
 
     assert.equal(state.totalFeeds, 6);
@@ -856,12 +816,10 @@ describe('review-gate transcript: fresh state to slime-2', () => {
     assert.equal(companion.createdAtMs, 60_000);
 
     const summary = sequence.map((step) =>
-      step.op === 'applyCommand'
+      step.op === 'legacyFeed'
         ? {
             op: step.op,
-            type: step.command.type,
             atMs: step.atMs,
-            ok: step.ok,
           }
         : {
             op: step.op,
@@ -871,21 +829,21 @@ describe('review-gate transcript: fresh state to slime-2', () => {
           },
     );
     assert.deepEqual(summary, [
-      { op: 'applyCommand', type: 'FEED', atMs: 0, ok: true },
+      { op: 'legacyFeed', atMs: 0 },
       { op: 'advance', elapsedMs: 4_000, fromMs: 0, toMs: 4_000 },
-      { op: 'applyCommand', type: 'FEED', atMs: 4_000, ok: true },
+      { op: 'legacyFeed', atMs: 4_000 },
       { op: 'advance', elapsedMs: 4_000, fromMs: 4_000, toMs: 8_000 },
-      { op: 'applyCommand', type: 'FEED', atMs: 8_000, ok: true },
+      { op: 'legacyFeed', atMs: 8_000 },
       { op: 'advance', elapsedMs: 4_000, fromMs: 8_000, toMs: 12_000 },
-      { op: 'applyCommand', type: 'FEED', atMs: 12_000, ok: true },
+      { op: 'legacyFeed', atMs: 12_000 },
       { op: 'advance', elapsedMs: 4_000, fromMs: 12_000, toMs: 16_000 },
-      { op: 'applyCommand', type: 'FEED', atMs: 16_000, ok: true },
+      { op: 'legacyFeed', atMs: 16_000 },
       { op: 'advance', elapsedMs: 4_000, fromMs: 16_000, toMs: 20_000 },
-      { op: 'applyCommand', type: 'FEED', atMs: 20_000, ok: true },
+      { op: 'legacyFeed', atMs: 20_000 },
       { op: 'advance', elapsedMs: 40_000, fromMs: 20_000, toMs: 60_000 },
     ]);
     console.log(
-      'P2-04 review-gate transcript (fresh → slime-2):\n' +
+      'P2-07 review-gate transcript (legacy feed → slime-2; FEED command rejected):\n' +
         JSON.stringify(summary, null, 2),
     );
   });

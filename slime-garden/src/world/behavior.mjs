@@ -1,6 +1,8 @@
 /**
- * Wander, yield, and active-arrival planning. Pure world decisions; no food
- * claims (P2-07). No DOM, Three, wall-clock APIs, randomness, or scene.
+ * Wander, yield, and active-arrival planning. Food claims live in `food.mjs`
+ * (P2-07) and run before wander so seekers beat ordinary walks. Path priority:
+ * gate arrivals, then food seekers, then yield, then wander. Pure: no DOM,
+ * Three, wall-clock APIs, randomness, or scene.
  */
 
 import {
@@ -108,6 +110,20 @@ export function assignRoute(resident, result, timeMs, activity) {
   resident.nextReplanWorldMs = timeMs;
   const pose = poseAlongPolyline(route.points, 0);
   resident.yaw = pose.yaw;
+}
+
+/**
+ * Clear a wander (or other) walk at the current point. Does not snap to the
+ * route destination. Used when a food claim needs a mover slot.
+ *
+ * @param {WorldResident} resident
+ * @param {number} timeMs
+ */
+export function stopRouteAtCurrent(resident, timeMs) {
+  resident.route = null;
+  resident.activity = 'idle';
+  resident.blockedSinceWorldMs = null;
+  scheduleIdleWait(resident, timeMs);
 }
 
 /**
@@ -351,17 +367,35 @@ function tryYieldForRequester(world, requester) {
 }
 
 /**
+ * Pause new wanders when a landed berry has no claimant and all three mover
+ * slots are full (plan 03 path priority).
+ *
+ * @param {WorldState} world
+ * @returns {boolean}
+ */
+function hasPendingLandedFood(world) {
+  if (!Array.isArray(world.foods)) return false;
+  for (const food of world.foods) {
+    if (food.stage === 'landed' && food.claimedBy == null) return true;
+  }
+  return false;
+}
+
+/**
  * @param {WorldState} world
  * @returns {number} New path starts this tick.
  */
 export function applyIdleDecisions(world) {
   const timeMs = world.timeMs;
   let starts = 0;
+  const pauseWander =
+    hasPendingLandedFood(world) && movingRouteCount(world) >= MAX_ACTIVE_ROUTES;
 
   /**
    * @returns {boolean}
    */
   function canStart() {
+    if (pauseWander) return false;
     return starts < MAX_ACTIVE_ROUTES && movingRouteCount(world) < MAX_ACTIVE_ROUTES;
   }
 

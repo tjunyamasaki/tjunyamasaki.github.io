@@ -12,9 +12,18 @@ import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { advanceEconomy } from '../src/core/advance.mjs';
-import { FEED_BERRY_COST, SLIME_NAMES } from '../src/core/balance.mjs';
-import { applyCommand } from '../src/core/commands.mjs';
 import {
+  BONUS_EXTEND_MS,
+  BONUS_MAX_REMAINING_MS,
+  FEED_BERRY_COST,
+  FEED_COOLDOWN_MS,
+  FEED_COUNTER_CAP,
+  SLIME_NAMES,
+} from '../src/core/balance.mjs';
+import { applyCommand } from '../src/core/commands.mjs';
+import { resolveCompanionsNow } from '../src/core/progression.mjs';
+import {
+  getBerryIntervalMs,
   getCompanionEligibility,
   getNextUpgradeCostMicro,
 } from '../src/core/selectors.mjs';
@@ -69,7 +78,51 @@ function mustApply(state, command) {
 }
 
 /**
- * Legal v1 feed: wait out cooldown and berry regen, then FEED slime-1.
+ * Test-local v1 FEED mutation so WRITE_P2_00_FIXTURES / deepEqual rebuilds stay
+ * byte-identical after production FEED was removed (P2-07). Applies the old
+ * berry spend, 4s `nextFeedAllowedAtMs`, boost formula, counters, and feed
+ * tutorial. Does **not** use THROW_FOOD.
+ *
+ * @param {import('../src/core/state.mjs').GameState} state
+ * @param {string} [slimeId]
+ */
+function applyLegacyFeed(state, slimeId = 'slime-1') {
+  const slimeIndex = state.slimes.findIndex((slime) => slime.id === slimeId);
+  if (slimeIndex < 0) {
+    throw new Error(`legacy feed: unknown slime ${slimeId}`);
+  }
+  if (state.berries < FEED_BERRY_COST) {
+    throw new Error(`legacy feed: no berries at simTimeMs=${state.simTimeMs}`);
+  }
+  if (state.simTimeMs < state.nextFeedAllowedAtMs) {
+    throw new Error(`legacy feed: cooldown at simTimeMs=${state.simTimeMs}`);
+  }
+  const t = state.simTimeMs;
+  const next = cloneState(state);
+  const wasFull = next.nextBerryAtMs === null;
+  next.berries -= FEED_BERRY_COST;
+  if (wasFull) {
+    next.nextBerryAtMs = t + getBerryIntervalMs(next);
+  }
+  const slime = next.slimes[slimeIndex];
+  slime.boostUntilMs = Math.min(
+    t + BONUS_MAX_REMAINING_MS,
+    Math.max(t, slime.boostUntilMs) + BONUS_EXTEND_MS,
+  );
+  next.nextFeedAllowedAtMs = t + FEED_COOLDOWN_MS;
+  if (next.totalFeeds < FEED_COUNTER_CAP) {
+    next.totalFeeds += 1;
+    slime.feedCount += 1;
+  }
+  if (!next.tutorialCompleted.includes('feed')) {
+    next.tutorialCompleted.push('feed');
+  }
+  return resolveCompanionsNow(next).state;
+}
+
+/**
+ * Legal v1 feed: wait out cooldown and berry regen, then apply the old feed
+ * mutation (not THROW_FOOD, not production FEED).
  *
  * @param {import('../src/core/state.mjs').GameState} state
  */
@@ -91,7 +144,7 @@ function feedWhenReady(state) {
     }
     next = waitUntil(next, next.nextBerryAtMs);
   }
-  return mustApply(next, { type: 'FEED', slimeId: 'slime-1' });
+  return applyLegacyFeed(next, 'slime-1');
 }
 
 /**
@@ -221,10 +274,7 @@ function buildFreshEnvelope() {
 }
 
 function buildCooldownEnvelope() {
-  const fed = mustApply(createInitialState(), {
-    type: 'FEED',
-    slimeId: 'slime-1',
-  });
+  const fed = applyLegacyFeed(createInitialState(), 'slime-1');
   return wrapV1Envelope(fed, 1);
 }
 

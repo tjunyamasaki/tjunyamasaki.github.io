@@ -5,7 +5,6 @@ import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { MICRO_PER_GLOW, OFFLINE_CAP_MS } from '../src/core/balance.mjs';
-import { applyCommand } from '../src/core/commands.mjs';
 import { cloneState, createInitialState } from '../src/core/state.mjs';
 import { createFreshEnvelope } from '../src/core/validate.mjs';
 import { reconcileAway } from '../src/persistence/reconcile.mjs';
@@ -196,16 +195,18 @@ describe('reconcileAway', () => {
 
   test('feed-shaped 120s boost then 1h away earns 372 Glow at the actual expiry boundary', () => {
     const now = 2_000_000_000_000;
-    const fed = applyCommand(createInitialState(), {
-      type: 'FEED',
-      slimeId: 'slime-1',
-    });
-    assert.equal(fed.ok, true);
-    assert.equal(fed.state.slimes[0].boostUntilMs, 120_000);
+    const fed = cloneState(createInitialState());
+    fed.berries = 5;
+    fed.nextBerryAtMs = 15_000;
+    fed.nextFeedAllowedAtMs = 4_000;
+    fed.totalFeeds = 1;
+    fed.slimes[0].boostUntilMs = 120_000;
+    fed.slimes[0].feedCount = 1;
+    assert.equal(fed.slimes[0].boostUntilMs, 120_000);
     const save = createFreshEnvelope({
       nowWallMs: now - HOUR_MS,
       revision: 1,
-      state: fed.state,
+      state: fed,
     });
     const result = reconcileAway(save, now);
     assert.equal(result.summary.glowEarnedMicro, 372 * MICRO_PER_GLOW);

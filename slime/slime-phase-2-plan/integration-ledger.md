@@ -19,9 +19,9 @@ Production:
 | `slime-garden/src/main.mjs` | `dispatch` | 744–757 | `applyCommand` then save + `syncScene` + audio. |
 | `slime-garden/src/main.mjs` | `handleEvents` `FED` branch | 766–769 | Immediate “Offered a berry to …” copy. |
 | `slime-garden/src/main.mjs` | `cuePresentationAudio` `FED` | 382 | `audio.playFeed()`. |
-| `slime-garden/src/core/commands.mjs` | `FeedCommand` typedef | 24 | `{ type: 'FEED', slimeId }`. |
-| `slime-garden/src/core/commands.mjs` | `applyFeed` | 86–129 | Charges berry, starts cooldown, applies boost **now**. Remove from new-core normal route in P2-07. |
-| `slime-garden/src/core/commands.mjs` | `applyCommand` `case 'FEED'` | 232–233 | Dispatch table. |
+| `slime-garden/src/core/commands.mjs` | `FeedCommand` typedef | — | Removed in P2-07. |
+| `slime-garden/src/core/commands.mjs` | `applyFeed` | — | Removed in P2-07. |
+| `slime-garden/src/core/commands.mjs` | `applyCommand` `case 'FEED'` | — | Now `INVALID_COMMAND` (same as WELCOME). |
 | `slime-garden/src/scene/scene.mjs` | `play` `FED` | 491–505 | Starts cosmetic arc via `startFeed`. |
 | `slime-garden/src/scene/scene.mjs` | `startFeed` | 312–337 | Writes the single `feedFx` slot. |
 
@@ -35,7 +35,7 @@ Tests (legacy fixtures; do not delete in later packets without replacing coverag
 | `slime-garden/tests/arrivals.test.mjs` | feed presentation timing | 9, 43 |
 | `slime-garden/tests/phase2-baseline-fixtures.test.mjs` | constructor FEED used only to build frozen v1 saves | (P2-00) |
 
-P2-07/P2-11/P2-13: replace the player FEED route with `THROW_FOOD` + later consumption. Keep these tests as v1 goldens where they still describe old commands.
+P2-07: new-core `FEED` is `INVALID_COMMAND`. Live Offer berry (`main.mjs` `feedSelected`) still dispatches `FEED` and will fail until P2-13 rewires it to `THROW_FOOD`. Fixture rebuilds use a test-local v1 feed mutation, not THROW_FOOD. Eating / `FED` from meals is P2-08.
 
 ## 2. WELCOME_COMPANION callers (manual join)
 
@@ -482,5 +482,47 @@ World gait constants already in `balance.mjs`: `GAIT_CYCLE_MS=1250`, `STRIDE_UNI
 
 ### 12.3 Integration leftovers (P2-13)
 
-`export { advancePassive as advance }` is unchanged. Visible `main.mjs` still uses passive time; residents will not walk in the browser until P2-13 swaps `advanceBy` to `advanceActive` for visible sessions. THROW_FOOD / eating remain P2-07/P2-08.
+`export { advancePassive as advance }` is unchanged. Visible `main.mjs` still uses passive time; residents will not walk in the browser until P2-13 swaps `advanceBy` to `advanceActive` for visible sessions. Eating / `FED` from meals remains P2-08. Offer berry UI still dispatches `FEED` until P2-13.
+
+## 13. P2-07 throw food and exclusive claims
+
+Landed on `feat/slime` after P2-06. Pure command + world land/claim only: no `main.mjs` / UI / scene / persistence / eating rewards.
+
+### 13.1 `THROW_FOOD { target: {x,z} }`
+
+Handled in `src/core/commands.mjs` against already time-settled state. Never mutates input. Rejections return the original state object.
+
+Reject order (first failure wins):
+
+1. Missing/non-object command, missing type, or `target` missing/not a plain object → `INVALID_COMMAND`.
+2. `target` present but not a finite `{x,z}` **or** illegal grass (`!isValidFoodTarget`: outside rect, gate lane, arrival corridor, prop exclusion, no static eating approach; also NaN/Infinity) → `INVALID_TARGET`. Clicks are never clamped.
+3. `world.foods.length >= 12` (flying + landed + claimed + eating) → `FOOD_LIMIT`.
+4. `berries < 1` → `NO_BERRIES`.
+5. `simTimeMs < nextThrowAllowedAtMs` (alias of `nextFeedAllowedAtMs`) → `THROW_COOLDOWN` (1000 ms).
+6. `nextFoodSequence` cannot safely increment → `ID_LIMIT`.
+
+On success: clone; spend one berry; if the basket was full, start regen at `t + getBerryIntervalMs`; `nextThrowAllowedAtMs = t + 1000`; allocate `food-n`; `createdWorldMs = world.timeMs + carryMs`, `landAtWorldMs = createdWorldMs + 600`; stage `flying`; exact thrown point retained (not grid-snapped); `FOOD_THROWN`; tutorial `throw` once. **No** `totalFeeds`, slime `feedCount`, boost, or `FED`.
+
+`resolveNearSelectedTarget` is unchanged (eight points, radius 1.5). Core does not add an Offer-near command; that is UI (P2-13). `NO_VALID_TARGET` is unused by `THROW_FOOD`.
+
+### 13.2 Land and claim (`src/world/food.mjs` + `step.mjs`)
+
+- Land in `stepWorld` when `world.timeMs >= landAtWorldMs`. Not during `advancePassive` (hidden/away freeze remaining flight).
+- Only landed unclaimed food. Oldest `food-n` first. Eligible: not arriving, not already `targetFoodId`, not eating, not `restUntilWorldMs > world.timeMs`.
+- 16 headings, angle 0 toward +X, radii 1.0 / 1.125 / 1.25, plus current point if in range (≤ 1.25 + GEOM_EPS, valid center, `segmentClearsStatic` to the berry). `permitGate: false`.
+- Tie-break: shorter `planRoute` length, then lowest remaining boost, then numeric slime id; stable approach-index when lengths equal.
+- In range: claim in place (`seekingFood`, `targetFoodId` set, `route: null`). No fake walk cycle.
+- Reciprocal exclusive claims; `stage` becomes `claimed`. At most one claim per resident/food.
+- No path: leave unclaimed. Replan 500 ms / blocked 2000 ms / release claim at 5000 ms without progress. Never delete food; never remote-eat.
+- Completing a `seekingFood` route stays `seekingFood` at the approach (no wander idle, no `eating` / `EATING_STARTED` / `FED`).
+- Path priority: gate arrivals, food seekers, yield, wander. A wanderer may stop at the current point when a claim needs a mover slot. Pause new wanders when a pending landed food has no claimant and slots are full.
+
+`WorldStepResult.events` may include `FOOD_LANDED` and `FOOD_CLAIMED`. `meals` stays `[]`.
+
+### 13.3 FEED gone / leftovers
+
+- Production `FEED` → `INVALID_COMMAND`. Frozen v1 fixture constructors use a **test-local** legacy feed mutation (berry, 4s cooldown, boost formula, counters, feed tutorial, then `resolveCompanionsNow`).
+- Live `#feed-button` / `feedSelected` still dispatches `FEED` and fails until P2-13.
+- P2-08: eating, meal settlement, `FED`, Glow on completion.
+- Do not change `export { advancePassive as advance }`.
 

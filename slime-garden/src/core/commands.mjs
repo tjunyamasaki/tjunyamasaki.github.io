@@ -1,15 +1,15 @@
 import {
-  BONUS_EXTEND_MS,
-  BONUS_MAX_REMAINING_MS,
   FEED_BERRY_COST,
-  FEED_COOLDOWN_MS,
-  FEED_COUNTER_CAP,
+  FOOD_FLIGHT_MS,
+  MAX_FOOD,
+  THROW_COOLDOWN_MS,
   UPGRADE_IDS,
 } from './balance.mjs';
 import { resolveCompanionsNow } from './progression.mjs';
 import {
   getBerryIntervalMs,
   getNextUpgradeCostMicro,
+  isValidFoodTarget,
 } from './selectors.mjs';
 import { cloneState } from './state.mjs';
 
@@ -18,18 +18,34 @@ import { cloneState } from './state.mjs';
  * @typedef {import('./state.mjs').SlimeId} SlimeId
  * @typedef {import('./state.mjs').UpgradeId} UpgradeId
  * @typedef {import('./state.mjs').TutorialStep} TutorialStep
+ * @typedef {import('./state.mjs').PointXZ} PointXZ
+ * @typedef {import('./state.mjs').FoodId} FoodId
  *
- * @typedef {{ type: 'FEED', slimeId: SlimeId }} FeedCommand
+ * @typedef {{ type: 'THROW_FOOD', target: PointXZ }} ThrowFoodCommand
  * @typedef {{ type: 'BUY_UPGRADE', upgradeId: UpgradeId, expectedLevel: number }} BuyUpgradeCommand
- * @typedef {FeedCommand | BuyUpgradeCommand} Command
+ * @typedef {ThrowFoodCommand | BuyUpgradeCommand} Command
  *
- * @typedef {'UNKNOWN_SLIME' | 'NO_BERRIES' | 'FEED_COOLDOWN' | 'UNKNOWN_UPGRADE' | 'MAX_LEVEL' | 'INSUFFICIENT_GLOW' | 'STALE_REQUEST' | 'NOT_READY' | 'POPULATION_CAP' | 'INVALID_COMMAND'} RejectReason
+ * Reject order for THROW_FOOD (first failure wins):
+ * 1. Missing/non-object command, missing type, or `target` missing/not a plain
+ *    object → `INVALID_COMMAND`.
+ * 2. `target` present but not a finite `{x,z}` **or** not legal grass
+ *    (`!isValidFoodTarget`, including outside rect / gate lane / arrival
+ *    corridor / prop exclusion / no static eating approach; also NaN/Infinity)
+ *    → `INVALID_TARGET`. Clicks are never clamped.
+ * 3. `world.foods.length >= 12` (flying+landed+claimed+eating) → `FOOD_LIMIT`.
+ * 4. `berries < 1` → `NO_BERRIES`.
+ * 5. `simTimeMs < nextThrowAllowedAtMs` (alias of `nextFeedAllowedAtMs`)
+ *    → `THROW_COOLDOWN`.
+ * 6. `nextFoodSequence` cannot safely increment → `ID_LIMIT`.
+ *
+ * @typedef {'INVALID_COMMAND' | 'INVALID_TARGET' | 'NO_VALID_TARGET' | 'FOOD_LIMIT' | 'NO_BERRIES' | 'THROW_COOLDOWN' | 'ID_LIMIT' | 'UNKNOWN_UPGRADE' | 'MAX_LEVEL' | 'INSUFFICIENT_GLOW' | 'STALE_REQUEST'} RejectReason
  *
  * @typedef {object} GameEvent
- * @property {'FED' | 'UPGRADE_BOUGHT' | 'COMPANION_ADDED' | 'TUTORIAL_COMPLETED'} type
+ * @property {'FOOD_THROWN' | 'UPGRADE_BOUGHT' | 'COMPANION_ADDED' | 'TUTORIAL_COMPLETED'} type
+ * @property {FoodId} [foodId]
+ * @property {PointXZ} [target]
  * @property {SlimeId} [slimeId]
  * @property {number} [atMs]
- * @property {number} [boostUntilMs]
  * @property {UpgradeId} [upgradeId]
  * @property {number} [level]
  * @property {number} [homeSlot]
@@ -76,55 +92,113 @@ function completeTutorial(next, events, step, atMs) {
 }
 
 /**
+ * Shared FEED/THROW cooldown integer. Prefers the throw name, then the v1 name.
+ *
+ * @param {GameState} state
+ * @returns {number}
+ */
+function throwCooldownAtMs(state) {
+  if (Number.isInteger(state.nextThrowAllowedAtMs)) {
+    return state.nextThrowAllowedAtMs;
+  }
+  if (Number.isInteger(state.nextFeedAllowedAtMs)) {
+    return state.nextFeedAllowedAtMs;
+  }
+  return 0;
+}
+
+/**
+ * True when `nextFoodSequence` can become a new `food-n` id.
+ *
+ * @param {number | undefined} sequence
+ * @returns {boolean}
+ */
+function canAllocateFoodSequence(sequence) {
+  if (!Number.isSafeInteger(sequence) || sequence < 1) return false;
+  if (sequence >= Number.MAX_SAFE_INTEGER) return false;
+  const next = sequence + 1;
+  return Number.isSafeInteger(next) && next > sequence;
+}
+
+/**
+ * THROW_FOOD against already time-settled state. Never mutates input.
+ * Rejections return the original state object. Does not grant boost, increment
+ * feed counters, or emit FED.
+ *
  * @param {GameState} state
  * @param {Record<string, unknown>} command
  * @returns {CommandResult}
  */
-function applyFeed(state, command) {
-  if (typeof command.slimeId !== 'string') {
+function applyThrowFood(state, command) {
+  if (!('target' in command) || !isPlainObject(command.target)) {
     return reject(state, 'INVALID_COMMAND');
   }
-  const slimeIndex = state.slimes.findIndex((slime) => slime.id === command.slimeId);
-  if (slimeIndex < 0) {
-    return reject(state, 'UNKNOWN_SLIME');
+  const raw = command.target;
+  const x = raw.x;
+  const z = raw.z;
+  if (
+    typeof x !== 'number' ||
+    typeof z !== 'number' ||
+    !Number.isFinite(x) ||
+    !Number.isFinite(z)
+  ) {
+    return reject(state, 'INVALID_TARGET');
+  }
+  const target = { x, z };
+  if (!isValidFoodTarget(target)) {
+    return reject(state, 'INVALID_TARGET');
+  }
+
+  const foods = state.world?.foods;
+  const foodCount = Array.isArray(foods) ? foods.length : 0;
+  if (foodCount >= MAX_FOOD) {
+    return reject(state, 'FOOD_LIMIT');
   }
   if (state.berries < FEED_BERRY_COST) {
     return reject(state, 'NO_BERRIES');
   }
-  if (state.simTimeMs < state.nextFeedAllowedAtMs) {
-    return reject(state, 'FEED_COOLDOWN');
+  const t = state.simTimeMs;
+  if (t < throwCooldownAtMs(state)) {
+    return reject(state, 'THROW_COOLDOWN');
+  }
+  const sequence = state.world?.nextFoodSequence ?? 1;
+  if (!canAllocateFoodSequence(sequence)) {
+    return reject(state, 'ID_LIMIT');
   }
 
-  const t = state.simTimeMs;
   const next = cloneState(state);
   const wasFull = next.nextBerryAtMs === null;
   next.berries -= FEED_BERRY_COST;
   if (wasFull) {
     next.nextBerryAtMs = t + getBerryIntervalMs(next);
   }
-  const slime = next.slimes[slimeIndex];
-  const boostUntilMs = Math.min(
-    t + BONUS_MAX_REMAINING_MS,
-    Math.max(t, slime.boostUntilMs) + BONUS_EXTEND_MS,
-  );
-  slime.boostUntilMs = boostUntilMs;
-  next.nextFeedAllowedAtMs = t + FEED_COOLDOWN_MS;
-  if (next.totalFeeds < FEED_COUNTER_CAP) {
-    next.totalFeeds += 1;
-    slime.feedCount += 1;
-  }
+  next.nextThrowAllowedAtMs = t + THROW_COOLDOWN_MS;
+
+  const world = next.world;
+  const createdWorldMs = world.timeMs + world.carryMs;
+  const foodId = /** @type {FoodId} */ (`food-${sequence}`);
+  world.foods.push({
+    id: foodId,
+    target: { x: target.x, z: target.z },
+    createdWorldMs,
+    landAtWorldMs: createdWorldMs + FOOD_FLIGHT_MS,
+    stage: 'flying',
+    claimedBy: null,
+    eatUntilWorldMs: null,
+  });
+  world.nextFoodSequence = sequence + 1;
+
   /** @type {GameEvent[]} */
   const events = [
     {
-      type: 'FED',
-      slimeId: slime.id,
+      type: 'FOOD_THROWN',
+      foodId,
+      target: { x: target.x, z: target.z },
       atMs: t,
-      boostUntilMs,
     },
   ];
-  completeTutorial(next, events, 'feed', t);
-  const joined = resolveCompanionsNow(next);
-  return { ok: true, state: joined.state, events: [...events, ...joined.events] };
+  completeTutorial(next, events, 'throw', t);
+  return { ok: true, state: next, events };
 }
 
 /**
@@ -179,6 +253,8 @@ function applyBuyUpgrade(state, command) {
  * `state.simTimeMs` is the command timestamp `t`. Does not call `advance`.
  * Never mutates `state`. Rejections return the original input object.
  *
+ * FEED and WELCOME_COMPANION are not production commands (INVALID_COMMAND).
+ *
  * @param {GameState} state
  * @param {unknown} command
  * @returns {CommandResult}
@@ -188,10 +264,12 @@ export function applyCommand(state, command) {
     return reject(state, 'INVALID_COMMAND');
   }
   switch (command.type) {
-    case 'FEED':
-      return applyFeed(state, command);
+    case 'THROW_FOOD':
+      return applyThrowFood(state, command);
     case 'BUY_UPGRADE':
       return applyBuyUpgrade(state, command);
+    case 'FEED':
+      return reject(state, 'INVALID_COMMAND');
     case 'WELCOME_COMPANION':
       return reject(state, 'INVALID_COMMAND');
     default:

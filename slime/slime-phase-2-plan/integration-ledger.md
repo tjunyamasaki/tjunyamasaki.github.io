@@ -526,3 +526,49 @@ On success: clone; spend one berry; if the basket was full, start regen at `t + 
 - P2-08: eating, meal settlement, `FED`, Glow on completion.
 - Do not change `export { advancePassive as advance }`.
 
+## 14. P2-08 eating, rewards and restart-safe settlement
+
+Landed on `feat/slime` after P2-07. Pure `stepWorld` / `advanceActive` only: no `main.mjs` / UI / scene / commands.mjs `CONSUME_FOOD`. Live garden still uses `advancePassive`, so it still will not walk or eat.
+
+### 14.1 Start-eating vs `finishMeal`
+
+`stepWorld` keeps the P2-06/07 movement-first gait, then:
+
+1. Progress/finish travel (`seekingFood` snap stays `seekingFood` until the start-eating pass).
+2. Land due food.
+3. Collect due meals from **previous** steps (`stage === 'eating'` and `world.timeMs >= eatUntilWorldMs`), oldest `food-n` first. Starting eating this tick cannot complete this tick.
+4. Release stale claims (skip eaters).
+5. Allocate claims.
+6. Wander/yield (eaters already busy; post-meal rest is `restUntilWorldMs`).
+7. Start eating when a reciprocal claimant is in range (`isInEatingRange`: 1.25 + `GEOM_EPS`, valid center, `segmentClearsStatic`). Stop any route, face the berry, `activity: 'eating'`, food `stage: 'eating'`, `eatUntilWorldMs = world.timeMs + 800`. Emit `EATING_STARTED { foodId, slimeId, atMs: simTimeMs }`. No boost here.
+
+In-range land at `(1.1, 2)`: the t=600 world tick lands, claims, and starts eating in that same step (no fake walk). `meals` are internal `{ foodId, slimeId }` intents only; Glow/counters are not applied in `stepWorld`. Failed consistency releases/replans without deleting the berry and without a meal intent. Due-but-valid eating foods stay in `world.foods` for the wrapper.
+
+`advanceActive` then calls internal `finishMeal` (exported for constructed goldens; **not** reachable from `applyCommand`) per meal in `food-n` order:
+
+1. Re-check presence + consistency; gone/mismatched → no reward (duplicate food cannot pay twice).
+2. Remove that food.
+3. Clear claim/path; `idle`; `restUntilWorldMs = world.timeMs + 1500`; schedule idle wait.
+4. v1 boost at **current** `simTimeMs` `t` (completion, not throw/eat-start): `min(t+300_000, max(t, boostUntilMs)+120_000)`.
+5. If `totalFeeds < FEED_COUNTER_CAP`, increment `totalFeeds` and that slime’s `feedCount`.
+6. `FED { foodId, slimeId, atMs: t, boostUntilMs }`, then tutorial `'feed'` once.
+7. `resolveCompanionsNow` (event order per meal: `FED`, optional `TUTORIAL_COMPLETED` (`feed`), then `COMPANION_ADDED` / welcome). New IDs go on `pendingArrivals` for `planActiveArrival` at the next world boundary.
+
+Income for the completing 50 ms slice still runs **before** the world step; boost applies after that slice. `summary.mealsCompleted` is the count of meals that actually rewarded this `advanceActive` call. `advancePassive` summaries stay `mealsCompleted: 0`. `advanceActive(s, 0)` may still normalize companions but must not move, land, start eating, or complete meals. Never mutates the `advanceActive` input.
+
+### 14.2 Goldens
+
+- Near throw at zero: berries 6→5, landAt 600, eatUntil 1400 at the 600 tick (`EATING_STARTED`, no `FED` / feeds / boost). Meal once at 1400: `totalFeeds` 1, `boostUntilMs` 121_400, one `FED`, tutorial `feed`, wallet/lifetime 140_000, inventory stays 5. At 2600 wallet 380_000. Chunk vs combined `advanceActive` partitions match economic fields.
+- Constructed meals at sim 0 / 4000 / 8000 → expiries 120_000 / 240_000 / 308_000 via `finishMeal` on valid eating state (deleting food does not grant `FED`).
+- Same `foodId` cannot reward twice; two same-tick meals use stable `food-n` order.
+- Round-trip (`createFreshEnvelope` / `serializeEnvelope` / `validateSave` / in-memory `writeCheckpoint`+`loadBest` only) during flight, claimed travel, eating at 1399, and just after the meal. Remaining world delay/carry resume; the meal pays once. Controller persistence wiring is still P2-13; main is not taught to save meals.
+- Hidden hour mid-flight or mid-eat: economy advances; world food timer/position frozen; remaining active ms complete once. Pause/reduced-motion/quality are controller flags — the same `advanceActive` input twice matches.
+
+### 14.3 Leftovers (P2-13)
+
+- `main.mjs` still calls `advancePassive` for visible time, so the playable garden still will not walk, land, eat, or emit `FED` from meals.
+- Offer berry (`#feed-button` / `feedSelected`) still dispatches `FEED` and fails until P2-13 rewires it to `THROW_FOOD`.
+- No public `CONSUME_FOOD`. Production `FEED` stays `INVALID_COMMAND`.
+- `export { advancePassive as advance }` unchanged.
+- Persistence round-trip in this packet is test-only.
+

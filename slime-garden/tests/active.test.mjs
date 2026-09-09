@@ -106,6 +106,32 @@ describe('advanceActive zero elapsed', () => {
     assert.deepEqual(first.position, { x: 0, z: 2 });
   });
 
+  test('zero elapsed does not complete an already-due eating meal', () => {
+    const state = cloneState(createInitialState());
+    state.simTimeMs = 1400;
+    state.world.timeMs = 1400;
+    state.world.foods = [
+      {
+        id: 'food-1',
+        target: { x: 1.1, z: 2 },
+        createdWorldMs: 0,
+        landAtWorldMs: 600,
+        stage: 'eating',
+        claimedBy: 'slime-1',
+        eatUntilWorldMs: 1400,
+      },
+    ];
+    state.world.nextFoodSequence = 2;
+    const resident = state.world.residents[0];
+    resident.activity = 'eating';
+    resident.targetFoodId = 'food-1';
+    const result = advanceActive(deepFreeze(state), 0);
+    assert.equal(result.summary.mealsCompleted, 0);
+    assert.equal(result.state.world.foods.length, 1);
+    assert.equal(result.state.totalFeeds, 0);
+    assert.equal(result.state.world.timeMs, 1400);
+  });
+
   test('zero elapsed after motion leaves positions and routes unchanged', () => {
     let state = cloneState(createInitialState());
     state = advanceActive(state, 2500).state;
@@ -310,7 +336,7 @@ describe('active module isolation', () => {
       /\bDate\s*\./,
       /Math\s*\.\s*random/,
     ];
-    for (const file of ['behavior.mjs', 'step.mjs', 'gait.mjs', 'hash.mjs']) {
+    for (const file of ['behavior.mjs', 'step.mjs', 'gait.mjs', 'hash.mjs', 'eating.mjs']) {
       const source = readFileSync(join(worldDir, file), 'utf8');
       for (const pattern of forbidden) {
         assert.equal(pattern.test(source), false, `${file} ${pattern}`);

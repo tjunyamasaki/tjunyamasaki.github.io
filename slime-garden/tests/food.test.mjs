@@ -327,7 +327,7 @@ describe('THROW_FOOD', () => {
     assert.equal(result.state.slimes[0].boostUntilMs, 0);
   });
 
-  test('FEED is INVALID_COMMAND and does not feed', () => {
+  test('FEED and CONSUME_FOOD are INVALID_COMMAND and do not feed', () => {
     const input = deepFreeze(createInitialState());
     const snapshot = structuredClone(input);
     const result = applyCommand(input, { type: 'FEED', slimeId: 'slime-1' });
@@ -335,6 +335,10 @@ describe('THROW_FOOD', () => {
     assert.equal(result.reason, 'INVALID_COMMAND');
     assert.equal(result.state, input);
     assert.deepEqual(result.events, []);
+    const consume = applyCommand(input, { type: 'CONSUME_FOOD', foodId: 'food-1' });
+    assert.equal(consume.ok, false);
+    assert.equal(consume.reason, 'INVALID_COMMAND');
+    assert.equal(consume.state, input);
     assert.equal(input.berries, 6);
     assert.equal(input.totalFeeds, 0);
     assert.equal(input.slimes[0].boostUntilMs, 0);
@@ -380,13 +384,23 @@ describe('food landing', () => {
 
     const at600 = advanceChunks(thrown.state, 600);
     assert.equal(at600.state.world.timeMs, 600);
-    assert.equal(at600.state.world.foods[0].stage === 'landed' || at600.state.world.foods[0].stage === 'claimed', true);
+    assert.equal(at600.state.world.foods[0].stage, 'eating');
+    assert.equal(at600.state.world.foods[0].eatUntilWorldMs, 1400);
     assert.equal(
       at600.events.some((event) => event.type === 'FOOD_LANDED' && event.foodId === 'food-1'),
       true,
     );
     assert.equal(
-      at600.events.some((event) => event.type === 'FED' || event.type === 'EATING_STARTED'),
+      at600.events.some(
+        (event) =>
+          event.type === 'EATING_STARTED' &&
+          event.foodId === 'food-1' &&
+          event.slimeId === 'slime-1',
+      ),
+      true,
+    );
+    assert.equal(
+      at600.events.some((event) => event.type === 'FED'),
       false,
     );
     assert.equal(at600.state.totalFeeds, 0);
@@ -412,7 +426,7 @@ describe('food landing', () => {
 });
 
 describe('food claims', () => {
-  test('in-range throw: after land, same resident claims without a walking route; no FED', () => {
+  test('in-range throw: t=600 lands, claims, and starts eating; FED only at 1400', () => {
     const thrown = assertOk(throwFood(createInitialState()));
     const slime = thrown.state.world.residents[0];
     assert.equal(isInEatingRange(slime.position, LEGAL_TARGET), true);
@@ -420,23 +434,49 @@ describe('food claims', () => {
     const food = landed.state.world.foods[0];
     const resident = landed.state.world.residents[0];
     assert.equal(food.claimedBy, 'slime-1');
-    assert.equal(food.stage, 'claimed');
+    assert.equal(food.stage, 'eating');
+    assert.equal(food.eatUntilWorldMs, 1400);
     assert.equal(resident.targetFoodId, 'food-1');
-    assert.equal(resident.activity, 'seekingFood');
+    assert.equal(resident.activity, 'eating');
     assert.equal(resident.route, null);
-    assert.equal(resident.activity === 'eating', false);
     assert.equal(
       landed.events.some((event) => event.type === 'FOOD_CLAIMED' && event.slimeId === 'slime-1'),
       true,
     );
     assert.equal(
-      landed.events.some((event) => event.type === 'FED' || event.type === 'EATING_STARTED'),
+      landed.events.some(
+        (event) => event.type === 'EATING_STARTED' && event.slimeId === 'slime-1',
+      ),
+      true,
+    );
+    assert.equal(
+      landed.events.some((event) => event.type === 'FED'),
       false,
     );
     assert.equal(landed.state.totalFeeds, 0);
     assert.equal(landed.state.slimes[0].boostUntilMs, 0);
     assert.equal(landed.state.slimes[0].feedCount, 0);
     assertReciprocalClaims(landed.state.world);
+
+    const at1399 = advanceChunks(thrown.state, 1399);
+    assert.equal(at1399.state.totalFeeds, 0);
+    assert.equal(at1399.state.world.foods.length, 1);
+    assert.equal(
+      at1399.events.some((event) => event.type === 'FED'),
+      false,
+    );
+
+    const at1400 = advanceChunks(thrown.state, 1400);
+    assert.equal(at1400.state.totalFeeds, 1);
+    assert.equal(at1400.state.slimes[0].feedCount, 1);
+    assert.equal(at1400.state.slimes[0].boostUntilMs, 121_400);
+    assert.equal(at1400.state.world.foods.length, 0);
+    const fed = at1400.events.filter((event) => event.type === 'FED');
+    assert.equal(fed.length, 1);
+    assert.equal(fed[0].foodId, 'food-1');
+    assert.equal(fed[0].slimeId, 'slime-1');
+    assert.equal(fed[0].atMs, 1400);
+    assert.equal(fed[0].boostUntilMs, 121_400);
   });
 
   test('two residents, one berry: one claim only; numeric-id tie-break is stable', () => {
@@ -515,7 +555,7 @@ describe('food claims', () => {
     assertReciprocalClaims(landed.state.world);
   });
 
-  test('seekingFood walk completion stays seekingFood at the approach; no wander idle, no eating', () => {
+  test('seekingFood walk completion starts eating in range; no wander idle, no FED yet', () => {
     const state = makeColony(1);
     state.world.residents[0].position = { x: 0, z: 2 };
     const thrown = assertOk(throwFood(state, { x: 3.2, z: 2 }));
@@ -527,21 +567,21 @@ describe('food claims', () => {
     for (let i = 0; i < 80; i += 1) {
       current = advanceChunks(current, 50).state;
       const resident = current.world.residents[0];
-      if (resident.activity === 'seekingFood' && resident.route == null) {
+      if (resident.activity === 'eating' && resident.route == null) {
         assert.equal(resident.targetFoodId, 'food-1');
         assert.equal(current.world.foods[0].claimedBy, 'slime-1');
-        assert.equal(current.world.foods[0].stage, 'claimed');
+        assert.equal(current.world.foods[0].stage, 'eating');
         assert.equal(current.totalFeeds, 0);
-        assert.equal(
-          current.world.foods[0].eatUntilWorldMs,
-          null,
-        );
+        assert.equal(current.world.foods[0].eatUntilWorldMs, current.world.timeMs + 800);
         assert.notEqual(resident.activity, 'idle');
-        assert.notEqual(resident.activity, 'eating');
+        assert.equal(
+          current.world.foods.length,
+          1,
+        );
         return;
       }
     }
-    assert.fail('seeker never arrived at the approach');
+    assert.fail('seeker never started eating at the approach');
   });
 });
 
@@ -559,9 +599,11 @@ describe('food module isolation', () => {
     ];
     const files = [
       join(worldDir, 'food.mjs'),
+      join(worldDir, 'eating.mjs'),
       join(worldDir, 'behavior.mjs'),
       join(worldDir, 'step.mjs'),
       join(coreDir, 'commands.mjs'),
+      join(coreDir, 'active.mjs'),
     ];
     for (const file of files) {
       const source = readFileSync(file, 'utf8');

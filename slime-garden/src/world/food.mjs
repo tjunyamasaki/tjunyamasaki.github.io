@@ -1,7 +1,7 @@
 /**
  * Physical food: landing on the world clock and exclusive claims.
- * Eating completion / FED is P2-08. Pure: no DOM, Three, wall-clock APIs,
- * randomness, or scene.
+ * Starting/finishing meals lives in `eating.mjs` / `active.mjs`.
+ * Pure: no DOM, Three, wall-clock APIs, randomness, or scene.
  *
  * Approach samples (plan 02 §5 / 03): 16 headings, angle 0 toward +X
  * (`cos/sin`, k=0 → +X), radii 1.0, mid 1.125, and 1.25. Plus the resident's
@@ -425,6 +425,7 @@ function claimedFoodFor(world, resident) {
 export function releaseStaleClaims(world) {
   const timeMs = world.timeMs;
   for (const resident of world.residents) {
+    if (resident.activity === 'eating') continue;
     if (resident.activity !== 'seekingFood') continue;
     const food = claimedFoodFor(world, resident);
     if (!food || food.claimedBy !== resident.id) {

@@ -1,7 +1,8 @@
 /**
- * One 50 ms world step: gait progress, land due food, exclusive claims, then
- * wander/yield. Eating completion / FED is P2-08. Path priority: arrivals
- * (planned before this step), food seekers, yield, wander.
+ * One 50 ms world step: gait progress, land due food, collect due meals,
+ * exclusive claims, wander/yield, then start eating in range. Glow / FED
+ * stay in the active wrapper. Path priority: arrivals (planned before this
+ * step), food seekers, yield, wander.
  * Pure: no DOM, Three, wall-clock APIs, randomness, or scene.
  */
 
@@ -10,6 +11,7 @@ import {
   applyIdleDecisions,
   scheduleIdleWait,
 } from './behavior.mjs';
+import { collectDueMeals, startEatingInRange } from './eating.mjs';
 import {
   allocateFoodClaims,
   completeSeekingFoodTravel,
@@ -83,7 +85,7 @@ export function progressResident(resident, world) {
 
 /**
  * Precondition: the active wrapper has already added 50 to `world.timeMs`.
- * Never mutates `state`. Meals stay empty until P2-08.
+ * Never mutates `state`. Meal intents do not apply Glow or counters.
  *
  * @param {GameState} state
  * @returns {WorldStepResult}
@@ -96,12 +98,14 @@ export function stepWorld(state) {
   /** @type {object[]} */
   const events = [];
   landDueFood(world, state.simTimeMs, events);
+  const meals = collectDueMeals(world);
   releaseStaleClaims(world);
   allocateFoodClaims(state, world, events);
   applyIdleDecisions(world);
+  startEatingInRange(world, state.simTimeMs, events);
   return {
     world,
-    meals: [],
+    meals,
     events,
   };
 }

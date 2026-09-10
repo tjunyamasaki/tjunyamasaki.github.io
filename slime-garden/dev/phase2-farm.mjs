@@ -28,7 +28,8 @@ function formatHit(hit) {
     return `kind none${occluder}`;
   }
   if (hit.kind === 'object') {
-    return `kind object · interactableId ${hit.interactableId}`;
+    const id = hit.interactableId || hit.upgradeId;
+    return `kind object · interactableId ${id}`;
   }
   if (hit.kind === 'ground') {
     return `kind ground · (${formatNum(hit.point.x, 2)}, ${formatNum(hit.point.z, 2)})`;

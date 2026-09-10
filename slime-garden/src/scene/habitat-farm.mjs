@@ -213,21 +213,27 @@ export function createFarmHabitat(THREE, scene, options = {}) {
 
   const padGeo = trackGeom(new THREE.CircleGeometry(PAD_RADIUS, 24));
   const padMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0xd5e4c0, roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: 0xd2c48c, roughness: 1 }),
+  );
+  const padRingGeo = trackGeom(new THREE.RingGeometry(PAD_RADIUS * 0.78, PAD_RADIUS, 24));
+  const padRingMat = trackMat(
+    new THREE.MeshStandardMaterial({ color: 0xa89468, roughness: 1 }),
   );
   const dormantGeo = trackGeom(
-    new THREE.RingGeometry(DORMANT_PAD_RADIUS * 0.45, DORMANT_PAD_RADIUS, 20),
+    new THREE.RingGeometry(DORMANT_PAD_RADIUS * 0.42, DORMANT_PAD_RADIUS, 20),
   );
   const dormantMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0xb7c0aa,
+      color: 0x6e7864,
       roughness: 1,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.92,
     }),
   );
   /** @type {import('../../vendor/three/three.module.js').Mesh[]} */
   const pads = [];
+  /** @type {import('../../vendor/three/three.module.js').Mesh[]} */
+  const padRings = [];
   /** @type {import('../../vendor/three/three.module.js').Mesh[]} */
   const dormantMarks = [];
   for (let i = 0; i < HOME_SLOTS.length; i += 1) {
@@ -241,6 +247,16 @@ export function createFarmHabitat(THREE, scene, options = {}) {
     pad.visible = false;
     group.add(pad);
     pads.push(pad);
+
+    const ring = new THREE.Mesh(padRingGeo, padRingMat);
+    ring.name = `farm-pad-ring-${i}`;
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(slot.x, 0.01, slot.z);
+    ring.receiveShadow = true;
+    ring.userData.role = 'ground';
+    ring.visible = false;
+    group.add(ring);
+    padRings.push(ring);
 
     const mark = new THREE.Mesh(dormantGeo, dormantMat);
     mark.name = `farm-pad-dormant-${i}`;
@@ -590,6 +606,7 @@ export function createFarmHabitat(THREE, scene, options = {}) {
     for (let i = 0; i < pads.length; i += 1) {
       const on = i < capacityNow;
       pads[i].visible = on;
+      padRings[i].visible = on;
       dormantMarks[i].visible = !on;
     }
   }
@@ -704,6 +721,7 @@ export function createFarmHabitat(THREE, scene, options = {}) {
     materials.length = 0;
     roots.length = 0;
     pads.length = 0;
+    padRings.length = 0;
     dormantMarks.length = 0;
     shrubBerries.length = 0;
   }

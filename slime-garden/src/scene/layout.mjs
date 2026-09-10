@@ -1,6 +1,7 @@
 /**
- * Provisional garden layout in the approved slime’s original world units.
+ * Provisional circular garden layout in the approved slime’s original world units.
  * Economy code must not import this module; it knows capacity and slot indices only.
+ * Phase-2 farm extents live in `world/layout.mjs`; meshes in `habitat-farm.mjs`.
  */
 
 import { HABITAT_ID } from '../core/balance.mjs';

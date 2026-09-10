@@ -623,3 +623,9 @@ Open: `npx serve .` from repo root → `/slime-garden/dev/phase2-camera` (extens
 - `main.mjs` is unchanged; no HUD camera cluster, no production Orbit mode.
 - Do not claim the playable garden now orbits or throws from this router.
 
+## 16. P2-10 bigger farm, fence, scene composition
+
+Landed on `feat/slime` after P2-09. Full write-up: `slime-garden/docs/implementation-ledger.md` §16.
+
+Farm meshes are **isolated**. `scene.mjs` still mounts circular `createHabitat`. Preview: `/slime-garden/dev/phase2-farm`. P2-13 swaps the live mount to `createFarmHabitat`. P2-12 owns food meshes / eating / pet FX / gait binding. Collision numbers stay in `world/layout.mjs` (not forked).
+

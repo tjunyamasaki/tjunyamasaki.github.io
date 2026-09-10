@@ -1,5 +1,6 @@
 /**
- * Provisional garden: approved lighting/tone and a handful of static props.
+ * Provisional circular garden used by live `/slime-garden/` until P2-13.
+ * Phase-2 farm meshes live in `habitat-farm.mjs` (`createFarmHabitat`).
  * Does not create slimes or write economic state.
  */
 

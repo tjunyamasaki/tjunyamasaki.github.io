@@ -4,19 +4,23 @@
  */
 
 import { createAudio } from './audio/audio.mjs';
-import { advance } from './core/advance.mjs';
-import { OFFLINE_CAP_MS } from './core/balance.mjs';
-import { absorbFrameDelta, flushWholeMs } from './core/clock-carry.mjs';
-import { applyCommand } from './core/commands.mjs';
+import { advanceActive } from './core/active.mjs';
 import {
-  getCompanionEligibility,
+  MAX_WORLD_STEPS_PER_ADVANCE,
+  WORLD_STEP_MS,
+} from './core/balance.mjs';
+import { absorbFrameDelta, flushWholeMs } from './core/clock-carry.mjs';
+import { applyCommand, completeHint } from './core/commands.mjs';
+import {
   getRateMicroPerSecond,
+  resolveNearSelectedTarget,
 } from './core/selectors.mjs';
 import { cloneState, createInitialState } from './core/state.mjs';
 import {
   createDefaultSettings,
   createFreshEnvelope,
 } from './core/validate.mjs';
+import { createPointerRouter } from './input/pointer-router.mjs';
 import { reconcileAway } from './persistence/reconcile.mjs';
 import {
   importSave,
@@ -36,9 +40,13 @@ import {
   effectiveReducedMotion,
 } from './ui/dom.mjs';
 import {
+  formatArrivalStatus,
   formatExportDate,
   formatImportFailure,
+  formatMealCompleteStatus,
+  formatThrowReject,
   formatUpgradeLabel,
+  HUD_COPY,
 } from './ui/format.mjs';
 import { bindSettings } from './ui/settings.mjs';
 
@@ -59,6 +67,7 @@ const DOM_INTERVAL_MS = 250;
 const PERIODIC_SAVE_MS = 10_000;
 const SLEEP_GAP_MS = 5_000;
 const OFFLINE_SUMMARY_MS = 60_000;
+const MAX_VISIBLE_ADVANCE_MS = MAX_WORLD_STEPS_PER_ADVANCE * WORLD_STEP_MS;
 
 const audio = createAudio();
 
@@ -90,7 +99,6 @@ const audio = createAudio();
  * @property {number} lastSettlePerfMs
  * @property {number} lastDomPerfMs
  * @property {number} lastSavePerfMs
- * @property {boolean} companionWasReady
  * @property {{
  *   sync: Function,
  *   play: Function,
@@ -101,7 +109,11 @@ const audio = createAudio();
  *   update: Function,
  *   render: Function,
  *   dispose: Function,
+ *   pet?: Function,
+ *   getCameraRig?: Function,
+ *   pick?: Function,
  * } | null} scene
+ * @property {ReturnType<typeof createPointerRouter> | null} pointerRouter
  * @property {boolean} sceneFailed
  * @property {number | null} lastScenePerfMs
  */
@@ -134,8 +146,8 @@ const app = {
   lastSettlePerfMs: 0,
   lastDomPerfMs: 0,
   lastSavePerfMs: 0,
-  companionWasReady: false,
   scene: null,
+  pointerRouter: null,
   sceneFailed: false,
   lastScenePerfMs: null,
 };
@@ -147,9 +159,9 @@ if (!gameRoot) {
 
 const ui = bindDom(gameRoot, {
   onSelect: selectSlime,
-  onFeed: feedSelected,
+  onFeed: offerNear,
+  onOfferNear: offerNear,
   onBuy: buyUpgrade,
-  onWelcome: welcomeCompanion,
   onTryAgain: tryAgain,
   onDismissOffline: dismissOffline,
   onDismissNotice: dismissNotice,
@@ -157,6 +169,14 @@ const ui = bindDom(gameRoot, {
   onRecoveryImport: recoveryImport,
   onRecoveryDownload: downloadUnreadable,
   onOpenSettings: openSettings,
+  onSetMode: onHudMode,
+  onSetTool: onHudTool,
+  onZoom: onZoom,
+  onResetView: onResetView,
+  onFocusSelected: onFocusSelected,
+  onPet: petResident,
+  onThrowPreset: onThrowPreset,
+  onReticleThrow: throwAt,
 });
 
 const settingsUi = bindSettings({
@@ -291,14 +311,27 @@ function setSceneStatus(text, ready) {
  */
 function onSceneError(message) {
   app.sceneFailed = true;
+  ui.setRendererAvailable(false);
   const detail = message ? ` ${message}` : '';
   setSceneStatus(
-    `The 3D garden is unavailable.${detail} Feeding and saving still work.`,
+    `The 3D garden is unavailable.${detail} Tossing berries, upgrades, and export still work.`,
     false,
   );
 }
 
+function detachPointerRouter() {
+  if (app.pointerRouter && typeof app.pointerRouter.dispose === 'function') {
+    try {
+      app.pointerRouter.dispose();
+    } catch {
+      // Gesture cleanup must not break save/export.
+    }
+  }
+  app.pointerRouter = null;
+}
+
 function disposeScene() {
+  detachPointerRouter();
   if (app.scene && typeof app.scene.dispose === 'function') {
     try {
       app.scene.dispose();
@@ -307,6 +340,62 @@ function disposeScene() {
     }
   }
   app.scene = null;
+}
+
+/**
+ * @returns {ReturnType<import('./scene/camera.mjs').createCameraRig> | null}
+ */
+function cameraRig() {
+  if (!app.scene || typeof app.scene.getCameraRig !== 'function') return null;
+  try {
+    return app.scene.getCameraRig() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {'care' | 'orbit'} mode
+ */
+function applyPlaySurfaceMode(mode) {
+  const canvas = document.querySelector('#scene-host canvas');
+  if (canvas instanceof HTMLElement) {
+    canvas.style.touchAction = mode === 'orbit' ? 'none' : 'pan-y';
+  }
+  app.pointerRouter?.notifyModeChange();
+}
+
+/**
+ * @param {GameEvent[]} events
+ * @returns {boolean}
+ */
+function eventsNeedImmediateSave(events) {
+  return events.some(
+    (event) =>
+      event.type === 'FOOD_THROWN' ||
+      event.type === 'FED' ||
+      event.type === 'UPGRADE_BOUGHT' ||
+      event.type === 'COMPANION_ADDED' ||
+      event.type === 'TUTORIAL_COMPLETED',
+  );
+}
+
+/**
+ * Shared commit for commands and visible advance: install state, copy, scene,
+ * durable save on cost/reward/tutorial checkpoints, audio, optional paint.
+ *
+ * @param {GameState} nextState
+ * @param {GameEvent[]} events
+ * @param {{ fromAdvance?: boolean, paintNow?: boolean, extra?: { resetPositions?: boolean } }} [options]
+ */
+function commitTransition(nextState, events, options = {}) {
+  app.state = nextState;
+  handleEvents(events, { fromAdvance: !!options.fromAdvance });
+  syncScene(events, options.extra);
+  if (eventsNeedImmediateSave(events)) saveNow();
+  else if (!options.fromAdvance) touchMemoryCheckpoint();
+  cuePresentationAudio(events);
+  if (options.paintNow || events.length) paint();
 }
 
 /**
@@ -343,6 +432,92 @@ function presentScene(perfNow, dtMs) {
   app.scene.render();
 }
 
+/**
+ * @param {unknown} intent
+ */
+function handleWorldClick(intent) {
+  if (!intent || typeof intent !== 'object') return;
+  const typed = /** @type {{ type?: string, hit?: object, tool?: string }} */ (intent);
+  if (typed.type !== 'WORLD_CLICK') return;
+  const hit = typed.hit;
+  if (!hit || typeof hit !== 'object') return;
+  const kind = /** @type {{ kind?: string }} */ (hit).kind;
+  const tool = typed.tool === 'hand' ? 'hand' : 'berry';
+
+  if (kind === 'object') {
+    const id =
+      /** @type {{ upgradeId?: string, interactableId?: string }} */ (hit)
+        .upgradeId ||
+      /** @type {{ interactableId?: string }} */ (hit).interactableId;
+    if (typeof id === 'string' && id) ui.selectObject(id);
+    return;
+  }
+
+  if (kind === 'slime') {
+    const slimeId = /** @type {{ slimeId?: string }} */ (hit).slimeId;
+    if (typeof slimeId !== 'string' || !slimeId) return;
+    selectSlime(/** @type {SlimeId} */ (slimeId));
+    if (tool === 'hand') petResident(/** @type {SlimeId} */ (slimeId));
+    return;
+  }
+
+  if (kind === 'ground' && tool === 'berry') {
+    const ground = /** @type {{ point?: { x: number, z: number }, valid?: boolean }} */ (
+      hit
+    );
+    if (ground.valid === false) {
+      reportCommandFailure('INVALID_TARGET');
+      return;
+    }
+    throwAt(ground.point);
+  }
+}
+
+function attachPointerRouter() {
+  detachPointerRouter();
+  const stage = document.getElementById('scene-stage');
+  if (!stage || !app.scene) return;
+  app.pointerRouter = createPointerRouter({
+    getMode: () => (ui.getHudState().mode === 'orbit' ? 'orbit' : 'care'),
+    getTool: () => (ui.getHudState().tool === 'hand' ? 'hand' : 'berry'),
+    pick: (clientX, clientY) => {
+      if (!app.scene || typeof app.scene.pick !== 'function') {
+        return { kind: 'none' };
+      }
+      return app.scene.pick(clientX, clientY) || { kind: 'none' };
+    },
+    onIntent: handleWorldClick,
+    onCamera: (intent) => {
+      const rig = cameraRig();
+      if (!rig) return;
+      rig.applyIntent(intent);
+      if (isRealCameraIntent(intent)) acknowledgeCameraHint();
+    },
+    isOverPlaySurface: (event) => {
+      const rect = stage.getBoundingClientRect();
+      return (
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom
+      );
+    },
+    isHudHit: (event) => {
+      const target = event && event.target;
+      if (!(target instanceof Element)) return false;
+      if (target.closest('#scene-host')) return false;
+      return Boolean(target.closest('#orbit-hint, #scene-status'));
+    },
+    isPlaySurfaceFocused: () => {
+      const active = document.activeElement;
+      const play = document.getElementById('play-controls');
+      return Boolean(active && play && play.contains(active));
+    },
+  });
+  app.pointerRouter.attach(stage);
+  applyPlaySurfaceMode(ui.getHudState().mode === 'orbit' ? 'orbit' : 'care');
+}
+
 async function mountScene() {
   if (app.scene || app.sceneFailed) return;
   if (app.phase === 'recovery') return;
@@ -352,14 +527,20 @@ async function mountScene() {
   try {
     const { createScene } = await import('./scene/scene.mjs');
     if (app.scene || app.phase === 'recovery' || app.sceneFailed) return;
-    app.scene = createScene(host, sceneOptions(), {
-      onSelect: selectSlime,
-      onError: onSceneError,
-    });
+    app.scene = createScene(
+      host,
+      { ...sceneOptions(), presentation: 'world' },
+      {
+        onSelect: selectSlime,
+        onError: onSceneError,
+      },
+    );
     if (app.sceneFailed) {
       disposeScene();
       return;
     }
+    ui.setRendererAvailable(true);
+    attachPointerRouter();
     syncScene([], { resetPositions: true });
     setSceneStatus('', true);
     presentScene(performance.now(), 0);
@@ -495,21 +676,25 @@ function saveNow() {
 }
 
 /**
+ * Visible-session world+economy. Hidden/away time uses reconcileAway instead.
+ *
  * @param {number} elapsedMs
  */
 function advanceBy(elapsedMs) {
-  if (!app.state || elapsedMs <= 0) return;
-  let remaining = elapsedMs;
+  if (!canAdvance() || !app.state || elapsedMs <= 0) return;
+  let remaining = Math.floor(elapsedMs);
+  if (remaining <= 0) return;
   /** @type {GameEvent[]} */
   const events = [];
+  let state = app.state;
   while (remaining > 0) {
-    const chunk = Math.min(remaining, OFFLINE_CAP_MS);
-    const result = advance(app.state, chunk);
-    app.state = result.state;
+    const chunk = Math.min(remaining, MAX_VISIBLE_ADVANCE_MS);
+    const result = advanceActive(state, chunk);
+    state = result.state;
     events.push(...result.events);
     remaining -= chunk;
   }
-  handleEvents(events, { fromAdvance: true });
+  commitTransition(state, events, { fromAdvance: true, paintNow: false });
 }
 
 function flushCarryAdvance() {
@@ -650,8 +835,9 @@ function onFrame(perfNow) {
   app.lastMonotonicMs = perfNow;
   app.lastWallMs = wallNow;
 
+  flushCarryAdvance();
+
   if (perfNow - app.lastSettlePerfMs >= SETTLE_INTERVAL_MS) {
-    flushCarryAdvance();
     touchMemoryCheckpoint(wallNow);
     app.lastSettlePerfMs = perfNow;
   }
@@ -662,7 +848,6 @@ function onFrame(perfNow) {
   }
 
   if (canWrite() && perfNow - app.lastSavePerfMs >= PERIODIC_SAVE_MS) {
-    flushCarryAdvance();
     touchMemoryCheckpoint(wallNow);
     saveNow();
     app.lastSavePerfMs = perfNow;
@@ -726,6 +911,13 @@ function bindLifecycle() {
       if (app.settings?.reducedMotion == null) paint();
     });
   }
+  for (const id of ['settings-dialog', 'import-dialog', 'reset-dialog']) {
+    const dialog = document.getElementById(id);
+    if (!dialog) continue;
+    dialog.addEventListener('toggle', () => {
+      if ('open' in dialog && dialog.open) app.pointerRouter?.notifyDialogOpen();
+    });
+  }
 }
 
 async function restoreFromBfCache() {
@@ -739,21 +931,30 @@ async function restoreFromBfCache() {
 }
 
 /**
+ * @param {string} reason
+ */
+function reportCommandFailure(reason) {
+  const copy = formatThrowReject(reason, app.state ?? undefined);
+  if (copy) setAction(copy);
+  paint();
+}
+
+/**
  * @param {Command} command
  */
 function dispatch(command) {
   if (!canCommand() || !app.state) return;
   settleNow();
+  if (!app.state) return;
   const result = applyCommand(app.state, command);
-  app.state = result.state;
-  touchMemoryCheckpoint();
-  if (result.ok) {
-    handleEvents(result.events, { fromAdvance: false });
-    saveNow();
-    syncScene(result.events);
-    cuePresentationAudio(result.events);
+  if (!result.ok) {
+    reportCommandFailure(result.reason);
+    return;
   }
-  paint();
+  commitTransition(result.state, result.events, {
+    fromAdvance: false,
+    paintNow: true,
+  });
 }
 
 /**
@@ -762,32 +963,36 @@ function dispatch(command) {
  */
 function handleEvents(events, origin) {
   if (!app.state) return;
+  /** @type {string[]} */
+  const statuses = [];
   for (const event of events) {
-    if (event.type === 'FED') {
+    if (event.type === 'FOOD_THROWN') {
+      statuses.push(HUD_COPY.berryTossed);
+    } else if (event.type === 'FED') {
       const slime = app.state.slimes.find((entry) => entry.id === event.slimeId);
       const name = slime?.name ?? 'a slime';
-      setAction(`Offered a berry to ${name}.`);
+      const until =
+        typeof event.boostUntilMs === 'number'
+          ? event.boostUntilMs
+          : slime?.boostUntilMs ?? app.state.simTimeMs;
+      statuses.push(formatMealCompleteStatus(name, until - app.state.simTimeMs));
     } else if (event.type === 'UPGRADE_BOUGHT' && event.upgradeId) {
-      setAction(
+      statuses.push(
         `Bought ${formatUpgradeLabel(event.upgradeId)} (level ${event.level}).`,
       );
     } else if (event.type === 'COMPANION_ADDED') {
       const slime = app.state.slimes.find((entry) => entry.id === event.slimeId);
-      const name = slime?.name ?? 'A companion';
-      setAction(`${name} joined the garden.`);
+      const name = slime?.name ?? 'A friend';
+      statuses.push(formatArrivalStatus(name));
     } else if (
       event.type === 'TUTORIAL_COMPLETED' &&
       event.step === 'berry' &&
       origin.fromAdvance
     ) {
-      setAction('A berry grew back.');
+      statuses.push('A berry grew back.');
     }
   }
-  const ready = getCompanionEligibility(app.state).ready;
-  if (ready && !app.companionWasReady) {
-    setAction('A companion is ready');
-  }
-  app.companionWasReady = ready;
+  if (statuses.length) setAction(statuses.join(' · '));
 }
 
 /**
@@ -801,9 +1006,146 @@ function selectSlime(id) {
   paint();
 }
 
-function feedSelected() {
-  if (!app.selectedSlimeId) return;
-  dispatch({ type: 'FEED', slimeId: app.selectedSlimeId });
+/**
+ * @param {{ x: number, z: number } | null | undefined} point
+ */
+function throwAt(point) {
+  if (!canCommand() || !app.state) return;
+  if (
+    !point ||
+    typeof point.x !== 'number' ||
+    typeof point.z !== 'number' ||
+    !Number.isFinite(point.x) ||
+    !Number.isFinite(point.z)
+  ) {
+    reportCommandFailure('INVALID_TARGET');
+    return;
+  }
+  dispatch({ type: 'THROW_FOOD', target: { x: point.x, z: point.z } });
+}
+
+function offerNear() {
+  if (!canCommand() || !app.state) return;
+  if (!app.selectedSlimeId) {
+    reportCommandFailure('NO_VALID_TARGET');
+    return;
+  }
+  const target = resolveNearSelectedTarget(app.state, app.selectedSlimeId);
+  if (!target) {
+    reportCommandFailure('NO_VALID_TARGET');
+    return;
+  }
+  dispatch({ type: 'THROW_FOOD', target });
+}
+
+/**
+ * @param {string} _id
+ * @param {{ x: number, z: number }} point
+ */
+function onThrowPreset(_id, point) {
+  throwAt(point);
+}
+
+/**
+ * @param {SlimeId} slimeId
+ */
+function petResident(slimeId) {
+  if (!canCommand() || !app.state) return;
+  if (!app.state.slimes.some((slime) => slime.id === slimeId)) return;
+  selectSlime(slimeId);
+  if (app.scene && typeof app.scene.pet === 'function') {
+    const result = app.scene.pet(slimeId);
+    if (result && result.ok === false && result.reason === 'cooldown') {
+      setAction(HUD_COPY.alreadyPetted);
+      paint();
+      return;
+    }
+    if (result && result.ok && result.playSound && app.settings?.soundEnabled) {
+      audio.setEnabled(true);
+      audio.unlock();
+      audio.playPet();
+    }
+  }
+  acknowledgeHint('pet');
+}
+
+/**
+ * @param {'pet' | 'camera'} step
+ */
+function acknowledgeHint(step) {
+  if (!canCommand() || !app.state) return;
+  const result = completeHint(app.state, step);
+  if (!result.events.length) return;
+  commitTransition(result.state, result.events, {
+    fromAdvance: false,
+    paintNow: true,
+  });
+}
+
+/**
+ * @param {unknown} intent
+ * @returns {boolean}
+ */
+function isRealCameraIntent(intent) {
+  if (!intent || typeof intent !== 'object') return false;
+  const type = /** @type {{ type?: string, factor?: number }} */ (intent).type;
+  if (type === 'ZOOM') {
+    const factor = /** @type {{ factor?: number }} */ (intent).factor;
+    return factor != null && factor !== 1;
+  }
+  return type === 'ORBIT' || type === 'RESET_VIEW' || type === 'FOCUS_SELECTED';
+}
+
+function acknowledgeCameraHint() {
+  acknowledgeHint('camera');
+}
+
+/**
+ * @param {'care' | 'orbit'} mode
+ */
+function onHudMode(mode) {
+  applyPlaySurfaceMode(mode === 'orbit' ? 'orbit' : 'care');
+}
+
+function onHudTool() {
+  applyPlaySurfaceMode(ui.getHudState().mode === 'orbit' ? 'orbit' : 'care');
+}
+
+/**
+ * @param {number} factor
+ */
+function onZoom(factor) {
+  const rig = cameraRig();
+  if (!rig) return;
+  rig.zoomByFactor(factor);
+  acknowledgeCameraHint();
+}
+
+function onResetView() {
+  const rig = cameraRig();
+  if (!rig) return;
+  rig.reset();
+  acknowledgeCameraHint();
+}
+
+function onFocusSelected() {
+  const rig = cameraRig();
+  if (!rig || !app.state || !app.selectedSlimeId) return;
+  const resident = app.state.world?.residents?.find(
+    (entry) => entry.id === app.selectedSlimeId,
+  );
+  const position = resident?.position;
+  if (
+    !position ||
+    typeof position.x !== 'number' ||
+    typeof position.z !== 'number' ||
+    !Number.isFinite(position.x) ||
+    !Number.isFinite(position.z)
+  ) {
+    return;
+  }
+  rig.focusResident({ x: position.x, z: position.z });
+  acknowledgeCameraHint();
 }
 
 /**
@@ -826,14 +1168,6 @@ function buyUpgrade(upgradeId) {
   });
 }
 
-function welcomeCompanion() {
-  if (!app.state) return;
-  dispatch({
-    type: 'WELCOME_COMPANION',
-    expectedPopulation: app.state.slimes.length,
-  });
-}
-
 function dismissOffline() {
   app.offlineSummary = null;
   paint();
@@ -846,6 +1180,7 @@ function dismissNotice() {
 
 function openSettings() {
   if (app.phase === 'blocked') return;
+  app.pointerRouter?.notifyDialogOpen();
   settingsUi.open(document.getElementById('settings-open'));
 }
 
@@ -1017,7 +1352,6 @@ function installPlayable(save, options) {
     settings: cloneSettings(save.settings),
   };
   app.selectedSlimeId = pickDefaultSelection(app.state);
-  app.companionWasReady = getCompanionEligibility(app.state).ready;
   app.recoveryReason = null;
   if (options.persist) saveNow();
   if (app.scene) syncScene([], { resetPositions: true });

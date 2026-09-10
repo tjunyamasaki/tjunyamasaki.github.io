@@ -18,7 +18,7 @@ import {
   SLIME_NAMES,
   UPGRADE_MAX_LEVEL,
 } from '../src/core/balance.mjs';
-import { applyCommand } from '../src/core/commands.mjs';
+import { applyCommand, completeHint } from '../src/core/commands.mjs';
 import { resolveCompanionsNow } from '../src/core/progression.mjs';
 import {
   getBerryCapacity,
@@ -706,6 +706,65 @@ describe('tutorial steps', () => {
     );
     assert.equal(secondWelcome.events[0].type, 'COMPANION_ADDED');
     assert.equal(secondWelcome.state.slimes.length, 3);
+  });
+});
+
+describe('completeHint', () => {
+  test('only pet and camera complete; Glow, berries, and foods stay unchanged', () => {
+    const thrown = assertOk(
+      applyCommand(deepFreeze(createInitialState()), THROW_LEGAL),
+    );
+    const input = deepFreeze(cloneState(thrown.state));
+    const foods = JSON.stringify(input.world.foods);
+    const economy = {
+      glowMicro: input.glowMicro,
+      lifetimeGlowMicro: input.lifetimeGlowMicro,
+      berries: input.berries,
+      totalFeeds: input.totalFeeds,
+      simTimeMs: input.simTimeMs,
+      boostUntilMs: input.slimes[0].boostUntilMs,
+      worldTimeMs: input.world.timeMs,
+      carryMs: input.world.carryMs,
+    };
+
+    for (const bad of ['feed', 'throw', 'welcome', 'upgrade', 'berry', 'nope', '', null]) {
+      const ignored = completeHint(input, bad);
+      assert.equal(ignored.state, input);
+      assert.deepEqual(ignored.events, []);
+    }
+
+    const pet = completeHint(input, 'pet');
+    assert.notEqual(pet.state, input);
+    assert.ok(pet.state.tutorialCompleted.includes('pet'));
+    assert.equal(pet.state.glowMicro, economy.glowMicro);
+    assert.equal(pet.state.lifetimeGlowMicro, economy.lifetimeGlowMicro);
+    assert.equal(pet.state.berries, economy.berries);
+    assert.equal(pet.state.totalFeeds, economy.totalFeeds);
+    assert.equal(pet.state.simTimeMs, economy.simTimeMs);
+    assert.equal(pet.state.slimes[0].boostUntilMs, economy.boostUntilMs);
+    assert.equal(pet.state.world.timeMs, economy.worldTimeMs);
+    assert.equal(pet.state.carryMs ?? pet.state.world.carryMs, economy.carryMs);
+    assert.equal(JSON.stringify(pet.state.world.foods), foods);
+    assert.deepEqual(
+      pet.events.filter((event) => event.type === 'TUTORIAL_COMPLETED'),
+      [{ type: 'TUTORIAL_COMPLETED', step: 'pet', atMs: input.simTimeMs }],
+    );
+
+    const again = completeHint(deepFreeze(pet.state), 'pet');
+    assert.equal(again.state, pet.state);
+    assert.deepEqual(again.events, []);
+
+    const camera = completeHint(input, 'camera');
+    assert.ok(camera.state.tutorialCompleted.includes('camera'));
+    assert.equal(camera.state.glowMicro, economy.glowMicro);
+    assert.equal(camera.state.berries, economy.berries);
+    assert.equal(JSON.stringify(camera.state.world.foods), foods);
+    assert.equal(
+      camera.events.some(
+        (event) => event.type === 'TUTORIAL_COMPLETED' && event.step === 'camera',
+      ),
+      true,
+    );
   });
 });
 

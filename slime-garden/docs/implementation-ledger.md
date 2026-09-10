@@ -178,3 +178,36 @@ v2 replaces single `feedFx` / `arrivalFx` with `createWorldFxPool`: at most **10
 
 Gate arrivals are core-planned. Presentation never invents a second gate walk in Three.
 
+## 19. P2-13 application integration and accessible fallback
+
+Landed on `feat/slime` after P2-12. **Working product gate.** Live `/slime-garden/` is the farm, not a harness. Do not start P2-14/15/16 until this loop holds.
+
+### 19.1 Clocks
+
+| Session | Clock |
+| --- | --- |
+| Visible (`flushCarryAdvance` / `settleNow` while `canAdvance()`) | `advanceActive`, chunked by `MAX_WORLD_STEPS_PER_ADVANCE * WORLD_STEP_MS` (5000). `absorbFrameDelta` / `flushWholeMs` / `SLEEP_GAP_MS` kept. |
+| Hidden / away / BFCache return | `reconcileAway` (passive/economy). **No** `advanceActive` while `sessionHidden`. |
+
+Visible time is not left on `advance` / `advancePassive`. Residents walk and eat.
+
+### 19.2 Shared commit
+
+`commitTransition` is used by commands and visible advance: install state → `handleEvents` (copy) → `syncScene(events)` so FOOD_THROWN / FED / COMPANION_ADDED / UPGRADE play immediately → `saveNow()` on `FOOD_THROWN`, `FED`, `UPGRADE_BOUGHT`, `COMPANION_ADDED`, and tutorial hints when storage succeeds → `cuePresentationAudio` → paint (DOM interval stays 250 ms; action/status can update sooner). Walking checkpoints remain periodic (10 s), hide, or export.
+
+### 19.3 Farm scene, camera, one pointer router
+
+Live `createScene(host, { ...sceneOptions(), presentation: 'world' }, { onSelect, onError })`. Default `presentation` stays `'v1'` for other callers. `createPointerRouter` attaches to `#scene-stage`. `getMode` / `getTool` read `ui.getHudState()`. `pick` → `scene.pick`. `onCamera` → `getCameraRig().applyIntent`. WORLD_CLICK: object → `ui.selectObject` (free card); slime → select, Hand also pets; ground + Care/Berry → `THROW_FOOD` if `valid !== false`. No throw through a slime. World path has no competing canvas pick listeners. HUD `onZoom` → `zoomByFactor`; `onResetView` → `reset`; `onFocusSelected` → `focusResident` using that resident’s **world** x/z. Switching to Orbit does not throw.
+
+### 19.4 HUD / commands / copy
+
+FEED and WELCOME callers **removed** from live main. Offer near / presets / reticle / `onFeed` alias all `THROW_FOOD`. `onPet` → `scene.pet` + `completeHint('pet')`; cooldown status `Already enjoying a pat`. Failed `applyCommand` uses `formatThrowReject`. FOOD_THROWN → `Berry tossed`. FED → `formatMealCompleteStatus`. COMPANION_ADDED → `{name} joined the farm`. No “A companion is ready” Welcome toast. `completeHint('camera')` on first real zoom/orbit/reset/focus, not on boot. Throw tutorial still completes on THROW_FOOD; meals complete `feed`.
+
+### 19.5 No-WebGL / lifecycle
+
+`ui.setRendererAvailable(false)` on scene error. Headless world still throws, advances, buys, and exports. Scene-status: tossing berries / upgrades / export still work. BFCache `pageshow` / `reacquireWriter` kept. Hidden: `setVisible(false)`, stop loop, save. Visible: `reconcileAway` then `startLoop` with `advanceActive`. Secondary tab never mutates.
+
+### 19.6 Remaining polish (P2-14+)
+
+Pacing evidence, crowded-food QA, real-device review, and player README/copy. Not this packet.
+

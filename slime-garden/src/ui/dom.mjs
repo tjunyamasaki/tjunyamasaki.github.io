@@ -64,7 +64,7 @@ export { throwDisabledReason } from './hud.mjs';
  *
  * @typedef {object} UiCallbacks
  * @property {(id: SlimeId) => void} [onSelect]
- * @property {() => void} [onFeed] live main.mjs still passes FEED; Offer near falls back here until P2-13
+ * @property {() => void} [onFeed] compatibility alias; live main throws (does not FEED)
  * @property {(id: string) => void} [onBuy]
  * @property {() => void} [onWelcome] kept for compatibility; no primary Welcome control
  * @property {() => void} [onTryAgain]
@@ -1019,6 +1019,7 @@ export function bindDom(_root, callbacks = {}) {
     getHudState() {
       return hud;
     },
+    selectObject,
   };
 }
 

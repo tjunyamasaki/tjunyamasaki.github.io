@@ -249,6 +249,29 @@ function applyBuyUpgrade(state, command) {
 }
 
 /**
+ * Tutorial-only acknowledgement for pet/camera. Clones; never changes Glow,
+ * berries, food, bonuses, positions, or membership. Other step ids are ignored
+ * (`throw` completes on THROW_FOOD; `feed` completes on a meal).
+ *
+ * @param {GameState} state
+ * @param {unknown} step
+ * @returns {{ state: GameState, events: GameEvent[] }}
+ */
+export function completeHint(state, step) {
+  if (step !== 'pet' && step !== 'camera') {
+    return { state, events: [] };
+  }
+  if (state.tutorialCompleted.includes(step)) {
+    return { state, events: [] };
+  }
+  const next = cloneState(state);
+  /** @type {GameEvent[]} */
+  const events = [];
+  completeTutorial(next, events, step, next.simTimeMs);
+  return { state: next, events };
+}
+
+/**
  * Apply one economic command to an already time-settled state.
  * `state.simTimeMs` is the command timestamp `t`. Does not call `advance`.
  * Never mutates `state`. Rejections return the original input object.

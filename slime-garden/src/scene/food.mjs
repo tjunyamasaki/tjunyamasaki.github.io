@@ -93,6 +93,46 @@ export function eatProgress(food, worldMs, eatDurationMs = EAT_DURATION_MS) {
 }
 
 /**
+ * Duck-typed direction target. Three r180 `Object3D.getWorldDirection` calls
+ * `target.set(x,y,z).normalize()` — a plain `{x,y,z}` throws
+ * `target.set is not a function` on every throw.
+ *
+ * @returns {{
+ *   x: number,
+ *   y: number,
+ *   z: number,
+ *   set: (x: number, y: number, z: number) => object,
+ *   normalize: () => object,
+ * }}
+ */
+function directionTarget() {
+  const target = {
+    x: 0,
+    y: 0,
+    z: 0,
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {number} z
+     */
+    set(x, y, z) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+      return this;
+    },
+    normalize() {
+      const len = Math.hypot(this.x, this.y, this.z) || 1;
+      this.x /= len;
+      this.y /= len;
+      this.z /= len;
+      return this;
+    },
+  };
+  return target;
+}
+
+/**
  * Camera-relative foreground toss origin. Reconstructs nothing — callers
  * pass this only for a freshly observed FOOD_THROWN.
  *
@@ -110,8 +150,12 @@ export function cameraThrowOrigin(camera) {
   let fy = -0.35;
   let fz = -1;
   if (typeof camera.getWorldDirection === 'function') {
-    const dir = { x: 0, y: 0, z: 0 };
-    camera.getWorldDirection(dir);
+    const dir = directionTarget();
+    try {
+      camera.getWorldDirection(dir);
+    } catch {
+      // Keep the default look vector; never let a throw arc crash the loop.
+    }
     if (Number.isFinite(dir.x) && Number.isFinite(dir.z)) {
       fx = dir.x;
       fy = dir.y;

@@ -201,6 +201,24 @@ describe('P2-12 throw and eating positions', () => {
     assert.ok(origin.y >= 1.15);
   });
 
+  test('camera throw origin accepts Three-style getWorldDirection(target.set)', () => {
+    const origin = cameraThrowOrigin({
+      position: { x: 0, y: 12, z: 18 },
+      getWorldDirection(target) {
+        return target.set(0, -0.4, -1).normalize();
+      },
+    });
+    assert.equal(Number.isFinite(origin.x), true);
+    assert.ok(origin.z < 18);
+    const missingSet = cameraThrowOrigin({
+      position: { x: 0, y: 12, z: 18 },
+      getWorldDirection(target) {
+        target.set(0, -0.4, -1);
+      },
+    });
+    assert.equal(Number.isFinite(missingSet.x), true);
+  });
+
   test('worldClockMs adds carry', () => {
     assert.equal(worldClockMs({ timeMs: 100, carryMs: 20 }), 120);
   });

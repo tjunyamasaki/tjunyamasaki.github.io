@@ -207,7 +207,11 @@ FEED and WELCOME callers **removed** from live main. Offer near / presets / reti
 
 `ui.setRendererAvailable(false)` on scene error. Headless world still throws, advances, buys, and exports. Scene-status: tossing berries / upgrades / export still work. BFCache `pageshow` / `reacquireWriter` kept. Hidden: `setVisible(false)`, stop loop, save. Visible: `reconcileAway` then `startLoop` with `advanceActive`. Secondary tab never mutates.
 
-### 19.6 Remaining polish (P2-14+)
+### 19.6 Throw-origin Vector3 duck (follow-up)
+
+Live throws called `camera.getWorldDirection({x,y,z})`. Three r180 requires `target.set().normalize()`, which threw `target.set is not a function` on every `FOOD_THROWN`. `cameraThrowOrigin` now passes a duck-typed target with `set`/`normalize` and swallows direction failures so the throw still lands.
+
+### 19.7 Remaining polish (P2-14+)
 
 Pacing evidence, crowded-food QA, real-device review, and player README/copy. Not this packet.
 

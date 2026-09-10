@@ -3,7 +3,8 @@
  * `world/layout.mjs` via `farm-geometry.mjs`. Live `/slime-garden/` still
  * mounts the circular `createHabitat` until P2-13.
  *
- * Does not create slimes, throw food, or write economic state.
+ * Does not create slimes, throw food, or write economic state. `setFoods`
+ * parents one berry mesh per food ID into `foodsGroup` (P2-12).
  */
 
 import {
@@ -30,6 +31,7 @@ import {
   gatePostPositions,
   PAD_RADIUS,
 } from './farm-geometry.mjs';
+import { createFoodPresentation } from './food.mjs';
 
 export {
   FARM_VISUAL,
@@ -594,6 +596,7 @@ export function createFarmHabitat(THREE, scene, options = {}) {
   const foodsGroup = new THREE.Group();
   foodsGroup.name = 'farm-foods';
   group.add(foodsGroup);
+  const foods = createFoodPresentation(THREE, foodsGroup);
 
   let capacityNow = enabledPadCount(options.capacity ?? 6);
   let shrubLevelNow = clampShrubLevel(options.shrubLevel ?? 0);
@@ -624,10 +627,13 @@ export function createFarmHabitat(THREE, scene, options = {}) {
   }
 
   /**
-   * P2-12 owns food meshes. Empty parent is reserved here.
-   * @param {unknown} [_foods]
+   * Host one mesh per current food ID in `foodsGroup`. Extra IDs are removed.
+   * Positions are updated by `foods.update` (scene) from world snapshots.
+   * @param {readonly import('../world/state.mjs').FoodState[] | null | undefined} nextFoods
    */
-  function setFoods(_foods) {}
+  function setFoods(nextFoods) {
+    foods.sync(nextFoods);
+  }
 
   /**
    * Fade the near-side rails (visual only). Posts stay opaque.
@@ -714,6 +720,7 @@ export function createFarmHabitat(THREE, scene, options = {}) {
   }
 
   function dispose() {
+    foods.dispose();
     for (const root of roots) root.removeFromParent();
     for (const geometry of geometries) geometry.dispose();
     for (const material of materials) material.dispose();
@@ -735,6 +742,7 @@ export function createFarmHabitat(THREE, scene, options = {}) {
     hemi,
     rim,
     foodsGroup,
+    foods,
     setCapacity,
     setShrubLevel,
     setFoods,

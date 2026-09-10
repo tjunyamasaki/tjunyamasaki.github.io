@@ -126,3 +126,55 @@ Throw reject reasons live in `formatThrowReject` / `throwDisabledReason`: `NO_BE
 - Swap circular habitat for the farm; `completeHint` for throw/pet/camera.
 - Failed-command copy into `actionStatus` / `announce` using `formatThrowReject`.
 
+## 18. P2-12 Food, petting and arrivals feel physical
+
+Landed on `feat/slime` after P2-11. **Presentation only.** Core/world clocks already throw, land, walk, and eat. This packet binds meshes to those snapshots.
+
+### 18.1 v1 vs v2 scene split
+
+| Path | Role |
+| --- | --- |
+| `createScene()` default `presentation: 'v1'` | Unchanged circular `createHabitat` + `createMotionWorld`. Live `/slime-garden/` still looks coherent with the P2-11 HUD. |
+| `createScene(..., { presentation: 'world' })` | Farm `createFarmHabitat`, P2-09 `createCameraRig`, actors bound to `state.world.residents`, foods in `habitat.foodsGroup`. `motion.mjs` is not gameplay authority. |
+| `src/scene/motion.mjs` | Kept for live v1 circular wander/feed presentation. |
+| `src/scene/pose-adapter.mjs` | v2 walk phase from route clock (stride 1.0, 1250 ms, travel 0.29–0.68). Blink/idle offsets stay per-id. Does not call `actor.update()`. |
+| `src/scene/food.mjs` | One mesh per food ID; throw arcs; mouth attachment. Never grants Glow. |
+| `src/scene/arrivals.mjs` | v1 helpers kept (`FEED_DURATION_SEC=1.1`). v2 `arrivalVisualPlan` / `createWorldFxPool` consume core snapshots and do not call `planRoute`. |
+
+Approved slime actor, `reference/`, and original preview are unchanged. Reactions use existing `setFeedSquash` / `getMouthWorldPosition` / `setWorldPose` / `setPose`.
+
+### 18.2 Isolated preview
+
+`slime-garden/dev/phase2-presentation.html` + `phase2-presentation.mjs`.
+
+Open with `npx serve .` from the repo root:
+
+- `/slime-garden/dev/phase2-presentation` (extensionless; `serve` 301s `.html?…` and drops the query)
+- `/slime-garden/dev/phase2-presentation.html`
+
+Harness uses real `advanceActive` + `applyCommand({ type: 'THROW_FOOD' })`. Throw button (preset `{x:4.5,z:4}`) or Care-mode ground click. Pet does not change Glow/berries. Arrival button seeds eligibility then `advanceActive` so core `planActiveArrival` may reserve a gate walk.
+
+**Live `/slime-garden/` is still circular + `advancePassive` until P2-13.**
+
+### 18.3 Food mesh ownership
+
+`createFarmHabitat().setFoods` is no longer a no-op. It reconciles `createFoodPresentation` into `farm-foods`. Extra IDs are removed from the graph. Shared berry + leaf + landing shadow. Reconstructing a flying food without a visible `FOOD_THROWN` sits at the world target (no fake throw origin). New throws capture a camera-relative foreground origin; duration/target come from `createdWorldMs` / `landAtWorldMs` / `target`. Eating lerps ground → `getMouthWorldPosition` over `EAT_DURATION_MS` (800). Mesh callbacks never call `finishMeal`.
+
+### 18.4 Gait binding
+
+v2 `actor.worldRoot` position/yaw come from `WorldResident`. Visual walk phase is `(world.timeMs - route.startedWorldMs) / 1250` (same clock as `progressResident`). Walk blend ~200 ms. Contact shadow and selection ring stay on `worldRoot`. Idle/social look is renderer-only when `activity==='idle'` and does not interrupt eating. No auto-face-camera on every idle resident.
+
+### 18.5 FX caps
+
+v2 replaces single `feedFx` / `arrivalFx` with `createWorldFxPool`: at most **10** brief reactions and **40** celebration particles. `playFeed` has a 150 ms aggregate limiter in `src/audio/audio.mjs`. Optional quiet `playPet`. Pet never dispatches FEED and never writes Glow/world. Hidden `setVisible(false)` does not enqueue effects. Reduced motion: still snapshots, no arcs/particles/squash. Pause: freeze interpolation; roster/food membership still tracks; resume snaps to current snapshots without replaying missed rewards.
+
+### 18.6 What P2-13 still wires
+
+- Pass `presentation: 'world'` from live `createScene` (default remains `'v1'` until then).
+- Visible time uses `advanceActive`; absence stays `advancePassive`.
+- Pointer router on the live canvas (world scene currently installs no competing pointer listeners).
+- HUD throw/pet/arrival callbacks, `completeHint`, Offer-near → `THROW_FOOD`.
+- Audio limiter already helps multi-meal FED bursts once main plays `playFeed` per event.
+
+Gate arrivals are core-planned. Presentation never invents a second gate walk in Three.
+

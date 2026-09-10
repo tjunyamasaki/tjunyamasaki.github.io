@@ -2,11 +2,19 @@
  * Gameplay habitat scene. Reconciles actors by resident id, fits the camera
  * to enabled pads, and owns picking / quality / context restore. Never writes
  * Glow, berries, or save keys.
+ *
+ * Default `presentation: 'v1'` is the circular garden + `createMotionWorld`
+ * (live `/slime-garden/` until P2-13). Pass `presentation: 'world'` for the
+ * farm habitat bound to `state.world` snapshots (isolated preview / P2-13).
  */
 
 import * as THREE from '../../vendor/three/three.module.js';
 import { getResidentCapacity } from '../core/selectors.mjs';
 import { createHabitat } from './habitat.mjs';
+import { createFarmHabitat, setFarmFog } from './habitat-farm.mjs';
+import { createCameraRig } from './camera.mjs';
+import { createPoseBinder } from './pose-adapter.mjs';
+import { cameraThrowOrigin, worldClockMs } from './food.mjs';
 import {
   CAMERA_FAR,
   CAMERA_NEAR,
@@ -35,8 +43,12 @@ import {
 import {
   ARRIVAL_REVEAL_SEC,
   createPresentationPool,
+  createWorldFxPool,
   feedPresentationAt,
   planArrival,
+  planPetReaction,
+  presentationGate,
+  arrivalVisualPlan,
   quadraticBezier,
   STILL_BERRY_SEC,
 } from './arrivals.mjs';
@@ -59,6 +71,7 @@ import { createSlimeActor } from './slime-actor.mjs';
  * @property {boolean} animationsPaused
  * @property {Quality} quality
  * @property {boolean} [inspectionMode]
+ * @property {'v1' | 'world'} [presentation]
  *
  * @typedef {object} SceneCallbacks
  * @property {(id: SlimeId) => void} onSelect
@@ -82,6 +95,9 @@ const CAMERA_DAMP = 4;
  *   update: (renderNowMs: number, frameDeltaMs: number) => void,
  *   render: () => void,
  *   dispose: () => void,
+ *   pet: (slimeId: SlimeId) => { ok: boolean, reason?: string },
+ *   getCameraRig: () => ReturnType<typeof createCameraRig> | null,
+ *   pick: (clientX: number, clientY: number) => object,
  * }}
  */
 function inertController() {
@@ -95,6 +111,15 @@ function inertController() {
     update() {},
     render() {},
     dispose() {},
+    pet() {
+      return { ok: false, reason: 'inert' };
+    },
+    getCameraRig() {
+      return null;
+    },
+    pick() {
+      return { kind: 'none' };
+    },
   };
 }
 
@@ -147,6 +172,10 @@ export function createScene(container, initialOptions, callbacks) {
   renderer.domElement.setAttribute('role', 'presentation');
   renderer.domElement.tabIndex = -1;
   container.appendChild(renderer.domElement);
+
+  if (initialOptions && initialOptions.presentation === 'world') {
+    return createWorldScene(container, renderer, initialOptions, callbacks);
+  }
 
   const threeScene = new THREE.Scene();
   threeScene.background = new THREE.Color(0xeaf0d6);
@@ -849,5 +878,537 @@ export function createScene(container, initialOptions, callbacks) {
     update,
     render,
     dispose,
+    pet() {
+      return { ok: false, reason: 'v1' };
+    },
+    getCameraRig() {
+      return null;
+    },
+    pick(clientX, clientY) {
+      const id = pickFromClient(clientX, clientY);
+      return id ? { kind: 'slime', slimeId: id } : { kind: 'none' };
+    },
+  };
+}
+
+/**
+ * Farm presentation bound to `state.world`. Motion.mjs is not gameplay
+ * authority here — XZ/yaw come from WorldResident, walk phase from the route
+ * clock. Isolated preview and later P2-13 (`presentation: 'world'`).
+ *
+ * @param {HTMLElement} container
+ * @param {THREE.WebGLRenderer} renderer
+ * @param {SceneOptions} initialOptions
+ * @param {SceneCallbacks} callbacks
+ */
+function createWorldScene(container, renderer, initialOptions, callbacks) {
+  void callbacks;
+  const threeScene = new THREE.Scene();
+  threeScene.background = new THREE.Color(0xeaf0d6);
+  threeScene.fog = new THREE.Fog(0xeaf0d6, 28, 80);
+
+  const camera = new THREE.PerspectiveCamera(VFOV_DEG, 1, CAMERA_NEAR, CAMERA_FAR);
+
+  const habitat = createFarmHabitat(THREE, threeScene, {
+    capacity: 6,
+    shrubLevel: 0,
+  });
+
+  const fx = createWorldFxPool(THREE, threeScene);
+  const poseBinder = createPoseBinder();
+  const mouthWorld = new THREE.Vector3();
+  /** @type {Map<string, ReturnType<typeof createSlimeActor>>} */
+  const actors = new Map();
+  /** @type {Map<string, { x: number, y: number, z: number }>} */
+  const throwOrigins = new Map();
+  const raycaster = new THREE.Raycaster();
+  const pointerNdc = new THREE.Vector2();
+
+  /** @type {SceneOptions} */
+  let options = {
+    reducedMotion: !!initialOptions.reducedMotion,
+    animationsPaused: !!initialOptions.animationsPaused,
+    quality:
+      initialOptions.quality === 'low' || initialOptions.quality === 'high'
+        ? initialOptions.quality
+        : 'auto',
+    presentation: 'world',
+  };
+
+  const governor = createAutoQualityGovernor();
+  let appliedTier = options.quality === 'low' ? 'low' : 'high';
+  let lastCapacity = -1;
+  let lastShrubLevel = -1;
+  /** @type {GameState | null} */
+  let lastState = null;
+  /** @type {number | null} */
+  let lastSimTimeMs = null;
+  /** @type {SlimeId | null} */
+  let selectedId = null;
+  let visible = true;
+  let disposed = false;
+  let contextLost = false;
+  let restoreOnce = false;
+  let needsPresent = true;
+  let poseAcc = 0;
+  let renderAcc = 0;
+  let lastCssW = 0;
+  let lastCssH = 0;
+  let lastPetAtMs = -1e15;
+
+  const rig = createCameraRig({
+    reducedMotion: options.reducedMotion,
+    getAspect: () => {
+      const w = lastCssW || container.clientWidth;
+      const h = lastCssH || container.clientHeight;
+      return h > 0 ? w / h : 16 / 9;
+    },
+  });
+
+  function applyTier(nextTier) {
+    appliedTier = nextTier === 'low' ? 'low' : 'high';
+    applyQuality(renderer, camera, null, appliedTier, {
+      devicePixelRatio: globalThis.devicePixelRatio,
+      shadowMapType: THREE.PCFSoftShadowMap,
+    });
+    habitat.sun.castShadow = appliedTier !== 'low';
+    renderer.shadowMap.enabled = appliedTier !== 'low';
+    poseAcc = 0;
+    renderAcc = 0;
+    needsPresent = true;
+    resizeToContainer();
+  }
+
+  applyTier(appliedTier);
+
+  function gateNow() {
+    return presentationGate({
+      visible,
+      reducedMotion: options.reducedMotion,
+      animationsPaused: options.animationsPaused,
+    });
+  }
+
+  function poseFrozen() {
+    return options.reducedMotion || options.animationsPaused;
+  }
+
+  function bodies() {
+    return [...actors.values()].map((actor) => actor.body);
+  }
+
+  /**
+   * @param {string} id
+   * @param {import('../world/state.mjs').WorldResident} resident
+   */
+  function spawnActor(id, resident) {
+    const actor = createSlimeActor(THREE, {
+      parent: threeScene,
+      id,
+      x: resident.position.x,
+      z: resident.position.z,
+      yaw: resident.yaw,
+      timeSec: idlePhaseOffsetSec(id),
+      comparisonTravelEnabled: false,
+      selected: id === selectedId,
+    });
+    actor.setComparisonTravelEnabled(false);
+    poseBinder.apply(actor, resident, {
+      worldTimeMs: lastState?.world?.timeMs ?? 0,
+      dtSec: 0,
+      paused: poseFrozen(),
+      reducedMotion: options.reducedMotion,
+    });
+    actor.setSelected(id === selectedId);
+    actors.set(id, actor);
+  }
+
+  function disposeActors() {
+    for (const actor of actors.values()) actor.dispose();
+    actors.clear();
+    poseBinder.dispose();
+  }
+
+  function clearPresentation(replayReset) {
+    fx.clearReactions();
+    if (replayReset) throwOrigins.clear();
+  }
+
+  function applyCameraView() {
+    rig.applyTo(camera);
+    setFarmFog(threeScene.fog, rig.getView().distance, rig.getFarPlane());
+    habitat.updateFenceFade(camera.position);
+  }
+
+  /**
+   * @param {number} [widthCssPx]
+   * @param {number} [heightCssPx]
+   */
+  function resizeToContainer(widthCssPx, heightCssPx) {
+    if (!renderer || disposed) return;
+    const w = Math.max(1, Math.floor(widthCssPx ?? container.clientWidth));
+    const h = Math.max(1, Math.floor(heightCssPx ?? container.clientHeight));
+    lastCssW = w;
+    lastCssH = h;
+    renderer.setSize(w, h, false);
+    rig.resize(w, h);
+    applyCameraView();
+    needsPresent = true;
+  }
+
+  /**
+   * @param {GameState} state
+   * @param {SyncOptions} [syncOptions]
+   */
+  function sync(state, syncOptions = {}) {
+    if (disposed || !state) return;
+    lastState = state;
+    const capacity = getResidentCapacity(state);
+    const shrubLevel = state.upgrades?.shrub ?? 0;
+    if (capacity !== lastCapacity) {
+      lastCapacity = capacity;
+      habitat.setCapacity(capacity);
+    }
+    if (shrubLevel !== lastShrubLevel) {
+      lastShrubLevel = shrubLevel;
+      habitat.setShrubLevel(shrubLevel);
+    }
+
+    const simTime = state.simTimeMs;
+    const jumped =
+      lastSimTimeMs != null && Math.abs(simTime - lastSimTimeMs) > LARGE_SIM_JUMP_MS;
+    const resetPositions = !!syncOptions.resetPositions || jumped;
+    lastSimTimeMs = simTime;
+
+    const world = state.world;
+    const residents = world && Array.isArray(world.residents) ? world.residents : [];
+    const living = new Set(residents.map((resident) => resident.id));
+    for (const [id, actor] of actors) {
+      if (living.has(id)) continue;
+      actor.dispose();
+      actors.delete(id);
+      poseBinder.forget(id);
+    }
+    const worldMs = world ? world.timeMs : 0;
+    for (const resident of residents) {
+      let actor = actors.get(resident.id);
+      if (!actor) {
+        spawnActor(resident.id, resident);
+        continue;
+      }
+      if (resetPositions) {
+        poseBinder.apply(actor, resident, {
+          worldTimeMs: worldMs,
+          dtSec: 0,
+          paused: poseFrozen(),
+          reducedMotion: options.reducedMotion,
+        });
+      }
+    }
+
+    const foods = world && Array.isArray(world.foods) ? world.foods : [];
+    habitat.setFoods(foods);
+    const foodIds = new Set(foods.map((food) => food.id));
+    for (const id of [...throwOrigins.keys()]) {
+      if (!foodIds.has(id)) throwOrigins.delete(id);
+    }
+    if (resetPositions) clearPresentation(true);
+    needsPresent = true;
+  }
+
+  /**
+   * @param {readonly GameEvent[]} events
+   */
+  function play(events) {
+    if (disposed || !events) return;
+    const gate = gateNow();
+    if (!gate.visible) return;
+    for (const event of events) {
+      if (event.type === 'FOOD_THROWN' && event.foodId) {
+        if (gate.captureThrowOrigin) {
+          throwOrigins.set(event.foodId, cameraThrowOrigin(camera));
+        }
+      }
+      if (event.type === 'FED' && event.slimeId) {
+        if (gate.enqueueReaction && gate.animateSquash) {
+          fx.beginReaction(event.slimeId, 'feed');
+        }
+      }
+      if (event.type === 'COMPANION_ADDED' && event.slimeId) {
+        const resident = lastState?.world?.residents?.find(
+          (entry) => entry.id === event.slimeId,
+        );
+        const plan = arrivalVisualPlan(resident);
+        if (gate.enqueueReaction && plan.style === 'still-greeting' && gate.animateSquash) {
+          fx.beginReaction(event.slimeId, 'arrive');
+        }
+      }
+    }
+    needsPresent = true;
+  }
+
+  /**
+   * @param {SlimeId | null} slimeId
+   */
+  function select(slimeId) {
+    selectedId = slimeId;
+    for (const actor of actors.values()) actor.setSelected(actor.id === slimeId);
+    needsPresent = true;
+  }
+
+  /**
+   * Visual pet only. Does not call FEED or change Glow/world.
+   * @param {SlimeId} slimeId
+   */
+  function pet(slimeId) {
+    const gate = gateNow();
+    const result = planPetReaction({
+      state: lastState,
+      slimeId,
+      nowMs: lastState?.simTimeMs ?? 0,
+      lastPetAtMs,
+      visible: gate.visible,
+      reducedMotion: options.reducedMotion,
+      animationsPaused: options.animationsPaused,
+    });
+    if (!result.ok) return result;
+    lastPetAtMs = lastState?.simTimeMs ?? 0;
+    if (result.particles) fx.beginReaction(slimeId, 'pet');
+    needsPresent = true;
+    return result;
+  }
+
+  /**
+   * @param {SceneOptions} next
+   */
+  function setOptions(next) {
+    const prevReduced = options.reducedMotion;
+    const prevPaused = options.animationsPaused;
+    const prevQuality = options.quality;
+    options = {
+      reducedMotion: !!next.reducedMotion,
+      animationsPaused: !!next.animationsPaused,
+      quality:
+        next.quality === 'low' || next.quality === 'high' || next.quality === 'auto'
+          ? next.quality
+          : options.quality,
+      presentation: 'world',
+    };
+    rig.setReducedMotion(options.reducedMotion);
+    if (options.quality !== prevQuality) {
+      governor.reset();
+      applyTier(options.quality === 'auto' ? 'high' : options.quality);
+    }
+    if (options.reducedMotion !== prevReduced || options.animationsPaused !== prevPaused) {
+      if (options.reducedMotion || options.animationsPaused) {
+        fx.clearReactions();
+      }
+      if (prevPaused && !options.animationsPaused && lastState) {
+        sync(lastState, { resetPositions: true });
+      }
+      needsPresent = true;
+    }
+  }
+
+  /**
+   * @param {boolean} nextVisible
+   */
+  function setVisible(nextVisible) {
+    visible = !!nextVisible;
+    if (!visible) {
+      fx.clearReactions();
+    }
+    if (visible && lastState) {
+      sync(lastState, { resetPositions: true });
+    }
+    if (visible) needsPresent = true;
+  }
+
+  /**
+   * @param {number} widthCssPx
+   * @param {number} heightCssPx
+   */
+  function resize(widthCssPx, heightCssPx) {
+    resizeToContainer(widthCssPx, heightCssPx);
+  }
+
+  function sampleMouth(slimeId) {
+    const actor = actors.get(slimeId);
+    if (!actor) return null;
+    actor.getMouthWorldPosition(mouthWorld);
+    return { x: mouthWorld.x, y: mouthWorld.y, z: mouthWorld.z };
+  }
+
+  /**
+   * @param {number} dt
+   */
+  function updatePresentation(dt) {
+    const world = lastState?.world;
+    const worldMs = world ? world.timeMs : 0;
+    const frozen = poseFrozen();
+    const foods = world && Array.isArray(world.foods) ? world.foods : [];
+    const residents = world && Array.isArray(world.residents) ? world.residents : [];
+
+    for (const resident of residents) {
+      const actor = actors.get(resident.id);
+      if (!actor) continue;
+      poseBinder.apply(actor, resident, {
+        worldTimeMs: worldMs,
+        dtSec: dt,
+        paused: frozen,
+        reducedMotion: options.reducedMotion,
+      });
+    }
+
+    habitat.foods.update({
+      foods,
+      worldMs: worldClockMs(world),
+      throwOrigins,
+      getMouth: sampleMouth,
+      reducedMotion: options.reducedMotion,
+      freezePositions: options.animationsPaused && !options.reducedMotion,
+    });
+
+    const squashById = fx.tick(
+      dt,
+      (id) => {
+        const actor = actors.get(id);
+        if (!actor) return null;
+        const pose = actor.getPose();
+        return { x: pose.x, z: pose.z, y: 0.75 };
+      },
+      options.animationsPaused,
+      options.reducedMotion,
+    );
+    if (!options.reducedMotion && !options.animationsPaused) {
+      for (const [id, amount] of squashById) {
+        const actor = actors.get(id);
+        if (actor && amount > 0) actor.setFeedSquash(amount);
+      }
+    }
+  }
+
+  /**
+   * @param {number} renderNowMs
+   * @param {number} frameDeltaMs
+   */
+  function update(renderNowMs, frameDeltaMs) {
+    if (disposed || contextLost || !visible) return;
+    const dt = Math.min(0.05, Math.max(0, frameDeltaMs / 1000));
+
+    if (options.quality === 'auto' && appliedTier === 'high') {
+      const next = governor.observe(renderNowMs, frameDeltaMs);
+      if (next === 'low') applyTier('low');
+    }
+
+    rig.update(dt);
+    applyCameraView();
+
+    poseAcc += dt;
+    const posePeriod = posePeriodSec(appliedTier);
+    const poseSteps = posePeriod > 0 ? Math.floor(poseAcc / posePeriod) : 1;
+    if (poseSteps > 0) {
+      const step = posePeriod > 0 ? posePeriod : dt;
+      for (let i = 0; i < poseSteps; i += 1) updatePresentation(step);
+      poseAcc -= poseSteps * (posePeriod > 0 ? posePeriod : poseAcc);
+    } else if (needsPresent && dt === 0) {
+      updatePresentation(0);
+    }
+
+    renderAcc += dt;
+    needsPresent = true;
+  }
+
+  function render() {
+    if (disposed || contextLost || !visible || !renderer) return;
+    const period = renderPeriodSec(appliedTier);
+    if (!needsPresent && renderAcc < period) return;
+    renderAcc = 0;
+    needsPresent = false;
+    renderer.render(threeScene, camera);
+  }
+
+  function pick(clientX, clientY) {
+    if (!renderer) return { kind: 'none' };
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return { kind: 'none' };
+    pointerNdc.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(pointerNdc, camera);
+    const slimeHits = raycaster.intersectObjects(bodies(), false);
+    const slimeHit = slimeHits[0];
+    if (slimeHit && slimeHit.object.userData.role === 'slime-body') {
+      const id = slimeHit.object.userData.slimeId;
+      if (typeof id === 'string' && id) return { kind: 'slime', slimeId: id };
+    }
+    return habitat.pick(raycaster);
+  }
+
+  function onContextLost(event) {
+    event.preventDefault();
+    contextLost = true;
+    restoreOnce = false;
+  }
+
+  function onContextRestored() {
+    if (disposed || restoreOnce) return;
+    restoreOnce = true;
+    contextLost = false;
+    applyTier(appliedTier);
+    if (lastState) sync(lastState, { resetPositions: true });
+    if (selectedId) select(selectedId);
+    resizeToContainer();
+    needsPresent = true;
+  }
+
+  const canvas = renderer.domElement;
+  canvas.addEventListener('webglcontextlost', onContextLost, false);
+  canvas.addEventListener('webglcontextrestored', onContextRestored, false);
+
+  const observer = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (!entry) return;
+    const box = entry.contentRect;
+    resizeToContainer(box.width, box.height);
+  });
+  observer.observe(container);
+  resizeToContainer();
+
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    observer.disconnect();
+    canvas.removeEventListener('webglcontextlost', onContextLost, false);
+    canvas.removeEventListener('webglcontextrestored', onContextRestored, false);
+    disposeActors();
+    fx.dispose();
+    throwOrigins.clear();
+    habitat.dispose();
+    rig.dispose();
+    if (renderer) {
+      renderer.dispose();
+      renderer.forceContextLoss?.();
+      renderer.domElement.remove();
+    }
+    lastState = null;
+  }
+
+  return {
+    sync,
+    play,
+    select,
+    setOptions,
+    setVisible,
+    resize,
+    update,
+    render,
+    dispose,
+    pet,
+    getCameraRig() {
+      return rig;
+    },
+    pick,
   };
 }

@@ -17,6 +17,8 @@ import { ENTRY_POINT, HOME_SLOTS, MIN_SEPARATION } from '../src/scene/layout.mjs
 import { createPoseState, deform, evaluatePose, mouthRestLocal } from '../src/scene/slime-pose.mjs';
 
 describe('feed presentation', () => {
+  // P2-12 farm eating is 800 ms and world-driven (`EAT_DURATION_MS`).
+  // These timings remain the unused v1 circular helpers (`FEED_DURATION_SEC=1.1`).
   test('berry travels then shrinks, then particles, then idle', () => {
     const start = feedPresentationAt(0);
     assert.equal(start.berryVisible, true);

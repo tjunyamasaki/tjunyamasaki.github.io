@@ -3,15 +3,34 @@
  * gesture when sound is enabled. Missing AudioContext must never throw.
  */
 
+/** Aggregate limiter for overlapping FED cues (P2-12). */
+export const FEED_CUE_MIN_INTERVAL_MS = 150;
+
 /**
  * @typedef {object} AudioCues
  * @property {(enabled: boolean) => void} setEnabled
  * @property {() => void} unlock
- * @property {() => void} playFeed
+ * @property {(nowMs?: number) => void} playFeed
  * @property {() => void} playUpgrade
  * @property {() => void} playWelcome
+ * @property {() => void} playPet
  * @property {() => void} dispose
  */
+
+/**
+ * @param {number} [nowMs]
+ * @returns {number}
+ */
+function resolveNow(nowMs) {
+  if (typeof nowMs === 'number' && Number.isFinite(nowMs)) return nowMs;
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return performance.now();
+  }
+  if (typeof Date !== 'undefined' && typeof Date.now === 'function') {
+    return Date.now();
+  }
+  return 0;
+}
 
 /**
  * @param {{
@@ -25,6 +44,7 @@ export function createAudio(globals = globalThis) {
   /** @type {AudioContext | null} */
   let ctx = null;
   let failed = false;
+  let lastFeedCueAt = -Infinity;
 
   function Ctor() {
     return globals.AudioContext || globals.webkitAudioContext || null;
@@ -99,7 +119,11 @@ export function createAudio(globals = globalThis) {
       }
     },
     unlock,
-    playFeed() {
+    playFeed(nowMs) {
+      if (!enabled || failed) return;
+      const t = resolveNow(nowMs);
+      if (t - lastFeedCueAt < FEED_CUE_MIN_INTERVAL_MS) return;
+      lastFeedCueAt = t;
       tone({ freq: 640, dur: 0.08, type: 'sine', gain: 0.032, slide: 880 });
     },
     playUpgrade() {
@@ -108,8 +132,12 @@ export function createAudio(globals = globalThis) {
     playWelcome() {
       tone({ freq: 349, dur: 0.28, type: 'sine', gain: 0.034, slide: 523 });
     },
+    playPet() {
+      tone({ freq: 520, dur: 0.07, type: 'sine', gain: 0.018, slide: 640 });
+    },
     dispose() {
       enabled = false;
+      lastFeedCueAt = -Infinity;
       if (ctx && typeof ctx.close === 'function') {
         try {
           const closed = ctx.close();

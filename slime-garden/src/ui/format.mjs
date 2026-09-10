@@ -26,6 +26,61 @@ export const UPGRADE_LABELS = Object.freeze({
   beds: 'Resting pads',
 });
 
+/** Contextual HUD names for the four farm objects. */
+export const HUD_OBJECT_LABELS = Object.freeze({
+  shrub: 'Berry shrub',
+  pantry: 'Pantry basket',
+  bloom: 'Glow flowers',
+  beds: 'Resting area',
+});
+
+/**
+ * Concise player-facing HUD strings. Mechanics stay in core; this is copy only.
+ */
+export const HUD_COPY = Object.freeze({
+  berryTossed: 'Berry tossed',
+  foodLimit: 'Let them finish the berries on the grass',
+  invalidTarget: 'Toss onto open grass inside the fence',
+  noValidTarget: 'Choose another patch of grass',
+  chooseSlime: 'Choose a slime',
+  alreadyPetted: 'Already enjoying a pat',
+  missingPad: 'A new friend needs a resting pad',
+  fullColony: 'All ten friends are home',
+  companionNeeds: 'Next friend needs care, Glow, and a resting pad.',
+  companionReady: 'Care, Glow, and space are ready — a friend joins on their own.',
+  unsaved: 'Progress is not saved · Export a copy',
+  sessionOnly: 'Session-only',
+  secondaryTab: 'This farm is active in another tab',
+  saved: 'Saved',
+  orbitHint: 'Drag to orbit · Two fingers to pan/zoom',
+  backToCare: 'Back to care',
+  cameraUnavailable:
+    'Camera needs the 3D garden. Use Farm controls to toss berries.',
+  offerNearNote: 'Another nearby slime may reach it first.',
+  pauseNote: 'Pause scene motion; farm activity continues.',
+  maxLevel: 'Max level',
+  upgrade: 'Upgrade',
+});
+
+export const TUTORIAL_COPY = Object.freeze({
+  feed: 'Tap the grass to toss a berry.',
+  berry: 'Berries grow back on their own.',
+  welcome: 'New friends join on their own when care, Glow, and a pad are ready.',
+  upgrade: 'Tap a farm object, then Upgrade, to spend Glow.',
+  throw: 'Tap open grass inside the fence to toss a berry.',
+  pet: 'Choose Hand, then pet a slime.',
+  camera: 'Use +/− or Orbit to look around the farm.',
+});
+
+export const ACTIVITY_COPY = Object.freeze({
+  idle: 'Resting',
+  wandering: 'Wandering',
+  seekingFood: 'Heading to a berry',
+  eating: 'Eating',
+  arriving: 'Arriving',
+  yielding: 'Waiting',
+});
+
 /**
  * Trim trailing zeros from a decimal string while keeping at least one digit
  * after the point when the value is not an integer.
@@ -261,5 +316,132 @@ export function formatImportFailure(reason) {
     case 'INVALID_STATE':
     default:
       return 'This file is not a valid save. Your garden was not changed.';
+  }
+}
+
+/**
+ * @param {UpgradeId | string} id
+ * @returns {string}
+ */
+export function formatHudObjectLabel(id) {
+  return HUD_OBJECT_LABELS[/** @type {UpgradeId} */ (id)] ?? formatUpgradeLabel(id);
+}
+
+/**
+ * Current → next effect for a contextual upgrade card.
+ *
+ * @param {GameState} state
+ * @param {UpgradeId | string} id
+ * @returns {string}
+ */
+export function formatUpgradeCardEffect(state, id) {
+  const max = UPGRADE_MAX_LEVEL[/** @type {UpgradeId} */ (id)];
+  if (max == null) return '';
+  const level = state.upgrades[/** @type {UpgradeId} */ (id)];
+  if (typeof level !== 'number' || level >= max) return HUD_COPY.maxLevel;
+  switch (id) {
+    case 'shrub':
+      return `Berries grow every ${SHRUB_INTERVALS_MS[level] / 1000}s → ${SHRUB_INTERVALS_MS[level + 1] / 1000}s`;
+    case 'pantry':
+      return `Hold ${PANTRY_CAPACITIES[level]} → ${PANTRY_CAPACITIES[level + 1]} berries`;
+    case 'bloom':
+      return 'All friends make +25 percentage points more Glow';
+    case 'beds':
+      return `Room for ${BEDS_CAPACITIES[level]} → ${BEDS_CAPACITIES[level + 1]} friends`;
+    default:
+      return '';
+  }
+}
+
+/**
+ * @param {string} [activity]
+ * @returns {string}
+ */
+export function formatActivity(activity) {
+  if (activity && Object.prototype.hasOwnProperty.call(ACTIVITY_COPY, activity)) {
+    return ACTIVITY_COPY[/** @type {keyof typeof ACTIVITY_COPY} */ (activity)];
+  }
+  return ACTIVITY_COPY.idle;
+}
+
+/**
+ * @param {number} feedCount
+ * @returns {string}
+ */
+export function formatMealCount(feedCount) {
+  const n = typeof feedCount === 'number' && Number.isFinite(feedCount) ? feedCount : 0;
+  if (n === 1) return '1 meal';
+  return `${n} meals`;
+}
+
+/**
+ * @param {string} name
+ * @returns {string}
+ */
+export function formatSeekingStatus(name) {
+  return `${name} is heading to a berry`;
+}
+
+/**
+ * @param {string} name
+ * @param {number} bonusMs
+ * @returns {string}
+ */
+export function formatMealCompleteStatus(name, bonusMs) {
+  return `${name} enjoyed a berry · Cozy bonus ${formatDuration(bonusMs)}`;
+}
+
+/**
+ * @param {string} name
+ * @returns {string}
+ */
+export function formatArrivalStatus(name) {
+  return `${name} joined the farm`;
+}
+
+/**
+ * @param {number} count
+ * @returns {string}
+ */
+export function formatPendingFood(count) {
+  const n = typeof count === 'number' && Number.isFinite(count) ? Math.max(0, count) : 0;
+  if (n === 0) return 'No berries on the grass';
+  if (n === 1) return '1 berry on the grass';
+  return `${n} berries on the grass`;
+}
+
+/**
+ * Command reject copy. Timer reasons need live state for remaining ms.
+ *
+ * @param {string} reason
+ * @param {GameState} [state]
+ * @returns {string}
+ */
+export function formatThrowReject(reason, state) {
+  switch (reason) {
+    case 'NO_BERRIES': {
+      const remaining =
+        !state || state.nextBerryAtMs == null
+          ? 0
+          : state.nextBerryAtMs - state.simTimeMs;
+      return `More berries in ${formatDuration(remaining)}`;
+    }
+    case 'THROW_COOLDOWN': {
+      const until = state
+        ? Number.isInteger(state.nextThrowAllowedAtMs)
+          ? state.nextThrowAllowedAtMs
+          : state.nextFeedAllowedAtMs
+        : 0;
+      const remaining = state ? until - state.simTimeMs : 0;
+      return `Ready to toss in ${formatDuration(remaining)}`;
+    }
+    case 'FOOD_LIMIT':
+      return HUD_COPY.foodLimit;
+    case 'INVALID_TARGET':
+      return HUD_COPY.invalidTarget;
+    case 'NO_VALID_TARGET':
+      return HUD_COPY.noValidTarget;
+    default:
+      return '';
   }
 }

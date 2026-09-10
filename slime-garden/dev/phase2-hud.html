@@ -3,10 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Slime garden</title>
-  <link rel="stylesheet" href="./styles.css">
+  <title>Phase-2 HUD preview</title>
+  <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
+  <div class="banner banner-info" style="margin:12px">
+    <p>
+      Isolated HUD playground with mocked callbacks. Live
+      <a href="../">/slime-garden/</a> still boots <code>src/main.mjs</code>
+      (circular farm until P2-13). Offer near falls back to <code>onFeed</code>.
+    </p>
+  </div>
   <a class="skip-link" href="#play-controls">Skip to garden controls</a>
   <div id="live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
@@ -260,18 +267,16 @@
     <p>
       <a href="/links/">Games</a>
       ·
-      <a href="./reference/original-preview.html">Original slime preview</a>
+      <a href="../">Live garden</a>
       ·
-      <a href="./dev/inspection.html">Extracted actor inspection</a>
+      <a href="./phase2-farm.html">Farm habitat preview</a>
       ·
-      <a href="./dev/stress.html">Six-slime stress</a>
-      ·
-      <a href="./dev/phase2-hud.html">HUD preview</a>
+      <a href="./phase2-camera.html">Camera harness</a>
     </p>
   </footer>
 
   <script type="module">
-    import('./src/main.mjs').catch((error) => {
+    import('./phase2-hud.mjs').catch((error) => {
       const loading = document.getElementById('loading');
       const region = document.getElementById('error');
       const message = document.getElementById('error-message');

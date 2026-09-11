@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [feat/ball-game]
+    branches: [master, feat/ball-game]
   workflow_dispatch:
 
 permissions:

@@ -22,7 +22,7 @@ export class SpatialGrid {
 }
 export class World {
   constructor(seed = (Math.random()*1e9)|0) {
-    this.seed=seed; this.time=0; this.nextId=1; this.players=new Map(); this.generations=Array(RULES.food).fill(0);
+    this.seed=seed; this.phase='playing'; this.frameSeq=0; this.time=0; this.nextId=1; this.players=new Map(); this.generations=Array(RULES.food).fill(0);
     this.food=this.generations.map((g,i)=>foodAt(seed,i,g)); this.foodGrid=new SpatialGrid(); this.cellGrid=new SpatialGrid(200);
     this.viruses=[]; this.ejected=[]; this.botClock=0;
     for(let i=0;i<RULES.viruses;i++) this.viruses.push(this.virus());
@@ -53,7 +53,13 @@ export class World {
     const p=this.players.get(id); if(!p||!raw||!Number.isFinite(raw.x)||!Number.isFinite(raw.y)) return;
     const length=Math.max(1,Math.hypot(raw.x,raw.y));p.input={x:raw.x/length,y:raw.y/length};p.lastInput=this.time;
   }
+  start() {
+    if(this.phase!=='lobby')return;
+    this.phase='playing';
+    for(const p of this.players.values()){p.input={x:0,y:0};p.lastInput=this.time;}
+  }
   action(id,type) {
+    if(this.phase!=='playing')return;
     const p=this.players.get(id);if(!p)return;
     if(type==='respawn') { if(!p.cells.length && this.time-p.deadAt>=1.5) this.spawn(p);return; }
     let {x,y}=p.input; const d=Math.hypot(x,y); if(d<0.01){x=1;y=0;}else{x/=d;y/=d;}
@@ -95,6 +101,7 @@ export class World {
     }
   }
   step(dt=1/60) {
+    if(this.phase!=='playing')return;
     this.time+=dt;
     this.foodGrid.clear();for(const f of this.food)this.foodGrid.insert(f);
     this.botClock-=dt;if(this.botClock<=0){this.botClock=0.2;this.think();}
@@ -132,7 +139,7 @@ export class World {
   bound(c) {const r=radius(c.m);c.x=clamp(c.x,r,RULES.size-r);c.y=clamp(c.y,r,RULES.size-r);}
   snapshot() {
     const q=n=>Math.round(n*10)/10;
-    return {type:'frame',time:q(this.time),players:[...this.players.values()].map(p=>({id:p.id,name:p.name,bot:p.bot,hue:p.hue,kills:p.kills,peak:q(p.peak),deadAt:p.deadAt,cells:p.cells.map(c=>[c.id,q(c.x),q(c.y),q(c.m),q(c.vx),q(c.vy),q(c.mergeAt)])})),viruses:this.viruses.map(v=>[v.id,q(v.x),q(v.y),v.m]),ejected:this.ejected.map(e=>[e.id,q(e.x),q(e.y),e.m,e.hue])};
+    return {type:'frame',phase:this.phase,seq:++this.frameSeq,time:q(this.time),players:[...this.players.values()].map(p=>({id:p.id,name:p.name,bot:p.bot,hue:p.hue,kills:p.kills,peak:q(p.peak),deadAt:p.deadAt,cells:p.cells.map(c=>[c.id,q(c.x),q(c.y),q(c.m),q(c.vx),q(c.vy),q(c.mergeAt)])})),viruses:this.viruses.map(v=>[v.id,q(v.x),q(v.y),v.m]),ejected:this.ejected.map(e=>[e.id,q(e.x),q(e.y),e.m,e.hue])};
   }
 }
 export function decodeFrame(frame) {

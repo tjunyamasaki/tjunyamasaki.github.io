@@ -33,7 +33,7 @@ test('two endpoints join, exchange host frames/food and validated input/actions,
  try{
  const code=await host.host();await guest.join(code,'Guest',2);await flush();assert.ok(guestId);assert.equal(w.players.size,2);assert.equal(frame.type,'frame');assert.equal(food.seed,42);
  guest.input({x:99,y:0});await flush();assert.deepEqual(w.players.get(guestId).input,{x:1,y:0});
- const p=w.players.get(guestId);p.cells[0].m=100;guest.action('split');await flush();assert.equal(p.cells.length,2);
+ host.start();await flush();const p=w.players.get(guestId);p.cells[0].m=100;guest.action('split');await flush();assert.equal(p.cells.length,2);
  guest.action('setBots');await flush();assert.equal(w.players.size,2);
  w.step();host.broadcast(true);await flush();assert.equal(frame.players.find(p=>p.id===guestId).cells.length,2);assert.equal(food.generations.length,900);
  await host.stop();await flush();assert.equal(left,true);assert.equal(h.rooms.size,0);
@@ -47,4 +47,31 @@ test('missing or malformed rooms fail without opening a peer connection',async()
 test('a guest cannot claim the host identity through an input packet',async()=>{
  const h=harness(),w=new World(42);w.addPlayer('local','Host');let id;const opts={signaling:h.signal,PeerConnection:h.PC};const host=createNetwork({...opts,world:w}),guest=createNetwork({...opts,onReady:x=>id=x,onFood(){},onFrame(){}});
  try{await host.host();await guest.join('ABCDE','Guest',0);await flush();guest.input({x:1,y:0,id:'local',playerId:'local'});await flush();assert.equal(w.players.get('local').input.x,0);assert.equal(w.players.get(id).input.x,1);}finally{await guest.stop();await host.stop();}
+});
+
+test('lobby stays frozen, publishes roster changes, and only host starts the match',async()=>{
+ const h=harness(),w=new World(42);w.addPlayer('local','Host');w.setBots(4);let frame,id;
+ const opts={signaling:h.signal,PeerConnection:h.PC};const host=createNetwork({...opts,world:w}),guest=createNetwork({...opts,onReady:x=>id=x,onFood(){},onFrame:x=>frame=x});
+ try{
+  await host.host();await guest.join('ABCDE','Guest',0);await flush();assert.equal(frame.phase,'lobby');assert.equal(frame.players.length,6);
+  const before=JSON.stringify([...w.players.values()].map(p=>p.cells));for(let i=0;i<120;i++)w.step();assert.equal(w.time,0);assert.equal(JSON.stringify([...w.players.values()].map(p=>p.cells)),before);
+  guest.action('start');guest.action('split');await flush();assert.equal(w.phase,'lobby');assert.equal(w.players.get(id).cells.length,1);
+  const seq=frame.seq;w.setBots(8);host.broadcast();await flush();assert.equal(frame.players.length,10);assert.ok(frame.seq>seq);assert.equal(frame.time,0);
+  host.start();await flush();assert.equal(frame.phase,'playing');w.step();assert.ok(w.time>0);
+ }finally{await guest.stop();await host.stop();}
+});
+test('drawings reach the host, peers and late joiners without bloating realtime frames',async()=>{
+ const h=harness(),w=new World(42);w.addPlayer('local','Host').skin='1'.repeat(4096);
+ const opts={signaling:h.signal,PeerConnection:h.PC};let id;const received=new Map(),lateReceived=new Map(),hostReceived=new Map();
+ const host=createNetwork({...opts,world:w,onSkin:x=>hostReceived.set(x.id,x.skin)});
+ const guest=createNetwork({...opts,onReady:x=>id=x,onFrame(){},onFood(){},onSkin:x=>received.set(x.id,x.skin)});
+ const late=createNetwork({...opts,onReady(){},onFrame(){},onFood(){},onSkin:x=>lateReceived.set(x.id,x.skin)});
+ try{
+  await host.host();await guest.join('ABCDE','Artist',0,'2'.repeat(4096));await flush();assert.equal(received.get('local'),'1'.repeat(4096));assert.equal(hostReceived.get(id),'2'.repeat(4096));
+  guest.skin('3'.repeat(4096));await flush();assert.equal(w.players.get(id).skin,'3'.repeat(4096));
+  await late.join('ABCDE','Late',0);await flush();assert.equal(lateReceived.get(id),'3'.repeat(4096));assert.equal(lateReceived.get('local'),'1'.repeat(4096));
+  guest.skin('x'.repeat(4096));await flush();assert.equal(w.players.get(id).skin,'3'.repeat(4096));
+  host.skin('4'.repeat(4096));await flush();assert.equal(received.get('local'),'4'.repeat(4096));assert.equal(lateReceived.get('local'),'4'.repeat(4096));
+  assert.ok(w.snapshot().players.every(p=>!('skin' in p)));
+ }finally{await late.stop();await guest.stop();await host.stop();}
 });

@@ -16,6 +16,7 @@
 <p class="intro">Eat the little things. Become the big thing.</p>
 <label for="name">YOUR NAME</label><input id="name" maxlength="18" placeholder="Wanderer" autocomplete="nickname" value="Wanderer">
 <div class="form-row"><fieldset><legend>CELL COLOR</legend><div id="colors" class="colors"><button type="button" aria-label="Mint" aria-pressed="true" data-color="0" style="--swatch:#66efc2"></button><button type="button" aria-label="Sky" aria-pressed="false" data-color="1" style="--swatch:#65baff"></button><button type="button" aria-label="Lilac" aria-pressed="false" data-color="2" style="--swatch:#b29aff"></button><button type="button" aria-label="Rose" aria-pressed="false" data-color="3" style="--swatch:#ff8da8"></button><button type="button" aria-label="Gold" aria-pressed="false" data-color="4" style="--swatch:#ffcf74"></button><button type="button" aria-label="Ice" aria-pressed="false" data-color="5" style="--swatch:#a3eef4"></button></div></fieldset><div><label for="bots">BOTS</label><select id="bots"><option value="0">None</option><option value="4">4 bots</option><option value="8" selected>8 bots</option><option value="16">16 bots</option></select></div></div>
+<button id="draw-cell" class="secondary draw-button" type="button">✎ Draw your cell</button>
 <button id="play" class="primary">Play solo <span>↗</span></button>
 <div class="multiplayer"><button id="host" class="secondary">Host friends</button><button id="join-toggle" class="secondary" aria-expanded="false">Join room</button></div>
 <form id="join-form" hidden><label for="code">ROOM CODE</label><div class="join-row"><input id="code" maxlength="5" placeholder="ABCDE" autocomplete="off" autocapitalize="characters" spellcheck="false" required><button class="primary" type="submit">Join</button></div></form>
@@ -25,6 +26,27 @@
 </section>
 <div class="menu-caption" aria-hidden="true"><span>01 / SURVIVE</span><span>Small beginnings.<br>Infinite appetite.</span></div>
 </main>
+<section id="lobby" class="overlay" hidden aria-labelledby="lobby-title">
+  <div class="panel lobby-panel">
+    <span class="eyebrow">GATHER YOUR LITTLE CELLS</span>
+    <h2 id="lobby-title">The growing room.</h2>
+    <div class="lobby-code"><span>ROOM CODE</span><strong id="lobby-code"></strong><button id="lobby-copy" class="secondary">Copy invite</button></div>
+    <h3>Players <span id="lobby-count"></span></h3><ul id="lobby-players"></ul>
+    <label for="lobby-bots">BOTS</label><select id="lobby-bots"><option value="0">None</option><option value="4">4 bots</option><option value="8">8 bots</option><option value="16">16 bots</option></select>
+    <button id="lobby-draw" class="secondary draw-button">✎ Draw your cell</button>
+    <p id="lobby-hint" class="intro">Invite your friends, then start when everyone is here.</p>
+    <button id="start-game" class="primary">Start game</button>
+    <button id="lobby-leave" class="secondary">Leave room</button>
+  </div>
+</section>
+<dialog id="paint-dialog" aria-labelledby="paint-title">
+  <h2 id="paint-title">Make it yours.</h2><p>Draw a face, a doodle, anything. It wraps onto your cell.</p>
+  <canvas id="paint-canvas" width="256" height="256" aria-label="Drawing pad. Drag with a mouse or finger to paint."></canvas>
+  <div id="paint-colors" aria-label="Brush colors"></div>
+  <label for="brush-size">BRUSH SIZE</label><select id="brush-size"><option value="1">Fine</option><option value="2.5" selected>Medium</option><option value="5">Thick</option></select>
+  <div class="paint-tools"><button id="paint-eraser" aria-pressed="false">Eraser</button><button id="paint-undo">Undo</button><button id="paint-clear">Clear</button></div>
+  <div class="paint-actions"><button id="paint-cancel" class="secondary">Cancel</button><button id="paint-save" class="primary">Use drawing</button></div>
+</dialog>
 <section id="hud" hidden aria-label="Game information">
 <div class="score-card"><span>MASS</span><strong id="mass">25</strong><div><span id="cell-count">1 cell</span><span id="rank">#1</span></div></div>
 <aside class="leaderboard"><h2>TOP CELLS <span id="population"></span></h2><ol id="leaders"></ol></aside>

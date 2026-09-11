@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080e19"><meta name="description" content="A luminous cell arena. Eat, split, survive. Play with friends or bots.">
+<title>Bloom — Cell Arena</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="arena" aria-label="Cell arena. Move with the mouse, arrow keys, or touch joystick."></canvas>
+<div class="vignette" aria-hidden="true"></div>
+<header><a class="brand" href="../links/" aria-label="Back to games"><span class="brand-icon">◉</span> bloom<span class="brand-sub">CELL ARENA</span></a><div class="top-actions"><span id="connection">SOLO / ONLINE</span><button id="menu-button" class="icon-button" hidden aria-label="Open game menu">☰</button></div></header>
+<main id="menu" class="overlay">
+<section class="panel" aria-labelledby="title">
+<div class="eyebrow"><span></span> A LITTLE CELL. A BIG WORLD.</div>
+<h1 id="title">Stay hungry.<br><em>Grow wild.</em></h1>
+<p class="intro">Eat the little things. Become the big thing.</p>
+<label for="name">YOUR NAME</label><input id="name" maxlength="18" placeholder="Wanderer" autocomplete="nickname" value="Wanderer">
+<div class="form-row"><fieldset><legend>CELL COLOR</legend><div id="colors" class="colors"><button type="button" aria-label="Mint" aria-pressed="true" data-color="0" style="--swatch:#66efc2"></button><button type="button" aria-label="Sky" aria-pressed="false" data-color="1" style="--swatch:#65baff"></button><button type="button" aria-label="Lilac" aria-pressed="false" data-color="2" style="--swatch:#b29aff"></button><button type="button" aria-label="Rose" aria-pressed="false" data-color="3" style="--swatch:#ff8da8"></button><button type="button" aria-label="Gold" aria-pressed="false" data-color="4" style="--swatch:#ffcf74"></button><button type="button" aria-label="Ice" aria-pressed="false" data-color="5" style="--swatch:#a3eef4"></button></div></fieldset><div><label for="bots">BOTS</label><select id="bots"><option value="0">None</option><option value="4">4 bots</option><option value="8" selected>8 bots</option><option value="16">16 bots</option></select></div></div>
+<button id="draw-cell" class="secondary draw-button" type="button">✎ Draw your cell</button>
+<button id="play" class="primary">Play solo <span>↗</span></button>
+<div class="multiplayer"><button id="host" class="secondary">Host friends</button><button id="join-toggle" class="secondary" aria-expanded="false">Join room</button></div>
+<form id="join-form" hidden><label for="code">ROOM CODE</label><div class="join-row"><input id="code" maxlength="5" placeholder="ABCDE" autocomplete="off" autocapitalize="characters" spellcheck="false" required><button class="primary" type="submit">Join</button></div></form>
+<p id="status" class="status" role="status" aria-live="polite"></p>
+<div class="menu-session" id="session-options" hidden><button id="resume" class="primary">Back to arena</button><button id="leave" class="secondary">Leave game</button></div>
+<details><summary>How to play <span>+</span></summary><div class="instructions"><p>Eat sparks and smaller cells. Bigger cells eat you. The larger you grow, the slower you move.</p><p><b>Move:</b> mouse, arrow keys, or drag the arena on touch.</p><p><b>Split:</b> Space / Split button. <b>Feed:</b> W / Feed button.</p><p>Split cells rejoin after 30+ seconds. Spiky green viruses burst large cells; small cells can hide under them. Feed a virus 7 times to launch another.</p><p>Hosts choose 0–16 bots. Rooms support 8 people. Keep the host’s tab open during a match.</p></div></details>
+</section>
+<div class="menu-caption" aria-hidden="true"><span>01 / SURVIVE</span><span>Small beginnings.<br>Infinite appetite.</span></div>
+</main>
+<section id="lobby" class="overlay" hidden aria-labelledby="lobby-title">
+  <div class="panel lobby-panel">
+    <span class="eyebrow">GATHER YOUR LITTLE CELLS</span>
+    <h2 id="lobby-title">The growing room.</h2>
+    <div class="lobby-code"><span>ROOM CODE</span><strong id="lobby-code"></strong><button id="lobby-copy" class="secondary">Copy invite</button></div>
+    <h3>Players <span id="lobby-count"></span></h3><ul id="lobby-players"></ul>
+    <label for="lobby-bots">BOTS</label><select id="lobby-bots"><option value="0">None</option><option value="4">4 bots</option><option value="8">8 bots</option><option value="16">16 bots</option></select>
+    <button id="lobby-draw" class="secondary draw-button">✎ Draw your cell</button>
+    <p id="lobby-hint" class="intro">Invite your friends, then start when everyone is here.</p>
+    <button id="start-game" class="primary">Start game</button>
+    <button id="lobby-leave" class="secondary">Leave room</button>
+  </div>
+</section>
+<dialog id="paint-dialog" aria-labelledby="paint-title">
+  <h2 id="paint-title">Make it yours.</h2><p>Draw a face, a doodle, anything. It wraps onto your cell.</p>
+  <canvas id="paint-canvas" width="256" height="256" aria-label="Drawing pad. Drag with a mouse or finger to paint."></canvas>
+  <div id="paint-colors" aria-label="Brush colors"></div>
+  <label for="brush-size">BRUSH SIZE</label><select id="brush-size"><option value="1">Fine</option><option value="2.5" selected>Medium</option><option value="5">Thick</option></select>
+  <div class="paint-tools"><button id="paint-eraser" aria-pressed="false">Eraser</button><button id="paint-undo">Undo</button><button id="paint-clear">Clear</button></div>
+  <div class="paint-actions"><button id="paint-cancel" class="secondary">Cancel</button><button id="paint-save" class="primary">Use drawing</button></div>
+</dialog>
+<section id="hud" hidden aria-label="Game information">
+<div class="score-card"><span>MASS</span><strong id="mass">25</strong><div><span id="cell-count">1 cell</span><span id="rank">#1</span></div></div>
+<aside class="leaderboard"><h2>TOP CELLS <span id="population"></span></h2><ol id="leaders"></ol></aside>
+<div id="room-bar" hidden><span>ROOM <b id="room-code"></b></span><button id="copy-room" aria-label="Copy room invitation">Copy invite</button></div>
+<div class="bottom-info"><span id="hint">Eat sparks to grow</span><canvas id="minimap" width="112" height="112" aria-label="Arena minimap"></canvas></div>
+<div class="controls"><button id="feed" class="action"><span>· · ·</span>Feed<kbd>W</kbd></button><button id="split" class="action split"><span>◒ ◓</span>Split<kbd>SPACE</kbd></button></div>
+<div id="joystick" hidden aria-hidden="true"><div id="stick"></div></div>
+</section>
+<section id="death" class="overlay" hidden><div class="panel death-panel"><span class="eyebrow">BACK TO THE BEGINNING</span><h2>You were<br><em>delicious.</em></h2><p id="death-stats"></p><button id="respawn" class="primary">Bloom again</button><button id="death-menu" class="secondary">Game menu</button></div></section>
+<script type="module" src="main.mjs"></script>
+</body></html>

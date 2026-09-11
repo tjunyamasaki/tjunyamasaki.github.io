@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [master]
+    branches: [master, feat/ball-game]
   workflow_dispatch:
 
 permissions:
@@ -22,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Test ball game rules
+        run: node --test ball-game/tests/*.test.mjs
 
       - name: Write Firebase config from secrets
         env:
@@ -47,6 +50,8 @@ jobs:
           if [ -d count ]; then cp -r count _site/count; fi
           if [ -d links ]; then cp -r links _site/links; fi
           if [ -d hushlight ]; then cp -r hushlight _site/hushlight; fi
+          cp -r ball-game _site/ball-game
+          rm -rf _site/ball-game/tests
           cp -r game-of-life _site/game-of-life
           cp -r css _site/css
           cp -r js _site/js

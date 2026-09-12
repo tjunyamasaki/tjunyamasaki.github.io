@@ -95,9 +95,16 @@ class SeatPlayer extends AI {
     ask(this, options);
   }
   action_fulou(data) {
-    if (this.isBot) return super.action_fulou(data);
+    if (this.isBot) {
+      try { return super.action_fulou(data); }
+      catch {
+        const tile = this.get_dapai(this.shoupai)?.[0];
+        return this._callback(tile ? {dapai: tile} : {});
+      }
+    }
     if (data.l !== this._menfeng || /^[mpsz]\d{4}/.test(data.m)) return this._callback();
-    ask(this, optionsFor(this.get_dapai(this.shoupai), 'discard', 'dapai'));
+    const tilesToDiscard = this.get_dapai(this.shoupai) || this.shoupai.get_dapai(false) || [];
+    ask(this, optionsFor(tilesToDiscard, 'discard', 'dapai'));
   }
   action_gang(data) {
     if (this.isBot) return super.action_gang(data);
@@ -113,7 +120,10 @@ class SeatPlayer extends AI {
 class Table extends Majiang.Game {
   next() {
     if (paused) { clearTimeout(this._timeout_id); this._timeout_id = null; return; }
-    super.next();
+    try { super.next(); }
+    catch (error) {
+      postMessage({type: 'error', message: 'The table could not continue. Return to the room and deal again.', detail: String(error?.stack || error)});
+    }
   }
   // Include the first-draw yakuman in the core's legal-win check.
   allow_hule(wind) {
@@ -128,6 +138,16 @@ function start(config) {
   online = !!config.online;
   pace = config.speed === 'quick' ? 230 : 460;
   players = seats.map(() => new SeatPlayer());
+  for (const player of players) {
+    const action = player.action.bind(player);
+    player.action = (message, callback) => {
+      try { action(message, callback); }
+      catch (error) {
+        postMessage({type: 'error', message: 'The table could not continue. Return to the room and deal again.', detail: String(error?.stack || error)});
+        callback?.({});
+      }
+    };
+  }
   const rule = Majiang.rule({'場数': config.length === 'south' ? 2 : config.length === 'single' ? 0 : 1, '延長戦方式': 0});
   game = new Table(players, () => {}, rule, 'Yoru · Riichi Mahjong');
   game.model.player = seats.map(seat => seat.name);
@@ -164,6 +184,9 @@ function start(config) {
   game.kaiju();
 }
 
+self.onunhandledrejection = event => {
+  postMessage({type: 'error', message: 'The table could not continue. Return to the room and deal again.', detail: String(event?.reason?.stack || event?.reason || event)});
+};
 self.onerror = event => {
   postMessage({type: 'error', message: 'The table could not continue. Return to the room and deal again.', detail: String(event?.message || event)});
 };
@@ -182,6 +205,7 @@ self.onmessage = ({data}) => {
       const request = pending.get(seat.id);
       if (!request || request.token !== data.token || hints.get(seat.id)?.token === request.token || !request.options.some(o => o.kind === 'discard')) return;
       const value = players[seat.id].select_dapai();
+      if (!value) return;
       hints.set(seat.id, {token: request.token, tile: value.slice(0, 2), riichi: value.endsWith('*')});
       publish();
     }

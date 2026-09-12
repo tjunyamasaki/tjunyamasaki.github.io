@@ -162,6 +162,9 @@ function acceptState(next) {
   if (mode !== 'game') { showScreen('game'); window.scrollTo({top: 0, behavior: 'instant'}); }
   if (previous?.action?.token !== state.action?.token) {
     selected = -1; riichiMode = false; awaitingToken = null; hintBusy = false;
+    if (!state.drawn && state.action?.options?.some(o => o.kind === 'discard')) {
+      selected = state.hand.findIndex((_, index) => discardOption(index));
+    }
   }
   if (state.hint) hintBusy = false;
   renderTable(); renderHand(); renderActions(); renderResult();
@@ -202,7 +205,7 @@ function renderHand() {
   for (const button of $('hand').children) {
     const index = +button.dataset.tileIndex, option = discardOption(index);
     button.classList.toggle('selected', selected === index);
-    button.classList.toggle('illegal', riichiMode && !option);
+    button.classList.toggle('illegal', !!state.action?.options?.some(o => o.kind === (riichiMode ? 'riichi' : 'discard')) && !option);
     button.classList.toggle('riichi-choice', riichiMode && !!option);
     button.classList.toggle('hinted', !!state.hint && state.hint.token === state.action?.token && state.hint.tile === state.hand[index]);
     button.setAttribute('aria-pressed', selected === index);
@@ -217,12 +220,13 @@ function renderActions() {
   $('hint-button').textContent = hintBusy ? 'Considering your hand…' : '✧ Suggest a discard';
   let message;
   if (riichiMode) message = 'Riichi · choose a highlighted discard. Stake: 1,000 points.';
+  else if (hasDiscards && !state.drawn) message = selected >= 0 && discardOption() ? `${tileName(state.hand[selected])} · ready to discard` : 'After that call, discard a highlighted tile. Dimmed tiles are not allowed.';
   else if (selected >= 0) message = tileName(state.hand[selected]) + (discardOption() ? ' · ready to discard' : ' · inspect your tile');
   else if (hasDiscards) message = 'Your turn. What will you let go?';
   else if (options.some(o => o.kind !== 'continue')) message = 'An opportunity. Call a tile, or let it pass.';
   else message = state.result ? 'A hand to remember.' : `${state.seats[state.turn]?.name || 'The table'} is playing…`;
   $('action-message').textContent = message;
-  $('hand-tip').textContent = state.hint ? `Suggestion: ${tileName(state.hint.tile)}${state.hint.riichi ? ' · consider riichi' : ''}.` : state.waits.length ? `Waiting for ${state.waits.map(tileLabel).join(' · ')}${state.furiten ? '. Ron is blocked.' : ''}` : 'Select a tile. Tap it again or press Discard.';
+  $('hand-tip').textContent = state.hint ? `Suggestion: ${tileName(state.hint.tile)}${state.hint.riichi ? ' · consider riichi' : ''}.` : state.waits.length ? `Waiting for ${state.waits.map(tileLabel).join(' · ')}${state.furiten ? '. Ron is blocked.' : ''}` : hasDiscards && !state.drawn ? 'Dimmed tiles cannot be discarded after that call.' : 'Select a tile. Tap it again or press Discard.';
   if (waiting || !options.length) {
     patch('actions', '<div class="waiting"><span class="waiting-dot"></span>' + (state.result ? 'Waiting for the next hand' : waiting ? 'At the table…' : 'Watch the discards. Your moment is coming.') + '</div>'); return;
   }

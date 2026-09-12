@@ -7,7 +7,7 @@ A mobile-first, four-seat Japanese riichi table at `/mahjong/`.
 - **Play with bots** starts a private match against three strategic opponents. No sign-in or signaling service is needed for solo play.
 - **Host a table** opens a lobby. Share the room code or invite link, then deal when ready. Empty seats can be filled by bots; turn off that option to wait for four humans.
 - Tap a tile to select it, then tap it again or press **Discard**. Riichi highlights eligible discards. Legal chi, pon, kan, ron, and tsumo decisions appear automatically.
-- Optional discard advice, English tile labels, sound, haptics, reduced effects, and an in-game guide are included. The hand uses two rows on phones; arrow keys move through tiles on a keyboard.
+- Optional discard advice, English tile labels, sound, haptics, reduced effects, and a multi-page in-game rules guide are included. The guide covers tiles, calls, every scored yaku with example hands, yakuman, fu/han payments, draws, and this parlor's house rules. The hand uses two rows on phones; arrow keys move through tiles on a keyboard.
 - Inspect any player's river to enlarge their discards and open melds. Win screens show the winning hand, yaku, han/fu, dora, and all point transfers.
 
 ## Rules

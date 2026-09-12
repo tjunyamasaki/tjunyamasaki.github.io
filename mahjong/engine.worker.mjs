@@ -132,11 +132,24 @@ function start(config) {
   game = new Table(players, () => {}, rule, 'Yoru · Riichi Mahjong');
   game.model.player = seats.map(seat => seat.name);
   game.dwell = pace; game.wait = 500;
+  const delay = game.delay.bind(game);
+  game.delay = (fn, t) => delay(() => {
+    try { fn(); }
+    catch (error) {
+      postMessage({type: 'error', message: 'The table could not continue. Return to the room and deal again.', detail: String(error?.stack || error)});
+    }
+  }, t);
   game.view = {
     kaiju() {},
     redraw() { result = null; emit('deal'); },
     update(message) {
-      const [kind, data] = Object.entries(message)[0];
+      // Majiang calls update() with no payload after scores settle, just
+      // before the next deal. Object.entries(undefined) would throw and
+      // abort last() before qipai/jieju, leaving Continue stuck.
+      if (!message) return;
+      const entry = Object.entries(message)[0];
+      if (!entry) return;
+      const [kind, data = {}] = entry;
       if (kind === 'hule') result = {kind: 'win', ...data};
       if (kind === 'pingju') result = {kind: 'draw', ...data};
       // Draw messages contain a secret tile; send only the drawing seat.
@@ -151,6 +164,9 @@ function start(config) {
   game.kaiju();
 }
 
+self.onerror = event => {
+  postMessage({type: 'error', message: 'The table could not continue. Return to the room and deal again.', detail: String(event?.message || event)});
+};
 self.onmessage = ({data}) => {
   try {
     if (data.type === 'start') { start(data); return; }

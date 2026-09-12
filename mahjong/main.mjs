@@ -1,4 +1,5 @@
 import {createNetwork} from './network.mjs';
+import {mountGuide} from './rules.mjs';
 import {tile, tileName, tileLabel, meldTiles, stringTiles, winds, windKanji, yakuNames, escapeHTML as esc} from './tiles.mjs';
 
 const $ = id => document.getElementById(id);
@@ -115,7 +116,13 @@ function beginMatch() {
   $('action-message').textContent = 'A new evening. A fresh hand.';
   worker = new Worker(new URL('./engine.worker.mjs', import.meta.url), {type: 'module'});
   worker.onmessage = ({data}) => {
-    if (data.type === 'error') { console.error(data.detail); toast(data.message, true); return; }
+    if (data.type === 'error') {
+      console.error(data.detail);
+      toast(data.message, true);
+      awaitingToken = null;
+      if (state) { renderActions(); renderResult(); }
+      return;
+    }
     if (data.type !== 'frames') return;
     for (const [peerKey, frame] of Object.entries(data.frames)) {
       if (peerKey === key) acceptState(frame);
@@ -372,8 +379,7 @@ setInterval(() => {
 }, 1000);
 
 patch('hero-tiles', ['s1', 'm1', 'z7', 'p5', 's8'].map((p, i) => tile(p, '', `style="--i:${i};--angle:${[-14, -6, 0, 7, 16][i]}deg;--lift:${[12, -10, -20, -10, 12][i]}px"`)).join(''));
-patch('guide-hand', ['m2', 'm3', 'm4', 'p3', 'p4', 'p5', 's6', 's7', 's8', 'z7', 'z7', 'z7', 'z1', 'z1'].map(p => tile(p)).join(''));
-patch('tile-reference', [['m3', 'Characters'], ['p3', 'Circles'], ['s3', 'Bamboo'], ['z7', 'Honors']].map(([p, label]) => `<span>${tile(p)}${label}</span>`).join(''));
+mountGuide();
 preferences();
 const invite = new URLSearchParams(location.search).get('room');
 if (invite && /^[A-HJ-NP-Z2-9]{5}$/i.test(invite)) { $('join-code').value = invite.toUpperCase(); $('join-dialog').showModal(); }

@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [feat/wob-tower]
+    branches: [feat/riichi-mahjong]
   workflow_dispatch:
 
 permissions:
@@ -53,6 +53,8 @@ jobs:
           if [ -d count ]; then cp -r count _site/count; fi
           if [ -d links ]; then cp -r links _site/links; fi
           if [ -d hushlight ]; then cp -r hushlight _site/hushlight; fi
+          cp -r mahjong _site/mahjong
+          rm -f _site/mahjong/vendor/build.mjs
           cp -r wob-tower _site/wob-tower
           cp wob-tower/tests/responsive.html _site/wob-tower/responsive-check.html
           rm -rf _site/wob-tower/tests

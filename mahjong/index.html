@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#091f22">
+  <meta name="description" content="An atmospheric Japanese riichi mahjong table. Play against thoughtful bots or bring your friends. Made for your phone.">
+  <title>Yoru — Riichi Mahjong</title>
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="Yoru home"><span class="seal">雀</span><span>yoru<span class="brand-dot">.</span></span></a>
+    <span class="header-caption">THE RIICHI PARLOR</span>
+    <nav aria-label="Game controls">
+      <button class="icon-button" id="help-button" aria-label="How to play">?</button>
+      <button class="icon-button" id="sound-button" aria-label="Turn sound on" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM16 9l5 6m0-6-5 6"/></svg></button>
+      <button class="icon-button" id="settings-button" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="16" cy="17" r="3"/></svg></button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="home" class="home-screen">
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span> JAPANESE RIICHI MAHJONG</p>
+        <h1>Every tile.<br><em>A possibility.</em></h1>
+        <p class="hero-description">Four seats. A quiet mind. That one perfect draw.<br>Stay for a hand. Make a night of it.</p>
+        <div class="hero-features"><span>伝統 <b>Classic riichi</b></span><span>四人 <b>Friends & bots</b></span><span>随時 <b>Your own pace</b></span></div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="moon"></div><div class="moon-ring"></div><div class="vertical-poem">月明かりの下で、もう一局。</div>
+        <div class="art-table"><div class="art-table-inner"><span class="table-signature">夜</span><span class="table-signature-sub">THE NIGHT IS YOURS</span></div></div>
+        <div class="hero-tiles" id="hero-tiles"></div>
+        <span class="art-spark spark-one"></span><span class="art-spark spark-two"></span><span class="art-spark spark-three"></span>
+        <div class="art-caption"><span class="small-line"></span> A CLASSIC, AFTER DARK <span class="small-line"></span></div>
+      </div>
+      <div class="start-card">
+        <div class="card-heading"><div><p class="eyebrow">YOUR EVENING STARTS HERE</p><h2>Take a seat.</h2></div><span class="card-flower" aria-hidden="true">✳</span></div>
+        <label class="field">Your name<input id="name" maxlength="16" autocomplete="nickname" placeholder="Traveler" value="Traveler"></label>
+        <div class="field-row">
+          <label class="field">Match<select id="match-length"><option value="east">East round · Tonpuu</option><option value="south">East + South · Hanchan</option><option value="single">One hand · Quick escape</option></select></label>
+          <label class="field">Table pace<select id="pace"><option value="relaxed">Unhurried</option><option value="quick">Quick</option></select></label>
+        </div>
+        <button class="button primary" id="solo-button"><span>Play with bots</span><span aria-hidden="true">↗</span></button>
+        <p class="button-note">Your seat + three thoughtful opponents. No account needed.</p>
+        <div class="online-buttons"><button class="button secondary" id="host-button">Host a table <span aria-hidden="true">＋</span></button><button class="button secondary" id="join-button">Join friends <span aria-hidden="true">→</span></button></div>
+      </div>
+      <footer class="home-footer"><span>136 TILES. ENDLESS POSSIBILITIES.</span><a href="/links/">Explore the arcade ↗</a></footer>
+    </section>
+
+    <section id="lobby" class="lobby-screen" hidden>
+      <p class="eyebrow">GOOD COMPANY. GREAT HANDS.</p><h1>Your table<br><em>is waiting.</em></h1>
+      <p id="lobby-caption" class="muted">Share the code. Settle in. Open seats become bots.</p>
+      <button class="room-code" id="copy-code" aria-label="Copy room code"><span>ROOM CODE</span><strong id="room-code">·····</strong><small id="copy-label">Tap to copy ↗</small></button>
+      <div class="lobby-seats" id="lobby-seats"></div>
+      <div class="lobby-options"><label><input id="fill-bots" type="checkbox" checked> Fill open seats with bots</label><span id="lobby-rules"></span></div>
+      <div class="lobby-actions"><button class="button primary" id="start-button">Deal the first hand <span>→</span></button><button class="button secondary" id="share-button">Invite friends ↗</button></div>
+      <button class="text-button" id="leave-lobby">Leave table</button>
+    </section>
+
+    <section id="game" class="game-screen" hidden>
+      <div class="game-toolbar"><div><span class="eyebrow" id="table-mode">YOUR PRIVATE PARLOR</span><h2 id="round-name">East 1</h2></div><div class="dora-group"><span>DORA INDICATORS</span><div id="dora"></div></div><button class="text-button" id="table-menu">Table menu ⋯</button></div>
+      <div class="table-wrap"><div class="table" id="table" aria-label="Mahjong table">
+        <div class="felt-ring" aria-hidden="true"></div>
+        <div class="table-corner corner-tl" aria-hidden="true">東</div><div class="table-corner corner-tr" aria-hidden="true">南</div><div class="table-corner corner-bl" aria-hidden="true">北</div><div class="table-corner corner-br" aria-hidden="true">西</div>
+        <div id="opponents"></div>
+        <div id="rivers"></div>
+        <div class="table-center"><span id="center-round">東一局</span><strong id="remaining">70</strong><small>TILES IN THE WALL</small><div class="table-counters"><span title="Honba repeat counters">↟ <b id="honba">0</b></span><span title="Riichi sticks">━ <b id="sticks">0</b></span></div></div>
+        <div id="call-effect" class="call-effect" aria-live="polite"></div>
+      </div></div>
+      <div class="hand-area">
+        <div class="hand-meta"><div><span class="your-wind" id="your-wind">東</span><strong id="your-name">Traveler</strong><span id="your-score">25,000</span></div><div id="hand-quality" class="hand-quality"></div></div>
+        <div class="your-melds" id="your-melds"></div>
+        <div class="hand" id="hand" role="group" aria-label="Your tiles. Select a tile, then press Discard."></div>
+        <div class="action-info"><span id="action-message" aria-live="polite">The tiles are being dealt…</span><span id="turn-clock"></span></div>
+        <div class="actions" id="actions"></div>
+        <div class="table-footnote"><span id="hand-tip">Tap a tile to inspect it. Tap Discard to commit.</span><button class="text-button" id="hint-button">✧ Suggest a discard</button></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="join-dialog" aria-labelledby="join-title"><form id="join-form"><button class="dialog-close" type="button" data-close aria-label="Close">×</button><p class="eyebrow">THERE'S A SEAT FOR YOU</p><h2 id="join-title">Join the table.</h2><p class="muted">Ask your host for their five-character room code.</p><label class="field">Room code<input id="join-code" required maxlength="5" minlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDE"></label><button class="button primary" id="connect-button">Find my seat <span>→</span></button></form></dialog>
+  <dialog id="settings-dialog" aria-labelledby="settings-title"><button class="dialog-close" data-close aria-label="Close">×</button><p class="eyebrow">MAKE YOURSELF AT HOME</p><h2 id="settings-title">Your parlor.</h2><label class="toggle-row"><span>Tile labels<small>Small English suit and wind labels.</small></span><input type="checkbox" id="labels-toggle" checked></label><label class="toggle-row"><span>Sound<small>Soft tile clicks and chimes.</small></span><input type="checkbox" id="sound-toggle"></label><label class="toggle-row"><span>Haptics<small>A little feedback, where supported.</small></span><input type="checkbox" id="haptics-toggle" checked></label><label class="toggle-row"><span>Calm effects<small>Less movement and no floating particles.</small></span><input type="checkbox" id="motion-toggle"></label><p class="muted settings-note" id="pause-note">Preferences are saved on this device.</p><button class="button secondary" id="return-room" hidden>Return to the lobby</button><button class="button danger" id="leave-game" hidden>Leave the table</button></dialog>
+  <dialog id="guide-dialog" class="guide-dialog" aria-labelledby="guide-title"><button class="dialog-close" data-close aria-label="Close">×</button><p class="eyebrow">A MOMENT TO LEARN</p><h2 id="guide-title">The art of riichi.</h2><p class="muted">Japanese four-player mahjong. Build a winning hand from the tiles you draw, and read what everyone leaves behind.</p><div class="guide-hand" id="guide-hand"></div><p><strong>Four groups and a pair.</strong> A group is three consecutive numbers in one suit, or three identical tiles. A pair is two identical tiles. Seven pairs and thirteen orphans are special winning shapes.</p><details open><summary>Your turn</summary><p>Draw automatically, select a tile, then press <b>Discard</b>. A gold edge marks your newest tile. The optional suggestion considers your hand and the public table.</p><p>You need at least one <b>yaku</b> — a scoring pattern — to win. Dora add value but are not a yaku. A complete-looking hand may therefore be unable to win.</p></details><details><summary>Riichi, tsumo, and ron</summary><p><b>Riichi:</b> with a closed hand one tile from winning, stake 1,000 points and choose a highlighted discard. Your hand becomes locked. <b>Tsumo:</b> win on your own draw. <b>Ron:</b> win on another player's discard.</p><p><b>Furiten:</b> you cannot ron if your own discard history contains any current winning tile. Passing a winning discard also blocks ron temporarily, or for the rest of the hand after riichi. You may still tsumo.</p></details><details><summary>Chi, pon, and kan</summary><p><b>Chi</b> claims a sequence from the player on your left. <b>Pon</b> claims a triplet from anyone. <b>Kan</b> makes four of a kind and draws a replacement tile. Calls appear only when legal; you can always pass.</p><p>Calling generally opens your hand and removes some yaku. All simples (2–8 only), a triplet of dragons, or your seat/round wind are useful open-hand patterns.</p></details><details><summary>Tiles and dora</summary><div class="tile-reference" id="tile-reference"></div><p>Characters, circles, and bamboo run from 1 to 9. Honors are the four winds and three dragons. Honor tiles cannot form sequences.</p><p>The tile <b>after</b> an indicator is dora: 9 wraps to 1; winds cycle East → South → West → North; dragons cycle white → green → red. Red fives are also dora. Ura dora are revealed for a winning riichi hand.</p></details><details><summary>The table rules</summary><p>25,000 starting points, three red fives, open tanyao, ippatsu, ura and kan dora. Scoring uses Japanese han/fu, including yakuman. Double ron is allowed; triple ron is an abortive draw. Dealer repeats on a win or tenpai draw.</p><p>Choose one hand, East, or East + South. East and South matches have no extra wind extension. Bankruptcy and the leading dealer's final-hand stop apply. Exhaustive draws settle tenpai payments.</p><p>Solo has no turn timer. Online decisions allow 60 seconds; inactive players pass calls or discard a legal tile. Disconnected guests are replaced by bots. The host must keep the table open.</p></details><p class="credits">Rules & AI: <a href="https://github.com/kobalab/majiang-core" target="_blank" rel="noopener">Majiang by Satoshi Kobayashi</a> (MIT). Tile art: <a href="https://github.com/FluffyStuff/riichi-mahjong-tiles" target="_blank" rel="noopener">FluffyStuff</a> (CC0).</p></dialog>
+  <dialog id="result-dialog" class="result-dialog" aria-labelledby="result-title"><div id="result-content"></div><button class="button primary" id="continue-button">Next hand →</button></dialog>
+  <dialog id="inspect-dialog" aria-labelledby="inspect-title"><button class="dialog-close" data-close aria-label="Close">×</button><p class="eyebrow">READ THE TABLE</p><h2 id="inspect-title">Discards</h2><div class="inspected-tiles" id="inspected-tiles"></div><p class="muted">Dimmed tiles were claimed. A red marker shows the riichi declaration.</p></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <noscript><p class="noscript">Enable JavaScript to take a seat at the mahjong table.</p></noscript>
+  <script type="module" src="./main.mjs"></script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#eeeee7" />
+    <meta name="description" content="The beauty of logic, in motion. An interactive theater for sorting, graph traversal, maze generation, and pathfinding algorithms." />
+    <title>Kinetic — Algorithm Theater</title>
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" stroke-width="3" /></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7Z" fill="currentColor" stroke="none" /></symbol>
+      <symbol id="i-remix" viewBox="0 0 24 24"><path d="M3 7h3c4 0 8 10 12 10h3m-4-4 4 4-4 4M3 17h3c1.5 0 3-1.5 4.5-3.5M14 9.5C15.5 8 16.5 7 18 7h3m-4-4 4 4-4 4" /></symbol>
+      <symbol id="i-sound" viewBox="0 0 24 24"><path d="m11 5-5 4H3v6h3l5 4Zm4 4a5 5 0 0 1 0 6m3-9a9 9 0 0 1 0 12" /></symbol>
+      <symbol id="i-muted" viewBox="0 0 24 24"><path d="m11 5-5 4H3v6h3l5 4Zm5 4 6 6m0-6-6 6" /></symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24"><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" /></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6" /></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m7 9 5 5 5-5" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M19 12H5m6-6-6 6 6 6" /></symbol>
+      <symbol id="i-sorting" viewBox="0 0 24 24"><path d="M4 18v-4m5 4V7m6 11V3m5 15v-8" stroke-width="2.5" /></symbol>
+      <symbol id="i-graphs" viewBox="0 0 24 24"><path d="m6 7 12 2-6 10Zm0 0 6 12" /><circle cx="6" cy="7" r="2.5" fill="currentColor" stroke="none" /><circle cx="18" cy="9" r="2.5" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="2.5" fill="currentColor" stroke="none" /></symbol>
+      <symbol id="i-mazes" viewBox="0 0 24 24"><path d="M10 3H3v18h18V3h-5v12h-5V9H7v8m14-8h-5" /></symbol>
+      <symbol id="i-routes" viewBox="0 0 24 24"><path d="M5 17V7h8v10h6V7" /><circle cx="5" cy="18" r="2" /><circle cx="19" cy="5" r="2" /></symbol>
+    </svg>
+
+    <main class="shell">
+      <header class="masthead">
+        <a class="wordmark" href="../links/" aria-label="Kinetic — back to all experiments">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          KINETIC<span class="wordmark-sub">ALGORITHM THEATER</span>
+        </a>
+        <div class="header-actions">
+          <a class="back-link" href="../links/"><svg><use href="#i-arrow" /></svg><span>All experiments</span></a>
+          <button class="icon-button" id="sound" aria-label="Enable sound" aria-pressed="false" title="Enable sound"><svg><use href="#i-muted" /></svg></button>
+        </div>
+      </header>
+
+      <section class="introduction" aria-label="Welcome">
+        <h1>Logic, <em>in motion.</em><span class="title-dot">●</span></h1>
+        <p>Beautiful problems. Satisfying solutions.<br /><span>Take a moment. Watch them unfold.</span></p>
+      </section>
+
+      <nav class="scene-tabs" aria-label="Algorithm scenes">
+        <button class="scene-tab is-active" data-scene="sorting" aria-pressed="true"><span class="tab-number">01</span><svg><use href="#i-sorting" /></svg><span>Sorting</span><span class="tab-caption">Order from chaos</span></button>
+        <button class="scene-tab" data-scene="graphs" aria-pressed="false"><span class="tab-number">02</span><svg><use href="#i-graphs" /></svg><span>Graphs</span><span class="tab-caption">Follow the connections</span></button>
+        <button class="scene-tab" data-scene="mazes" aria-pressed="false"><span class="tab-number">03</span><svg><use href="#i-mazes" /></svg><span>Mazes</span><span class="tab-caption">Make a way through</span></button>
+        <button class="scene-tab" data-scene="routes" aria-pressed="false"><span class="tab-number">04</span><svg><use href="#i-routes" /></svg><span>Routes</span><span class="tab-caption">Find a way home</span></button>
+      </nav>
+
+      <section class="theater" id="theater" aria-label="Algorithm visualizer">
+        <div class="stage" id="stage">
+          <canvas id="canvas" tabindex="0" aria-label="Animated sorting visualization. Press Enter to reshuffle. Swipe or use the scene buttons to change scenes.">Your browser needs canvas support to show the algorithm animations.</canvas>
+          <div class="stage-heading">
+            <div>
+              <p class="eyebrow" id="scene-eyebrow">01 / ORDER FROM CHAOS</p>
+              <button class="algorithm-picker" id="algorithm-picker" aria-haspopup="dialog" aria-controls="algorithm-dialog"><span id="algorithm-name">Quick sort</span><svg><use href="#i-chevron" /></svg></button>
+              <p class="algorithm-subtitle" id="algorithm-subtitle">Divide. Partition. Repeat.</p>
+            </div>
+            <div class="stage-tools">
+              <span class="live-state" id="live-state"><i></i><span>Playing</span></span>
+              <button class="icon-button expand-button" id="expand" aria-label="Enter immersive view" aria-pressed="false" title="Immersive view"><svg><use href="#i-expand" /></svg></button>
+            </div>
+          </div>
+          <div class="stage-foot">
+            <div class="narration"><span class="narration-mark" aria-hidden="true"></span><span id="narration">Finding a little order.</span></div>
+            <div class="live-metrics">
+              <div><strong id="metric-a">0</strong><span id="metric-a-label">comparisons</span></div>
+              <div><strong id="metric-b">0</strong><span id="metric-b-label">writes</span></div>
+            </div>
+          </div>
+          <div class="scene-flash" id="scene-flash" aria-hidden="true"></div>
+        </div>
+
+        <div class="control-strip">
+          <div class="transport" aria-label="Playback controls">
+            <button class="play-button" id="play" aria-label="Pause animation" title="Pause"><svg><use href="#i-pause" /></svg></button>
+            <button class="icon-button remix-button" id="remix" aria-label="Generate new data" title="Remix"><svg><use href="#i-remix" /></svg></button>
+            <button class="speed-button" id="speed" aria-label="Playback speed: 1 times. Click to change." title="Playback speed">1×</button>
+            <span class="control-divider" aria-hidden="true"></span>
+            <span class="loop-note" id="loop-note">Always unfolding</span>
+          </div>
+          <div class="interaction-hint" id="interaction-hint">Tap the bars to reshuffle <span>↗</span></div>
+        </div>
+      </section>
+
+      <section class="context-row" aria-label="About this algorithm">
+        <div class="context-copy"><span class="small-label">THE IDEA</span><p id="algorithm-description">Pick a pivot. Move smaller values to one side and larger values to the other. Repeat until everything finds its place.</p></div>
+        <div class="context-facts"><span class="complexity" id="complexity">O(n log n) average</span><span class="data-note" id="data-note">56 values · one sorted spectrum</span></div>
+      </section>
+
+      <footer class="page-footer"><span>A study in beautiful logic.</span><span>16 algorithms <span class="footer-dot">·</span> 4 living scenes</span></footer>
+      <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+      <noscript><p class="noscript">Enable JavaScript to bring the algorithms to life.</p></noscript>
+    </main>
+
+    <dialog class="algorithm-dialog" id="algorithm-dialog" aria-labelledby="dialog-title">
+      <div class="dialog-heading"><div><span class="small-label" id="dialog-category">SORTING / 6 ALGORITHMS</span><h2 id="dialog-title">Choose a rhythm.</h2></div><button class="icon-button" id="close-dialog" aria-label="Close algorithm menu"><svg><use href="#i-close" /></svg></button></div>
+      <div class="algorithm-list" id="algorithm-list"></div>
+      <p class="dialog-note">Same data. A different way of thinking.</p>
+    </dialog>
+  </body>
+</html>

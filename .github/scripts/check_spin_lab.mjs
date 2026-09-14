@@ -46,7 +46,10 @@ try{
       await setRange('#control-w1',-320);
     }else if(mode==='return'||mode==='serve'){
       await page.locator('#stroke-pad').press('ArrowRight');
+      const beforeY=await page.locator('#contact-dot').getAttribute('cy');
       await page.locator('#contact-pad').press('ArrowUp');
+      const afterY=await page.locator('#contact-dot').getAttribute('cy');
+      check(Number(afterY)<Number(beforeY),'Up must move the contact marker toward the top of the ball');
       await setRange('#control-angle',15);
     }
     await page.locator('#adjust-dialog .sheet-done').click();

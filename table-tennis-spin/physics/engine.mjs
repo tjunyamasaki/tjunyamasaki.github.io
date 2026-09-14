@@ -60,10 +60,11 @@ export function onTable(p) {
   return Math.abs(p[0])<=C.tableWidth/2 && Math.abs(p[2])<=C.tableLength/2;
 }
 export function racketSetup(config) {
-  const pitch=config.angle*Math.PI/180,yaw=config.contactX*.65;
+  const pitch=config.angle*Math.PI/180;
+  const yaw=clamp(config.contactX*.65,-Math.PI/2+.02,Math.PI/2-.02);
   // Contact Y and face pitch jointly orient the tangent plane, so the
   // chosen contact patch and displayed racket are geometrically consistent.
-  const tilt=pitch+config.contactY*.65;
+  const tilt=clamp(pitch+config.contactY*.65,-Math.PI/2+.02,Math.PI/2-.02);
   const normal=unit([Math.sin(yaw)*Math.cos(tilt),Math.sin(tilt),Math.cos(yaw)*Math.cos(tilt)]);
   const side=unit(cross([0,1,0],normal)),up=unit(cross(normal,side));
   const a=config.direction*Math.PI/180;
@@ -72,4 +73,22 @@ export function racketSetup(config) {
   const velocity=config.velocityOverride?.slice()||mul(unit(add(mul(normal,1-.83*config.brush),mul(brush,config.brush))),config.speed);
   return {normal,velocity,side,up,restitution:C.racketRestitution,friction:C.racketFriction,
     grip:.25+.75*config.brush};
+}
+
+// Contact-pad coordinates are a projection from the racket side:
+// +x is screen-right (world -X on the ball), +y is world-up.
+// Use the ACTUAL plane normal, including face pitch, for both directions.
+export function contactPatch(config) {
+  const {normal}=racketSetup(config);
+  return [normal[0],-normal[1]];
+}
+export function setContactPatch(config,x,y) {
+  // Stay on the visible hemisphere; avoid the singular silhouette at z=0.
+  const scale=Math.min(1,.98/(Math.hypot(x,y)||1));
+  x*=scale;y*=scale;
+  const nz=Math.sqrt(Math.max(0,1-x*x-y*y));
+  const yaw=Math.atan2(x,nz),tilt=Math.asin(-y);
+  config.contactX=yaw/.65;
+  config.contactY=(tilt-config.angle*Math.PI/180)/.65;
+  return config;
 }

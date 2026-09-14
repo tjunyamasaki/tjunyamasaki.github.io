@@ -1,5 +1,5 @@
 import {createScene} from './visualization/scene.mjs';
-import {C,ball,racketSetup} from './physics/engine.mjs';
+import {C,ball,racketSetup,contactPatch,setContactPatch} from './physics/engine.mjs';
 import {add,mul,length,limit,clamp,rpm,rotate,unit} from './physics/math.mjs';
 import {simulate,sample,align} from './simulation/timeline.mjs';
 import {SPINS,SERVES,RETURNS,COMPARES,LESSONS,defaults,spinFor} from './simulation/presets.mjs';
@@ -234,7 +234,7 @@ function renderAdjust(){
         range('offset','Horizontal toss offset',c.offset,-.5,.5,.01,'m');
       html+='<div class="gesture-editors"><div class="gesture-editor"><svg id="stroke-pad" class="gesture-pad" viewBox="0 0 120 120" tabindex="0" role="slider" aria-label="Stroke direction. Drag arrow tip; arrow keys adjust direction." aria-valuemin="0" aria-valuemax="360" aria-valuenow="'+c.direction+'"><defs><marker id="stroke-head" markerWidth="5" markerHeight="5" refX="3" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5" fill="#c6a0ff"/></marker></defs><path class="pad-grid" d="M60 15V105M15 60H105"/><circle cx="60" cy="60" r="37" fill="none" stroke="#52705755"/><text x="48" y="13">UPWARD</text><text x="44" y="114">DOWNWARD</text><line id="stroke-line" class="stroke-line" x1="60" y1="60" x2="60" y2="23" marker-end="url(#stroke-head)"/><circle id="stroke-tip" cx="60" cy="23" r="5" fill="#c6a0ff"/><circle cx="60" cy="60" r="3" fill="#d9e8c6"/></svg><p>Brush direction<br>Drag the purple arrow</p></div><div class="gesture-editor"><svg id="contact-pad" class="gesture-pad" viewBox="0 0 120 120" tabindex="0" role="application" aria-label="Contact patch. Drag the orange dot or use arrow keys."><circle class="contact-ball" cx="60" cy="60" r="35"/><ellipse class="contact-guide" cx="60" cy="60" rx="16" ry="35"/><ellipse class="contact-guide" cx="60" cy="60" rx="35" ry="12"/><line x1="25" y1="60" x2="95" y2="60" stroke="#203c33" stroke-width="3"/><circle id="contact-dot" class="contact-marker" cx="60" cy="60" r="6"/><text x="29" y="113">RACKET-SIDE VIEW</text></svg><p>Contact on the ball<br>Drag the orange dot</p></div></div>';
       html+=range('speed','Racket speed',c.speed,.2,14,.1,'m/s')+
-        range('brush','Brush ↔ hit through',c.brush,0,1,.01,'','Left: normal hit · Right: tangential brush')+
+        range('brush','Brush ↔ hit through',c.brush,0,1,.01,'','Left: normal hit · Right: mostly tangential brush. Maximum retains a small normal approach.')+
         range('angle','Face angle · open / closed',c.angle,-40,40,1,'°')+
         '<div id="edit-summary" class="vector-equation"></div>';
     }
@@ -253,7 +253,7 @@ function renderAdjust(){
     if(key.startsWith('w')){state.spin[Number(key[1])]=value;state.preset='custom';updateEditSummary();updateReadout();}
     else{state.config[key]=value;state.preset=-1;scheduleRebuild();}
     $('value-'+key).textContent=fmt(value,Number(input.step)<1?2:0)+' '+input.dataset.unit;
-    renderPresets();
+    updatePads();renderPresets();
   }));
   updatePads();updateEditSummary();
 }
@@ -272,8 +272,12 @@ function wirePads(){
     const speed=clamp(Math.hypot(x,y)*12,.2,14);state.config.speed=speed;
     $('control-speed').value=speed;$('value-speed').textContent=fmt(speed)+' m/s';
   },key=>state.config.direction=(state.config.direction+(key==='ArrowRight'||key==='ArrowUp'?5:-5)+360)%360);
-  wirePad($('contact-pad'),(x,y)=>{state.config.contactX=clamp(x*1.5,-1,1);state.config.contactY=clamp(y*1.5,-1,1);},
-    key=>{const k=key==='ArrowLeft'||key==='ArrowRight'?'contactX':'contactY';state.config[k]=clamp(state.config[k]+(key==='ArrowRight'||key==='ArrowUp'?.05:-.05),-1,1);});
+  wirePad($('contact-pad'),(x,y)=>setContactPatch(state.config,x*60/35,y*60/35),
+    key=>{
+      const point=contactPatch(state.config),axis=key==='ArrowLeft'||key==='ArrowRight'?0:1;
+      point[axis]+=key==='ArrowRight'||key==='ArrowUp'?.05:-.05;
+      setContactPatch(state.config,...point);
+    });
 }
 function updatePads(){
   const c=state.config,a=c.direction*Math.PI/180;
@@ -282,7 +286,8 @@ function updatePads(){
     $('stroke-line').setAttribute('x2',x);$('stroke-line').setAttribute('y2',y);
     $('stroke-tip').setAttribute('cx',x);$('stroke-tip').setAttribute('cy',y);
     $('stroke-pad').setAttribute('aria-valuenow',Math.round(c.direction));
-    $('contact-dot').setAttribute('cx',60+c.contactX*24);$('contact-dot').setAttribute('cy',60-c.contactY*24);
+    const [patchX,patchY]=contactPatch(c);
+    $('contact-dot').setAttribute('cx',60+patchX*35);$('contact-dot').setAttribute('cy',60-patchY*35);
   }
 }
 function vectorGlyph(w,color='#e9ff78'){
@@ -335,6 +340,13 @@ function showWhy(){
     bounce?'The table pushes upward and friction opposes slip at the bottom of the ball. Topspin can reduce forward slip; backspin increases it. Pure vertical sidespin has no rotational surface velocity at that bottom point.':
     actualMode()==='serve'?'A higher toss arrives with more downward velocity. Only the part of the relative motion tangent to the racket can drive friction and torque. The brush and face angle determine the outgoing spin.':
     'The racket meets a patch already moving because of translation and spin. Friction follows the tangential difference between the racket and that patch. Its torque adds a new vector to the incoming spin.';
+  if(hit&&!bounce&&state.mode!=='spin'){
+    if(hit.closing<=0){
+      $('why-text').textContent+=' At this setting the racket and ball separate along the face normal. No rubber impulse is applied, so extra tangential speed alone cannot catch the ball.';
+    }else if(hit.after.v[1]<0&&hit.tangentImpulse[1]>0){
+      $('why-text').textContent+=' Here, friction pulls upward, but the incoming motion and normal rebound together outweigh that lift. The ball gains spin and still leaves downward.';
+    }
+  }
   $('vector-equation').innerHTML=hit?equation(hit.before.w,hit.deltaW,hit.after.w):
     '<figure>'+vectorGlyph(state.spin)+'<figcaption>ω '+vec(state.spin)+' rad/s</figcaption></figure>';
   $('vector-inspector').innerHTML='';
@@ -359,6 +371,9 @@ function showWhy(){
     ['Racket velocity',setup?vec(setup.velocity)+' m/s':'—'],
     ['Face pitch',fmt(state.config.angle,0)+'° + contact-patch tilt'],
     ['Relative contact velocity',hit?vec(hit.relative)+' m/s':'—'],
+    ['Contact offset · Y above center',hit?fmt(hit.r[1]*1000,1)+' mm':'—'],
+    ['Vertical change · rebound / friction',hit?fmt(hit.normalImpulse[1]/C.mass,2)+' / '+fmt(hit.tangentImpulse[1]/C.mass,2)+' m/s':'—'],
+    ['Friction limit · μ × normal impulse',hit?fmt((bounce?C.tableFriction:C.racketFriction)*length(hit.normalImpulse),4)+' N·s':'—'],
     ['Normal / tangent impulse',hit?fmt(length(hit.normalImpulse),4)+' / '+fmt(length(hit.tangentImpulse),4)+' N·s':'—'],
     ['Restitution / friction',bounce?C.tableRestitution+' / '+C.tableFriction:C.racketRestitution+' / '+C.racketFriction],
     ['Ball / inertia','2.7 g · 40 mm · ⅔mr²'],

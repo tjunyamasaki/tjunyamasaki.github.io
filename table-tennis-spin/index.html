@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0a1417">
+  <meta name="description" content="Feel the physics. An interactive 3D table tennis spin lab for serves, returns, bounces and the beautiful things vectors do.">
+  <title>Spin Lab — Feel the physics</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="app">
+    <header class="masthead">
+      <a href="../links/" class="brand" aria-label="Back to games"><span class="brand-orbit" aria-hidden="true">↗</span><span>SPIN<span class="brand-light"> / LAB</span><small>TABLE TENNIS, REVEALED</small></span></a>
+      <div class="header-actions"><button id="lessons" class="quiet">Discover <span>↗</span></button><button id="settings" class="icon-button" aria-label="Visual settings">☷</button></div>
+    </header>
+    <nav id="modes" class="modes" aria-label="Experiment">
+      <button data-mode="spin"><span>◉</span> Spin</button>
+      <button data-mode="return" aria-pressed="true"><span>↗</span> Return</button>
+      <button data-mode="serve"><span>↑</span> Serve</button>
+      <button data-mode="bounce"><span>⌁</span> Bounce</button>
+      <button data-mode="compare"><span>∥</span> Compare</button>
+    </nav>
+    <section id="stage" class="stage" aria-label="Interactive 3D experiment">
+      <canvas id="world" tabindex="0" aria-label="3D table tennis scene. Drag empty space to orbit, pinch to zoom. In Spin mode drag the ball to add spin. Use arrow keys to orbit and plus or minus to zoom."></canvas>
+      <div class="stage-heading"><p class="eyebrow" id="chapter">01 / THE RETURN</p><h1 id="headline">Sidespin in.<br><em>Topspin out.</em></h1><p id="phase" class="phase">Incoming ball</p></div>
+      <div class="lens-label" id="lens-label">SPIN LENS <span>↗ ω</span></div>
+      <div id="comparison-labels" class="comparison-labels" hidden><span id="label-a"></span><span id="label-b"></span></div>
+      <div id="toss-handle-wrap" class="toss-handle-wrap" hidden><span>APEX</span><button id="toss-handle" aria-label="Drag vertically to change toss height; use arrow keys for fine adjustment">↕ <strong id="toss-value">0.80 m</strong></button><span>DRAG TO TOSS</span></div>
+      <div id="lesson-card" class="lesson-card" hidden><button id="dismiss-lesson" class="close-small" aria-label="Close lesson">×</button><span class="eyebrow">TRY THIS</span><p id="lesson-text"></p><button id="lesson-action"></button></div>
+      <div class="stage-bottom">
+        <div class="camera-controls"><label class="sr-only" for="camera">Camera view</label><select id="camera"><option value="arena">↗ Arena</option><option value="player">Player</option><option value="side">Side</option><option value="top">Top</option><option value="ball">Ball close-up</option><option value="contact">Contact close-up</option></select><button id="reset-view" aria-label="Reset camera view">⤾</button></div>
+        <button id="overlays" class="glass-button" aria-pressed="true">ω <span>Vectors</span></button>
+      </div>
+      <div id="loading" class="loading"><div class="loader-ball"></div><p>Putting a little spin on things…</p></div>
+      <div id="error" class="error" hidden role="alert"><h2>The arena couldn’t open.</h2><p>Try a browser with WebGL 2 enabled, then reload the page.</p><button onclick="location.reload()">Try again ↗</button><a href="../links/">Back to games</a></div>
+    </section>
+    <section class="deck" aria-label="Experiment controls">
+      <div class="readout-row"><div><span class="eyebrow" id="scenario-label">INCOMING SIDESPIN → TOPSPIN RETURN</span><p id="insight">One stroke. A new axis.</p></div><div class="spin-reading"><strong id="rpm">0</strong><span>RPM <i id="spin-direction">↗</i></span></div></div>
+      <div id="spin-controls" class="spin-controls" hidden>
+        <div class="axis-control axis-x"><button data-axis="0" data-sign="-1" aria-label="Subtract X spin">−</button><button data-axis="0" data-sign="1"><b>+X</b><small>top / back</small></button></div>
+        <div class="axis-control axis-y"><button data-axis="1" data-sign="-1" aria-label="Subtract Y spin">−</button><button data-axis="1" data-sign="1"><b>+Y</b><small>sidespin</small></button></div>
+        <div class="axis-control axis-z"><button data-axis="2" data-sign="-1" aria-label="Subtract Z spin">−</button><button data-axis="2" data-sign="1"><b>+Z</b><small>corkscrew</small></button></div>
+      </div>
+      <div id="presets" class="presets" aria-label="Editable presets"></div>
+      <div id="timeline-wrap" class="timeline-wrap">
+        <div id="event-markers" class="event-markers"></div>
+        <label for="timeline" class="sr-only">Scrub experiment timeline</label><input id="timeline" type="range" min="0" max="1" step=".001" value="0">
+        <div class="timeline-caption"><span id="time-label">0.00 s</span><span id="event-label">Drag time. See the moment.</span><span id="duration-label">2.00 s</span></div>
+      </div>
+      <div class="transport">
+        <div class="playback"><button id="replay" aria-label="Replay from beginning">↶</button><button id="play" class="play" aria-label="Pause">Ⅱ</button><button id="step" aria-label="Advance one simulation frame">▹│</button><button id="speed" aria-label="Change playback speed">0.5×</button></div>
+        <div class="actions"><button id="why" class="quiet">Why?</button><button id="adjust" class="accent">Adjust <span>↗</span></button></div>
+      </div>
+      <p class="gesture-hint" id="gesture-hint">Drag the racket to brush · Pinch to explore</p>
+    </section>
+    <footer class="footnote"><span id="display-note">Ball enlarged · Surface rotation slowed for clarity</span><button id="about">About the physics ↗</button></footer>
+  </main>
+
+  <dialog id="adjust-dialog" class="sheet">
+    <div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">MAKE IT YOURS</p><h2 id="adjust-title">Shape the stroke.</h2></div><button data-close aria-label="Close adjustments">×</button></div>
+    <div id="adjust-content" class="sheet-content"></div>
+    <button data-close class="sheet-done accent">Back to the experiment ↗</button>
+  </dialog>
+  <dialog id="why-dialog" class="sheet">
+    <div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">THE MOMENT, EXPLAINED</p><h2 id="why-title">Follow the friction.</h2></div><button data-close aria-label="Close explanation">×</button></div>
+    <div class="sheet-content"><p id="why-text" class="explanation"></p><div id="vector-equation" class="vector-equation"></div><div id="vector-inspector" class="vector-inspector"></div><p class="small" id="vector-description">Tap a vector to understand its role. Arrow lengths use separate display scales for different physical units.</p><button id="inspect-impact" class="accent wide">Slow down the impact ↗</button><details><summary>Advanced details</summary><div id="advanced" class="advanced"></div></details></div>
+  </dialog>
+  <dialog id="settings-dialog" class="sheet">
+    <div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">YOUR VIEW</p><h2>Keep it clear.</h2></div><button data-close aria-label="Close visual settings">×</button></div>
+    <div class="sheet-content toggle-list">
+      <label>Spin axis <span>ω through the ball</span><input type="checkbox" data-overlay="axis" checked></label>
+      <label>Component vectors <span>X + Y + Z = ω</span><input type="checkbox" data-overlay="components"></label>
+      <label>Rotation ring <span>Right-hand direction</span><input type="checkbox" data-overlay="ring" checked></label>
+      <label>Contact & velocity arrows <span>Translation, stroke, friction</span><input type="checkbox" data-overlay="vectors" checked></label>
+      <label>Spin lens <span>Enlarged orientation during flight</span><input type="checkbox" data-overlay="lens" checked></label>
+      <label>Orientation ghosts <span>Previous marker positions</span><input type="checkbox" data-overlay="ghosts"></label>
+      <label>Trajectory trails <span>See where the ball has been</span><input type="checkbox" data-overlay="trails" checked></label>
+      <label>Reference trajectory <span>Dashed ghost · no Magnus / no spin in Bounce</span><input type="checkbox" data-overlay="baseline" checked></label>
+      <label>Show spin effect <span>Apply Magnus curvature to flight</span><input id="magnus" type="checkbox" checked></label>
+      <label>Readable rotation <span>Slow markers; retain true physical RPM</span><input type="checkbox" data-overlay="readable" checked></label>
+      <label>Impact sounds <span>Quiet racket and table taps</span><input id="sound" type="checkbox"></label>
+      <label>Auto slow motion <span>Ease into racket contact and bounces</span><input id="auto-slow" type="checkbox" checked></label>
+    </div>
+  </dialog>
+  <dialog id="lessons-dialog" class="sheet">
+    <div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">SMALL EXPERIMENTS, BIG AHA</p><h2>Follow your curiosity.</h2></div><button data-close aria-label="Close lessons">×</button></div>
+    <div id="lesson-list" class="sheet-content lesson-list"></div>
+  </dialog>
+  <dialog id="about-dialog" class="sheet">
+    <div class="sheet-handle"></div><div class="sheet-header"><div><p class="eyebrow">FEEL THE PHYSICS</p><h2>A ball. Infinite possibilities.</h2></div><button data-close aria-label="Close about panel">×</button></div>
+    <div class="sheet-content about">
+      <p>Physics are simplified for visualization and learning.</p><p>A 40 mm, 2.7 g hollow ball. Gravity, drag, Magnus lift and friction share the same world: <b>X right, Y up, Z down the table away from you.</b> Topspin is defined for the ball’s travel direction. Clockwise sidespin is viewed from above.</p>
+      <p>The rotation axis is the angular velocity vector. Components add to one vector; they never alternate. Surface markers are slowed by default and the ball is enlarged in the arena. RPM and motion always use the actual physics.</p>
+      <p>Table friction acts on the bottom contact point. Pure vertical sidespin does not directly make that point slide sideways. A tilted axis can; sidespin also changes the incoming flight through Magnus lift.</p>
+      <p>Toss height is measured from the contact height to the apex. The ideal vertical toss uses gravity without air drag: <b>v = √(2gΔh)</b> on the descent. A higher toss does not create spin by itself.</p>
+      <p>The racket is a moving plane tangent to the chosen patch. Moving the patch also changes the face normal. Elastic rubber deformation, dwell time and net cloth motion are not modeled. Presets illustrate contact ideas, not exact professional technique or serve legality.</p>
+      <p>Flight and contact are recorded at 120 steps per second. Scrubbing replays the same result. Compare synchronizes racket impacts; a shorter toss waits before release.</p>
+      <p class="small">Background reading: <a href="https://www.physics.usyd.edu.au/~cross/SPIN%20GENERATION/Spin%20Generation.htm" target="_blank" rel="noopener noreferrer">Rod Cross · Generation of ball spin ↗</a></p>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <noscript><div class="error"><h2>Spin Lab needs JavaScript.</h2><p>Enable JavaScript to explore the experiments.</p></div></noscript>
+  <script type="module">
+    import('./main.mjs').catch(error=>{
+      console.error('Spin Lab failed to start',error);
+      document.getElementById('loading').hidden=true;
+      document.getElementById('error').hidden=false;
+    });
+  </script>
+</body>
+</html>

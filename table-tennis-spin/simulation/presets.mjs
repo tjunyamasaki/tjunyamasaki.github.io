@@ -11,10 +11,10 @@ export const SPINS = [
   {id:'cork',name:'Tilted / corkscrew',w:[100,190,320]},
 ];
 export const SERVES = [
-  {name:'Pendulum',direction:205,angle:14,brush:.86,speed:5.2,contactX:-.18,contactY:-.25},
-  {name:'Reverse pendulum',direction:335,angle:14,brush:.86,speed:5.2,contactX:.18,contactY:-.25},
-  {name:'Heavy backspin',direction:270,angle:30,brush:.92,speed:9.8,contactX:0,contactY:-.35},
-  {name:'Sidespin',direction:180,angle:7,brush:.83,speed:4.6,contactX:-.18,contactY:0},
+  {name:'Pendulum',direction:225,angle:15,brush:.9,speed:8,contactX:.4,contactY:-.18},
+  {name:'Reverse pendulum',direction:315,angle:15,brush:.9,speed:8,contactX:-.4,contactY:-.18},
+  {name:'Heavy backspin',direction:270,angle:8,brush:.95,speed:12,contactX:0,contactY:-.18},
+  {name:'Sidespin',direction:225,angle:0,brush:.85,speed:6,contactX:.4,contactY:0},
   {name:'Top-sidespin',direction:115,angle:0,brush:.72,speed:4.4,contactX:0,contactY:0},
   {name:'Tomahawk',direction:320,angle:22,brush:.9,speed:5.1,contactX:.15,contactY:-.2},
 ];

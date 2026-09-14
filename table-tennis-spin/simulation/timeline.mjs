@@ -9,7 +9,7 @@ export function simulate(config,{noMagnus=false,noSpin=false}={}) {
   const launchUp=Math.sqrt(2*C.gravity*Math.max(.01,apex-releaseHeight));
   const hitTime=serve?(launchUp+Math.sqrt(2*C.gravity*config.toss))/C.gravity:.42;
   let s=serve?ball([-.1,releaseHeight,-1.15],[0,launchUp,0]):
-    isBounce?ball([0,config.launchHeight,-1.1],[0,-.2,config.launchSpeed],noSpin?[0,0,0]:spinFor(config.incoming)):
+    isBounce?ball([0,config.launchHeight,-1.25],[0,-.2,config.launchSpeed],noSpin?[0,0,0]:spinFor(config.incoming)):
     ball([0,1.62,.57],[0,.9,-3.8],noSpin?[0,0,0]:spinFor(config.incoming,true));
   let impacted=isBounce,bounces=0,groundTime=null,impact=null,falling=false,netDone=false;
   const event=(kind,label,extra={})=>events.push({kind,label,t:s.t,p:s.p.slice(),...extra});

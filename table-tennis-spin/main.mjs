@@ -34,6 +34,8 @@ function rebuild(reset=true){
   if(state.mode==='compare'){
     const p=COMPARES.find(p=>p.id===state.compare);
     const base={...state.config,mode:p.mode};
+    // Isolate face/contact changes: keep the racket's WORLD velocity identical.
+    if(p.id==='contact'||p.id==='angle')base.velocityOverride=racketSetup(base).velocity;
     timelines=align(simulate({...base,...p.a}),simulate({...base,...p.b}));
     ghost=simulate({...base,...p.a},{noMagnus:true});
     const offset=timelines[0].impactTime-ghost.impactTime;
@@ -74,8 +76,9 @@ function buildEvents(){
   });
 }
 function setMode(mode){
+  const magnus=state.config.magnus;
   state.mode=mode;state.time=0;state.cinematic=false;state.cinematicClose=false;state.preset=0;
-  state.config=defaults(mode==='compare'?COMPARES.find(p=>p.id===state.compare).mode:mode);
+  state.config={...defaults(mode==='compare'?COMPARES.find(p=>p.id===state.compare).mode:mode),magnus};
   if(mode==='spin'){state.spin=[280,-280,0];state.spinQ=[0,0,0,1];state.spinDisplayQ=[0,0,0,1];}
   scene.setMode(mode);state.view=mode==='spin'?'ball':'arena';$('camera').value=state.view;
   document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===mode)));
@@ -107,7 +110,7 @@ function renderPresets(){
       state.cinematic=false;state.preset=state.mode==='spin'?p.id:i;
       if(state.mode==='spin'){state.spin=p.w.slice();state.spinQ=[0,0,0,1];state.spinDisplayQ=[0,0,0,1];}
       else if(state.mode==='bounce')state.config.incoming=p.id;
-      else if(state.mode==='compare'){state.compare=p.id;state.config=defaults(p.mode);}
+      else if(state.mode==='compare'){state.compare=p.id;state.config={...defaults(p.mode),magnus:state.config.magnus};}
       else Object.assign(state.config,p);
       state.time=0;state.playing=!reduced;renderPresets();rebuild();updatePlay();
     };$('presets').append(b);
@@ -435,6 +438,6 @@ setHeading();renderPresets();scene.setMode('return');rebuild();updatePlay();
 $('loading').hidden=true;
 document.documentElement.dataset.spinLabReady='true';
 // Read-only diagnostics for browser smoke checks; no external services or analytics.
-window.spinLabSnapshot=()=>({mode:state.mode,time:state.time,spin:current().w,
+window.spinLabSnapshot=()=>({mode:state.mode,time:state.time,spin:current().w,playing:state.playing,renderedTriangles:scene.renderer.info.render.triangles,
   events:state.timelines.map(t=>t.events.map(e=>({kind:e.kind,t:e.t}))),canvas:{width:$('world').width,height:$('world').height}});
 requestAnimationFrame(animate);

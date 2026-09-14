@@ -68,7 +68,8 @@ export function racketSetup(config) {
   const side=unit(cross([0,1,0],normal)),up=unit(cross(normal,side));
   const a=config.direction*Math.PI/180;
   const brush=add(mul(side,Math.cos(a)),mul(up,Math.sin(a)));
-  const velocity=add(mul(normal,config.speed*(1-.83*config.brush)),mul(brush,config.speed*config.brush));
+  // The speed control is the magnitude, independent of the brush/normal mix.
+  const velocity=config.velocityOverride?.slice()||mul(unit(add(mul(normal,1-.83*config.brush),mul(brush,config.brush))),config.speed);
   return {normal,velocity,side,up,restitution:C.racketRestitution,friction:C.racketFriction,
     grip:.25+.75*config.brush};
 }

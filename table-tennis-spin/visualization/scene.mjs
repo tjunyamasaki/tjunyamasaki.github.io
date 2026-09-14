@@ -94,6 +94,7 @@ export function createScene(canvas,callbacks={}) {
     const axis=arrow(ghost?COLORS.b:COLORS.spin);root.add(axis);
     const rear=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(),new T.Vector3(0,-1,0)]),new T.LineBasicMaterial({color:COLORS.spin,transparent:true,opacity:.28}));root.add(rear);
     const components=['x','y','z'].map(k=>{const a=arrow(COLORS[k]);root.add(a);return a;});
+    const componentLabels=['x','y','z'].map(k=>{const label=textSprite('ω'+k,'#'+COLORS[k].toString(16),.19);root.add(label);return label;});
     const ring=new T.Group();root.add(ring);
     const points=[];for(let i=0;i<=100;i++){const a=i/100*Math.PI*2;points.push(new T.Vector3(Math.cos(a)*1.38,0,-Math.sin(a)*1.38));}
     const circle=new T.Line(new T.BufferGeometry().setFromPoints(points),new T.LineBasicMaterial({color:ghost?COLORS.b:COLORS.spin,transparent:true,opacity:.4}));ring.add(circle);
@@ -110,7 +111,7 @@ export function createScene(canvas,callbacks={}) {
       g.scale.setScalar(1.015+i*.015);root.add(g);surfaceGhosts.push(g);
     }
     const contactDot=new T.Mesh(new T.SphereGeometry(.07,12,8),basic(COLORS.friction));root.add(contactDot);contactDot.visible=false;
-    return {root,body,axis,rear,components,ring,label,surfaceGhosts,contactDot};
+    return {root,body,axis,rear,components,componentLabels,ring,label,surfaceGhosts,contactDot};
   }
   const primary=makeBall(scene),secondary=makeBall(scene,true),lens=makeBall(lensScene);
   lens.root.position.set(0,0,0);lens.root.scale.setScalar(.38);
@@ -205,7 +206,9 @@ export function createScene(canvas,callbacks={}) {
     o.label.visible=o.axis.visible;o.label.position.copy(u).multiplyScalar(axisLength+.2);
     o.ring.visible=opts.ring&&speed>.001;o.ring.quaternion.setFromUnitVectors(Y,u);
     // Components use one common linear scale and share an origin.
-    o.components.forEach((a,i)=>{const w=[0,0,0];w[i]=s.w[i];setArrow(a,w,[0,0,0],axisLength/(speed||1));a.visible=opts.components&&Math.abs(w[i])>.01;});
+    o.components.forEach((a,i)=>{const w=[0,0,0];w[i]=s.w[i];setArrow(a,w,[0,0,0],axisLength/(speed||1));a.visible=opts.components&&Math.abs(w[i])>.01;
+      const label=o.componentLabels[i];label.visible=a.visible;const position=[0,0,0];position[i]=w[i]*axisLength/(speed||1)+Math.sign(w[i])*.2;label.position.set(...position);
+    });
     o.surfaceGhosts.forEach((g,i)=>{g.visible=opts.ghosts;g.quaternion.copy(o.body.quaternion);
       if(speed)g.quaternion.premultiply(new T.Quaternion().setFromAxisAngle(u,-.18*(i+1)));});
     o.contactDot.visible=false;

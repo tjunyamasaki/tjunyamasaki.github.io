@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#eeede6" />
+    <meta name="description" content="A little piano for a little peace. Play a warm acoustic grand with your fingers or keyboard." />
+    <title>Pocket Piano — a little room for music</title>
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./main.mjs"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="wordmark" href="./" aria-label="Pocket Piano home">
+        <svg viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="3" width="24" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 4v20M18 4v20" stroke="currentColor" stroke-width="1.5"/><path d="M8 4h4v12H8zM16 4h4v12h-4z" fill="currentColor"/></svg>
+        pocket piano<span class="wordmark-dot">.</span>
+      </a>
+      <a class="back-link" href="/links/">All projects <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="title">
+        <p class="eyebrow"><span></span> A MOMENT TO YOURSELF</p>
+        <h1 id="title">A little room for <em>music.</em></h1>
+        <p class="intro-copy">Find a melody. Lose track of time.</p>
+      </section>
+
+      <section class="piano" aria-label="Interactive acoustic piano">
+        <div class="piano-top">
+          <div class="instrument-label"><span class="status-light" id="status-light"></span> ACOUSTIC GRAND</div>
+          <div class="speaker" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <span class="instrument-edition">No. 01</span>
+        </div>
+
+        <div class="resonance" id="resonance">
+          <canvas id="visualizer" aria-hidden="true"></canvas>
+          <div class="wake" id="wake">
+            <button class="start-button" id="start" type="button"><span aria-hidden="true">♪</span> Start playing</button>
+            <p id="load-status" role="status">A grand piano, at your fingertips.</p>
+          </div>
+          <div class="playing-info" id="playing-info" hidden>
+            <p class="note-caption">MAKE SOMETHING YOURS</p>
+            <output id="notes" aria-label="Held notes">Just begin.</output>
+          </div>
+        </div>
+
+        <div class="keyboard-frame">
+          <div class="felt-strip" aria-hidden="true"></div>
+          <div class="keyboard" id="keyboard" role="group" aria-label="Piano keys" aria-busy="true"></div>
+        </div>
+
+        <div class="piano-bottom">
+          <span>POCKET <span class="tiny-mark" aria-hidden="true">✳</span> PIANO</span>
+          <span id="range-label">C4 — C5</span>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Piano controls">
+        <div class="octave-control">
+          <button class="icon-button" id="octave-down" type="button" aria-label="Lower one octave" title="Lower octave (Z)">−</button>
+          <div><span class="control-label">OCTAVE</span><output id="octave">4</output></div>
+          <button class="icon-button" id="octave-up" type="button" aria-label="Raise one octave" title="Raise octave (X)">+</button>
+        </div>
+        <div class="control-divider" aria-hidden="true"></div>
+        <button class="sustain-button" id="sustain" type="button" aria-pressed="false" title="Toggle sustain, or hold Space">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 17h14M7 14l2-7h6l2 7H7Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Sustain <span class="toggle-track" aria-hidden="true"><i></i></span>
+        </button>
+        <div class="sliders">
+          <label class="slider-control"><span>Room</span><input id="room" type="range" min="0" max="100" value="28" aria-label="Room reverb" /></label>
+          <label class="slider-control"><span>Volume</span><input id="volume" type="range" min="0" max="100" value="72" aria-label="Volume" /></label>
+        </div>
+      </section>
+
+      <div class="under-controls">
+        <p class="hint touch-hint">Tap a key. Hold a chord. Slide into a melody.</p>
+        <p class="hint desktop-hint">Play with <kbd>A</kbd>–<kbd>L</kbd> &amp; the keys above. Hold <kbd>space</kbd> to sustain.</p>
+        <button class="demo-button" id="demo" type="button" disabled><span id="demo-icon" aria-hidden="true">▷</span><span id="demo-label">A little inspiration</span></button>
+      </div>
+      <p class="audio-status" id="audio-status" role="status"></p>
+      <noscript><p class="noscript">Please enable JavaScript to play this piano.</p></noscript>
+    </main>
+
+    <footer>
+      <span>Take your time. Stay a little.</span>
+      <a href="./credits.html">About the sound <span aria-hidden="true">↗</span></a>
+    </footer>
+  </body>
+</html>

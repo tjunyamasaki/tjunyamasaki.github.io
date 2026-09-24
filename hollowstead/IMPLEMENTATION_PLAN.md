@@ -1108,7 +1108,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Package | Status | Owner | Commit / evidence | Remaining issue |
 | --- | --- | --- | --- | --- |
 | Planning | Complete | Orchestrator | Plan only; baseline 395baac7a332f1ed94b5c73e0ec4b4882ee47afe | Gameplay implementation not started |
-| P0 | Complete | P0 agent | Shared contract and v1 fixtures; see the handoff below | No gameplay change. P1–P6 not started |
+| P0 | Complete | P0 agent | bc220e92a19eb4665e0346ce025a124e4e283035 | No gameplay change. P1–P6 not started |
 | P1 | Not started | Unassigned | — | — |
 | P2 | Not started | Unassigned | — | — |
 | P3 | Not started | Unassigned | — | — |
@@ -1135,7 +1135,7 @@ The next agent should start with P1. The original game's previous 17 Hollowstead
 Date: 2026-09-24
 Package / agent: P0 / P0 agent
 Starting commit: d94450e2b40b31eb5bf8ea22b5a95dad05b54e5b
-Ending commit: parent d94450e2b40b31eb5bf8ea22b5a95dad05b54e5b on feat/hollowstead-coop, subject "Hollowstead P0: shared contracts and v1 save fixtures".
+Ending commit: bc220e92a19eb4665e0346ce025a124e4e283035. The branch tip that records this hash changes only this log. Start P1 from that tip.
 Files changed:
 - hollowstead/src/contracts.mjs
 - hollowstead/tests/contracts.test.mjs
@@ -1154,7 +1154,7 @@ Tests and device checks actually run:
 - No browser gameplay pass. This package does not change the running game.
 Evidence / screenshots / deployment run:
 - Baseline comparison: `git diff 395baac7a332f1ed94b5c73e0ec4b4882ee47afe..d94450e2b40b31eb5bf8ea22b5a95dad05b54e5b --stat` is IMPLEMENTATION_PLAN.md only.
-- Deployment is recorded after push of this commit. Visible gameplay is unchanged. The published plan text is the only player-visible file in this package.
+- Contracts and fixtures are commit bc220e92a19eb4665e0346ce025a124e4e283035. This log line is the only later P0 edit. Visible gameplay is unchanged. The published plan text is the only player-visible file in this package.
 Remaining failures or unverified cases:
 - None in the existing suites. M01–M18 were not run. v1→v2 migration is not implemented, so the fixtures are not yet migrated.
 Compatibility/migration notes:

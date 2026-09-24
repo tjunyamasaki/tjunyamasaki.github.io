@@ -1,6 +1,7 @@
 import {World,clamp,distance,biome} from './engine.mjs';
 import {RULES,ITEMS,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs';
 import {Renderer,loadTheme} from './renderer.mjs';
+import {CanvasRenderer} from './canvas-renderer.mjs';
 import {createNetwork} from './network.mjs';
 import {Sound} from './audio.mjs';
 const $=id=>document.getElementById(id),escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -198,7 +199,7 @@ function frame(now){
   const target=!$('game').hidden?currentTarget():null;renderer.render(world,localId,dt,{target,placement,demo:$('game').hidden});requestAnimationFrame(frame);
 }
 async function init(){
-  theme=await loadTheme();renderer=new Renderer($('world'),theme);await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;
+  theme=await loadTheme();try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;
   demoWorld();setupControls();syncSaveOption();const params=new URLSearchParams(location.search),code=params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showStatus('A place by the fire is waiting. Choose a name and join.');}
   $('loading').hidden=true;$('front').hidden=false;requestAnimationFrame(frame);
   if(params.has('dev'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},renderer,send,solo,openSheet,save,get placement(){return placement;},setTime(t){world.time=t;},get network(){return network;}};

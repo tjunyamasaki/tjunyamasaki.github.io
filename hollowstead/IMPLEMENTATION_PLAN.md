@@ -1154,7 +1154,7 @@ Tests and device checks actually run:
 - No browser gameplay pass. This package does not change the running game.
 Evidence / screenshots / deployment run:
 - Baseline comparison: `git diff 395baac7a332f1ed94b5c73e0ec4b4882ee47afe..d94450e2b40b31eb5bf8ea22b5a95dad05b54e5b --stat` is IMPLEMENTATION_PLAN.md only.
-- Contracts and fixtures are commit bc220e92a19eb4665e0346ce025a124e4e283035. This log line is the only later P0 edit. Visible gameplay is unchanged. The published plan text is the only player-visible file in this package.
+- Contracts and fixtures are commit bc220e92a19eb4665e0346ce025a124e4e283035. The log tip ab72b416e98f9d5a2ef5526aa8b5dd917a13bf03 was deployed by GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36058559239 (success; Hollowstead and ball-game tests passed in that run). The live plan page served that revision. Visible gameplay is unchanged. The published plan text is the only player-visible file in this package. Recording this URL is a plan-only follow-up.
 Remaining failures or unverified cases:
 - None in the existing suites. M01–M18 were not run. v1→v2 migration is not implemented, so the fixtures are not yet migrated.
 Compatibility/migration notes:

@@ -1,0 +1,1098 @@
+{
+  "schedule": {
+    "day": 150,
+    "dusk": 30,
+    "night": 80,
+    "cycle": 260
+  },
+  "saves": [
+    {
+      "name": "cycle0-day-start",
+      "time": 0,
+      "phase": "day",
+      "savedAt": 1760000000000,
+      "world": {
+        "version": 1,
+        "seed": 402,
+        "time": 0,
+        "status": "playing",
+        "players": [
+          {
+            "id": "host",
+            "name": "Jun",
+            "character": "ember",
+            "x": 2,
+            "z": 1.8,
+            "dx": 0,
+            "dz": 1,
+            "hp": 80,
+            "hunger": 70,
+            "courage": 60,
+            "stamina": 100,
+            "inventory": {
+              "wood": 3,
+              "stone": 2,
+              "fiber": 3,
+              "berry": 3
+            },
+            "equipment": {},
+            "cooldown": 0,
+            "dash": 0,
+            "dashCooldown": 0,
+            "down": 0,
+            "ghost": false,
+            "revive": 0,
+            "charm": 1,
+            "online": true,
+            "lantern": false,
+            "rest": false,
+            "action": "idle",
+            "actionUntil": 0,
+            "notice": "",
+            "noticeAt": 0,
+            "goal": null
+          }
+        ],
+        "buildings": [
+          {
+            "id": "heart",
+            "type": "hearth",
+            "x": 0,
+            "z": 0,
+            "hp": 600,
+            "maxHp": 600,
+            "fuel": 150,
+            "level": 1,
+            "rotation": 0,
+            "open": false,
+            "charges": 3,
+            "growth": 0,
+            "planted": false,
+            "store": {},
+            "cooldown": 0
+          }
+        ],
+        "enemies": [],
+        "drops": [
+          {
+            "id": "d1",
+            "type": "berry",
+            "count": 2,
+            "x": 1,
+            "z": 2,
+            "until": 600
+          }
+        ],
+        "events": [],
+        "explored": [],
+        "nodeChanges": [
+          [
+            "n0",
+            2,
+            0
+          ],
+          [
+            "n2",
+            0,
+            520
+          ]
+        ],
+        "idCounter": 2,
+        "eventId": 0,
+        "wave": 0,
+        "nextSpawn": 0,
+        "kills": 0,
+        "bossSlain": false,
+        "bossSpawned": false,
+        "endless": false,
+        "stats": {
+          "gathered": 0,
+          "built": 0,
+          "revives": 0
+        }
+      }
+    },
+    {
+      "name": "cycle0-dusk-start",
+      "time": 150,
+      "phase": "dusk",
+      "savedAt": 1760000150000,
+      "world": {
+        "version": 1,
+        "seed": 402,
+        "time": 150,
+        "status": "playing",
+        "players": [
+          {
+            "id": "host",
+            "name": "Jun",
+            "character": "ember",
+            "x": 2,
+            "z": 1.8,
+            "dx": 0,
+            "dz": 1,
+            "hp": 80,
+            "hunger": 70,
+            "courage": 60,
+            "stamina": 100,
+            "inventory": {
+              "wood": 3,
+              "stone": 2,
+              "fiber": 3,
+              "berry": 3
+            },
+            "equipment": {},
+            "cooldown": 0,
+            "dash": 0,
+            "dashCooldown": 0,
+            "down": 0,
+            "ghost": false,
+            "revive": 0,
+            "charm": 1,
+            "online": true,
+            "lantern": false,
+            "rest": false,
+            "action": "idle",
+            "actionUntil": 0,
+            "notice": "",
+            "noticeAt": 0,
+            "goal": null
+          }
+        ],
+        "buildings": [
+          {
+            "id": "heart",
+            "type": "hearth",
+            "x": 0,
+            "z": 0,
+            "hp": 600,
+            "maxHp": 600,
+            "fuel": 150,
+            "level": 1,
+            "rotation": 0,
+            "open": false,
+            "charges": 3,
+            "growth": 0,
+            "planted": false,
+            "store": {},
+            "cooldown": 0
+          }
+        ],
+        "enemies": [],
+        "drops": [
+          {
+            "id": "d1",
+            "type": "berry",
+            "count": 2,
+            "x": 1,
+            "z": 2,
+            "until": 750
+          }
+        ],
+        "events": [],
+        "explored": [],
+        "nodeChanges": [
+          [
+            "n0",
+            2,
+            0
+          ],
+          [
+            "n2",
+            0,
+            670
+          ]
+        ],
+        "idCounter": 2,
+        "eventId": 0,
+        "wave": 0,
+        "nextSpawn": 0,
+        "kills": 0,
+        "bossSlain": false,
+        "bossSpawned": false,
+        "endless": false,
+        "stats": {
+          "gathered": 0,
+          "built": 0,
+          "revives": 0
+        }
+      }
+    },
+    {
+      "name": "cycle0-night-start",
+      "time": 180,
+      "phase": "night",
+      "savedAt": 1760000180000,
+      "world": {
+        "version": 1,
+        "seed": 402,
+        "time": 180,
+        "status": "playing",
+        "players": [
+          {
+            "id": "host",
+            "name": "Jun",
+            "character": "ember",
+            "x": 2,
+            "z": 1.8,
+            "dx": 0,
+            "dz": 1,
+            "hp": 80,
+            "hunger": 70,
+            "courage": 60,
+            "stamina": 100,
+            "inventory": {
+              "wood": 3,
+              "stone": 2,
+              "fiber": 3,
+              "berry": 3
+            },
+            "equipment": {},
+            "cooldown": 0,
+            "dash": 0,
+            "dashCooldown": 0,
+            "down": 0,
+            "ghost": false,
+            "revive": 0,
+            "charm": 1,
+            "online": true,
+            "lantern": false,
+            "rest": false,
+            "action": "idle",
+            "actionUntil": 0,
+            "notice": "",
+            "noticeAt": 0,
+            "goal": null
+          }
+        ],
+        "buildings": [
+          {
+            "id": "heart",
+            "type": "hearth",
+            "x": 0,
+            "z": 0,
+            "hp": 600,
+            "maxHp": 600,
+            "fuel": 150,
+            "level": 1,
+            "rotation": 0,
+            "open": false,
+            "charges": 3,
+            "growth": 0,
+            "planted": false,
+            "store": {},
+            "cooldown": 0
+          }
+        ],
+        "enemies": [
+          {
+            "id": "e2",
+            "type": "crawler",
+            "x": -12.86397238775036,
+            "z": 12.398551287518378,
+            "hp": 48,
+            "maxHp": 48,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": -12.86397238775036,
+            "tz": 12.398551287518378,
+            "slowed": 0
+          },
+          {
+            "id": "e3",
+            "type": "crawler",
+            "x": -19.733568479848618,
+            "z": 2.1649142591590373,
+            "hp": 48,
+            "maxHp": 48,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": -19.733568479848618,
+            "tz": 2.1649142591590373,
+            "slowed": 0
+          },
+          {
+            "id": "e4",
+            "type": "crawler",
+            "x": 14.438403342388122,
+            "z": 10.234652986785719,
+            "hp": 48,
+            "maxHp": 48,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": 14.438403342388122,
+            "tz": 10.234652986785719,
+            "slowed": 0
+          }
+        ],
+        "drops": [
+          {
+            "id": "d1",
+            "type": "berry",
+            "count": 2,
+            "x": 1,
+            "z": 2,
+            "until": 780
+          }
+        ],
+        "events": [
+          {
+            "id": 1,
+            "type": "announce",
+            "x": 0,
+            "z": 0,
+            "text": "Night 1 • the woods are waking",
+            "at": 180
+          }
+        ],
+        "explored": [],
+        "nodeChanges": [
+          [
+            "n0",
+            2,
+            0
+          ],
+          [
+            "n2",
+            0,
+            700
+          ]
+        ],
+        "idCounter": 5,
+        "eventId": 1,
+        "wave": 1,
+        "nextSpawn": 212,
+        "kills": 0,
+        "bossSlain": false,
+        "bossSpawned": false,
+        "endless": false,
+        "stats": {
+          "gathered": 0,
+          "built": 0,
+          "revives": 0
+        }
+      }
+    },
+    {
+      "name": "cycle1-day-start",
+      "time": 260,
+      "phase": "day",
+      "savedAt": 1760000260000,
+      "world": {
+        "version": 1,
+        "seed": 402,
+        "time": 260,
+        "status": "playing",
+        "players": [
+          {
+            "id": "host",
+            "name": "Jun",
+            "character": "ember",
+            "x": 2,
+            "z": 1.8,
+            "dx": 0,
+            "dz": 1,
+            "hp": 80,
+            "hunger": 70,
+            "courage": 60,
+            "stamina": 100,
+            "inventory": {
+              "wood": 3,
+              "stone": 2,
+              "fiber": 3,
+              "berry": 3
+            },
+            "equipment": {},
+            "cooldown": 0,
+            "dash": 0,
+            "dashCooldown": 0,
+            "down": 0,
+            "ghost": false,
+            "revive": 0,
+            "charm": 1,
+            "online": true,
+            "lantern": false,
+            "rest": false,
+            "action": "idle",
+            "actionUntil": 0,
+            "notice": "",
+            "noticeAt": 0,
+            "goal": null
+          }
+        ],
+        "buildings": [
+          {
+            "id": "heart",
+            "type": "hearth",
+            "x": 0,
+            "z": 0,
+            "hp": 600,
+            "maxHp": 600,
+            "fuel": 150,
+            "level": 1,
+            "rotation": 0,
+            "open": false,
+            "charges": 3,
+            "growth": 0,
+            "planted": false,
+            "store": {},
+            "cooldown": 0
+          }
+        ],
+        "enemies": [],
+        "drops": [
+          {
+            "id": "d1",
+            "type": "berry",
+            "count": 2,
+            "x": 1,
+            "z": 2,
+            "until": 860
+          }
+        ],
+        "events": [],
+        "explored": [],
+        "nodeChanges": [
+          [
+            "n0",
+            2,
+            0
+          ],
+          [
+            "n2",
+            0,
+            780
+          ]
+        ],
+        "idCounter": 2,
+        "eventId": 0,
+        "wave": 0,
+        "nextSpawn": 0,
+        "kills": 0,
+        "bossSlain": false,
+        "bossSpawned": false,
+        "endless": false,
+        "stats": {
+          "gathered": 0,
+          "built": 0,
+          "revives": 0
+        }
+      }
+    },
+    {
+      "name": "cycle1-dusk-start",
+      "time": 410,
+      "phase": "dusk",
+      "savedAt": 1760000410000,
+      "world": {
+        "version": 1,
+        "seed": 402,
+        "time": 410,
+        "status": "playing",
+        "players": [
+          {
+            "id": "host",
+            "name": "Jun",
+            "character": "ember",
+            "x": 2,
+            "z": 1.8,
+            "dx": 0,
+            "dz": 1,
+            "hp": 80,
+            "hunger": 70,
+            "courage": 60,
+            "stamina": 100,
+            "inventory": {
+              "wood": 3,
+              "stone": 2,
+              "fiber": 3,
+              "berry": 3
+            },
+            "equipment": {},
+            "cooldown": 0,
+            "dash": 0,
+            "dashCooldown": 0,
+            "down": 0,
+            "ghost": false,
+            "revive": 0,
+            "charm": 1,
+            "online": true,
+            "lantern": false,
+            "rest": false,
+            "action": "idle",
+            "actionUntil": 0,
+            "notice": "",
+            "noticeAt": 0,
+            "goal": null
+          }
+        ],
+        "buildings": [
+          {
+            "id": "heart",
+            "type": "hearth",
+            "x": 0,
+            "z": 0,
+            "hp": 600,
+            "maxHp": 600,
+            "fuel": 150,
+            "level": 1,
+            "rotation": 0,
+            "open": false,
+            "charges": 3,
+            "growth": 0,
+            "planted": false,
+            "store": {},
+            "cooldown": 0
+          }
+        ],
+        "enemies": [],
+        "drops": [
+          {
+            "id": "d1",
+            "type": "berry",
+            "count": 2,
+            "x": 1,
+            "z": 2,
+            "until": 1010
+          }
+        ],
+        "events": [],
+        "explored": [],
+        "nodeChanges": [
+          [
+            "n0",
+            2,
+            0
+          ],
+          [
+            "n2",
+            0,
+            930
+          ]
+        ],
+        "idCounter": 2,
+        "eventId": 0,
+        "wave": 0,
+        "nextSpawn": 0,
+        "kills": 0,
+        "bossSlain": false,
+        "bossSpawned": false,
+        "endless": false,
+        "stats": {
+          "gathered": 0,
+          "built": 0,
+          "revives": 0
+        }
+      }
+    },
+    {
+      "name": "cycle1-night-start",
+      "time": 440,
+      "phase": "night",
+      "savedAt": 1760000440000,
+      "world": {
+        "version": 1,
+        "seed": 402,
+        "time": 440,
+        "status": "playing",
+        "players": [
+          {
+            "id": "host",
+            "name": "Jun",
+            "character": "ember",
+            "x": 2,
+            "z": 1.8,
+            "dx": 0,
+            "dz": 1,
+            "hp": 80,
+            "hunger": 70,
+            "courage": 60,
+            "stamina": 100,
+            "inventory": {
+              "wood": 3,
+              "stone": 2,
+              "fiber": 3,
+              "berry": 3
+            },
+            "equipment": {},
+            "cooldown": 0,
+            "dash": 0,
+            "dashCooldown": 0,
+            "down": 0,
+            "ghost": false,
+            "revive": 0,
+            "charm": 1,
+            "online": true,
+            "lantern": false,
+            "rest": false,
+            "action": "idle",
+            "actionUntil": 0,
+            "notice": "",
+            "noticeAt": 0,
+            "goal": null
+          }
+        ],
+        "buildings": [
+          {
+            "id": "heart",
+            "type": "hearth",
+            "x": 0,
+            "z": 0,
+            "hp": 600,
+            "maxHp": 600,
+            "fuel": 150,
+            "level": 1,
+            "rotation": 0,
+            "open": false,
+            "charges": 3,
+            "growth": 0,
+            "planted": false,
+            "store": {},
+            "cooldown": 0
+          }
+        ],
+        "enemies": [
+          {
+            "id": "e2",
+            "type": "wraith",
+            "x": -12.86397238775036,
+            "z": 12.398551287518378,
+            "hp": 60,
+            "maxHp": 60,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": -12.86397238775036,
+            "tz": 12.398551287518378,
+            "slowed": 0
+          },
+          {
+            "id": "e3",
+            "type": "crawler",
+            "x": -19.733568479848618,
+            "z": 2.1649142591590373,
+            "hp": 48,
+            "maxHp": 48,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": -19.733568479848618,
+            "tz": 2.1649142591590373,
+            "slowed": 0
+          },
+          {
+            "id": "e4",
+            "type": "crawler",
+            "x": 14.438403342388122,
+            "z": 10.234652986785719,
+            "hp": 48,
+            "maxHp": 48,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": 14.438403342388122,
+            "tz": 10.234652986785719,
+            "slowed": 0
+          },
+          {
+            "id": "e5",
+            "type": "wraith",
+            "x": 16.386201174439154,
+            "z": 9.642482707161783,
+            "hp": 60,
+            "maxHp": 60,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": 16.386201174439154,
+            "tz": 9.642482707161783,
+            "slowed": 0
+          }
+        ],
+        "drops": [
+          {
+            "id": "d1",
+            "type": "berry",
+            "count": 2,
+            "x": 1,
+            "z": 2,
+            "until": 1040
+          }
+        ],
+        "events": [
+          {
+            "id": 1,
+            "type": "announce",
+            "x": 0,
+            "z": 0,
+            "text": "Night 2 • the woods are waking",
+            "at": 440
+          }
+        ],
+        "explored": [],
+        "nodeChanges": [
+          [
+            "n0",
+            2,
+            0
+          ],
+          [
+            "n2",
+            0,
+            960
+          ]
+        ],
+        "idCounter": 6,
+        "eventId": 1,
+        "wave": 1,
+        "nextSpawn": 472,
+        "kills": 0,
+        "bossSlain": false,
+        "bossSpawned": false,
+        "endless": false,
+        "stats": {
+          "gathered": 0,
+          "built": 0,
+          "revives": 0
+        }
+      }
+    },
+    {
+      "name": "cycle4-night-start",
+      "time": 1220,
+      "phase": "night",
+      "savedAt": 1760001220000,
+      "world": {
+        "version": 1,
+        "seed": 402,
+        "time": 1220,
+        "status": "playing",
+        "players": [
+          {
+            "id": "host",
+            "name": "Jun",
+            "character": "ember",
+            "x": 2,
+            "z": 1.8,
+            "dx": 0,
+            "dz": 1,
+            "hp": 80,
+            "hunger": 70,
+            "courage": 60,
+            "stamina": 100,
+            "inventory": {
+              "wood": 3,
+              "stone": 2,
+              "fiber": 3,
+              "berry": 3
+            },
+            "equipment": {},
+            "cooldown": 0,
+            "dash": 0,
+            "dashCooldown": 0,
+            "down": 0,
+            "ghost": false,
+            "revive": 0,
+            "charm": 1,
+            "online": true,
+            "lantern": false,
+            "rest": false,
+            "action": "idle",
+            "actionUntil": 0,
+            "notice": "",
+            "noticeAt": 0,
+            "goal": null
+          }
+        ],
+        "buildings": [
+          {
+            "id": "heart",
+            "type": "hearth",
+            "x": 0,
+            "z": 0,
+            "hp": 600,
+            "maxHp": 600,
+            "fuel": 150,
+            "level": 1,
+            "rotation": 0,
+            "open": false,
+            "charges": 3,
+            "growth": 0,
+            "planted": false,
+            "store": {},
+            "cooldown": 0
+          }
+        ],
+        "enemies": [
+          {
+            "id": "e2",
+            "type": "brute",
+            "x": -12.86397238775036,
+            "z": 12.398551287518378,
+            "hp": 160,
+            "maxHp": 160,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": -12.86397238775036,
+            "tz": 12.398551287518378,
+            "slowed": 0
+          },
+          {
+            "id": "e3",
+            "type": "crawler",
+            "x": -19.733568479848618,
+            "z": 2.1649142591590373,
+            "hp": 48,
+            "maxHp": 48,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": -19.733568479848618,
+            "tz": 2.1649142591590373,
+            "slowed": 0
+          },
+          {
+            "id": "e4",
+            "type": "crawler",
+            "x": 14.438403342388122,
+            "z": 10.234652986785719,
+            "hp": 48,
+            "maxHp": 48,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": 14.438403342388122,
+            "tz": 10.234652986785719,
+            "slowed": 0
+          },
+          {
+            "id": "e5",
+            "type": "wraith",
+            "x": 16.386201174439154,
+            "z": 9.642482707161783,
+            "hp": 60,
+            "maxHp": 60,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": 16.386201174439154,
+            "tz": 9.642482707161783,
+            "slowed": 0
+          },
+          {
+            "id": "e6",
+            "type": "crawler",
+            "x": 2.571653573244806,
+            "z": -17.526922786267487,
+            "hp": 48,
+            "maxHp": 48,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": 2.571653573244806,
+            "tz": -17.526922786267487,
+            "slowed": 0
+          },
+          {
+            "id": "e7",
+            "type": "crawler",
+            "x": 7.20595429066695,
+            "z": -14.802739156569872,
+            "hp": 48,
+            "maxHp": 48,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": 7.20595429066695,
+            "tz": -14.802739156569872,
+            "slowed": 0
+          },
+          {
+            "id": "e8",
+            "type": "wraith",
+            "x": 14.912242184971909,
+            "z": 13.732698454337832,
+            "hp": 60,
+            "maxHp": 60,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": 14.912242184971909,
+            "tz": 13.732698454337832,
+            "slowed": 0
+          },
+          {
+            "id": "e9",
+            "type": "king",
+            "x": 0,
+            "z": -19,
+            "hp": 950,
+            "maxHp": 950,
+            "cooldown": 1,
+            "windup": 0,
+            "slam": 0,
+            "tx": 0,
+            "tz": -19,
+            "slowed": 0
+          }
+        ],
+        "drops": [
+          {
+            "id": "d1",
+            "type": "berry",
+            "count": 2,
+            "x": 1,
+            "z": 2,
+            "until": 1820
+          }
+        ],
+        "events": [
+          {
+            "id": 1,
+            "type": "announce",
+            "x": 0,
+            "z": 0,
+            "text": "The Hollow King has found your fire.",
+            "at": 1220
+          }
+        ],
+        "explored": [],
+        "nodeChanges": [
+          [
+            "n0",
+            2,
+            0
+          ],
+          [
+            "n2",
+            0,
+            1740
+          ]
+        ],
+        "idCounter": 10,
+        "eventId": 1,
+        "wave": 1,
+        "nextSpawn": 1252,
+        "kills": 0,
+        "bossSlain": false,
+        "bossSpawned": true,
+        "endless": false,
+        "stats": {
+          "gathered": 0,
+          "built": 0,
+          "revives": 0
+        }
+      }
+    },
+    {
+      "name": "cycle5-day-start",
+      "time": 1300,
+      "phase": "day",
+      "savedAt": 1760001300000,
+      "world": {
+        "version": 1,
+        "seed": 402,
+        "time": 1300,
+        "status": "playing",
+        "players": [
+          {
+            "id": "host",
+            "name": "Jun",
+            "character": "ember",
+            "x": 2,
+            "z": 1.8,
+            "dx": 0,
+            "dz": 1,
+            "hp": 80,
+            "hunger": 70,
+            "courage": 60,
+            "stamina": 100,
+            "inventory": {
+              "wood": 3,
+              "stone": 2,
+              "fiber": 3,
+              "berry": 3
+            },
+            "equipment": {},
+            "cooldown": 0,
+            "dash": 0,
+            "dashCooldown": 0,
+            "down": 0,
+            "ghost": false,
+            "revive": 0,
+            "charm": 1,
+            "online": true,
+            "lantern": false,
+            "rest": false,
+            "action": "idle",
+            "actionUntil": 0,
+            "notice": "",
+            "noticeAt": 0,
+            "goal": null
+          }
+        ],
+        "buildings": [
+          {
+            "id": "heart",
+            "type": "hearth",
+            "x": 0,
+            "z": 0,
+            "hp": 600,
+            "maxHp": 600,
+            "fuel": 150,
+            "level": 1,
+            "rotation": 0,
+            "open": false,
+            "charges": 3,
+            "growth": 0,
+            "planted": false,
+            "store": {},
+            "cooldown": 0
+          }
+        ],
+        "enemies": [],
+        "drops": [
+          {
+            "id": "d1",
+            "type": "berry",
+            "count": 2,
+            "x": 1,
+            "z": 2,
+            "until": 1900
+          }
+        ],
+        "events": [],
+        "explored": [],
+        "nodeChanges": [
+          [
+            "n0",
+            2,
+            0
+          ],
+          [
+            "n2",
+            0,
+            1820
+          ]
+        ],
+        "idCounter": 2,
+        "eventId": 0,
+        "wave": 0,
+        "nextSpawn": 0,
+        "kills": 0,
+        "bossSlain": false,
+        "bossSpawned": false,
+        "endless": false,
+        "stats": {
+          "gathered": 0,
+          "built": 0,
+          "revives": 0
+        }
+      }
+    }
+  ]
+}

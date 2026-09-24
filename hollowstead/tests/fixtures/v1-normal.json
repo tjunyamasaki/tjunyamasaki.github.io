@@ -1,0 +1,205 @@
+{
+  "savedAt": 1760000335000,
+  "world": {
+    "version": 1,
+    "seed": 402,
+    "time": 335,
+    "status": "playing",
+    "players": [
+      {
+        "id": "host",
+        "name": "Jun",
+        "character": "ember",
+        "x": 4,
+        "z": -2,
+        "dx": 0,
+        "dz": -1,
+        "hp": 76,
+        "hunger": 64,
+        "courage": 81,
+        "stamina": 94,
+        "inventory": {
+          "berry": 3,
+          "pumpkin": 2,
+          "mushroom": 1,
+          "roast": 1
+        },
+        "equipment": {
+          "axe": 54,
+          "pick": 61,
+          "spear": 88,
+          "torch": 167.5
+        },
+        "cooldown": 0.3,
+        "dash": 0,
+        "dashCooldown": 0,
+        "down": 0,
+        "ghost": false,
+        "revive": 0,
+        "charm": 1,
+        "online": true,
+        "lantern": true,
+        "rest": false,
+        "action": "gather",
+        "actionUntil": 335.4,
+        "notice": "Materials stored — nearby crafting uses this chest",
+        "noticeAt": 10,
+        "goal": null
+      }
+    ],
+    "buildings": [
+      {
+        "id": "heart",
+        "type": "hearth",
+        "x": 0,
+        "z": 0,
+        "hp": 600,
+        "maxHp": 600,
+        "fuel": 150,
+        "level": 1,
+        "rotation": 0,
+        "open": false,
+        "charges": 3,
+        "growth": 0,
+        "planted": false,
+        "store": {},
+        "cooldown": 0
+      },
+      {
+        "id": "b1",
+        "type": "chest",
+        "x": 5.5,
+        "z": -2,
+        "hp": 180,
+        "maxHp": 180,
+        "fuel": 0,
+        "level": 1,
+        "rotation": 0,
+        "open": false,
+        "charges": 3,
+        "growth": 0,
+        "planted": false,
+        "store": {
+          "wood": 2,
+          "fiber": 3,
+          "stone": 3
+        },
+        "cooldown": 0
+      }
+    ],
+    "enemies": [],
+    "drops": [
+      {
+        "id": "d2",
+        "type": "stone",
+        "count": 4,
+        "x": 4.4,
+        "z": -1.8,
+        "until": 935
+      }
+    ],
+    "events": [
+      {
+        "id": 1,
+        "type": "craft",
+        "x": 2,
+        "z": 1.8,
+        "text": "Woodcutter’s axe",
+        "at": 335
+      },
+      {
+        "id": 2,
+        "type": "hit",
+        "x": -4,
+        "z": -3,
+        "text": "",
+        "at": 335,
+        "key": "tree"
+      },
+      {
+        "id": 3,
+        "type": "hit",
+        "x": -4,
+        "z": -3,
+        "text": "",
+        "at": 335,
+        "key": "tree"
+      },
+      {
+        "id": 4,
+        "type": "loot",
+        "x": -4,
+        "z": -3,
+        "text": "+5 Twisted wood · +1 Dry grass",
+        "at": 335
+      },
+      {
+        "id": 5,
+        "type": "craft",
+        "x": -4,
+        "z": -2,
+        "text": "Flint pick",
+        "at": 335
+      },
+      {
+        "id": 6,
+        "type": "craft",
+        "x": -4,
+        "z": -2,
+        "text": "Briar spear",
+        "at": 335
+      },
+      {
+        "id": 7,
+        "type": "craft",
+        "x": -4,
+        "z": -2,
+        "text": "Hand lantern",
+        "at": 335
+      },
+      {
+        "id": 8,
+        "type": "hit",
+        "x": 4,
+        "z": -3,
+        "text": "",
+        "at": 335,
+        "key": "rock"
+      },
+      {
+        "id": 9,
+        "type": "build",
+        "x": 5.5,
+        "z": -2,
+        "text": "Supply chest",
+        "at": 335
+      }
+    ],
+    "explored": [],
+    "nodeChanges": [
+      [
+        "n0",
+        0,
+        755
+      ],
+      [
+        "n2",
+        2,
+        0
+      ]
+    ],
+    "idCounter": 3,
+    "eventId": 10,
+    "wave": 0,
+    "nextSpawn": 0,
+    "kills": 0,
+    "bossSlain": false,
+    "bossSpawned": false,
+    "endless": false,
+    "stats": {
+      "gathered": 6,
+      "built": 1,
+      "revives": 0
+    }
+  }
+}

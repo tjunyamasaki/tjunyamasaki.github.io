@@ -932,7 +932,7 @@ These searches are review aids, not blanket delete commands: 180 is now a valid 
 
 ## 16. Implementation packages for other agents
 
-Current status for every package below is NOT STARTED. The planning commit does not satisfy any implementation acceptance criterion.
+P0 is complete. P1–P6 are NOT STARTED. The planning commit does not satisfy any later package's acceptance criterion.
 
 Work on feat/hollowstead-coop or a narrowly scoped integration branch based on its current head. Only an integrator pushes the deployable branch after a coherent slice is working. Do not independently force-push shared history or merge to master.
 
@@ -942,12 +942,12 @@ No agents should edit the same ownership area concurrently. If agents work in pa
 
 Dependencies: none.
 
-- [ ] Record actual starting commit; compare with the baseline in this document.
-- [ ] Read repository rules and current affected files.
-- [ ] Run the two existing test suites once; record baseline failures if any.
-- [ ] Agree/export shared schema, equipment-slot names, command fields, recipe contexts, and authoritative range helpers.
-- [ ] Commit fixed v1 migration fixtures for normal, full-storage, and phase-boundary saves.
-- [ ] Create a short ownership/status entry in section 19.
+- [x] Record actual starting commit; compare with the baseline in this document.
+- [x] Read repository rules and current affected files.
+- [x] Run the two existing test suites once; record baseline failures if any.
+- [x] Agree/export shared schema, equipment-slot names, command fields, recipe contexts, and authoritative range helpers.
+- [x] Commit fixed v1 migration fixtures for normal, full-storage, and phase-boundary saves.
+- [x] Create a short ownership/status entry in section 19.
 
 Deliverable: contracts and fixtures, no unfinished gameplay exposed.
 
@@ -1108,7 +1108,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Package | Status | Owner | Commit / evidence | Remaining issue |
 | --- | --- | --- | --- | --- |
 | Planning | Complete | Orchestrator | Plan only; baseline 395baac7a332f1ed94b5c73e0ec4b4882ee47afe | Gameplay implementation not started |
-| P0 | Not started | Unassigned | — | — |
+| P0 | Complete | P0 agent | Shared contract and v1 fixtures; see the handoff below | No gameplay change. P1–P6 not started |
 | P1 | Not started | Unassigned | — | — |
 | P2 | Not started | Unassigned | — | — |
 | P3 | Not started | Unassigned | — | — |
@@ -1130,4 +1130,35 @@ For each handoff, append:
     Compatibility/migration notes:
     Exact next task:
 
-The next agent should start with P0, then P1. The original game's previous 17 Hollowstead tests and 17 ball-game tests passed at the inspected baseline; those counts are historical context, not evidence that this planned overhaul has been tested.
+The next agent should start with P1. The original game's previous 17 Hollowstead tests and 17 ball-game tests passed at the inspected baseline; those counts are historical context, not evidence that this planned overhaul has been tested.
+
+Date: 2026-09-24
+Package / agent: P0 / P0 agent
+Starting commit: d94450e2b40b31eb5bf8ea22b5a95dad05b54e5b
+Ending commit: parent d94450e2b40b31eb5bf8ea22b5a95dad05b54e5b on feat/hollowstead-coop, subject "Hollowstead P0: shared contracts and v1 save fixtures".
+Files changed:
+- hollowstead/src/contracts.mjs
+- hollowstead/tests/contracts.test.mjs
+- hollowstead/tests/fixtures/generate-v1-fixtures.mjs
+- hollowstead/tests/fixtures/v1-normal.json
+- hollowstead/tests/fixtures/v1-full-storage.json
+- hollowstead/tests/fixtures/v1-phase-boundaries.json
+- hollowstead/IMPLEMENTATION_PLAN.md
+Implemented behavior:
+- Recorded the starting commit d94450e2b40b31eb5bf8ea22b5a95dad05b54e5b. Its only change from the inspected baseline 395baac7a332f1ed94b5c73e0ec4b4882ee47afe is this plan. Repository rules were read; local docs/ was absent and was not created.
+- Exported the shared overhaul contract from hollowstead/src/contracts.mjs: equipment sockets, item/container fields, intent payloads, recipe contexts, action order, range helpers, and the 260→310 phase-preserving time helpers. Nothing in the live game imports it. Protocol stays hollowstead-1 and the clock stays 150/30/80.
+- Committed synthetic v1 saves generated with World: an ordinary camp, a full pack plus paged/overflow storage, and eight exact old cycle boundaries (0, 150, 180, 260, 410, 440, 1220, 1300). Each world round-trips through World.restore. No v1→v2 migration, inventory gameplay, HUD, chests, harvesting, or night visuals were added.
+Tests and device checks actually run:
+- Before the change, at d94450e: `node --test hollowstead/tests/*.test.mjs` (17 pass) and `node --test ball-game/tests/*.test.mjs` (17 pass).
+- After the change: the same Hollowstead command (21 pass, including 4 new contract/fixture tests) and the same ball-game command (17 pass). `node --check` on the new modules. `git diff --check` clean.
+- No browser gameplay pass. This package does not change the running game.
+Evidence / screenshots / deployment run:
+- Baseline comparison: `git diff 395baac7a332f1ed94b5c73e0ec4b4882ee47afe..d94450e2b40b31eb5bf8ea22b5a95dad05b54e5b --stat` is IMPLEMENTATION_PLAN.md only.
+- Deployment is recorded after push of this commit. Visible gameplay is unchanged. The published plan text is the only player-visible file in this package.
+Remaining failures or unverified cases:
+- None in the existing suites. M01–M18 were not run. v1→v2 migration is not implemented, so the fixtures are not yet migrated.
+Compatibility/migration notes:
+- Saves remain hollowstead.expedition.v1, RULES.version 1. Fixtures use the live snapshot wrapper `{world, savedAt}` (phase boundaries add name/time/phase labels around that world).
+- The guest pack in v1-full-storage.json is an over-capacity count dictionary. World.restore accepts it. A normal 120-supply pack always fits in 24 stacks of 20 because only 13 supply ids exist; that guest pack is the overflow case section 13 must not discard. The host pack is a legal 120, and the chest was filled through deposit plus the real store shape, including food.
+- Phase helpers snap exact old boundaries onto the phase that begins there (150→180, 180→210, 260→310) and do not replay the night-start wave. They are not called by the simulation.
+Exact next task: P1 — Item foundation and save migration. Do not enable the 180/30/100 clock until phase-preserving migration is in place and coordinated with P5.

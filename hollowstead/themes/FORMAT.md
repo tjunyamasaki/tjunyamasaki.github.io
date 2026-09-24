@@ -50,3 +50,5 @@ All supplied SVGs are original editable vector artwork. The character sheets con
 ## Change the setting
 
 For a full setting change, replace the theme images, animation clips, sounds and palette; replace the UI skin; then edit display names and narrative copy in `content.mjs`, `index.html` and `main.mjs`. Keep item keys such as `wood`, `ember` and `hearth` as stable gameplay identifiers. This keeps recipes, multiplayer packets and existing saves compatible.
+
+`../devices.html` provides phone, landscape and side-by-side co-op previews while replacing artwork. The second renderer uses Canvas2D projection automatically when WebGL is unavailable; it consumes the same assets, animation clips and game state.

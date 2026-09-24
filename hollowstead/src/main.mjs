@@ -10,6 +10,7 @@ let identity=crypto.randomUUID();try{identity=sessionStorage.getItem('hollowstea
 async function bounded(promise){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('The connection service did not respond. Please try again.')),18000);})]);}finally{clearTimeout(timer);}}
 let theme,renderer,sound,world,network=null,mode='front',localId='host',character='ember',room='',paused=false,remotePaused=false,hiddenPause=false;
 let sheet=null,category='all',campTarget=null,selected=null,placement=null,lastNotice=0,lastEvent=0,lastStatus='',lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,saveTime=0,pingTime=0;
+let sheetMarkup='',tabsMarkup='';
 let toastTimer,announceTimer,dirty=true,stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
 function profile(){try{return JSON.parse(localStorage.getItem(PROFILE)||'{}');}catch{return {};}}
 function saved(){try{const data=JSON.parse(localStorage.getItem(SAVE)||'null');return data?.world?.version===RULES.version?data:null;}catch{return null;}}
@@ -18,7 +19,7 @@ function showStatus(text,error=false){$('front-status').textContent=text;$('fron
 function toast(text){$('toast').textContent=text;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3200);}
 function announce(text){$('announcement').textContent=text;$('announcement').classList.add('visible');clearTimeout(announceTimer);announceTimer=setTimeout(()=>$('announcement').classList.remove('visible'),4100);}
 function icon(key){const src=theme.sprites[ITEMS[key]?.icon||EQUIPMENT[key]?.icon||key]?.src||theme.sprites.ember.src;return `<img class="item-icon" src="${escape(src)}" alt="" draggable="false">`;}
-function portrait(key){return `<span class="portrait" style="background-image:url('${theme.sprites[key]?.src||theme.sprites.ember.src}')"></span>`;}
+function portrait(key){return `<span class="portrait" style="background-image:url('${theme.sprites[key]?.src||theme.sprites.ember.src}');background-size:${(theme.sprites[key]?.columns||1)*100}% ${(theme.sprites[key]?.rows||1)*100}%"></span>`;}
 function me(){return world.player(localId);}
 function send(cmd){if(mode==='guest')network?.action(cmd);else if(mode==='solo'||mode==='host')world.action(localId,cmd);dirty=true;sound.unlock();}
 function save(manual=false){if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;try{localStorage.setItem(SAVE,JSON.stringify({world:world.snapshot(),savedAt:Date.now()}));if(manual)toast('Expedition saved');else if(mode==='solo')$('network-status').textContent='Expedition saved';}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
@@ -106,7 +107,7 @@ function renderSheet(){
       if(b.type!=='hearth')html+='<p class="section-label">RECOVER MATERIALS</p><button data-command="dismantle">Dismantle for half the materials</button>';
     }
   }
-  $('sheet-title').textContent=title;$('sheet-kicker').textContent=kicker;$('sheet-tabs').innerHTML=tabs;$('sheet-content').innerHTML=html;if(sheet==='map')drawMap($('full-map'),true);
+  $('sheet-title').textContent=title;$('sheet-kicker').textContent=kicker;if(tabs!==tabsMarkup){$('sheet-tabs').innerHTML=tabs;tabsMarkup=tabs;}if(html!==sheetMarkup){$('sheet-content').innerHTML=html;sheetMarkup=html;}if(sheet==='map')drawMap($('full-map'),true);
 }
 function placeRecipe(key){const p=me();placement={key,x:Math.round((p.x+p.dx*3)*2)/2,z:Math.round((p.z+p.dz*3)*2)/2,rotation:0,valid:false,anchored:false};closeSheet();$('placement').hidden=false;$('placement-name').textContent=label(key);selected=null;dirty=true;}
 function objective(){const p=me(),h=world.buildings.find(b=>b.type==='hearth');if(!p)return;

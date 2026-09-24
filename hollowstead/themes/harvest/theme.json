@@ -1,0 +1,1040 @@
+{
+  "id": "harvest",
+  "name": "The Hollow Harvest",
+  "title": "Hollowstead",
+  "subtitle": "A little light. A long night.",
+  "palette": {
+    "background": "#302d3c",
+    "meadow": "#7d735d",
+    "woods": "#565e55",
+    "graveyard": "#746977",
+    "path": "#9c8968",
+    "night": "#38394f",
+    "light": "#f7ba72",
+    "accent": "#eaaa6a"
+  },
+  "audio": {},
+  "sprites": {
+    "tree": {
+      "src": "./sprites/tree.svg",
+      "size": [
+        4.1,
+        6.15
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "rock": {
+      "src": "./sprites/rock.svg",
+      "size": [
+        2.8,
+        4.2
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "ore": {
+      "src": "./sprites/ore.svg",
+      "size": [
+        2.8,
+        4.2
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "grass": {
+      "src": "./sprites/grass.svg",
+      "size": [
+        1.5,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "bush": {
+      "src": "./sprites/bush.svg",
+      "size": [
+        2.4,
+        3.6
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "pumpkin": {
+      "src": "./sprites/pumpkin.svg",
+      "size": [
+        2.1,
+        3.15
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "mushroom": {
+      "src": "./sprites/mushroom.svg",
+      "size": [
+        1.5,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "grave": {
+      "src": "./sprites/grave.svg",
+      "size": [
+        2.3,
+        3.45
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "fire": {
+      "src": "./sprites/fire.svg",
+      "size": [
+        2.6,
+        3.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "hearth": {
+      "src": "./sprites/hearth.svg",
+      "size": [
+        3.5,
+        5.25
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "bench": {
+      "src": "./sprites/bench.svg",
+      "size": [
+        2.6,
+        3.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "chest": {
+      "src": "./sprites/chest.svg",
+      "size": [
+        2.3,
+        3.45
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "wall": {
+      "src": "./sprites/wall.svg",
+      "size": [
+        2.4,
+        3.6
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "gate": {
+      "src": "./sprites/gate.svg",
+      "size": [
+        2.4,
+        3.6
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "trap": {
+      "src": "./sprites/trap.svg",
+      "size": [
+        2,
+        3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "farm": {
+      "src": "./sprites/farm.svg",
+      "size": [
+        2.8,
+        4.2
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "pot": {
+      "src": "./sprites/pot.svg",
+      "size": [
+        2.5,
+        3.75
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "lantern": {
+      "src": "./sprites/lantern.svg",
+      "size": [
+        1.9,
+        2.85
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "bed": {
+      "src": "./sprites/bed.svg",
+      "size": [
+        2.5,
+        3.75
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "ward": {
+      "src": "./sprites/ward.svg",
+      "size": [
+        2.6,
+        3.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "crawler": {
+      "src": "./sprites/crawler.svg",
+      "size": [
+        1.9,
+        2.85
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "wraith": {
+      "src": "./sprites/wraith.svg",
+      "size": [
+        2,
+        3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "brute": {
+      "src": "./sprites/brute.svg",
+      "size": [
+        2.6,
+        3.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "king": {
+      "src": "./sprites/king.svg",
+      "size": [
+        4.4,
+        6.6
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "wood": {
+      "src": "./sprites/wood.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "stone": {
+      "src": "./sprites/stone.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "ember": {
+      "src": "./sprites/ember.svg",
+      "size": [
+        1.65,
+        2.48
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            1,
+            0,
+            2,
+            0
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        },
+        "gather": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        },
+        "dash": {
+          "frames": [
+            1
+          ],
+          "fps": 1
+        },
+        "down": {
+          "frames": [
+            2
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "seed": {
+      "src": "./sprites/seed.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "berry": {
+      "src": "./sprites/berry.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "meat": {
+      "src": "./sprites/meat.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "roast": {
+      "src": "./sprites/roast.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "stew": {
+      "src": "./sprites/stew.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "bandage": {
+      "src": "./sprites/bandage.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "axe": {
+      "src": "./sprites/axe.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "pick": {
+      "src": "./sprites/pick.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "spear": {
+      "src": "./sprites/spear.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "sword": {
+      "src": "./sprites/sword.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "armor": {
+      "src": "./sprites/armor.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "moss": {
+      "src": "./sprites/moss.svg",
+      "size": [
+        1.65,
+        2.48
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            1,
+            0,
+            2,
+            0
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        },
+        "gather": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        },
+        "dash": {
+          "frames": [
+            1
+          ],
+          "fps": 1
+        },
+        "down": {
+          "frames": [
+            2
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "vesper": {
+      "src": "./sprites/vesper.svg",
+      "size": [
+        1.65,
+        2.48
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            1,
+            0,
+            2,
+            0
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        },
+        "gather": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        },
+        "dash": {
+          "frames": [
+            1
+          ],
+          "fps": 1
+        },
+        "down": {
+          "frames": [
+            2
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "cinder": {
+      "src": "./sprites/cinder.svg",
+      "size": [
+        1.65,
+        2.48
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            1,
+            0,
+            2,
+            0
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        },
+        "gather": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        },
+        "dash": {
+          "frames": [
+            1
+          ],
+          "fps": 1
+        },
+        "down": {
+          "frames": [
+            2
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "soul": {
+      "src": "./sprites/soul.svg",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    }
+  },
+  "motion": {
+    "walkBob": 0.08,
+    "walkTilt": 0.045,
+    "idleSway": 0.018,
+    "hitSquash": 0.16,
+    "attackTilt": 0.26
+  }
+}

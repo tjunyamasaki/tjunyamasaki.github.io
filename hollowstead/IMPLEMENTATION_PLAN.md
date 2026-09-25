@@ -1115,7 +1115,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Pack, chest, and pickup motion | Complete | follow-up on feat/hollowstead-coop | 2e41d385f008a10e200a08846e0516db17226487. 99 Hollowstead + 17 ball-game tests passing | Slot counts superseded by the 12/24 follow-up. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
 | Pack 12 and chest 24 | Complete | follow-up on feat/hollowstead-coop | This commit. 99 Hollowstead + 17 ball-game tests passing | No separate stack action. Pack is 12 slots. Chests are 24 slots. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
 | P5 | Complete | P5 agent | a07f48616a658a1edd34540e6a667b5ff6b53a31. 104 Hollowstead + 17 ball-game tests passing. Pages run 36170883617 succeeded | Real phone and a four-player scene were not run. M14 is unverified |
-| Showcase and magic weapons | Complete | showcase agent | Showcase commit on feat/hollowstead-coop. 108 Hollowstead + 17 ball-game tests passing. Cache query harvest-13 | P6 not started. A real phone and a second device were not used |
+| Showcase and magic weapons | Complete | showcase agent | bb5a9a09bd28f56fca6fca2c2262732ac99ea0dd. 108 Hollowstead + 17 ball-game tests passing. Cache query harvest-13 | P6 not started. A real phone and a second device were not used |
 | P6 | Not started | Unassigned | — | — |
 
 For each handoff, append:
@@ -1654,7 +1654,7 @@ Exact next task: P6 — Integration and release. Do not start P6 in this package
 Date: 2026-09-25
 Package / agent: Showcase mode and four magic weapons. P6 was not started.
 Starting commit: 6bfd10d2f728059d87322137432ba612be3757a1
-Ending commit: SHOWCASE_COMMIT
+Ending commit: bb5a9a09bd28f56fca6fca2c2262732ac99ea0dd
 Files changed: hollowstead showcase UI, engine hooks, both renderers, magic registry/loader, and the four weapon modules with their art (barrow-rattle, cinder-staff, widows-needle, spirit-fan).
 Implemented behavior:
 - Title-screen Showcase and ?showcase start a solo empty world. Flat ground still renders. No resource nodes, camps, pre-placed trees, rocks, buildings, drops, or waves. Health, hunger, and courage stay at 100 and damage does not apply to the player. Spawned mobs can still be hurt and killed. Campaign, multiplayer, and ?dev are unchanged.

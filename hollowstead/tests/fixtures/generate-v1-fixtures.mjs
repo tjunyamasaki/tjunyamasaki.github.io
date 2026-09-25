@@ -5,6 +5,8 @@
 import {writeFileSync} from 'node:fs';
 import {World} from '../../src/engine.mjs';
 import {ITEMS, NODES, RULES, phaseAt} from '../../src/content.mjs';
+console.error('Refusing to overwrite frozen v1 fixtures in hollowstead/tests/fixtures. They record the pre-container save shape.');
+process.exit(1);
 
 const SAVED_AT_ORIGIN = 1760000000000;
 const here = new URL('./', import.meta.url);

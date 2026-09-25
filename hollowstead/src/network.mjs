@@ -1,5 +1,7 @@
 import {RULES} from './content.mjs';
-export const PROTOCOL='hollowstead-1';
+import {PROTOCOL_V2} from './contracts.mjs';
+export const PROTOCOL=PROTOCOL_V2;
+const REFRESH='This camp uses a different Hollowstead version. Refresh the page to update, then join again.';
 // Firebase exchanges connection offers only. All game state stays with the host.
 export function createNetwork({getWorld,onFrame,onReady,onStatus,onPause,onLeave,signaling,identity,PeerConnection=globalThis.RTCPeerConnection}){
   let signal=signaling,code='',hosting=false,stopped=false,guest=null,unsubscribe=()=>{},timeout;
@@ -28,7 +30,7 @@ export function createNetwork({getWorld,onFrame,onReady,onStatus,onPause,onLeave
     channel.onmessage=e=>{
       if(typeof e.data!=='string'||e.data.length>2000)return;let msg;try{msg=JSON.parse(e.data);}catch{return;}if(!msg||typeof msg!=='object')return;
       const now=performance.now();if(now-p.window>1000){p.window=now;p.messages=0;}if(++p.messages>65)return;p.at=now;
-      if(msg.type==='hello'&&!p.ready){if(msg.protocol!==PROTOCOL){send(channel,{type:'error',text:'This room belongs to a different game.'});return;}
+      if(msg.type==='hello'&&!p.ready){if(msg.protocol!==PROTOCOL){send(channel,{type:'error',text:REFRESH});return;}
         const player=getWorld().addPlayer(key,info.name,msg.character);if(!player){closePeer(key);return;}p.ready=true;clearTimeout(p.timer);send(channel,{type:'welcome',protocol:PROTOCOL,id:key});sendFrame(channel);status(`${peers.size+1} wanderers connected`);
       }
       if(!p.ready)return;
@@ -47,7 +49,7 @@ export function createNetwork({getWorld,onFrame,onReady,onStatus,onPause,onLeave
     pc.onicecandidate=e=>{if(e.candidate)signal.pushIce(code,id,false,e.candidate).catch(()=>{});};
     pc.onconnectionstatechange=()=>{if(['failed','closed'].includes(pc.connectionState))fail('Connection lost. The host can save and reopen this expedition.');};
     pc.ondatachannel=e=>{
-      if(e.channel.label!==PROTOCOL){fail('That code is for a different game.');return;}
+      if(e.channel.label!==PROTOCOL){fail(REFRESH);return;}
       const ch=guest.channel=e.channel;ch.onopen=()=>send(ch,{type:'hello',protocol:PROTOCOL,character});ch.onclose=()=>fail('The host closed the camp. Ask them to reopen their saved expedition.');
       ch.onmessage=e=>{
         if(typeof e.data!=='string'||e.data.length>20000)return;let m;try{m=JSON.parse(e.data);}catch{return;}if(!m)return;guest.last=performance.now();

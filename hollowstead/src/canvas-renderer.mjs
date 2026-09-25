@@ -1,7 +1,8 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
-import {ITEMS,NODES,STRUCTURES,RULES} from './content.mjs';
+import {NODES,STRUCTURES,RULES} from './content.mjs';
 import {biome,distance} from './engine.mjs';
+import {equippedLanternLit,itemSpriteKey} from './inventory.mjs';
 export class CanvasRenderer {
   constructor(canvas,theme){
     this.canvas=canvas;this.theme=theme;this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');
@@ -47,12 +48,12 @@ export class CanvasRenderer {
     }
     c.fillStyle=`rgba(27,28,49,${night*.64})`;c.fillRect(0,0,this.width,this.height);
     for(const b of world.buildings)if(STRUCTURES[b.type].light&&(b.type==='lantern'||b.fuel>0))this.glow(b.x,b.z,STRUCTURES[b.type].light+(b.type==='hearth'?(b.level-1)*1.5:0),.18+night*.26);
-    for(const q of world.players)if(q.online&&q.lantern&&q.equipment.torch>0)this.glow(q.x,q.z,4,.18+night*.2);
+    for(const q of world.players)if(equippedLanternLit(q))this.glow(q.x,q.z,4,.18+night*.2);
     if(target&&!placement){c.setLineDash([5,4]);c.lineDashOffset=-this.clock*6;this.ellipse(target.x,target.z,1,'#edc48c',false);c.setLineDash([]);}
     if(p.goal)this.ellipse(p.goal.x,p.goal.z,.2,'#eadaba',false);
     for(const e of world.enemies)if(e.windup>0){this.ellipse(e.tx,e.tz,e.type==='king'?4:1.9,`rgba(240,118,100,${.12+Math.sin(this.clock*12)*.06})`);this.ellipse(e.tx,e.tz,e.type==='king'?4:1.9,'#f1957b',false);}
-    const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:ITEMS[e.type]?.icon||e.type,kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
-    entities.sort((a,b)=>a.e.z-b.e.z);for(const {e,key,kind}of entities)if(Math.abs(e.x-this.focus.x)<halfX+4&&Math.abs(e.z-this.focus.z)<halfZ+4)this.drawSprite(key,e,kind,world,night,p);
+    const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
+    entities.sort((a,b)=>a.e.z-b.e.z);for(const {e,key,kind}of entities){if(kind==='drop'&&!this.theme.sprites[key])continue;if(Math.abs(e.x-this.focus.x)<halfX+4&&Math.abs(e.z-this.focus.z)<halfZ+4)this.drawSprite(key,e,kind,world,night,p);}
     if(placement){c.globalAlpha=.65;this.drawSprite(placement.key,{x:placement.x,z:placement.z},'preview',world,0,p);c.globalAlpha=1;this.ellipse(placement.x,placement.z,.9,placement.valid?'#bbdca5':'#d67d79',false);}
     for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2){if(['loot','damage','heal','build','craft'].includes(ev.type))this.float(ev.text,ev.x,ev.z,ev.type==='damage'?'#f5c2a9':ev.type==='heal'?'#b9e2ba':'#fbe1ad');if(['hit','kill','hurt','impact','bolt'].includes(ev.type))this.effects.push({...ev,life:0});}this.lastEvent=ev.id;}
     this.effects=this.effects.filter(e=>{e.life+=dt;this.ellipse(e.x,e.z,.2+e.life*(e.type==='impact'?8:3),`rgba(246,194,131,${Math.max(0,1-e.life*2)})`,false);return e.life<.5;});

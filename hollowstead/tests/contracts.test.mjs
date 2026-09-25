@@ -21,15 +21,16 @@ const load = name => JSON.parse(readFileSync(new URL(name, fixtureDir), 'utf8'))
 const keys = value => Object.keys(value).sort();
 const supplyLoad = inventory => Object.values(inventory).reduce((sum, count) => sum + count, 0);
 const stackCount = counts => Object.values(counts).reduce((sum, count) => sum + splitStackQuantities(count).length, 0);
+const V1_WORLD_KEYS = ['bossSlain','bossSpawned','buildings','drops','endless','enemies','eventId','events','explored','idCounter','kills','nextSpawn','nodeChanges','players','seed','stats','status','time','version','wave'];
+const V1_PLAYER_KEYS = ['action','actionUntil','character','charm','cooldown','courage','dash','dashCooldown','down','dx','dz','equipment','ghost','goal','hp','hunger','id','inventory','lantern','name','notice','noticeAt','online','rest','revive','stamina','x','z'];
+const V1_BUILDING_KEYS = ['charges','cooldown','fuel','growth','hp','id','level','maxHp','open','planted','rotation','store','type','x','z'];
+const V1_DROP_KEYS = ['count','id','type','until','x','z'];
 
 function assertV1World(world){
   assert.equal(world.version, RULES.version);
   assert.equal(world.version, SAVE_VERSION_V1);
-  const fresh = new World(world.seed);
-  fresh.addPlayer('host', 'Jun', 'ember');
-  fresh.start();
-  fresh.drop('wood', 1, 0, 0);
-  assert.deepEqual(keys(world), keys(fresh.snapshot()));
+  assert.equal(world.clock, undefined);
+  assert.deepEqual(keys(world), V1_WORLD_KEYS);
   assert.equal(world.inputs, undefined);
   assert.equal(world.rng, undefined);
   assert.equal(world.wipe, undefined);
@@ -37,7 +38,7 @@ function assertV1World(world){
   assert.ok(Array.isArray(world.buildings) && world.buildings.length <= 500);
   assert.equal(typeof world.savedAt, 'undefined');
   for (const player of world.players) {
-    assert.deepEqual(keys(player), keys(fresh.players[0]));
+    assert.deepEqual(keys(player), V1_PLAYER_KEYS);
     assert.equal(Array.isArray(player.inventory), false);
     for (const [itemId, count] of Object.entries(player.inventory)) {
       assert.ok(Object.hasOwn(ITEMS, itemId), itemId);
@@ -49,12 +50,12 @@ function assertV1World(world){
     }
   }
   for (const building of world.buildings) {
-    assert.deepEqual(keys(building), keys(fresh.buildings[0]));
+    assert.deepEqual(keys(building), V1_BUILDING_KEYS);
     assert.equal(Array.isArray(building.store), false);
   }
   for (const drop of world.drops) {
-    assert.deepEqual(keys(drop), keys(fresh.drops[0]));
-    assert.ok(Object.hasOwn(ITEMS, drop.type));
+    assert.deepEqual(keys(drop), V1_DROP_KEYS);
+    assert.ok(Object.hasOwn(ITEMS, drop.type) || itemDefinition(drop.type)?.kind === 'equipment');
     assert.equal(Number.isInteger(drop.count) && drop.count > 0, true);
     assert.equal(drop.until, world.time + 600);
   }
@@ -73,24 +74,32 @@ function assertV1World(world){
     probe.spawnEnemy('crawler', 1, 1);
     for (const enemy of world.enemies) assert.deepEqual(keys(enemy), keys(probe.enemies[0]));
   }
-  const restored = World.restore(JSON.parse(JSON.stringify(world)));
-  assert.deepEqual(restored.snapshot(), world);
+  assert.throws(() => World.restore(JSON.parse(JSON.stringify(world))), /not a Hollowstead expedition/);
 }
 
-test('runtime clock and protocol stay on the v1 baseline', () => {
+test('runtime clock stays on the v1 baseline while the protocol is hollowstead-2', () => {
   assert.equal(CONTRACT, 'hollowstead-contracts-1');
-  assert.equal(PROTOCOL, PROTOCOL_V1);
+  assert.equal(PROTOCOL, PROTOCOL_V2);
   assert.equal(PROTOCOL_V1, 'hollowstead-1');
   assert.equal(PROTOCOL_V2, 'hollowstead-2');
   assert.deepEqual(V1_PHASE, {day: RULES.day, dusk: RULES.dusk, night: RULES.night, cycle: RULES.cycle});
   assert.deepEqual(V2_PHASE, {day: 180, dusk: 30, night: 100, cycle: 310});
   assert.equal(V2_PHASE.cycle, V2_PHASE.day + V2_PHASE.dusk + V2_PHASE.night);
   assert.notEqual(V2_PHASE.cycle, RULES.cycle);
-  for (const file of ['content.mjs', 'engine.mjs', 'main.mjs', 'network.mjs', 'renderer.mjs', 'canvas-renderer.mjs']) {
+  for (const file of ['content.mjs', 'engine.mjs', 'main.mjs', 'renderer.mjs', 'canvas-renderer.mjs']) {
     const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
     assert.equal(source.includes('contracts.mjs'), false, file);
   }
+  const network = readFileSync(new URL('../src/network.mjs', import.meta.url), 'utf8');
+  assert.equal(network.includes('contracts.mjs'), true);
+  assert.match(network, /Refresh the page to update/);
   assert.equal(readFileSync(new URL('../index.html', import.meta.url), 'utf8').includes('contracts.mjs'), false);
+  for (const file of ['renderer.mjs', 'canvas-renderer.mjs']) {
+    const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
+    assert.match(source, /t>=180/);
+    assert.match(source, /t>150/);
+    assert.equal(source.includes('V2_PHASE'), false);
+  }
 });
 
 test('shared schema names equipment, intents, recipes, and ranges', () => {
@@ -189,7 +198,7 @@ test('phase mapping keeps the boundary that is beginning and does not add a wave
   assert.equal(nextNightWaveTime(0), null);
 });
 
-test('v1 fixtures restore and match the current save shape', () => {
+test('v1 fixtures keep the legacy save shape and cannot resume as container worlds', () => {
   const normal = load('v1-normal.json');
   const full = load('v1-full-storage.json');
   const boundaries = load('v1-phase-boundaries.json');

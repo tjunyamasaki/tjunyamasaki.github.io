@@ -1,5 +1,7 @@
-// Shared Hollowstead overhaul contract (P0).
-// Pure data and helpers for later packages. Live gameplay does not import this module.
+// Shared Hollowstead overhaul contract.
+// Pure data and helpers. The simulation reaches this module through inventory.mjs and
+// serialization.mjs. network.mjs imports the protocol id directly.
+// The running clock stays on content.mjs 150/30/80 until P5 enables 180/30/100.
 // Do not import World, the DOM, the network, or a renderer from here.
 
 import {EQUIPMENT, ITEMS, RULES} from './content.mjs';
@@ -38,6 +40,9 @@ export const REMOVED_GAMEPLAY_COMMANDS = Object.freeze(['eat', 'ping', 'deposit'
 
 export const V1_PHASE = Object.freeze({day: 150, dusk: 30, night: 80, cycle: 260});
 export const V2_PHASE = Object.freeze({day: 180, dusk: 30, night: 100, cycle: 310});
+/** P1 saves keep `v1` so the live 260s clock resumes the same phase. P5 sets `v2` when it enables 310s. */
+export const CLOCK_V1 = 'v1';
+export const CLOCK_V2 = 'v2';
 /** Fractions of the night length. 0 / 0.4 / 0.8 of the v2 night are 0s / 40s / 80s. */
 export const NIGHT_WAVE_FRACTIONS = Object.freeze([0, 0.4, 0.8]);
 const PHASE_EDGE_EPSILON = 1e-8;
@@ -202,6 +207,7 @@ export function itemDefinition(itemId){
     return Object.freeze({
       itemId, kind:'equipment', stackLimit:1, supplyUnits:0, equipmentSlot:equipmentSlotFor(itemId),
       maxDurability:EQUIPMENT[itemId].durability, use:null,
+      retainsAtZeroDurability:itemId==='torch',
     });
   }
   if(Object.hasOwn(ITEMS, itemId)){
@@ -209,6 +215,7 @@ export function itemDefinition(itemId){
     return Object.freeze({
       itemId, kind:'supply', stackLimit:STACK_LIMIT, supplyUnits:1, equipmentSlot:null, maxDurability:null,
       use:item.food?'eat':item.heal?'heal':null,
+      retainsAtZeroDurability:false,
     });
   }
   return null;

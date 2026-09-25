@@ -1,6 +1,7 @@
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {NODES,STRUCTURES,ITEMS,RULES,phaseAt} from './content.mjs';
+import {NODES,STRUCTURES,RULES,phaseAt} from './content.mjs';
 import {random,biome,distance} from './engine.mjs';
+import {equippedLanternLit,itemSpriteKey} from './inventory.mjs';
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
   const response=await fetch(url);if(!response.ok)throw new Error('The harvest art could not be loaded. Please reload.');
   const theme=await response.json();theme.url=url;for(const def of Object.values(theme.sprites))def.src=new URL(def.src,url).href;
@@ -64,8 +65,9 @@ export class Renderer {
     const t=world.time%RULES.cycle,night=t>=180?Math.min(1,(t-180)/7):t>150?(t-150)/30*.7:0;
     const groundColor=new THREE.Color('#ffffff').lerp(new THREE.Color('#555775'),night*.73);this.ground.material.color.copy(groundColor);this.scatter.material.color.copy(groundColor);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color('#191b2b'),night);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:ITEMS[e.type]?.icon||e.type,kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
     for(const {e,key,kind}of entities){
+      if(kind==='drop'&&!this.theme.sprites[key])continue;
       const id=kind+e.id;alive.add(id);let o=this.objects.get(id);if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=visible&&e.windup>0;if(o.health){o.health.back.visible=o.health.fill.visible=visible&&e.hp<e.maxHp;}if(!visible)continue;
       const smooth=['player','enemy'].includes(kind)&&!demo?Math.min(1,dt*(e.id===localId?22:13)):1;
       if(!o.initialized){o.x=e.x;o.z=e.z;o.initialized=true;}else{o.x+=(e.x-o.x)*smooth;o.z+=(e.z-o.z)*smooth;}
@@ -81,7 +83,7 @@ export class Renderer {
       o.sprite.material.color.set('#ffffff');if(night){o.sprite.material.color.lerp(new THREE.Color('#737b9f'),night*.7);if(world.lit(e))o.sprite.material.color.lerp(new THREE.Color('#fff0c8'),.6);}
       o.sprite.material.opacity=e.ghost?.4:key==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
       if(kind==='building'&&STRUCTURES[key].light){const lit=key==='lantern'||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit;o.glow.material.opacity=(.3+night*.7)*(1+Math.sin(this.clock*9)*.05);if(!lit)o.sprite.material.color.multiplyScalar(.45);}
-      if(kind==='player'){if(e.lantern&&e.equipment.torch>0){this.glow(o,4);o.glow.material.opacity=.6;}else if(o.glow)o.glow.visible=false;}
+      if(kind==='player'){if(equippedLanternLit(e)){this.glow(o,4);o.glow.material.opacity=.6;}else if(o.glow)o.glow.visible=false;}
       if(kind==='building'&&key==='gate'&&e.open)o.sprite.scale.x*=.35;
       if(kind==='building'&&key==='farm'&&e.growth>=100)o.sprite.material.color.set('#efd394');
       if((kind==='enemy'||kind==='building')&&e.hp<e.maxHp){if(!o.health){const back=new THREE.Sprite(new THREE.SpriteMaterial({color:0x302834,depthWrite:false})),fill=new THREE.Sprite(new THREE.SpriteMaterial({color:kind==='enemy'?0xdf9383:0xd2c395,depthWrite:false}));fill.center.set(0,.5);this.scene.add(back,fill);o.health={back,fill};}const y=(kind==='enemy'?key==='king'?5.4:key==='brute'?3.3:key==='wraith'?2.2:1.3:key==='hearth'?3.6:1.8);o.health.back.position.set(o.x,y,o.z);o.health.fill.position.set(o.x-.65,y,o.z+.025);o.health.back.scale.set(1.4,.1,1);o.health.fill.scale.set(1.3*Math.max(0,e.hp/e.maxHp),.055,1);o.health.back.visible=o.health.fill.visible=true;}

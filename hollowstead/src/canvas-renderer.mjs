@@ -1,22 +1,23 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
-import {STRUCTURES, RULES} from './content.mjs?v=harvest-14';
-import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-14';
-import {equippedLanternLit, itemSpriteKey} from './inventory.mjs?v=harvest-14';
-import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-14';
-import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-14';
-import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-14';
+import {STRUCTURES, RULES} from './content.mjs?v=harvest-15';
+import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-15';
+import {equippedLanternLit, itemSpriteKey} from './inventory.mjs?v=harvest-15';
+import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-15';
+import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-15';
+import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-15';
+import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-15';
 import {
   brightnessAt, canInspect, entityBrightness, frameLighting, labelOpacity, shadeHex, warningVisible,
-} from './lighting.mjs?v=harvest-14';
+} from './lighting.mjs?v=harvest-15';
 export class CanvasRenderer {
   constructor(canvas,theme){
     this.canvas=canvas;this.theme=theme;this.magicClock=new MagicClock();this.magicActors=new Map();this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');
     this.images=new Map();this.zoom=1;this.clock=0;this.lastEvent=0;this.seed=null;this.effects=[];this.floaters=[];this.focus={x:0,z:0,set:(x,y,z)=>{this.focus.x=x;this.focus.z=z;}};this.dropMotion=createDropMotion();this.view=null;this.localId=null;
-    this.onResize=()=>this.resize();window.addEventListener('resize',this.onResize);this.resize();
+    this.onResize=()=>this.resize();watchViewport(this.onResize);this.resize();
   }
   async preload(){await Promise.all(Object.entries(this.theme.sprites).map(([key,def])=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{this.images.set(key,image);resolve();};image.onerror=()=>reject(new Error(`Missing sprite: ${key}`));image.src=def.src;})));}
-  resize(){this.width=innerWidth;this.height=innerHeight;const dpr=Math.min(devicePixelRatio,1.6);this.canvas.width=Math.round(this.width*dpr);this.canvas.height=Math.round(this.height*dpr);this.ctx.setTransform(dpr,0,0,dpr,0,0);this.scale=this.height/(2*(this.width/this.height<.85?12:13)/this.zoom);}
+  resize(){const size=viewSize(this.canvas);this.width=size.width;this.height=size.height;const dpr=Math.min(devicePixelRatio||1,1.6);this.canvas.width=Math.round(this.width*dpr);this.canvas.height=Math.round(this.height*dpr);this.ctx.setTransform(dpr,0,0,dpr,0,0);const half=orthographicHalf(this.width,this.height);this.scale=this.height/(2*half/this.zoom);}
   setZoom(value){this.zoom=Math.max(.65,Math.min(1.6,value));this.resize();}
   screenPoint(x,z,y=0){return{x:(x-this.focus.x)*this.scale+this.width/2,y:(z-this.focus.z)*this.scale*.72-y*this.scale*.694+this.height/2};}
   worldPoint(x,y){return{x:(x-this.width/2)/this.scale+this.focus.x,z:(y-this.height/2)/(this.scale*.72)+this.focus.z};}

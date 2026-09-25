@@ -1,6 +1,6 @@
 // Solo showcase sandbox. The spawn list is built from the live content tables.
-import { ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES, label } from './content.mjs?v=harvest-14';
-import { clearMagicLists, deleteMagicEntity, magicItems, magicMobById, magicMobEntries } from './magic/registry.mjs?v=harvest-14';
+import { ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES, label } from './content.mjs?v=harvest-15';
+import { clearMagicLists, deleteMagicEntity, magicItems, magicMobById, magicMobEntries } from './magic/registry.mjs?v=harvest-15';
 
 const PLACE_RANGE = 5.5;
 
@@ -40,15 +40,17 @@ function escapeHtml(value){
   return String(value).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 }
 
-export function showcaseMarkup({active = 'materials', tool = '', icon = () => ''} = {}){
+export function showcaseMarkup({active = 'materials', tool = '', open = false, icon = () => ''} = {}){
+  const removing = tool === 'remove';
+  const bar = `<div class="showcase-bar"><button type="button" data-showcase-tool="open" aria-expanded="${open ? 'true' : 'false'}">Spawn</button><button type="button" data-showcase-tool="remove" aria-pressed="${removing ? 'true' : 'false'}">${removing ? 'Remove armed' : 'Remove'}</button><button type="button" data-showcase-tool="clear">Clear</button></div>`;
+  if(!open) return bar;
   const categories = showcaseCategories();
   const current = categories.find(category => category.id === active) || categories[0];
   const chips = categories.map(category => `<button type="button" class="chip ${category.id === current.id ? 'active' : ''}" data-showcase-cat="${category.id}">${escapeHtml(category.label)}</button>`).join('');
   const rows = current.entries.length
     ? current.entries.map(entry => `<button type="button" data-showcase-spawn="${escapeHtml(entry.kind)}:${escapeHtml(entry.id)}">${current.id==='magic'?icon(entry.id):''}<span>${escapeHtml(entry.name)}</span></button>`).join('')
     : '<p class="muted small">Nothing in this list yet.</p>';
-  const removing = tool === 'remove';
-  return `<div class="showcase-head"><button type="button" data-showcase-tool="remove" aria-pressed="${removing ? 'true' : 'false'}">${removing ? 'Remove armed' : 'Remove'}</button><button type="button" data-showcase-tool="clear">Clear</button></div><div class="showcase-cats">${chips}</div><div class="showcase-list" role="list">${rows}</div><p class="muted small showcase-note">${removing ? 'Tap an object or creature to delete it.' : 'Items go into the pack. Tap the ground to place an armed object.'}</p>`;
+  return `${bar}<div class="showcase-sheet" role="dialog" aria-label="Spawn list"><div class="showcase-head"><span>Spawn</span><button type="button" data-showcase-tool="close">Close</button></div><div class="showcase-cats">${chips}</div><div class="showcase-list" role="list">${rows}</div><p class="muted small showcase-note">${removing ? 'Tap an object or creature to delete it.' : 'Items go into the pack. Tap the ground to place an armed object.'}</p></div>`;
 }
 
 function separation(kind, type){

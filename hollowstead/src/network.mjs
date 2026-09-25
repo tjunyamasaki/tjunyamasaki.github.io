@@ -1,7 +1,7 @@
-import {RULES} from './content.mjs?v=harvest-14';
-import {PROTOCOL_V2,SNAPSHOT_CHUNK_CHARS,SNAPSHOT_MAX_CHUNKS} from './contracts.mjs?v=harvest-14';
-import {createActionSession,createActionClient,TRANSACTION_PROTOCOL} from './transactions.mjs?v=harvest-14';
-import {createWriter} from './transport.mjs?v=harvest-14';
+import {RULES} from './content.mjs?v=harvest-15';
+import {PROTOCOL_V2,SNAPSHOT_CHUNK_CHARS,SNAPSHOT_MAX_CHUNKS} from './contracts.mjs?v=harvest-15';
+import {createActionSession,createActionClient,TRANSACTION_PROTOCOL} from './transactions.mjs?v=harvest-15';
+import {createWriter} from './transport.mjs?v=harvest-15';
 export const PROTOCOL=PROTOCOL_V2;
 const REFRESH='This camp uses a different Hollowstead version. Refresh the page to update, then join again.';
 // Firebase exchanges connection offers only. All game state stays with the host.

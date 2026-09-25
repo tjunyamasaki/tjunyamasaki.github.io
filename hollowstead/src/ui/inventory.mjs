@@ -1,9 +1,9 @@
 // RPG inventory surface. Renders slots and reports taps, drags, and quantities.
 // It never writes player inventories, equipment, or chest contents.
 
-import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-14';
-import {equipmentSlotFor} from '../inventory.mjs?v=harvest-14';
-import {itemDefinition} from '../contracts.mjs?v=harvest-14';
+import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-15';
+import {equipmentSlotFor} from '../inventory.mjs?v=harvest-15';
+import {itemDefinition} from '../contracts.mjs?v=harvest-15';
 
 export const SOCKET_LABELS = Object.freeze({
   chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light',

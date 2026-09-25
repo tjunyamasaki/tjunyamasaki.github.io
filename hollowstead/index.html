@@ -2,15 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hollowstead">
   <meta name="theme-color" content="#292532"><meta name="description" content="Gather by day. Keep the fire alive at night. A Halloween co-op survival expedition for 1–4 players.">
   <title>Hollowstead — A little light. A long night.</title>
-  <link rel="icon" type="image/svg+xml" href="./themes/harvest/sprites/pumpkin.svg"><link rel="stylesheet" href="./style.css?v=harvest-14">
+  <link rel="icon" type="image/svg+xml" href="./themes/harvest/sprites/pumpkin.svg"><link rel="stylesheet" href="./style.css?v=harvest-15">
 </head>
 <body>
   <canvas id="world" aria-label="Hollowstead survival world"></canvas><div class="vignette" aria-hidden="true"></div><div id="world-labels" aria-hidden="true"></div>
   <div id="loading"><span class="flame-mark">♧</span><p>Lighting the way…</p><small id="load-status">Waking the Hollow Harvest</small></div>
   <main id="front" hidden>
-    <header class="front-header"><a href="../links/" aria-label="Back to games">← GAMES</a><span>THE HOLLOW HARVEST · 01</span><button id="front-sound" class="text-button" aria-label="Toggle sound">SOUND ON</button></header>
+    <header class="front-header"><a href="../links/" aria-label="Back to games">← GAMES</a><span>THE HOLLOW HARVEST · 01</span><div class="front-tools"><button id="front-fullscreen" class="text-button" type="button">FULLSCREEN</button><button id="front-sound" class="text-button" aria-label="Toggle sound">SOUND ON</button></div></header>
+    <p id="front-fullscreen-note" class="fullscreen-note" hidden></p>
     <section class="hero"><p class="eyebrow"><span class="tiny-dot"></span> 1–4 WANDERERS · CO-OP SURVIVAL</p><h1>Hollow<span>stead<span class="title-star">✦</span></span></h1><p class="tagline">A little light.<br>A long night.</p><p class="hero-description">Gather what the woods will give.<br>Build a home. Keep each other alive.</p></section>
     <section class="front-panel" id="home-panel">
       <div class="panel-heading"><span class="eyebrow">WHO WILL YOU BE?</span><span class="edition">AUTUMN ’26</span></div>
@@ -57,6 +62,6 @@
   </div>
   <section id="sheet" class="sheet" hidden role="dialog" aria-modal="false" aria-labelledby="sheet-title"><header><div><span class="eyebrow" id="sheet-kicker">FIELD NOTES</span><h2 id="sheet-title">Your pack</h2></div><div class="sheet-tools"><button id="sheet-menu" class="close-button gear-button" type="button" aria-label="Open game menu">⚙</button><button id="close-sheet" class="close-button" type="button" aria-label="Close panel">✕</button></div></header><div id="sheet-tabs"></div><div id="sheet-content"></div></section>
   <section id="end-screen" hidden><div class="end-card"><p id="end-kicker" class="eyebrow">THE EXPEDITION ENDS</p><h2 id="end-title">The last light.</h2><p id="end-text"></p><div id="end-stats"></div><button id="endless" class="primary wide" hidden>Keep surviving →</button><button id="new-expedition" class="primary wide">Another expedition →</button><button id="end-home" class="text-button">Return to the clearing</button></div></section>
-  <script type="module" src="./src/main.mjs?v=harvest-14"></script>
+  <script type="module" src="./src/main.mjs?v=harvest-15"></script>
 </body>
 </html>

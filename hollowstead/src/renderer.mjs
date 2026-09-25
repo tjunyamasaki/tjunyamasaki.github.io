@@ -1,15 +1,16 @@
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {STRUCTURES, RULES} from './content.mjs?v=harvest-14';
-import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-14';
-import {equippedLanternLit, itemSpriteKey} from './inventory.mjs?v=harvest-14';
-import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-14';
-import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-14';
-import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-14';
-import {MagicMesh} from './magic/effects-three.mjs?v=harvest-14';
+import {STRUCTURES, RULES} from './content.mjs?v=harvest-15';
+import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-15';
+import {equippedLanternLit, itemSpriteKey} from './inventory.mjs?v=harvest-15';
+import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-15';
+import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-15';
+import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-15';
+import {MagicMesh} from './magic/effects-three.mjs?v=harvest-15';
+import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-15';
 import {
   LIGHT_FIELD_ORIGIN, LIGHT_FIELD_SIZE, LIGHT_FIELD_SPAN, brightnessAt, canInspect, entityBrightness,
   frameLighting, labelOpacity, linearFromDisplay, spriteTint, warningVisible, writeLightField,
-} from './lighting.mjs?v=harvest-14';
+} from './lighting.mjs?v=harvest-15';
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
   const response=await fetch(url);if(!response.ok)throw new Error('The harvest art could not be loaded. Please reload.');
   const theme=await response.json();theme.url=url;for(const def of Object.values(theme.sprites))def.src=new URL(def.src,url).href;
@@ -37,7 +38,7 @@ export class Renderer {
     };
     this.marker=new THREE.Mesh(new THREE.RingGeometry(.85,1,40),new THREE.MeshBasicMaterial({color:theme.palette.accent,transparent:true,opacity:.8,side:THREE.DoubleSide,depthWrite:false}));this.marker.rotation.x=-Math.PI/2;this.marker.visible=false;this.scene.add(this.marker);
     this.ghost=null;this.pathMarker=new THREE.Mesh(new THREE.RingGeometry(.16,.22,20),new THREE.MeshBasicMaterial({color:0xeadaba,transparent:true,opacity:.7,side:THREE.DoubleSide}));this.pathMarker.rotation.x=-Math.PI/2;this.pathMarker.visible=false;this.scene.add(this.pathMarker);
-    this.onResize=()=>this.resize();window.addEventListener('resize',this.onResize);this.resize();
+    this.viewWidth=1;this.viewHeight=1;this.onResize=()=>this.resize();watchViewport(this.onResize);this.resize();
   }
   bindNight(material){
     const uniforms=this.lightUniforms;
@@ -62,7 +63,7 @@ export class Renderer {
     material.color.setRGB(channel(tint.r), channel(tint.g), channel(tint.b));
   }
   async preload(){const loader=new THREE.TextureLoader();await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{const map=await loader.loadAsync(def.src);map.colorSpace=THREE.SRGBColorSpace;map.minFilter=THREE.LinearFilter;map.magFilter=THREE.LinearFilter;this.textures.set(key,map);}));}
-  resize(){const w=innerWidth,h=innerHeight;this.gl.setSize(w,h,false);const aspect=w/h,half=aspect<.85?12:13;this.camera.left=-half*aspect/this.zoom;this.camera.right=half*aspect/this.zoom;this.camera.top=half/this.zoom;this.camera.bottom=-half/this.zoom;this.camera.updateProjectionMatrix();}
+  resize(){const size=viewSize(this.canvas);const w=size.width,h=size.height;this.viewWidth=w;this.viewHeight=h;this.gl.setSize(w,h,false);const aspect=w/Math.max(1,h),half=orthographicHalf(w,h);this.camera.left=-half*aspect/this.zoom;this.camera.right=half*aspect/this.zoom;this.camera.top=half/this.zoom;this.camera.bottom=-half/this.zoom;this.camera.updateProjectionMatrix();}
   setZoom(value){this.zoom=Math.max(.65,Math.min(1.6,value));this.resize();}
   sprite(key,id){
     const def=this.theme.sprites[key]||this.theme.sprites.ember;const texture=(this.textures.get(key)||this.textures.get('ember')).clone();texture.needsUpdate=true;
@@ -88,8 +89,8 @@ export class Renderer {
     this.seed=seed;
   }
   glow(o,radius){if(!o.glow){o.glow=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:this.glowMap,transparent:true,depthWrite:false,opacity:.8}));o.glow.rotation.x=-Math.PI/2;this.scene.add(o.glow);}const feather=this.view?.lighting.ambientFraction||1.2;o.glow.scale.setScalar(radius*feather*2);o.glow.position.set(o.x,.03,o.z);o.glow.visible=o.sprite.visible;}
-  screenPoint(x,z,y=0){const v=new THREE.Vector3(x,y,z).project(this.camera);return {x:(v.x*.5+.5)*innerWidth,y:(-.5*v.y+.5)*innerHeight};}
-  worldPoint(x,y){this.ray.setFromCamera(new THREE.Vector2(x/innerWidth*2-1,1-y/innerHeight*2),this.camera);const p=new THREE.Vector3();return this.ray.ray.intersectPlane(this.groundPlane,p)?{x:p.x,z:p.z}:null;}
+  screenPoint(x,z,y=0){const v=new THREE.Vector3(x,y,z).project(this.camera);const w=this.viewWidth||innerWidth,h=this.viewHeight||innerHeight;return {x:(v.x*.5+.5)*w,y:(-.5*v.y+.5)*h};}
+  worldPoint(x,y){const w=this.viewWidth||innerWidth,h=this.viewHeight||innerHeight;this.ray.setFromCamera(new THREE.Vector2(x/w*2-1,1-y/h*2),this.camera);const p=new THREE.Vector3();return this.ray.ray.intersectPlane(this.groundPlane,p)?{x:p.x,z:p.z}:null;}
   pick(x,y,world){
     const viewer=this.localId&&world.player?world.player(this.localId):null;
     let best=null,dist=44;

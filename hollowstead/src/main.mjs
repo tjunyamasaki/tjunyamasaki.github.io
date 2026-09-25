@@ -1,22 +1,22 @@
-import {World,clamp,distance,biome} from './engine.mjs?v=harvest-14';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-14';
-import {Renderer,loadTheme} from './renderer.mjs?v=harvest-14';
-import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-14';
-import {createNetwork} from './network.mjs?v=harvest-14';
-import {Sound} from './audio.mjs?v=harvest-14';
-import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-14';
-import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-14';
-import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-14';
-import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-14';
+import {World,clamp,distance,biome} from './engine.mjs?v=harvest-15';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-15';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-15';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-15';
+import {createNetwork} from './network.mjs?v=harvest-15';
+import {Sound} from './audio.mjs?v=harvest-15';
+import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-15';
+import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-15';
+import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-15';
+import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-15';
 import {
   allowsCombat,allowsMovement,clusterFor,effectLine,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
-} from './ui/actions.mjs?v=harvest-14';
-import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-14';
-import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-14';
-import {loadMagicModules} from './magic/load.mjs?v=harvest-14';
-import {installMagicSprites} from './magic/registry.mjs?v=harvest-14';
-import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-14';
+} from './ui/actions.mjs?v=harvest-15';
+import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-15';
+import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-15';
+import {loadMagicModules} from './magic/load.mjs?v=harvest-15';
+import {installMagicSprites} from './magic/registry.mjs?v=harvest-15';
+import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-15';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -28,7 +28,7 @@ async function bounded(promise){let timer;try{return await Promise.race([promise
 
 let theme,renderer,sound,world,network=null,mode='front',localId='host',character='ember',room='',paused=false,remotePaused=false,hiddenPause=false,linkLost=false;
 let sheet=null,category='all',selected=null,placement=null,maintenance=false,maintenanceTarget=null;
-let showcaseCategory='materials',showcaseTool='',showcaseMarkupCache='';
+let showcaseCategory='materials',showcaseTool='',showcaseListOpen=false,showcaseMarkupCache='',showcaseHistoryClosing=false,fullscreenNote='';
 let lastNotice=0,lastEvent=0,lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,saveTime=0,pingTime=0,lastMode='normal';
 let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:0},dirty=true;
 let stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
@@ -171,18 +171,44 @@ async function joinCamp(){
   try{world=new World();mode='guest';network=makeNetwork();await bounded(network.join(room,$('player-name').value,character));}catch(error){await network?.stop();network=null;mode='front';setBusy(false);showStatus(error.message,true);}
 }
 function solo(resume=false){sound.unlock();storeProfile();try{prepareWorld(resume);mode='solo';room='';enterGame();}catch(error){showStatus(error.message,true);}}
-function showShowcase(open){const panel=$('showcase-panel');if(!panel)return;panel.hidden=!open;if(open)paintShowcase();}
+function showShowcase(open){
+  const panel=$('showcase-panel');if(!panel)return;
+  if(!open){
+    panel.hidden=true;
+    if(showcaseListOpen){
+      showcaseListOpen=false;
+      if(history.state?.hollowsteadShowcase){showcaseHistoryClosing=true;try{history.back();}catch{showcaseHistoryClosing=false;}}
+    }
+    return;
+  }
+  panel.hidden=false;paintShowcase();
+}
 function paintShowcase(){
   const panel=$('showcase-panel');if(!panel||panel.hidden||!world?.showcase)return;
-  const html=showcaseMarkup({active:showcaseCategory,tool:showcaseTool,icon});
+  const html=showcaseMarkup({active:showcaseCategory,tool:showcaseTool,open:showcaseListOpen,icon});
   if(html===showcaseMarkupCache)return;
   showcaseMarkupCache=html;panel.innerHTML=html;
+}
+function openShowcaseList(){
+  if(showcaseListOpen)return;
+  showcaseListOpen=true;showcaseMarkupCache='';paintShowcase();
+  try{history.pushState({hollowsteadShowcase:1},'');}catch{}
+}
+function closeShowcaseList(){
+  if(!showcaseListOpen)return;
+  showcaseListOpen=false;showcaseMarkupCache='';paintShowcase();
+  if(history.state?.hollowsteadShowcase){showcaseHistoryClosing=true;try{history.back();}catch{showcaseHistoryClosing=false;}}
+}
+function onShowcasePop(){
+  if(showcaseHistoryClosing){showcaseHistoryClosing=false;return;}
+  if(!showcaseListOpen)return;
+  showcaseListOpen=false;showcaseMarkupCache='';paintShowcase();
 }
 function startShowcase(){
   sound.unlock();storeProfile();
   world=new World((Math.random()*0xffffffff)>>>0,{showcase:true});
   world.addPlayer('host',$('player-name').value,character);
-  mode='solo';room='';showcaseCategory='materials';showcaseTool='';showcaseMarkupCache='';
+  mode='solo';room='';showcaseCategory='materials';showcaseTool='';showcaseListOpen=false;showcaseMarkupCache='';
   cancelPlacement();cancelMaintenance();clearSelection();
   enterGame();
 }
@@ -192,13 +218,13 @@ function armShowcase(kind,id){
   if(kind==='item'){
     cancelPlacement();
     const result=grantShowcaseItem(world,p,id);
-    if(!result.ok){toast('That cannot be carried');return;}
+    if(!result.ok){toast('That cannot be carried');showcaseMarkupCache='';paintShowcase();return;}
     toast(result.dropped?`${showcaseSpawnName(kind,id)} dropped at your feet`:`${showcaseSpawnName(kind,id)} added to the pack`);
-    dirty=true;return;
+    dirty=true;closeShowcaseList();return;
   }
   cancelMaintenance();endContextHold();
   placement={key:id,kind,showcase:true,x:Math.round((p.x+p.dx*3)*2)/2,z:Math.round((p.z+p.dz*3)*2)/2,rotation:0,valid:false,anchored:false,pending:false,reason:'',stationId:null};
-  selected=null;refresh();
+  selected=null;closeShowcaseList();refresh();
 }
 function commitShowcase(x,z){
   if(!placement?.showcase)return;
@@ -417,9 +443,35 @@ function guideHTML(){
   ];
   return `<p class="guide-intro">The woods are unkind.<br>Your friends don’t have to be.</p>${steps.map(([title,text],index)=>`<div class="guide-step"><b>0${index+1}</b><div><h3>${title}</h3><p>${text}</p></div></div>`).join('')}<div class="key-help"><span>WASD / arrows · Move</span><span>E · Context action</span><span>Space · Attack</span><span>Shift · Dodge</span><span>I · Inventory</span><span>B · Build</span><span>F · Lantern</span><span>M · Map</span><span>1–4 · More actions</span><span>Esc · Menu</span></div><p class="muted small">The host saves the expedition automatically. Continue it alone, or host the saved expedition to open a new camp. Keep the host’s tab open during co-op; switching away pauses everyone.</p>`;
 }
+function fullscreenElement(){return document.fullscreenElement||document.webkitFullscreenElement||null;}
+function isFullscreen(){return !!fullscreenElement();}
+function syncFullscreenUi(){
+  const button=$('front-fullscreen');
+  if(button)button.textContent=isFullscreen()?'EXIT FULLSCREEN':'FULLSCREEN';
+  const note=$('front-fullscreen-note');
+  if(note){note.hidden=!fullscreenNote;note.textContent=fullscreenNote||'';}
+  if(sheet==='menu'){sheetMarkup='';dirty=true;renderSheet();}
+}
+function onFullscreenChange(){if(isFullscreen())fullscreenNote='';syncFullscreenUi();renderer?.resize?.();}
+async function toggleFullscreen(){
+  const unavailable='This browser cannot enter fullscreen.';
+  fullscreenNote='';
+  try{
+    if(isFullscreen()){
+      const exit=document.exitFullscreen||document.webkitExitFullscreen||document.webkitCancelFullScreen;
+      if(!exit)fullscreenNote=unavailable;else await exit.call(document);
+    }else{
+      const root=document.documentElement;
+      const request=root.requestFullscreen||root.webkitRequestFullscreen||root.webkitRequestFullScreen;
+      if(!request)fullscreenNote=unavailable;else await request.call(root);
+    }
+  }catch{fullscreenNote=unavailable;}
+  if(isFullscreen())fullscreenNote='';
+  syncFullscreenUi();renderer?.resize?.();
+}
 function menuHTML(){
   const camp=room?`Camp ${escapeHtml(room)}`:'Solo expedition';
-  return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div><div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">Save & return to title</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
+  return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div><div class="menu-row"><span>Fullscreen</span><button type="button" data-command="fullscreen">${isFullscreen()?'Exit fullscreen':'Fullscreen'}</button></div>${fullscreenNote?`<p class="muted small">${escapeHtml(fullscreenNote)}</p>`:''}<div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">Save & return to title</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
 }
 function replaceContent(html){
   const content=$('sheet-content');
@@ -618,6 +670,7 @@ function setupControls(){
     const cmd=button.dataset.command;if(!cmd)return;
     if(cmd==='resume')closeSheet();if(cmd==='save')save(true);if(cmd==='home')void goHome();if(cmd==='invite')void copyInvite();if(cmd==='guide')openSheet('guide');
     if(cmd==='sound'){sound.enabled=!sound.enabled;sound.unlock();storeProfile();dirty=true;renderSheet();}
+    if(cmd==='fullscreen')void toggleFullscreen();
     if(cmd==='zoom-in')renderer.setZoom(renderer.zoom+.15);if(cmd==='zoom-out')renderer.setZoom(renderer.zoom-.15);
     if(cmd==='maintain'){closeSheet();maintenance=true;maintenanceTarget=null;selected=null;dirty=true;}
   };
@@ -632,6 +685,7 @@ function setupControls(){
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();
       else if(step==='close-details'){clearSelection();refresh();}
       else if(step==='close-panel')closeSheet();
+      else if(showcaseListOpen)closeShowcaseList();
       else if(step==='cancel-placement'){cancelPlacement();showcaseTool='';showcaseMarkupCache='';dirty=true;}
       else if(step==='cancel-maintenance'){cancelMaintenance();dirty=true;}
       else openSheet('menu');
@@ -695,15 +749,25 @@ async function init(){
   theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;
   paintClock();demoWorld();setupControls();syncSaveOption();const params=new URLSearchParams(location.search);
   const code=params.has('showcase')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showStatus('A place by the fire is waiting. Choose a name and join.');}
-  $('showcase-panel')?.addEventListener('click',event=>{
+  const showcasePanel=$('showcase-panel');
+  showcasePanel?.addEventListener('pointerdown',event=>event.stopPropagation());
+  showcasePanel?.addEventListener('pointerup',event=>event.stopPropagation());
+  showcasePanel?.addEventListener('click',event=>{
+    event.stopPropagation();
     const cat=event.target.closest('[data-showcase-cat]');
     const spawn=event.target.closest('[data-showcase-spawn]');
     const tool=event.target.closest('[data-showcase-tool]');
     if(cat){showcaseCategory=cat.dataset.showcaseCat;showcaseMarkupCache='';paintShowcase();return;}
+    if(tool?.dataset.showcaseTool==='open'){showcaseListOpen?closeShowcaseList():openShowcaseList();return;}
+    if(tool?.dataset.showcaseTool==='close'){closeShowcaseList();return;}
     if(tool?.dataset.showcaseTool==='clear'){clearShowcaseWorld(world);cancelPlacement();showcaseTool='';if(sheet)closeSheet();toast('The clearing is empty');showcaseMarkupCache='';paintShowcase();return;}
-    if(tool?.dataset.showcaseTool==='remove'){showcaseTool=showcaseTool==='remove'?'':'remove';if(showcaseTool)cancelPlacement();showcaseMarkupCache='';paintShowcase();return;}
-    if(spawn){const value=spawn.dataset.showcaseSpawn,split=value.indexOf(':');armShowcase(value.slice(0,split),value.slice(split+1));showcaseMarkupCache='';paintShowcase();}
+    if(tool?.dataset.showcaseTool==='remove'){showcaseTool=showcaseTool==='remove'?'':'remove';if(showcaseTool)cancelPlacement();if(showcaseTool&&showcaseListOpen)closeShowcaseList();else{showcaseMarkupCache='';paintShowcase();}return;}
+    if(spawn){const value=spawn.dataset.showcaseSpawn,split=value.indexOf(':');armShowcase(value.slice(0,split),value.slice(split+1));}
   });
+  $('front-fullscreen')?.addEventListener('click',()=>void toggleFullscreen());
+  document.addEventListener('fullscreenchange',onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange',onFullscreenChange);
+  window.addEventListener('popstate',onShowcasePop);
   $('loading').hidden=true;$('front').hidden=false;requestAnimationFrame(frame);
   if(params.has('dev')||params.has('showcase'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,setTime(t){world.time=t;},get network(){return network;}};
   if(params.has('showcase'))startShowcase();

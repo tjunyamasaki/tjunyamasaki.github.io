@@ -3,8 +3,22 @@ import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
 import {ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES} from '../src/content.mjs';
 import {makeStack} from '../src/inventory.mjs';
-import {collectMagicSprites, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-14';
-import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseCategories} from '../src/showcase.mjs';
+import {collectMagicSprites, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-15';
+import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseCategories, showcaseMarkup} from '../src/showcase.mjs';
+
+test('showcase catalog stays closed until Spawn and can be dismissed', () => {
+  const closed = showcaseMarkup({open: false, tool: ''});
+  assert.match(closed, /data-showcase-tool="open"/);
+  assert.match(closed, /data-showcase-tool="remove"/);
+  assert.equal(closed.includes('showcase-sheet'), false);
+  assert.equal(closed.includes('data-showcase-cat'), false);
+  assert.equal(closed.includes('data-showcase-spawn'), false);
+  const open = showcaseMarkup({open: true, active: 'materials'});
+  assert.match(open, /data-showcase-tool="close"/);
+  assert.match(open, /data-showcase-cat="materials"/);
+  assert.match(open, /data-showcase-spawn="item:/);
+  assert.match(open, /showcase-sheet/);
+});
 
 test('showcase world has no nodes and the player takes no damage or hunger loss', () => {
   const world = new World(7, {showcase: true});

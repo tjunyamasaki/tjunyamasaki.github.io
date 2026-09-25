@@ -1,4 +1,4 @@
-import { registerMagicModule } from './registry.mjs?v=harvest-14';
+import { registerMagicModule } from './registry.mjs?v=harvest-15';
 
 const SPECS = [
   'barrow-rattle.mjs',

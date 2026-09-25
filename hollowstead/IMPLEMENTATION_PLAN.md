@@ -1116,6 +1116,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Pack 12 and chest 24 | Complete | follow-up on feat/hollowstead-coop | This commit. 99 Hollowstead + 17 ball-game tests passing | No separate stack action. Pack is 12 slots. Chests are 24 slots. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
 | P5 | Complete | P5 agent | a07f48616a658a1edd34540e6a667b5ff6b53a31. 104 Hollowstead + 17 ball-game tests passing. Pages run 36170883617 succeeded | Real phone and a four-player scene were not run. M14 is unverified |
 | Showcase and magic weapons | Complete | showcase agent | bb5a9a09bd28f56fca6fca2c2262732ac99ea0dd. 108 Hollowstead + 17 ball-game tests passing. Cache query harvest-13 | P6 not started. A real phone and a second device were not used |
+| Phone showcase, fullscreen, landscape camera | Complete | usability follow-up | This commit on feat/hollowstead-coop. 116 Hollowstead + 17 ball-game tests passing. Cache query harvest-15. Cartoon skeleton frames included | P6 not started. A physical phone was not used. iOS Safari still cannot fullscreen a page |
 | P6 | Not started | Unassigned | — | — |
 
 For each handoff, append:
@@ -1705,3 +1706,31 @@ now retain the loader's version query so returning browsers receive pack changes
 - Browser cannot reach the workspace localhost from its cloud environment; visual
   checks will use the deployed branch. No physical phone or second human player
   has been used. P6 remains unstarted.
+
+Date: 2026-09-25
+Package / agent: Phone showcase, fullscreen, and landscape camera. P6 was not started.
+Starting commit: 401db73d4a4ebf4c7b820823ace99113053a565d (fast-forwarded from b92a758b926fe71ebdf6881697db0f7b85004af0)
+Ending commit: this commit on feat/hollowstead-coop
+Files changed: showcase catalog, both cameras, fullscreen controls, viewport CSS, cache query harvest-15, and the cartoon barrow-rattle skeleton PNGs.
+Implemented behavior:
+- The spawn catalog is closed when Showcase opens. Spawn opens the category sheet. Close, Escape, the browser Back button, a successful pack item, and arming a tree, building, or mob close it. Remove and Clear stay on a small bar. Remove closes the sheet so the world stays tappable. Touches on the sheet do not move the wanderer. Portrait 390×844 and 360×780 keep the ground, joystick, and Attack visible while the sheet is closed, and the open sheet sits above those controls. Landscape uses a centered sheet instead of a permanent column.
+- Fullscreen is on the title screen and in the camp menu. The same control calls requestFullscreen or the webkit prefix on the page, and exits fullscreen when it is already active. The viewport is device-width with viewport-fit=cover. The game shell uses 100dvh and the existing safe-area insets. Apple web-app meta tags are set for Add to Home Screen. If the API is missing or the browser rejects it, the button stays and the page says "This browser cannot enter fullscreen." That is the expected iOS Safari case; those meta tags do not hide Safari's address bar. Both renderers resize on window resize, visual viewport resize and scroll, and fullscreen change.
+- Landscape orthographic half used to be 13 whenever the view was wider than it was tall. It is now min(13, max(5.25, height × 12 / 844)). Portrait stays at 12. A 1920×1080 desktop stays at 13. An 844×390 phone goes from half 13 (about 15 CSS pixels per world unit) to half 5.545 (about 35 CSS pixels per world unit), the same vertical scale as portrait at 844px tall. Both the WebGL camera and the canvas camera use that size.
+- Cartoon skeleton idle, walk, and attack frames from hollowstead/assets/magic/barrow-rattle/ are included. CARTOON.txt was present.
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 116 pass, 0 fail.
+- node --test ball-game/tests/*.test.mjs: 17 pass, 0 fail.
+- git diff --check and node --check on the changed modules.
+- Headless Chrome at 390×844 and 360×780: catalog closed on arrival, Spawn opens it, Close dismisses it, wood goes into the pack and closes the sheet, a drag on the sheet leaves the wanderer still. Landscape 844×390 camera.top is 5.545 and the wanderer is the same on-screen height as in portrait. Chrome entered fullscreen from the title button. With requestFullscreen forced to reject, the button stayed and showed "This browser cannot enter fullscreen." A physical phone was not used.
+Evidence / screenshots:
+- /opt/cursor/artifacts/hollowstead-showcase-portrait-closed.png
+- /opt/cursor/artifacts/hollowstead-showcase-portrait-open.png
+- /opt/cursor/artifacts/hollowstead-showcase-360.png
+- /opt/cursor/artifacts/hollowstead-showcase-landscape.png
+- /opt/cursor/artifacts/hollowstead-showcase-landscape-open.png
+- /opt/cursor/artifacts/hollowstead-title-fullscreen.png
+- /opt/cursor/artifacts/hollowstead-fullscreen-unavailable.png
+Compatibility/migration notes:
+- Pack stays 12 slots. Chests stay 24. Weapon rules, night length, and pickup are unchanged. Clock stays day 180, dusk 30, night 100.
+- Hard refresh with style.css?v=harvest-15 and src/main.mjs?v=harvest-15.
+Exact next task: P6 — Integration and release. Do not start P6.

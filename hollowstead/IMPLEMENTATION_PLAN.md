@@ -1388,3 +1388,26 @@ Evidence / screenshots / deployment run:
 - GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36094379157 succeeded (conclusion success) for 108481d958d253a47f92445abe3f15c6a2435121. That revision contains P4 implementation a61545910636fc65f2fe487071ab2e8aa8ea892f and the HUD rewrite f504b8031352223b161c20d377b7abadda5056b4. Hollowstead and ball-game tests passed in the workflow.
 Exact next task: P5 — Night visuals and pacing. Do not start P6. Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.
 
+
+---
+Package / agent: P4 mobile layout follow-up / Codex
+Date: 2026-09-25
+Starting commit: 6f2f5564dae01294330c7bbd82948a6edf224630
+Implementation commit: afa9c88f936f90032cb9e09c5cd1e64960c2cb78
+User request: put the remaining controls at the bottom, fix unusably short chest grids on phones, and shrink inventory slots. This follow-up supersedes the earlier P4 floating hotbar and four-column phone grid decisions.
+
+Changes:
+- Compact Pack/Build dock at the bottom with 52 × 48 px buttons. Portrait movement/combat controls sit above it; landscape retains the dock between the left/right controls. Safe-area offsets remain in use.
+- Inventory/chest panels use a definite viewport height with a compact header. Removed the competing automatic sheet height and per-grid viewport caps that squeezed chest contents. Empty tab bars take no space.
+- Six columns with roughly 54 px slots on a 390 px phone; five columns below 360 px, retaining 44 px minimum touch targets. Equipment sockets remain 44 px. Item artwork no longer contributes intrinsic height to the grid rows.
+- Pack/chest panes share the available height and scroll independently. Item details and operations remain below both panes. Wide views put the grids side by side. Single-page chests hide pagination; multi-page controls sit alongside the chest heading.
+- Only the changed stylesheet, main entry, and UI inventory module use harvest-8 cache keys; unchanged gameplay modules retain harvest-7. No save/protocol/rules migration.
+
+Evidence:
+- 98 existing tests pass: 81 Hollowstead + 17 ball-game. Syntax and git diff checks pass. No additional implementation-mirroring tests were added for these layout changes.
+- Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36137417109 succeeded for afa9c88f936f90032cb9e09c5cd1e64960c2cb78. Confirmed the live page loads style.css?v=harvest-8.
+- Live 390 × 780 device preview: compact dock is at the bottom. Built/opened a chest through gameplay, selected a stack, and transferred Half of 3 wood (2) into it; pack/chest quantities updated. With item controls open, the two grid viewports measured 226.5 / 224.5 px tall and cells measured 53.66 px (previous phone cells were 76.25 px). All four backpack rows are available together and the chest has its own scroll area.
+- Live 852 × 393 preview: pack/chest are side by side; grid viewports measured 168 / 166 px tall with item controls in a 53 px footer. Switching the preview's outer buttons blurs the game and releases the chest as designed; reopening works.
+- Browser preview occasionally timed out while inspecting or clicking the embedded game. Chest withdrawal after the landscape check was not confirmed. No physical-device or two-device session was run in this layout follow-up. Very small phone sizes and multi-page chest pagination were not visually exercised.
+
+Exact next task: P5 remains pending. Do not change pacing/night simulation as part of this layout follow-up. Retain these phone layout fixes when continuing later packages.

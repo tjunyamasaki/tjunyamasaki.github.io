@@ -1111,7 +1111,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | P0 | Complete | P0 agent | bc220e92a19eb4665e0346ce025a124e4e283035 | No gameplay change. P1–P6 not started |
 | P1 | Complete | P1 agent | f25990e8ee7f0c55c578df76ab54d2318bc3349d | Live clock still 150/30/80. Full inventory UI, chest locks, and 180/30/100 are later packages |
 | P2 | Complete | P2 review | e17d4a687f11b330defd7676489c31579b5005b7. 62 Hollowstead + 17 ball-game tests passing | Live clock stays 150/30/80. Review left stations, timed harvest, and gameplay ping for P3 |
-| P3 | Complete | P3 agent | P3_IMPLEMENTATION_SHA. 73 Hollowstead + 17 ball-game tests passing. Deploy note records the hash | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
+| P3 | Complete | P3 agent | 36614c80a0fb1520532df7368983188b08c0099a. 73 Hollowstead + 17 ball-game tests passing. Deploy note records the hash | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
 | P4 | Not started | Unassigned | — | — |
 | P5 | Not started | Unassigned | — | — |
 | P6 | Not started | Unassigned | — | — |
@@ -1272,7 +1272,7 @@ Exact next task: P3 — Context rules, recipes, timed interactions. Do not start
 Date: 2026-09-25
 Package / agent: P3 / P3 agent
 Starting commit: e17d4a687f11b330defd7676489c31579b5005b7
-Ending commit: P3_IMPLEMENTATION_SHA. The following note records the Pages run for the tip that contains this implementation.
+Ending commit: 36614c80a0fb1520532df7368983188b08c0099a is the implementation. The branch tip that records this hash changes only this log.
 Files changed:
 - hollowstead/src/interactions.mjs
 - hollowstead/src/engine.mjs
@@ -1311,7 +1311,7 @@ Tests and device checks actually run:
 - git diff --check clean. node --check on the changed Hollowstead modules.
 - Headless Chrome loaded /hollowstead/index.html?dev, started a solo camp, and held Gather on the starting dry grass. Fiber went from 3 to 7, that grass node was spent (hits 0), and the target card then read "THE WOODS ARE WAITING" because nothing else was in reach. Field Build listed the eight field structures and did not list cauldron, soul lantern, or ward. Field Craft read "Craft at a workbench or cooking station." The objective read "Gather wood and flint by hand, then place a workbench." The page text contained no "effort". FOOD and OFF were disabled. Daylight began at 2:30, which is the 150-second day. No phone and no second device.
 Evidence / screenshots / deployment run:
-- P3_DEPLOY_NOTE
+- Implementation commit 36614c80a0fb1520532df7368983188b08c0099a. Headless Chrome confirmed the starting grass harvest and the field catalogs. The Pages URL for the tip that contains this implementation is recorded in the following note.
 Remaining failures or unverified cases:
 - No automated failure remains in the Hollowstead or ball-game suites. M01–M18, a real phone, and a two-device join were not run. The full HUD rewrite, including removal of the old hotbar buttons and any progress presentation, is P4. The 180/30/100 clock and wave offsets 0/40/80 are P5.
 Compatibility/migration notes:

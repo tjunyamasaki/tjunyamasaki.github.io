@@ -1111,7 +1111,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | P0 | Complete | P0 agent | bc220e92a19eb4665e0346ce025a124e4e283035 | No gameplay change. P1–P6 not started |
 | P1 | Complete | P1 agent | f25990e8ee7f0c55c578df76ab54d2318bc3349d | Live clock still 150/30/80. Full inventory UI, chest locks, and 180/30/100 are later packages |
 | P2 | Complete | P2 review | e17d4a687f11b330defd7676489c31579b5005b7. 62 Hollowstead + 17 ball-game tests passing | Live clock stays 150/30/80. Review left stations, timed harvest, and gameplay ping for P3 |
-| P3 | Complete | P3 agent | 36614c80a0fb1520532df7368983188b08c0099a. 73 Hollowstead + 17 ball-game tests passing. Deploy note records the hash | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
+| P3 | Complete | P3 agent | 36614c80a0fb1520532df7368983188b08c0099a. 73 Hollowstead + 17 ball-game tests passing. Pages run 36088851645 succeeded for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0 | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
 | P4 | Not started | Unassigned | — | — |
 | P5 | Not started | Unassigned | — | — |
 | P6 | Not started | Unassigned | — | — |
@@ -1311,11 +1311,20 @@ Tests and device checks actually run:
 - git diff --check clean. node --check on the changed Hollowstead modules.
 - Headless Chrome loaded /hollowstead/index.html?dev, started a solo camp, and held Gather on the starting dry grass. Fiber went from 3 to 7, that grass node was spent (hits 0), and the target card then read "THE WOODS ARE WAITING" because nothing else was in reach. Field Build listed the eight field structures and did not list cauldron, soul lantern, or ward. Field Craft read "Craft at a workbench or cooking station." The objective read "Gather wood and flint by hand, then place a workbench." The page text contained no "effort". FOOD and OFF were disabled. Daylight began at 2:30, which is the 150-second day. No phone and no second device.
 Evidence / screenshots / deployment run:
-- Implementation commit 36614c80a0fb1520532df7368983188b08c0099a. Headless Chrome confirmed the starting grass harvest and the field catalogs. The Pages URL for the tip that contains this implementation is recorded in the following note.
+- Implementation commit 36614c80a0fb1520532df7368983188b08c0099a. Headless Chrome confirmed the starting grass harvest and the field catalogs.
+- GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36088851645 succeeded for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0, the handoff tip that contains that implementation. Hollowstead and ball-game tests passed in that run. This follow-up only records the URL.
 Remaining failures or unverified cases:
 - No automated failure remains in the Hollowstead or ball-game suites. M01–M18, a real phone, and a two-device join were not run. The full HUD rewrite, including removal of the old hotbar buttons and any progress presentation, is P4. The 180/30/100 clock and wave offsets 0/40/80 are P5.
 Compatibility/migration notes:
 - Saves stay v2 with clock v1. Partial harvest work is host-only and is not written into saves. Node hits remain in the snapshot for round-trip and are cleared only when a harvest completes. Continue still refuses clock v2.
 - Protocol stays hollowstead-2. Cache query on player entry modules is harvest-6.
 - Old peers that send gameplay ping or a bare eat command receive unsupported. Transport ping still answers.
+Exact next task: P4 — Mobile inventory, catalog, actions, HUD. Do not start P5 or P6. Do not enable the 180/30/100 clock.
+
+Date: 2026-09-25
+Package / agent: P3 deploy note
+Starting commit: 0798d6c4213d2aad3d9c6be979531222a2b3ccf0
+Ending commit: This note. It changes only this log.
+Evidence / screenshots / deployment run:
+- GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36088851645 succeeded (conclusion success) for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0. That revision contains P3 implementation 36614c80a0fb1520532df7368983188b08c0099a and the P2 review fix e17d4a687f11b330defd7676489c31579b5005b7. Hollowstead and ball-game tests passed in the workflow.
 Exact next task: P4 — Mobile inventory, catalog, actions, HUD. Do not start P5 or P6. Do not enable the 180/30/100 clock.

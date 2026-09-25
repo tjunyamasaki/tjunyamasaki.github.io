@@ -19,29 +19,32 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 3. Cook at a burning fire. Grow pumpkins in farm plots, make bandages at a workbench, and build a cauldron for stew. Eat from your pack: open it and tap Eat on the stack you want.
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
 5. Hold **Attack** to use the weapon you have equipped. Dodge the glowing enemy attack circles. Repair walls, rearm traps, and use wards to help defend the camp.
-6. Hold **Gather** beside a fallen friend for about three seconds to revive them. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable. Holding **Dismantle** on a camp structure or an open chest returns some materials. The Heartfire cannot be dismantled, and a chest someone else has open cannot either.
+6. Hold **Revive** beside a fallen friend for about three seconds. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable. Open **Build**, then **Maintain camp**, to repair a damaged structure or hold **Dismantle**. The Heartfire cannot be dismantled, and a chest someone else has open cannot either.
 7. Awaken the Heartfire with soul embers. The fifth night brings the Hollow King. Defeat him and survive until dawn to break the curse, then choose to keep surviving if you wish.
 
 Losing the Heartfire ends the expedition. If everyone falls and has spent their charm, the expedition also ends.
 
 ## Shared chests
 
-Only one wanderer can open a chest at a time. Its panel shows your pack, worn gear, and the chest together. Choose 1, Half, or All, then Store or Take to move materials, food, or equipment. Worn gear keeps its durability; storing a lit lantern switches it off. Close the panel to release the chest. Other players cannot spend its supplies while you have it open.
+Only one wanderer can open a chest at a time. The same panel shows your pack, worn gear, and the chest. Choose 1, Half, or All, then **Transfer**, or tap the slot you want the stack to land in. Food, materials, and equipment all move. Worn gear keeps its durability; putting a lit lantern into the chest switches it off. The panel says when it is waiting on the camp and does not move anything until the camp accepts it. Close the panel to release the chest. Other players cannot spend its supplies while you have it open.
 
 ## Controls
 
 | Action | Touch | Keyboard |
 | --- | --- | --- |
-| Move | Left stick, or tap ground | WASD / arrows |
-| Gather / interact | Hold Gather, or tap a resource | E |
-| Attack | Hold Attack | Hold Space |
-| Dodge | Dodge button | Shift |
-| Pack / Craft / Build | Bottom toolbar | I / C / B |
-| Eat / light | Eat from your pack. The Food button only reminds you. Light toggles a worn lantern. | Q reminds you / F |
-| Map | Minimap. Camp signals are off. | M |
-| Menu | H monogram | Escape |
+| Move | Left stick, or tap the ground | WASD / arrows |
+| Context action | The large circle. Its name follows what you are standing at: Gather, Chop, Feed, Cook, Open, Place, and so on. | E, hold when the action says to hold |
+| More actions | The smaller circles beside it. A campfire can show Feed, Cook, Awaken, and Repair at once. | 1–4 |
+| Attack | Hold Attack. Uses the weapon you have equipped. | Hold Space |
+| Dodge | Dodge | Shift |
+| Inventory / Build | Bottom bar | I / B |
+| Eat, equip, drop | Open Inventory, select the stack, then Eat, Equip, or Drop | Arrows, Enter, Escape |
+| Lantern | A light circle appears when you carry a usable lantern | F |
+| Place or cancel | Place and Cancel replace the action circles while you are placing. Maintain camp uses the same circles. | E places, Escape cancels |
+| Map | Minimap | M |
+| Menu | Gear button in the Inventory header. Camp code, connection, save, invite, camera, sound, guide, and title live here. | Escape |
 
-The in-game field guide explains crafting, farming, defenses and the campaign. Camera distance and sound are adjustable in the menu. Portrait and landscape layouts are supported.
+Opening Inventory, Build, or a station does not pause the expedition. The menu pauses the world only when you are playing alone. The in-game field guide explains crafting, farming, defenses, and the campaign. Portrait and landscape layouts are supported.
 
 ## Connection notes
 

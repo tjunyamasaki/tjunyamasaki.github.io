@@ -39,6 +39,8 @@ For example:
 
 Use transparent padding consistently between frames. Sprite sizes affect presentation; collision shapes and interaction distances belong to the simulation and stay stable during an art replacement.
 
+Inventory slots, equipment sockets, and the crafting list use these same sprite keys. Empty sockets and the round action buttons are short text marks drawn by the page, so a theme replaces item icons without shipping a separate inventory skin.
+
 ## Motion, color and audio
 
 `motion.walkBob`, `walkTilt`, `idleSway`, `hitSquash` and `attackTilt` are presentation-only parameters. Set procedural motion to zero when the sprite sheet contains all the desired motion. The UI stylesheet is a separate skin in `hollowstead/style.css`; its CSS variables control the UI's main colors. Terrain palette values live in the manifest.

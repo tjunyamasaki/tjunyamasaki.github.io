@@ -1112,7 +1112,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | P1 | Complete | P1 agent | f25990e8ee7f0c55c578df76ab54d2318bc3349d | Live clock still 150/30/80. Full inventory UI, chest locks, and 180/30/100 are later packages |
 | P2 | Complete | P2 review | e17d4a687f11b330defd7676489c31579b5005b7. 62 Hollowstead + 17 ball-game tests passing | Live clock stays 150/30/80. Review left stations, timed harvest, and gameplay ping for P3 |
 | P3 | Complete | P3 agent | 36614c80a0fb1520532df7368983188b08c0099a. 73 Hollowstead + 17 ball-game tests passing. Pages run 36088851645 succeeded for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0 | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
-| P4 | Complete | P4 agent | a61545910636fc65f2fe487071ab2e8aa8ea892f (HUD rewrite f504b8031352223b161c20d377b7abadda5056b4). 81 Hollowstead + 17 ball-game tests passing. Headless Chrome M01–M05, M09, and M15 as recorded below | Real phone, rotation-during-drag, two-device chest, full first night, cauldron station, M10, and M11 were not run. Live clock stays 150/30/80. Night visuals stay P5 |
+| P4 | Complete | P4 agent | a61545910636fc65f2fe487071ab2e8aa8ea892f (HUD rewrite f504b8031352223b161c20d377b7abadda5056b4). 81 Hollowstead + 17 ball-game tests passing. Pages run 36094379157 succeeded for 108481d958d253a47f92445abe3f15c6a2435121 | Real phone, rotation-during-drag, two-device chest, full first night, cauldron station, M10, and M11 were not run. Live clock stays 150/30/80. Night visuals stay P5 |
 | P5 | Not started | Unassigned | — | — |
 | P6 | Not started | Unassigned | — | — |
 
@@ -1378,5 +1378,13 @@ Compatibility/migration notes:
 - Saves stay v2 with clock v1. Continue does not call remapWorldClock. RULES stay day 150, dusk 30, night 80, cycle 260. Renderer night boundaries stay t>150 and t>=180. The wave schedule is unchanged. P5 owns the 180/30/100 clock, the 0/40/80 waves, and night-darkness rendering.
 - Protocol stays hollowstead-2. The UI sends inventory, chest, craft, place, building, and lantern intents. It does not decide that a recipe is legal; the host still checks. Bare eat and gameplay ping stay unsupported. Transport ping still answers.
 - Player entry cache query is harvest-7.
+Exact next task: P5 — Night visuals and pacing. Do not start P6. Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.
+
+Date: 2026-09-25
+Package / agent: P4 deploy note
+Starting commit: 108481d958d253a47f92445abe3f15c6a2435121
+Ending commit: This note. It changes only this log.
+Evidence / screenshots / deployment run:
+- GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36094379157 succeeded (conclusion success) for 108481d958d253a47f92445abe3f15c6a2435121. That revision contains P4 implementation a61545910636fc65f2fe487071ab2e8aa8ea892f and the HUD rewrite f504b8031352223b161c20d377b7abadda5056b4. Hollowstead and ball-game tests passed in the workflow.
 Exact next task: P5 — Night visuals and pacing. Do not start P6. Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.
 

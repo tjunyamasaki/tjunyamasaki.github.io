@@ -1114,7 +1114,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Floor pickup | Complete | proximity pickup | 5b79932cb6544780c23f05eb6097623ed8b20651. 94 Hollowstead + 17 ball-game tests passing. Pages run 36145733731 succeeded. Supersedes the P3 fresh-Gather pickup rule | Live clock stays 150/30/80. P5 and P6 not started |
 | Pack, chest, and pickup motion | Complete | follow-up on feat/hollowstead-coop | 2e41d385f008a10e200a08846e0516db17226487. 99 Hollowstead + 17 ball-game tests passing | Slot counts superseded by the 12/24 follow-up. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
 | Pack 12 and chest 24 | Complete | follow-up on feat/hollowstead-coop | This commit. 99 Hollowstead + 17 ball-game tests passing | No separate stack action. Pack is 12 slots. Chests are 24 slots. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
-| P5 | Complete | P5 agent | This commit. 104 Hollowstead + 17 ball-game tests passing. WebGL and canvas midnight screenshots under the handoff. Pages run recorded after deploy | Real phone and a four-player scene were not run. M14 is unverified |
+| P5 | Complete | P5 agent | a07f48616a658a1edd34540e6a667b5ff6b53a31. 104 Hollowstead + 17 ball-game tests passing. Pages run 36170883617 succeeded | Real phone and a four-player scene were not run. M14 is unverified |
 | P6 | Not started | Unassigned | — | — |
 
 For each handoff, append:
@@ -1591,7 +1591,7 @@ Exact next task: P5 — Night visuals and pacing. Do not start P6. Pack stays 12
 Date: 2026-09-25
 Package / agent: P5 / P5 agent
 Starting commit: 968a8a6d5d4b6bb5a296364e8ced6874077af388
-Ending commit: This commit on feat/hollowstead-coop.
+Ending commit: a07f48616a658a1edd34540e6a667b5ff6b53a31. The branch tip that records this hash changes only this log.
 Files changed:
 - hollowstead/src/lighting.mjs
 - hollowstead/src/renderer.mjs
@@ -1643,7 +1643,7 @@ Evidence / screenshots:
 - /opt/cursor/artifacts/hollowstead-p5-canvas-midnight-unlit.png
 - /opt/cursor/artifacts/hollowstead-p5-canvas-midnight-hearth.png
 - /opt/cursor/artifacts/hollowstead-p5-canvas-lantern-fading.png
-- Deployment of this tip is recorded once the Pages workflow finishes.
+- GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36170883617 succeeded for a07f48616a658a1edd34540e6a667b5ff6b53a31. Hollowstead and ball-game tests passed in that run. The live game is that revision.
 Compatibility/migration notes:
 - New worlds and resumed expeditions store world.clock as v2 on the 310-second cycle. A second Continue does not shift time or deadlines again. Protocol stays hollowstead-2. V1 fixture timestamps stay on the 260-second clock and are not regenerated.
 - Pack stays 12 slots. Chests stay 24 slots. Floor pickup stays proximity: attract 1.15, touch 0.42, dwell 0.65s, flight 0.28s, dropper cooldown 1.25s. Item actions still clear the selection. Do not restore a 120-supply bag cap, chest pages, a Stack same items button, or Gather-to-pickup.

@@ -1,5 +1,6 @@
 // Simulation identifiers are deliberately independent of art, names and animations.
-export const RULES = Object.freeze({version:1, tick:1/20, radius:42, maxPlayers:4, day:150, dusk:30, night:80, cycle:260, capacity:120, reach:2.8, speed:4.2, finalNight:5});
+const DAY=180, DUSK=30, NIGHT=100;
+export const RULES = Object.freeze({version:1, tick:1/20, radius:42, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2, finalNight:5});
 /**
  * Loose floor piles. Measured in this world: movement clearance 0.33, structure
  * occupancy 0.4, character billboard 1.65 wide (art padding included), interact

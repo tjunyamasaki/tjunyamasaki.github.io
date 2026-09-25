@@ -930,7 +930,7 @@ These searches are review aids, not blanket delete commands: 180 is now a valid 
 
 ## 16. Implementation packages for other agents
 
-P0, P1, P2, P3, and P4 are complete. P5 and P6 are not started. The planning commit does not satisfy any later package's acceptance criterion.
+P0, P1, P2, P3, P4, and P5 are complete. P6 is not started. The planning commit does not satisfy any later package's acceptance criterion.
 
 Work on feat/hollowstead-coop or a narrowly scoped integration branch based on its current head. Only an integrator pushes the deployable branch after a coherent slice is working. Do not independently force-push shared history or merge to master.
 
@@ -1025,13 +1025,13 @@ Dependencies: P1 lantern/source representation and migration contracts; may deve
 
 Owns: lighting.mjs, both renderers, timing configuration/wave schedule, theme lighting documentation.
 
-- [ ] Implement shared light collection/safety, phase interpolation, and replaceable theme values.
-- [ ] Darken terrain, sprites, effects, and labels consistently; limit dark picking information.
-- [ ] Enable 180/30/100 cycle only with migrated phase handling.
-- [ ] Change wave opportunities to 0/40/80 and derive clock gradient from durations.
-- [ ] Remove hardcoded old phase times, including demo scene/test assumptions.
-- [ ] Verify actual WebGL and Canvas parity and phone performance.
-- [ ] Add T28–T30 and verify M12–M14.
+- [x] Implement shared light collection/safety, phase interpolation, and replaceable theme values.
+- [x] Darken terrain, sprites, effects, and labels consistently; limit dark picking information.
+- [x] Enable 180/30/100 cycle only with migrated phase handling.
+- [x] Change wave opportunities to 0/40/80 and derive clock gradient from durations.
+- [x] Remove hardcoded old phase times, including demo scene/test assumptions.
+- [x] Verify WebGL and Canvas parity on this machine. A real phone was not available.
+- [x] Add T28–T30. M12 and M13 were checked in Chrome. M14 (phone, four players) was not run.
 
 Done when: unlit midnight is meaningfully dark in both renderers, safe light boundaries match gameplay, and the longer night does not unintentionally add waves.
 
@@ -1114,7 +1114,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Floor pickup | Complete | proximity pickup | 5b79932cb6544780c23f05eb6097623ed8b20651. 94 Hollowstead + 17 ball-game tests passing. Pages run 36145733731 succeeded. Supersedes the P3 fresh-Gather pickup rule | Live clock stays 150/30/80. P5 and P6 not started |
 | Pack, chest, and pickup motion | Complete | follow-up on feat/hollowstead-coop | 2e41d385f008a10e200a08846e0516db17226487. 99 Hollowstead + 17 ball-game tests passing | Slot counts superseded by the 12/24 follow-up. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
 | Pack 12 and chest 24 | Complete | follow-up on feat/hollowstead-coop | This commit. 99 Hollowstead + 17 ball-game tests passing | No separate stack action. Pack is 12 slots. Chests are 24 slots. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
-| P5 | Not started | Unassigned | — | — |
+| P5 | Complete | P5 agent | This commit. 104 Hollowstead + 17 ball-game tests passing. WebGL and canvas midnight screenshots under the handoff. Pages run recorded after deploy | Real phone and a four-player scene were not run. M14 is unverified |
 | P6 | Not started | Unassigned | — | — |
 
 For each handoff, append:
@@ -1587,3 +1587,65 @@ Compatibility/migration notes:
 - Saves stay v2 with clock v1. RULES stay day 150, dusk 30, night 80, cycle 260. Do not call remapWorldClock. Do not enable 180/30/100 or night darkness. Pickup radii and timing are unchanged. P5 and P6 are not started.
 - Player entry cache query is harvest-11 on index.html (style.css and main.mjs) and on the nested modules those files import.
 Exact next task: P5 — Night visuals and pacing. Do not start P6. Pack stays 12 slots and chests stay 24. Do not add a separate stack button, restore the 120-supply backpack cap, restore chest page growth, or restore "press Gather on the pile." Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.
+
+Date: 2026-09-25
+Package / agent: P5 / P5 agent
+Starting commit: 968a8a6d5d4b6bb5a296364e8ced6874077af388
+Ending commit: This commit on feat/hollowstead-coop.
+Files changed:
+- hollowstead/src/lighting.mjs
+- hollowstead/src/renderer.mjs
+- hollowstead/src/canvas-renderer.mjs
+- hollowstead/src/content.mjs
+- hollowstead/src/contracts.mjs
+- hollowstead/src/engine.mjs
+- hollowstead/src/serialization.mjs
+- hollowstead/src/inventory.mjs
+- hollowstead/src/main.mjs
+- hollowstead/src/network.mjs
+- hollowstead/src/transport.mjs
+- hollowstead/src/transactions.mjs
+- hollowstead/src/interactions.mjs
+- hollowstead/src/chests.mjs
+- hollowstead/src/ui/actions.mjs
+- hollowstead/src/ui/catalog.mjs
+- hollowstead/src/ui/inventory.mjs
+- hollowstead/index.html
+- hollowstead/style.css
+- hollowstead/themes/FORMAT.md
+- hollowstead/themes/harvest/theme.json
+- hollowstead/tests/night.test.mjs
+- hollowstead/tests/contracts.test.mjs
+- hollowstead/tests/items.test.mjs
+- hollowstead/tests/chests.test.mjs
+- hollowstead/tests/chest-network.test.mjs
+- hollowstead/tests/interactions.test.mjs
+- hollowstead/tests/survival.test.mjs
+- hollowstead/tests/fixtures/generate-v1-fixtures.mjs
+- hollowstead/IMPLEMENTATION_PLAN.md
+Implemented behavior:
+- Night darkness is shared illumination, not a floor overlay and not a Three.js light. lighting.mjs collects fueled heartfires (radius 8 plus 1.5 per level above 1), fueled campfires (6), soul lanterns (6, no fuel required), and a living equipped hand lantern (radius 4). World.lit uses that same list with a strict less-than radius. The visual halo is full inside 0.8 of the radius and ambient by 1.2. Overlapping lamps take the brightest, not the sum. The halo does not grant courage.
+- Unlit midnight display brightness is 0.03. WebGL multiplies terrain and scatter in the material shader from a 96×96 light field, and multiplies each sprite, effect, label, and selection by the same result. Canvas shades each ground sample and each sprite by that brightness. Nameplates, health bars, floaters, and selection fade out near ambient. Picking ignores a dark target beyond reach. The local wanderer keeps a faint silhouette (0.14) that is not a safe light. HUD, inventory, and the minimap stay bright.
+- A hand lantern keeps radius 4 until the last 6 seconds of torch fuel, then the safe disc and the visible pool shrink together with a smoothstep. At zero fuel the lantern gives no light. Downed, ghost, offline, backpack-only, and empty torches give no light.
+- The live clock is day 180, dusk 30, night 100, cycle 310. Continue applies remapWorldClock once when a v2 save still says clock v1, or when only a v1 expedition exists (migrateV1Save with remapTime). A save that is already clock v2 is not remapped again. World.restore accepts only clock v2. Phase, fraction through that phase, and remaining seconds on node-ready and drop-expiry deadlines are preserved. The next night wave is recomputed from the remaining 0/40/80 marks of the new night. A night-start wave is not replayed, and a v1 save past its last wave does not gain one because the night is longer.
+- Each night has three wave opportunities, at 0%, 40%, and 80% of the 100-second night (0, 40, and 80 seconds). Wave size and the enemy cap of 22 are unchanged. The fifth night still spawns one boss. Victory is still the following dawn, at 1550 seconds.
+- The day-track gradient is painted from those durations (about 58.06% and 67.74%). The old fixed 58%/69% CSS stops are gone.
+- Player cache query is harvest-12 on index.html and on the modules those files import.
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 104 pass, 0 fail. Includes T28 boundaries across six days, T29 exactly three waves plus the capped and boss cases, T29 migrated nights that do not replay or add a fourth wave, and T30 light eligibility including the lantern fade.
+- node --test ball-game/tests/*.test.mjs: 17 pass, 0 fail.
+- git diff --check and node --check on the changed modules.
+- Headless Chrome (swiftshader) loaded /hollowstead/index.html?dev. Venture alone. The existing dev hook set the clock to 260 (50 seconds into night) and held the next wave off. Unlit ground away from the heartfire measured about 5/255 in WebGL and 3/255 in Canvas. Standing on the heartfire measured about 79/255 and 74/255, with the camp visible inside the pool and the woods dark outside it. A hand lantern at fuel 40 lit a smaller pool; at about 1.6–1.8 fuel the pool had shrunk to under one world unit; at fuel 0 the scene matched unlit midnight. Canvas lamps are sampled on a half-unit grid, so the pool edge is coarser than WebGL. A real phone and a four-player scene were not run.
+Evidence / screenshots:
+- /opt/cursor/artifacts/hollowstead-p5-webgl-midnight-unlit.png
+- /opt/cursor/artifacts/hollowstead-p5-webgl-midnight-hearth.png
+- /opt/cursor/artifacts/hollowstead-p5-webgl-lantern-fading.png
+- /opt/cursor/artifacts/hollowstead-p5-canvas-midnight-unlit.png
+- /opt/cursor/artifacts/hollowstead-p5-canvas-midnight-hearth.png
+- /opt/cursor/artifacts/hollowstead-p5-canvas-lantern-fading.png
+- Deployment of this tip is recorded once the Pages workflow finishes.
+Compatibility/migration notes:
+- New worlds and resumed expeditions store world.clock as v2 on the 310-second cycle. A second Continue does not shift time or deadlines again. Protocol stays hollowstead-2. V1 fixture timestamps stay on the 260-second clock and are not regenerated.
+- Pack stays 12 slots. Chests stay 24 slots. Floor pickup stays proximity: attract 1.15, touch 0.42, dwell 0.65s, flight 0.28s, dropper cooldown 1.25s. Item actions still clear the selection. Do not restore a 120-supply bag cap, chest pages, a Stack same items button, or Gather-to-pickup.
+- Torch durability remains 180. That number is fuel, not the day length. Hearth starting fuel remains 150.
+Exact next task: P6 — Integration and release. Do not start P6 in this package. Pack stays 12 slots and chests stay 24. Do not add a separate stack button, restore the 120-supply backpack cap, restore chest page growth, or restore "press Gather on the pile."

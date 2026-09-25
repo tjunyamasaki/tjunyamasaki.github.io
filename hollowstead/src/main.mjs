@@ -1,19 +1,19 @@
-import {World,clamp,distance,biome} from './engine.mjs?v=harvest-11';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-11';
-import {Renderer,loadTheme} from './renderer.mjs?v=harvest-11';
-import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-11';
-import {createNetwork} from './network.mjs?v=harvest-11';
-import {Sound} from './audio.mjs?v=harvest-11';
-import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-11';
-import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-11';
-import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-11';
-import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-11';
+import {World,clamp,distance,biome} from './engine.mjs?v=harvest-12';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-12';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-12';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-12';
+import {createNetwork} from './network.mjs?v=harvest-12';
+import {Sound} from './audio.mjs?v=harvest-12';
+import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-12';
+import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-12';
+import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-12';
+import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-12';
 import {
   allowsCombat,allowsMovement,clusterFor,effectLine,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
-} from './ui/actions.mjs?v=harvest-11';
-import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-11';
-import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-11';
+} from './ui/actions.mjs?v=harvest-12';
+import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-12';
+import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-12';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -153,7 +153,7 @@ function enterGame(){
 async function goHome(){
   save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;cancelPlacement();cancelMaintenance();clearSelection();closeSheet();$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;$('room-panel').hidden=true;$('home-panel').hidden=false;$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();demoWorld();
 }
-function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=163;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
+function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
 function setBusy(value){busy=value;for(const id of ['host','join','solo','continue'])$(id).disabled=value;}
 function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status;world=World.restore(data);dirty=true;if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');$('home-panel').hidden=true;$('room-panel').hidden=false;$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
 async function hostCamp(){

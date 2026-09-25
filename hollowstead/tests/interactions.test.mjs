@@ -41,11 +41,12 @@ function takePiles(w,p){
 }
 function ready(node,w){return node.ready>w.time;}
 
-test('live clock stays 150/30/80',()=>{
-  assert.equal(RULES.day,150);
+test('live clock is 180/30/100',()=>{
+  assert.equal(RULES.day,180);
   assert.equal(RULES.dusk,30);
-  assert.equal(RULES.night,80);
-  assert.equal(RULES.cycle,260);
+  assert.equal(RULES.night,100);
+  assert.equal(RULES.cycle,310);
+  assert.equal(RULES.cycle, RULES.day+RULES.dusk+RULES.night);
 });
 
 test('T16 field build list, exact targets, and first workbench progression',()=>{

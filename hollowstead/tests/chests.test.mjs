@@ -6,7 +6,7 @@ import {ITEMS,EQUIPMENT} from '../src/content.mjs';
 import {createActionSession} from '../src/transactions.mjs';
 import {collectLocations,duplicateUids,containerId,countItem,totalQuantity} from '../src/inventory.mjs';
 import {CHEST_LEASE_SECONDS} from '../src/contracts.mjs';
-import {migrateV1Save,validateV2World} from '../src/serialization.mjs';
+import {migrateV1Save,remapWorldClock,validateV2World} from '../src/serialization.mjs';
 
 function camp(){
   const w=new World(12),p=w.addPlayer('host'),q=w.addPlayer('guest');w.start();
@@ -36,7 +36,11 @@ test('review P1: valid v1 zero-count pack/chest entries migrate without changing
   const before=copy(doc),converted=migrateV1Save(doc);
   assert.equal(converted.ok,true);assert.equal(copy(doc),before);
   assert.equal(countItem(converted.save.world.players[0].inventory,'berry'),0);
-  const world=World.fromSave(converted.save);world.tick();assert.equal(world.clock,'v1');
+  assert.equal(converted.save.world.clock,'v1');
+  const mapped=remapWorldClock(converted.save.world);
+  assert.equal(mapped.remapped,true);
+  const world=World.fromSave({world:mapped.world,savedAt:1});world.tick();assert.equal(world.clock,'v2');
+  assert.equal(remapWorldClock(mapped.world).remapped,false);
 });
 
 test('review P1: save validation rejects aliased containers and duplicate actors',()=>{

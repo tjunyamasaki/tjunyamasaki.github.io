@@ -1,16 +1,17 @@
-import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-11';
+import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-12';
 import {
-  CLOCK_V1, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2,
+  CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createChest, createContainer,
-  containerId, duplicateUids, emptyEquipment, equippedLanternLit, equipmentSlotFor, findStack, isMaterial,
+  containerId, duplicateUids, emptyEquipment, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
   supplyLoad, wearStack,
-} from './inventory.mjs?v=harvest-11';
-import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-11';
-import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange} from './contracts.mjs?v=harvest-11';
-import {pruneChests, releaseChests} from './chests.mjs?v=harvest-11';
-import {inventoryIntent} from './transactions.mjs?v=harvest-11';
-import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-11';
+} from './inventory.mjs?v=harvest-12';
+import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-12';
+import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-12';
+import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-12';
+import {pruneChests, releaseChests} from './chests.mjs?v=harvest-12';
+import {inventoryIntent} from './transactions.mjs?v=harvest-12';
+import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-12';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.z||0)-(b.z||0));
@@ -126,7 +127,7 @@ export function makeMap(seed){
 }
 export class World {
   constructor(seed=(Math.random()*0xffffffff)>>>0){
-    this.version=SAVE_VERSION_V2;this.clock=CLOCK_V1;this.seed=seed;this.time=0;this.status='lobby';this.players=[];this.nodes=makeMap(seed);
+    this.version=SAVE_VERSION_V2;this.clock=CLOCK_V2;this.seed=seed;this.time=0;this.status='lobby';this.players=[];this.nodes=makeMap(seed);
     this.buildings=[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
     this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=false;this.wipe=0;
     this.networkId=crypto.randomUUID();this.transactionRevision=0;this.chestSessions=new Map();
@@ -916,7 +917,14 @@ export class World {
     p.stamina-=7;p.cooldown=armed?.55:.65;p.rest=false;p.action='attack';p.actionUntil=this.time+.32;this.event('swing',p.x,p.z);
     if(enemy){p.dx=(enemy.x-p.x)/Math.max(.1,distance(enemy,p));p.dz=(enemy.z-p.z)/Math.max(.1,distance(enemy,p));const damage=armed?EQUIPMENT[weapon.itemId].damage:9;enemy.hp-=damage;enemy.x+=p.dx*.32;enemy.z+=p.dz*.32;this.event('damage',enemy.x,enemy.z,String(damage));if(armed)this.wearEquipped(p,'weapon',1);}
   }
-  lit(p){return this.players.some(q=>equippedLanternLit(q)&&distance(p,q)<4)||this.buildings.some(b=>STRUCTURES[b.type].light&&(b.type==='lantern'||b.fuel>0)&&distance(p,b)<STRUCTURES[b.type].light+(b.type==='hearth'?(b.level-1)*1.5:0));}
+  lit(p){return inSafeLight(collectLightSources(this), p.x, p.z);}
+  armNextWave(){
+    const schedule={day:RULES.day, dusk:RULES.dusk, night:RULES.night, cycle:RULES.cycle};
+    const progress=phaseProgress(this.time, schedule);
+    if(!progress||progress.name!=='night'){this.nextSpawn=0;return;}
+    const offset=remainingNightWaveOffsets(progress.elapsed, RULES.night)[0];
+    this.nextSpawn=offset===undefined?progress.cycleIndex*schedule.cycle+schedule.cycle:progress.cycleIndex*schedule.cycle+progress.phaseStart+offset;
+  }
   obstacles(){return [...this.nodes.filter(n=>!n.ready&&NODES[n.type].radius>.3).map(n=>({...n,radius:NODES[n.type].radius})),...this.buildings.filter(b=>STRUCTURES[b.type].radius>0&&!(b.type==='gate'&&b.open)).map(b=>({...b,radius:STRUCTURES[b.type].radius}))];}
   move(p,dx,dz,dt,obstacles){
     const can=(x,z)=>Math.abs(x)<41&&Math.abs(z)<41&&!obstacles.some(o=>o.id!==p.id&&Math.hypot(o.x-x,o.z-z)<o.radius+.33);
@@ -936,9 +944,9 @@ export class World {
   }
   tick(dt=RULES.tick){
     pruneChests(this);if(this.status!=='playing')return;dt=clamp(dt,0,.1);const before=phaseAt(this.time),oldDay=dayAt(this.time);this.time+=dt;const phase=phaseAt(this.time);
-    if(before!==phase){this.event('phase',0,0,phase==='day'?'Dawn. You made it.':phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='night'){this.spawnWave();this.nextSpawn=this.time+32;}if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);this.enemies=this.enemies.filter(e=>e.type==='king');}}
+    if(before!==phase){this.event('phase',0,0,phase==='day'?'Dawn. You made it.':phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='night'){this.spawnWave();this.armNextWave();}if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);this.enemies=this.enemies.filter(e=>e.type==='king');}}
     if(dayAt(this.time)!==oldDay&&this.bossSlain&&!this.endless){this.status='victory';this.event('announce',0,0,'The curse is broken. Your fire still burns.');return;}
-    if(phase==='night'&&this.time>=this.nextSpawn){if(this.enemies.length<22)this.spawnWave();this.nextSpawn=this.time+32;}
+    if(phase==='night'&&this.time>=this.nextSpawn){if(this.enemies.length<22)this.spawnWave();this.armNextWave();}
     for(const n of this.nodes)if(n.ready&&n.ready<this.time){n.ready=0;n.hits=NODES[n.type].hits;}
     const obstacles=this.obstacles();
     for(const p of this.players){
@@ -1018,10 +1026,10 @@ export class World {
   }
   static restore(data){
     if(data&&typeof data==='object')settleStorage(data);
-    if(!validateV2World(data).ok||data.clock!==CLOCK_V1)throw new Error('This save is not a Hollowstead expedition.');
+    if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
     const world=new World(data.seed);
     for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
-    world.version=SAVE_VERSION_V2;world.clock=CLOCK_V1;
+    world.version=SAVE_VERSION_V2;world.clock=CLOCK_V2;
     for(const change of data.nodeChanges||[]){const node=world.nodes.find(entry=>entry.id===change.id);if(node){node.hits=change.hits;node.ready=change.ready;}}
     if(typeof data.worldId==='string')world.networkId=data.worldId;
     world.transactionRevision=data.transactionRevision||0;

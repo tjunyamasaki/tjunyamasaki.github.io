@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {World} from '../src/engine.mjs';
-import {ITEMS, NODES, RULES, phaseAt} from '../src/content.mjs';
+import {ITEMS, NODES, RULES} from '../src/content.mjs';
 import {PROTOCOL} from '../src/network.mjs';
 import {
   ACTION_RESULT_FIELDS, ACTION_RESULT_TYPE, BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CONTEXT_ACTIONS,
@@ -77,24 +77,27 @@ function assertV1World(world){
   assert.throws(() => World.restore(JSON.parse(JSON.stringify(world))), /not a Hollowstead expedition/);
 }
 
-test('runtime clock stays on the v1 baseline while the protocol is hollowstead-2', () => {
+test('runtime clock is 180/30/100 while the protocol is hollowstead-2', () => {
   assert.equal(CONTRACT, 'hollowstead-contracts-1');
   assert.equal(PROTOCOL, PROTOCOL_V2);
   assert.equal(PROTOCOL_V1, 'hollowstead-1');
   assert.equal(PROTOCOL_V2, 'hollowstead-2');
-  assert.deepEqual(V1_PHASE, {day: RULES.day, dusk: RULES.dusk, night: RULES.night, cycle: RULES.cycle});
-  assert.deepEqual(V2_PHASE, {day: 180, dusk: 30, night: 100, cycle: 310});
-  assert.equal(V2_PHASE.cycle, V2_PHASE.day + V2_PHASE.dusk + V2_PHASE.night);
-  assert.notEqual(V2_PHASE.cycle, RULES.cycle);
-  assert.equal(new World(1).clock, 'v1');
+  assert.deepEqual(V1_PHASE, {day: 150, dusk: 30, night: 80, cycle: 260});
+  assert.deepEqual(V2_PHASE, {day: RULES.day, dusk: RULES.dusk, night: RULES.night, cycle: RULES.cycle});
+  assert.equal(RULES.cycle, RULES.day + RULES.dusk + RULES.night);
+  assert.equal(new World(1).clock, 'v2');
   const network = readFileSync(new URL('../src/network.mjs', import.meta.url), 'utf8');
   assert.equal(network.includes('contracts.mjs'), true);
   assert.match(network, /Refresh the page to update/);
   assert.equal(readFileSync(new URL('../index.html', import.meta.url), 'utf8').includes('contracts.mjs'), false);
+  const lighting = readFileSync(new URL('../src/lighting.mjs', import.meta.url), 'utf8');
+  assert.equal(lighting.includes('three.module'), false);
+  assert.equal(lighting.includes('canvas-renderer'), false);
   for (const file of ['renderer.mjs', 'canvas-renderer.mjs']) {
     const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
-    assert.match(source, /t>=180/);
-    assert.match(source, /t>150/);
+    assert.equal(source.includes('lighting.mjs'), true);
+    assert.equal(source.includes('t>=180'), false);
+    assert.equal(source.includes('t>150'), false);
     assert.equal(source.includes('V2_PHASE'), false);
   }
 });
@@ -211,7 +214,7 @@ test('v1 fixtures keep the legacy save shape and cannot resume as container worl
   assertV1World(normal.world);
   assertV1World(full.world);
   assert.equal(normal.world.time, 335);
-  assert.equal(phaseAt(normal.world.time), 'day');
+  assert.equal(phaseProgress(normal.world.time, V1_PHASE).name, 'day');
   assert.equal(normal.world.seed, 402);
   const camper = normal.world.players[0];
   assert.equal(supplyLoad(camper.inventory) < SUPPLY_CAPACITY, true);
@@ -226,7 +229,7 @@ test('v1 fixtures keep the legacy save shape and cannot resume as container worl
   assert.equal(normal.world.drops[0].count < STACK_LIMIT, true);
 
   assert.equal(full.world.time, 190);
-  assert.equal(phaseAt(full.world.time), 'night');
+  assert.equal(phaseProgress(full.world.time, V1_PHASE).name, 'night');
   assert.notEqual(full.world.time, V1_PHASE.day + V1_PHASE.dusk);
   const [host, guest] = full.world.players;
   assert.equal(supplyLoad(host.inventory), SUPPLY_CAPACITY);
@@ -258,7 +261,7 @@ test('v1 fixtures keep the legacy save shape and cannot resume as container worl
   assert.deepEqual(boundaries.saves.map(save => [save.name, save.time, save.phase, save.world.enemies.length, save.world.bossSpawned]), expected);
   for (const save of boundaries.saves) {
     assert.equal(save.world.time, save.time);
-    assert.equal(phaseAt(save.world.time), save.phase);
+    assert.equal(phaseProgress(save.world.time, V1_PHASE).name, save.phase);
     assert.equal(save.world.seed, 402);
     assertV1World(save.world);
     assert.equal(save.world.nodeChanges.some(([, hits, ready]) => ready === 0 && hits > 0 && hits < NODES.tree.hits), true);

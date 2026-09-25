@@ -4,7 +4,8 @@
 
 import {writeFileSync} from 'node:fs';
 import {World} from '../../src/engine.mjs';
-import {ITEMS, NODES, RULES, phaseAt} from '../../src/content.mjs';
+import {ITEMS, NODES, RULES} from '../../src/content.mjs';
+import {V1_PHASE, phaseProgress} from '../../src/contracts.mjs';
 console.error('Refusing to overwrite frozen v1 fixtures in hollowstead/tests/fixtures. They record the pre-container save shape.');
 process.exit(1);
 
@@ -147,7 +148,7 @@ function boundary(time){
   rock.hits=0;
   rock.ready=time+NODES.rock.regrow;
   w.drop('berry',2,1,2);
-  const phase=phaseAt(time);
+  const phase=phaseProgress(time, V1_PHASE).name;
   if(phase==='night'){
     w.spawnWave();
     w.nextSpawn=time+32;

@@ -1,19 +1,18 @@
 // v1 → v2 save migration and snapshot validation. Does not touch localStorage or World.
-// Live Continue keeps clock `v1`: absolute time stays on the 150/30/80 cycle so the
-// running simulation resumes in the same phase and fraction. remapTime is the 180/30/100
-// conversion P5 must apply when that clock is enabled. Do not resume a clock `v2`
-// document on the current 260s clock.
+// Continue remaps a clock `v1` campaign onto the 180/30/100 cycle exactly once.
+// remapWorldClock leaves a clock `v2` document unchanged, so a second Continue does
+// not shift time or deadlines again. World.restore accepts clock `v2` only.
 
 import {
   CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, SUPPLY_ITEM_IDS, V2_PHASE,
   legacyEquipmentPlan, nextNightWaveTime, phaseMigrationDelta, phaseProgress, remapPhaseTime,
-} from './contracts.mjs?v=harvest-11';
+} from './contracts.mjs?v=harvest-12';
 import {
   BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, collectLocations, cloneStack, createBackpack, createContainer, createRecovery,
   duplicateUids, emptyEquipment, itemDefinition, makeStack, planInsert, validateContainer,
   validateEquipment, validateStack, containerId,
-} from './inventory.mjs?v=harvest-11';
-import {STRUCTURES} from './content.mjs?v=harvest-11';
+} from './inventory.mjs?v=harvest-12';
+import {STRUCTURES} from './content.mjs?v=harvest-12';
 
 export {SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, CLOCK_V1, CLOCK_V2};
 
@@ -395,16 +394,23 @@ export function planContinue(stored){
     let world;
     try{world=structuredClone(v2.world);}catch{return {ok:false, code:'corrupt-v2', message:RECOVERABLE, write:null, preserveV1:true, recoverable:!!(v1&&!v1.invalid)};}
     const changed=settleStorage(world);
-    const settled={...v2, world};
-    const valid=validateV2Save(changed?settled:v2);
-    if(valid.ok&&(changed?world.clock:v2.world.clock)===CLOCK_V1)return {ok:true, save:changed?settled:v2, write:changed?'v2':null, preserveV1:true, recoverable:false};
-    if(valid.ok&&v2.world.clock===CLOCK_V2){
-      return {ok:false, code:'clock', message:'This expedition was saved for a longer day and night that is not active yet. The original save was kept.', write:null, preserveV1:true, recoverable:true};
+    let remapped=false;
+    if(world.clock===CLOCK_V1){
+      const mapped=remapWorldClock(world);
+      if(!mapped.ok||!mapped.remapped)return {ok:false, code:mapped.code||'time', message:RECOVERABLE, write:null, preserveV1:true, recoverable:true};
+      world=mapped.world;
+      remapped=true;
+    }else if(world.clock!==CLOCK_V2){
+      return {ok:false, code:'clock', message:RECOVERABLE, write:null, preserveV1:true, recoverable:true};
     }
-    return {ok:false, code:'corrupt-v2', message:RECOVERABLE, write:null, preserveV1:true, recoverable:!!(v1&&!v1.invalid)};
+    const settled={...v2, world};
+    const valid=validateV2Save(settled);
+    if(!valid.ok)return {ok:false, code:'corrupt-v2', message:RECOVERABLE, write:null, preserveV1:true, recoverable:!!(v1&&!v1.invalid)};
+    if(remapped||changed)return {ok:true, save:settled, write:'v2', preserveV1:true, recoverable:false};
+    return {ok:true, save:v2, write:null, preserveV1:true, recoverable:false};
   }
   if(!v1||v1.invalid)return {ok:false, code:'missing', message:'No saved expedition was found.', write:null, preserveV1:true, recoverable:false};
-  const migrated=migrateV1Save(v1, {remapTime:false});
+  const migrated=migrateV1Save(v1, {remapTime:true});
   if(!migrated.ok)return {ok:false, code:migrated.code, message:migrated.message, write:null, preserveV1:true, recoverable:true};
   return {ok:true, save:migrated.save, write:'v2', preserveV1:true, recoverable:false};
 }

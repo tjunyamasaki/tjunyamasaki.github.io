@@ -13,6 +13,20 @@
     "light": "#f7ba72",
     "accent": "#eaaa6a"
   },
+  "lighting": {
+    "ambientNight": 0.03,
+    "litBrightness": 0.92,
+    "transitionSeconds": 7,
+    "dawnSeconds": 4,
+    "readableFraction": 0.8,
+    "ambientFraction": 1.2,
+    "nightTint": "#191b2b",
+    "unlitTint": "#737b9f",
+    "sourceTint": "#fff0c8",
+    "dayTint": "#ffffff",
+    "localSilhouette": 0.14,
+    "emissiveCore": 0.42
+  },
   "audio": {},
   "sprites": {
     "tree": {

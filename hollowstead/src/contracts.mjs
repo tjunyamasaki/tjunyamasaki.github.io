@@ -1,10 +1,11 @@
 // Shared Hollowstead overhaul contract.
 // Pure data and helpers. The simulation reaches this module through inventory.mjs and
 // serialization.mjs. network.mjs imports the protocol id directly.
-// The running clock stays on content.mjs 150/30/80 until P5 enables 180/30/100.
-// Do not import World, the DOM, the network, or a renderer from here.
+// The running clock is content.mjs 180/30/100. V1_PHASE is the old 150/30/80
+// schedule, used only to migrate a saved campaign. Do not import World, the DOM,
+// the network, or a renderer from here.
 
-import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-11';
+import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-12';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 
@@ -40,7 +41,7 @@ export const REMOVED_GAMEPLAY_COMMANDS = Object.freeze(['eat', 'ping', 'deposit'
 
 export const V1_PHASE = Object.freeze({day: 150, dusk: 30, night: 80, cycle: 260});
 export const V2_PHASE = Object.freeze({day: 180, dusk: 30, night: 100, cycle: 310});
-/** P1 saves keep `v1` so the live 260s clock resumes the same phase. P5 sets `v2` when it enables 310s. */
+/** Saved campaigns written before the 310s clock. Continue remaps these once. New worlds use `v2`. */
 export const CLOCK_V1 = 'v1';
 export const CLOCK_V2 = 'v2';
 /** Fractions of the night length. 0 / 0.4 / 0.8 of the v2 night are 0s / 40s / 80s. */

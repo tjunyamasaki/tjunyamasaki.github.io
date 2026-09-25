@@ -1,8 +1,8 @@
 // RPG inventory surface. Renders slots and reports taps, drags, and quantities.
 // It never writes player inventories, equipment, or chest contents.
 
-import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-7';
-import {equipmentSlotFor} from '../inventory.mjs?v=harvest-7';
+import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-10';
+import {equipmentSlotFor} from '../inventory.mjs?v=harvest-10';
 
 export const SOCKET_LABELS = Object.freeze({
   chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light',
@@ -37,7 +37,7 @@ export function gridStep(index, count, columns, key) {
 export function slotLabel({empty = false, name = '', quantity = 1, durability = null, maxDurability = null, equipped = false, index = 0, kind = 'pack'} = {}) {
   if (empty) {
     if (kind === 'socket') return `Empty ${name} socket`;
-    const place = kind === 'chest' ? 'chest' : kind === 'recovery' ? 'saved' : 'pack';
+    const place = kind === 'chest' ? 'chest' : kind === 'recovery' || kind === 'overflow' ? 'saved' : 'pack';
     return `Empty ${place} slot ${index + 1}`;
   }
   const parts = [name];
@@ -47,8 +47,16 @@ export function slotLabel({empty = false, name = '', quantity = 1, durability = 
   return parts.join(', ');
 }
 
+const ITEM_ACTIONS = new Set(['equip', 'unequip', 'swap', 'eat', 'heal', 'drop', 'confirm-drop', 'transfer', 'take', 'store']);
+
+/** Per-item actions clear the UI selection when they are issued. Quantity and inspect do not. */
+export function itemActionClearsSelection(op) {
+  return ITEM_ACTIONS.has(op);
+}
+
 export function operationsFor({itemId, where, chestOpen = false} = {}) {
   if (where === 'recovery') return ['take'];
+  if (where === 'overflow') return chestOpen ? ['transfer'] : [];
   if (where === 'chest') return chestOpen ? ['transfer'] : [];
   const ops = [];
   const item = ITEMS[itemId];
@@ -88,6 +96,9 @@ export function createInventoryPanel(root, hooks) {
       </section>
       <section class="bag-column" aria-label="Backpack">
         <div id="inv-meta" class="bag-meta"></div>
+        <div class="storage-tools">
+          <button type="button" id="pack-sort" data-pack-op="sort">Sort</button>
+        </div>
         <div id="inv-grid" class="slot-grid" role="grid"></div>
         <div id="inv-recovery" class="recovery-block" hidden>
           <p class="section-label">SAVED FROM AN OLDER PACK</p>
@@ -98,13 +109,17 @@ export function createInventoryPanel(root, hooks) {
       <section id="inv-chest" class="chest-column" hidden aria-label="Chest">
         <div class="storage-heading">
           <div id="chest-meta" class="bag-meta"></div>
-          <div id="chest-pages" class="chest-pages" hidden>
-            <button type="button" id="chest-prev" aria-label="Previous chest page">←</button>
-            <small id="chest-page"></small>
-            <button type="button" id="chest-next" aria-label="Next chest page">→</button>
-          </div>
+        </div>
+        <div class="storage-tools" id="chest-tools">
+          <button type="button" data-chest-op="store">Store all</button>
+          <button type="button" data-chest-op="stack">Stack same items</button>
+          <button type="button" data-chest-op="sort">Sort</button>
         </div>
         <div id="chest-grid" class="slot-grid chest-grid" role="grid"></div>
+        <div id="chest-overflow" class="recovery-block chest-overflow" hidden>
+          <p class="section-label">SAVED FROM A LARGER CHEST</p>
+          <div id="chest-overflow-grid" class="slot-grid recovery-grid"></div>
+        </div>
       </section>
     </div>
     <footer id="inv-details" class="item-details" hidden>
@@ -132,7 +147,10 @@ export function createInventoryPanel(root, hooks) {
   const chestWrap = panel.querySelector('#inv-chest');
   const chestMeta = panel.querySelector('#chest-meta');
   const chestGrid = panel.querySelector('#chest-grid');
-  const chestPage = panel.querySelector('#chest-page');
+  const chestOverflow = panel.querySelector('#chest-overflow');
+  const chestOverflowGrid = panel.querySelector('#chest-overflow-grid');
+  const packSort = panel.querySelector('#pack-sort');
+  const chestTools = panel.querySelector('#chest-tools');
   const details = panel.querySelector('#inv-details');
   const detailName = panel.querySelector('#detail-name');
   const detailMeta = panel.querySelector('#detail-meta');
@@ -218,8 +236,9 @@ export function createInventoryPanel(root, hooks) {
       portraitSig = view.portraitHTML || '';
       portrait.innerHTML = portraitSig;
     }
-    const metaText = `Pack · ${view.occupied} / ${view.slotMax} slots · ${view.supply} / ${view.capacity} supplies`;
+    const metaText = `Pack · ${view.occupied} / ${view.slotMax}`;
     if (metaSig !== metaText) { metaSig = metaText; meta.textContent = metaText; }
+    packSort.disabled = !!view.pending;
     const charmText = `Last-chance charm, ${view.charm ? 'available' : 'spent'}`;
     if (charmSig !== charmText) { charmSig = charmText; charm.textContent = charmText; }
     syncGroup(sockets, view.sockets);
@@ -228,13 +247,14 @@ export function createInventoryPanel(root, hooks) {
     if (view.recovery?.length) syncGroup(recoveryGrid, view.recovery);
     chestWrap.hidden = !view.chest;
     if (view.chest) {
-      const chestLine = view.chest.pending ? 'Waiting for camp…' : 'Chest';
+      const occupied = view.chest.occupied ?? view.chest.slots.filter(cell => cell.stack).length;
+      const slotMax = view.chest.slotMax ?? view.chest.slots.length;
+      const chestLine = view.chest.pending ? 'Waiting for camp…' : `Chest · ${occupied} / ${slotMax}`;
       if (chestMeta.textContent !== chestLine) chestMeta.textContent = chestLine;
       syncGroup(chestGrid, view.chest.slots);
-      chestPage.textContent = `${view.chest.page + 1} / ${view.chest.pages}`;
-      panel.querySelector('#chest-pages').hidden = view.chest.pages <= 1;
-      panel.querySelector('#chest-prev').disabled = view.chest.page <= 0 || view.pending;
-      panel.querySelector('#chest-next').disabled = view.chest.page >= view.chest.pages - 1 || view.pending;
+      chestOverflow.hidden = !view.chest.overflow?.length;
+      if (view.chest.overflow?.length) syncGroup(chestOverflowGrid, view.chest.overflow);
+      for (const button of chestTools.querySelectorAll('button')) button.disabled = !!view.pending;
     }
     pendingLine.textContent = view.pendingText || '';
     paintDetails(view);
@@ -319,6 +339,10 @@ export function createInventoryPanel(root, hooks) {
     if (suppressClick) { suppressClick = false; event.preventDefault(); event.stopPropagation(); return; }
     const qty = event.target.closest('[data-qty]');
     if (qty) { hooks.onQuantity(qty.dataset.qty); return; }
+    const chestOp = event.target.closest('[data-chest-op]');
+    if (chestOp) { hooks.onChestOrganize?.(chestOp.dataset.chestOp); return; }
+    const packOp = event.target.closest('[data-pack-op]');
+    if (packOp) { hooks.onPackSort?.(); return; }
     const op = event.target.closest('[data-op]');
     if (op) { hooks.onOperate(op.dataset.op); return; }
     const slot = slotFromEvent(event);
@@ -326,9 +350,6 @@ export function createInventoryPanel(root, hooks) {
     if (event.shiftKey && slot.dataset.empty !== 'true') { hooks.onShift(slot.dataset.slotKey); return; }
     hooks.onSlot(slot.dataset.slotKey, slot.dataset.empty === 'true');
   });
-  panel.querySelector('#chest-prev').onclick = () => hooks.onChestPage(-1);
-  panel.querySelector('#chest-next').onclick = () => hooks.onChestPage(1);
-
   function cancelDrag() { endDrag(false); }
   function detailsOpen() { return !details.hidden; }
   function dragging() { return !!drag?.active; }

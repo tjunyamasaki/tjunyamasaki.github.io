@@ -26,7 +26,7 @@ Losing the Heartfire ends the expedition. If everyone falls and has spent their 
 
 ## Shared chests
 
-Only one wanderer can open a chest at a time. The same panel shows your pack, worn gear, and the chest. Choose 1, Half, or All, then **Transfer**, or tap the slot you want the stack to land in. Food, materials, and equipment all move. Worn gear keeps its durability; putting a lit lantern into the chest switches it off. The panel says when it is waiting on the camp and does not move anything until the camp accepts it. Close the panel to release the chest. Other players cannot spend its supplies while you have it open.
+Only one wanderer can open a chest at a time. The same panel shows your pack, worn gear, and the chest. The pack has six slots. A chest has eighteen. **Store all** moves what fits from your pack into the open chest. **Stack same items** combines matching piles. **Sort** orders the chest, or your pack, and stacks matches. Choose 1, Half, or All, then **Transfer**, or tap the slot you want the stack to land in. Food, materials, and equipment all move. Worn gear keeps its durability; putting a lit lantern into the chest switches it off. The panel says when it is waiting on the camp and does not move anything until the camp accepts it. Close the panel to release the chest. Other players cannot spend its supplies while you have it open.
 
 ## Controls
 

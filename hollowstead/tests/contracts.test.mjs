@@ -5,7 +5,7 @@ import {World} from '../src/engine.mjs';
 import {ITEMS, NODES, RULES, phaseAt} from '../src/content.mjs';
 import {PROTOCOL} from '../src/network.mjs';
 import {
-  ACTION_RESULT_FIELDS, ACTION_RESULT_TYPE, BACKPACK_SLOT_COUNT, CHEST_PAGE_SLOTS, CONTEXT_ACTIONS,
+  ACTION_RESULT_FIELDS, ACTION_RESULT_TYPE, BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CONTEXT_ACTIONS,
   CONTRACT, EQUIPMENT_SLOTS, EQUIPMENT_SLOT_ITEMS, FIELD_BUILD_RECIPES, FIRE_COOK_RECIPES,
   INTENTS, MIGRATION_PREFERRED_WEAPON, NIGHT_WAVE_FRACTIONS, PROTOCOL_V1, PROTOCOL_V2,
   RECIPE_CONTEXTS, REMOVED_GAMEPLAY_COMMANDS, RESULT_CODES, SAVE_VERSION_V1, STACK_LIMIT,
@@ -114,9 +114,9 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(itemDefinition('stew').use, 'eat');
   assert.equal(itemDefinition('__proto__'), null);
   assert.equal(itemDefinition('constructor'), null);
-  assert.equal(BACKPACK_SLOT_COUNT, 24);
+  assert.equal(BACKPACK_SLOT_COUNT, 6);
   assert.equal(SUPPLY_CAPACITY, 120);
-  assert.equal(CHEST_PAGE_SLOTS, 36);
+  assert.equal(CHEST_SLOT_COUNT, 18);
   assert.deepEqual(splitStackQuantities(45), [20, 20, 5]);
   assert.equal(splitStackQuantities(0), null);
 
@@ -149,6 +149,10 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.deepEqual(INTENTS.lanternToggle.optional, ['uid']);
   assert.deepEqual(INTENTS.placeBuilding.optional, ['stationId']);
   assert.deepEqual(INTENTS.setHarvestTarget.required, ['requestId', 'nodeId', 'mode']);
+  assert.deepEqual(INTENTS.chestStoreAll.required, ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']);
+  assert.deepEqual(INTENTS.chestStack.required, ['requestId', 'chestId', 'sessionId', 'destinationRevision']);
+  assert.deepEqual(INTENTS.chestSort.required, ['requestId', 'chestId', 'sessionId', 'destinationRevision']);
+  assert.deepEqual(INTENTS.packSort.required, ['requestId', 'inventoryRevision']);
   assert.equal(INTENTS.dropItem.required.includes('inventoryRevision'), true);
   assert.equal(INTENTS.dropItem.required.includes('x'), false);
   assert.equal(ACTION_RESULT_TYPE, 'actionResult');
@@ -233,7 +237,7 @@ test('v1 fixtures keep the legacy save shape and cannot resume as container worl
   assert.equal(supplyLoad(guest.inventory), SUPPLY_ITEM_IDS.length * 100);
   assert.equal(stackCount(guest.inventory) > BACKPACK_SLOT_COUNT, true);
   const fullChest = full.world.buildings.find(building => building.type === 'chest');
-  assert.equal(stackCount(fullChest.store) > CHEST_PAGE_SLOTS, true);
+  assert.equal(stackCount(fullChest.store) > CHEST_SLOT_COUNT, true);
   assert.equal(fullChest.store.berry, 80);
   assert.equal(fullChest.store.bandage, 80);
   assert.deepEqual(full.world.drops.map(drop => drop.count).sort((a, b) => a - b), [21, 45]);

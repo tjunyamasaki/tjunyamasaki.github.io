@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {World, dropPresentation} from '../src/engine.mjs';
+import {World, createDropMotion, dropPresentation} from '../src/engine.mjs';
 import {PICKUP, RULES} from '../src/content.mjs';
 import {collectLocations, countItem, duplicateUids} from '../src/inventory.mjs';
 
@@ -22,8 +22,11 @@ test('pickup distances are the measured body, dwell, flight, and drop cooldown',
   assert.ok(PICKUP.attract<RULES.reach);
   const renderer=readFileSync(new URL('../src/renderer.mjs',import.meta.url),'utf8');
   const canvas=readFileSync(new URL('../src/canvas-renderer.mjs',import.meta.url),'utf8');
-  assert.match(renderer,/dropPresentation/);
-  assert.match(canvas,/dropPresentation/);
+  assert.match(renderer,/createDropMotion/);
+  assert.match(canvas,/createDropMotion/);
+  assert.match(renderer,/dropMotion\.sample\([^)]*this\.clock/);
+  assert.match(canvas,/dropMotion\.sample\([^)]*this\.clock/);
+  assert.match(renderer,/shadow\.position\.set\(o\.x,\.018,o\.z\)/);
 });
 
 test('dwell then flight collects, and the same frame does not',()=>{
@@ -301,6 +304,25 @@ test('the flight homes on the moving body and a cancelled dwell returns home',()
   p.x=5;
   const later=dropPresentation(drop,w);
   assert.ok(Math.abs(later.x-3)<1e-6);
+});
+
+test('flight sampling follows the render clock and a mid-flight snapshot keeps moving',()=>{
+  const motion=createDropMotion();
+  const drop={id:'d1',x:0,z:0,flight:{playerId:'host',startedAt:0,duration:PICKUP.flight}};
+  const world={time:PICKUP.flight/2,player(){return {id:'host',x:4,z:0};}};
+  const first=motion.sample(drop,world,PICKUP.flight/2,0);
+  const second=motion.sample(drop,world,PICKUP.flight/2+0.02,0);
+  assert.ok(second.t>first.t);
+  assert.ok(second.x>first.x);
+  assert.ok(second.y>0);
+  const snap=structuredClone(drop);
+  const third=motion.sample(snap,world,PICKUP.flight/2+0.04,0);
+  assert.ok(third.x>second.x);
+  assert.ok(third.x>0.2);
+  delete snap.flight;
+  const home=motion.sample(snap,world,PICKUP.flight/2+0.05,0);
+  assert.equal(home.x,0);
+  assert.equal(home.y,0);
 });
 
 function distance(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}

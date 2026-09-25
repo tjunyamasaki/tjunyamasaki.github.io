@@ -1,20 +1,19 @@
 // Stack, container, and equipment primitives. No DOM, network, rendering, or World.
 
-import {EQUIPMENT, ITEMS} from './content.mjs?v=harvest-6';
+import {EQUIPMENT, ITEMS} from './content.mjs?v=harvest-10';
 import {
-  BACKPACK_SLOT_COUNT, CHEST_GROWTH_SLOTS, CHEST_PAGE_SLOTS, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,
+  BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,
   EQUIPMENT_SLOTS, RESULT_CODES, SAVE_VERSION_V2, SUPPLY_CAPACITY, SUPPLY_ITEM_IDS,
   containerId, equipmentSlotFor, itemDefinition,
-} from './contracts.mjs?v=harvest-6';
+} from './contracts.mjs?v=harvest-10';
 
 export {
-  BACKPACK_SLOT_COUNT, CHEST_GROWTH_SLOTS, CHEST_PAGE_SLOTS, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,
+  BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,
   EQUIPMENT_SLOTS, SAVE_VERSION_V2, SUPPLY_CAPACITY, SUPPLY_ITEM_IDS,
   containerId, equipmentSlotFor, itemDefinition,
 };
 
 const UID_PATTERN = /^[A-Za-z0-9:_-]{1,64}$/;
-const SLOT_CAP = 10000;
 
 function fail(code){return {ok:false, code, stack:null};}
 
@@ -60,11 +59,7 @@ export function createContainer(id, slotCount, revision=0){
 }
 
 export function createBackpack(ownerId){return createContainer(containerId('backpack', ownerId), BACKPACK_SLOT_COUNT);}
-export function createChest(ownerId, slotCount=CHEST_PAGE_SLOTS){
-  const count=Math.max(CHEST_PAGE_SLOTS, slotCount);
-  const padded=count%CHEST_GROWTH_SLOTS===0?count:count+CHEST_GROWTH_SLOTS-count%CHEST_GROWTH_SLOTS;
-  return createContainer(containerId('chest', ownerId), padded);
-}
+export function createChest(ownerId){return createContainer(containerId('chest', ownerId), CHEST_SLOT_COUNT);}
 export function createRecovery(ownerId, slotCount){return createContainer(containerId('recovery', ownerId), Math.max(0, slotCount|0));}
 
 export function emptyEquipment(){
@@ -143,16 +138,7 @@ export function validateEquipment(equipment){
   return {ok:true};
 }
 
-function growSlots(slots){
-  if(slots.length+CHEST_GROWTH_SLOTS>SLOT_CAP)return false;
-  for(let i=0;i<CHEST_GROWTH_SLOTS;i++)slots.push(null);
-  return true;
-}
-
-function placeInEmpty(slots, stack, grow){
-  let empties=0;
-  for(const slot of slots)if(slot==null)empties++;
-  if(grow&&empties<=1&&!growSlots(slots))return false;
+function placeInEmpty(slots, stack){
   const index=slots.findIndex(slot=>slot==null);
   if(index<0)return false;
   slots[index]=stack;
@@ -175,7 +161,6 @@ export function planInsert(container, stack, options={}){
   const def=itemDefinition(stack.itemId);
   const supplyCapacity=options.supplyCapacity==null?Infinity:options.supplyCapacity;
   const allowPartial=options.allowPartial===true;
-  const grow=options.grow===true;
   const mintUid=options.mintUid;
   const slots=cloneSlots(container.slots);
   let load=supplyLoad({slots});
@@ -207,7 +192,7 @@ export function planInsert(container, stack, options={}){
     }
     const piece=makeStack(uid, stack.itemId, room, stack.durability);
     if(!piece.ok)return reject(piece.code);
-    if(!placeInEmpty(slots, piece.stack, grow))break;
+    if(!placeInEmpty(slots, piece.stack))break;
     if(uid===stack.uid)placedOriginal=true;
     remaining-=room;
     load+=room*def.supplyUnits;
@@ -361,6 +346,63 @@ export function planConsume({inventory, inventoryRevision, uid, quantity=1}={}){
   return {ok:true, code:RESULT_CODES.ok, slots, revision:inventory.revision+1, itemId, quantity};
 }
 
+function sameStack(a, b){
+  if(a===b)return true;
+  if(!a||!b)return false;
+  return a.uid===b.uid&&a.itemId===b.itemId&&a.quantity===b.quantity&&a.durability===b.durability;
+}
+
+export function sameSlots(a, b){
+  if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length)return false;
+  for(let i=0;i<a.length;i++){
+    if(!a[i]&&!b[i])continue;
+    if(!sameStack(a[i], b[i]))return false;
+  }
+  return true;
+}
+
+function canCombine(stack){
+  if(!stack||typeof stack.durability==='number')return false;
+  const def=itemDefinition(stack.itemId);
+  return !!(def&&def.kind!=='equipment'&&def.stackLimit>1);
+}
+
+/** Pour later stacks of the same item into earlier ones. Equipment and different ids stay apart. */
+export function planStackSlots(slots){
+  const next=cloneSlots(slots||[]);
+  for(let i=0;i<next.length;i++){
+    const dest=next[i];
+    if(!canCombine(dest))continue;
+    const limit=itemDefinition(dest.itemId).stackLimit;
+    for(let j=i+1;j<next.length&&dest.quantity<limit;j++){
+      const src=next[j];
+      if(!src||src.itemId!==dest.itemId||!canCombine(src))continue;
+      const take=Math.min(limit-dest.quantity, src.quantity);
+      if(take<=0)continue;
+      dest.quantity+=take;
+      src.quantity-=take;
+      if(src.quantity<=0)next[j]=null;
+    }
+  }
+  return {slots:next, changed:!sameSlots(slots, next)};
+}
+
+/** Stack identical items, then group by item id with larger stacks first. Ties keep the earlier slot. */
+export function planSortSlots(slots){
+  const stacked=planStackSlots(slots);
+  const entries=[];
+  stacked.slots.forEach((stack, index)=>{if(stack)entries.push({stack, index});});
+  entries.sort((a, b)=>{
+    if(a.stack.itemId<b.stack.itemId)return -1;
+    if(a.stack.itemId>b.stack.itemId)return 1;
+    if(a.stack.quantity!==b.stack.quantity)return b.stack.quantity-a.stack.quantity;
+    return a.index-b.index;
+  });
+  const next=Array.from({length:stacked.slots.length}, ()=>null);
+  entries.forEach((entry, index)=>{next[index]=entry.stack;});
+  return {slots:next, changed:!sameSlots(slots, next)};
+}
+
 export function wearStack(stack, amount){
   if(!stack)return {stack:null, removed:false};
   const def=itemDefinition(stack.itemId);
@@ -405,7 +447,10 @@ export function collectLocations(world){
     for(const slot of EQUIPMENT_SLOTS)add(player.equipment?.[slot], {kind:'equipment', ownerId:player.id, slot});
     player.recovery?.slots?.forEach((stack, slot)=>add(stack, {kind:'recovery', ownerId:player.id, slot}));
   }
-  for(const building of world?.buildings||[])building.store?.slots?.forEach((stack, slot)=>add(stack, {kind:'chest', ownerId:building.id, slot}));
+  for(const building of world?.buildings||[]){
+    building.store?.slots?.forEach((stack, slot)=>add(stack, {kind:'chest', ownerId:building.id, slot}));
+    building.overflow?.slots?.forEach((stack, slot)=>add(stack, {kind:'overflow', ownerId:building.id, slot}));
+  }
   for(const drop of world?.drops||[])add(drop.stack, {kind:'drop', ownerId:drop.id, slot:null});
   return rows;
 }

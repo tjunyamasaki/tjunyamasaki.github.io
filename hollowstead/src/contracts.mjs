@@ -4,7 +4,7 @@
 // The running clock stays on content.mjs 150/30/80 until P5 enables 180/30/100.
 // Do not import World, the DOM, the network, or a renderer from here.
 
-import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-6';
+import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-10';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 
@@ -47,11 +47,11 @@ export const CLOCK_V2 = 'v2';
 export const NIGHT_WAVE_FRACTIONS = Object.freeze([0, 0.4, 0.8]);
 const PHASE_EDGE_EPSILON = 1e-8;
 
-export const BACKPACK_SLOT_COUNT = 24;
+export const BACKPACK_SLOT_COUNT = 6;
 export const STACK_LIMIT = 20;
+/** Legacy v1 supply counter. A backpack is limited by its slots and stack size, not this number. */
 export const SUPPLY_CAPACITY = RULES.capacity;
-export const CHEST_PAGE_SLOTS = 36;
-export const CHEST_GROWTH_SLOTS = 6;
+export const CHEST_SLOT_COUNT = 18;
 export const DROP_LIFETIME_SECONDS = 600;
 export const CHEST_LEASE_SECONDS = 12;
 export const CHEST_RENEW_SECONDS = 3;
@@ -68,7 +68,7 @@ export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
 /** v1 saves that contain both weapons equip the sword and keep the spear in the backpack. */
 export const MIGRATION_PREFERRED_WEAPON = 'sword';
 
-export const LOCATION_KINDS = Object.freeze(['backpack', 'equipment', 'chest', 'drop', 'recovery']);
+export const LOCATION_KINDS = Object.freeze(['backpack', 'equipment', 'chest', 'drop', 'recovery', 'overflow']);
 export const ITEM_STACK_FIELDS = Object.freeze(['uid', 'itemId', 'quantity']);
 export const ITEM_STACK_OPTIONAL = Object.freeze(['durability']);
 export const CONTAINER_FIELDS = Object.freeze(['id', 'revision', 'slots']);
@@ -159,6 +159,10 @@ export const INTENTS = Object.freeze({
   chestRenew: intent('chestRenew', ['requestId', 'chestId', 'sessionId']),
   chestClose: intent('chestClose', ['requestId', 'chestId', 'sessionId']),
   chestTransfer: intent('chestTransfer', ['requestId', 'chestId', 'sessionId', 'sourceContainerId', 'sourceSlot', 'destinationContainerId', 'destinationSlot', 'uid', 'quantity', 'sourceRevision', 'destinationRevision']),
+  chestStoreAll: intent('chestStoreAll', ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']),
+  chestStack: intent('chestStack', ['requestId', 'chestId', 'sessionId', 'destinationRevision']),
+  chestSort: intent('chestSort', ['requestId', 'chestId', 'sessionId', 'destinationRevision']),
+  packSort: intent('packSort', ['requestId', 'inventoryRevision']),
   craftRecipe: intent('craftRecipe', ['requestId', 'recipeId', 'stationId']),
   placeBuilding: intent('placeBuilding', ['requestId', 'recipeId', 'x', 'z'], ['stationId']),
   buildingAction: intent('buildingAction', ['requestId', 'targetId', 'actionId']),

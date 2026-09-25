@@ -1,7 +1,7 @@
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {NODES,STRUCTURES,RULES,phaseAt} from './content.mjs?v=harvest-9';
-import {random,biome,distance,dropPresentation} from './engine.mjs?v=harvest-9';
-import {equippedLanternLit,itemSpriteKey} from './inventory.mjs?v=harvest-6';
+import {NODES,STRUCTURES,RULES,phaseAt} from './content.mjs?v=harvest-10';
+import {random,biome,distance,createDropMotion} from './engine.mjs?v=harvest-10';
+import {equippedLanternLit,itemSpriteKey} from './inventory.mjs?v=harvest-10';
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
   const response=await fetch(url);if(!response.ok)throw new Error('The harvest art could not be loaded. Please reload.');
   const theme=await response.json();theme.url=url;for(const def of Object.values(theme.sprites))def.src=new URL(def.src,url).href;
@@ -12,7 +12,7 @@ export class Renderer {
     this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);
     this.scene.fog=new THREE.FogExp2(theme.palette.background,.009);this.camera=new THREE.OrthographicCamera(-15,15,15,-15,.1,180);
     this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.setPixelRatio(Math.min(devicePixelRatio,1.6));this.gl.outputColorSpace=THREE.SRGBColorSpace;
-    this.objects=new Map();this.textures=new Map();this.materials=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;
+    this.objects=new Map();this.textures=new Map();this.materials=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
     this.ray=new THREE.Raycaster();this.groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);this.v=new THREE.Vector3();
     this.shadowGeo=new THREE.CircleGeometry(1,16);this.shadowMat=new THREE.MeshBasicMaterial({color:0x241e2c,transparent:true,opacity:.19,depthWrite:false});
     const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d'),g=ctx.createRadialGradient(64,64,2,64,64,64);g.addColorStop(0,'rgba(255,217,149,.5)');g.addColorStop(.5,'rgba(239,176,100,.22)');g.addColorStop(1,'rgba(240,163,93,0)');ctx.fillStyle=g;ctx.fillRect(0,0,128,128);this.glowMap=new THREE.CanvasTexture(c);
@@ -66,10 +66,11 @@ export class Renderer {
     const groundColor=new THREE.Color('#ffffff').lerp(new THREE.Color('#555775'),night*.73);this.ground.material.color.copy(groundColor);this.scatter.material.color.copy(groundColor);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color('#191b2b'),night);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
     const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
+    entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
       const id=kind+e.id;alive.add(id);let o=this.objects.get(id);if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=visible&&e.windup>0;if(o.health){o.health.back.visible=o.health.fill.visible=visible&&e.hp<e.maxHp;}if(!visible)continue;
-      const present=kind==='drop'?dropPresentation(e,world):null;
+      const present=kind==='drop'?this.dropMotion.sample(e,world,this.clock,dt,id=>{const body=this.objects.get('player'+id);return body?.initialized?{x:body.x,z:body.z}:null;}):null;
       const tx=present?present.x:e.x, tz=present?present.z:e.z;
       const smooth=['player','enemy'].includes(kind)&&!demo?Math.min(1,dt*(e.id===localId?22:13)):1;
       if(!o.initialized){o.x=tx;o.z=tz;o.initialized=true;}else{o.x+=(tx-o.x)*smooth;o.z+=(tz-o.z)*smooth;}
@@ -92,6 +93,7 @@ export class Renderer {
       if(kind==='enemy'&&e.windup>0){if(!o.danger){o.danger=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),new THREE.MeshBasicMaterial({color:0xf5947b,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));o.danger.rotation.x=-Math.PI/2;this.scene.add(o.danger);}o.danger.visible=true;o.danger.position.set(e.tx,.08,e.tz);o.danger.scale.setScalar(key==='king'?4:1.9);o.danger.material.opacity=.4+Math.sin(this.clock*14)*.25;}
     }
     for(const o of this.objects.values())if(!alive.has(o.id)&&o!==this.ghost)this.remove(o);
+    this.dropMotion.retain(new Set(world.drops.map(drop=>drop.id)));
     this.marker.visible=!!target&&!placement;if(target){this.marker.position.set(target.x,.04,target.z);this.marker.rotation.z=this.clock*.3;}
     this.pathMarker.visible=!!p.goal;if(p.goal)this.pathMarker.position.set(p.goal.x,.03,p.goal.z);
     if(placement){if(!this.ghost||this.ghost.key!==placement.key){if(this.ghost)this.remove(this.ghost);this.ghost=this.sprite(placement.key,'preview');}this.ghost.sprite.position.set(placement.x,0,placement.z);this.ghost.sprite.material.color.set(placement.valid?'#c8e5a6':'#dd7471');this.ghost.sprite.material.opacity=.65;this.ghost.shadow.visible=false;this.ghost.sprite.visible=true;}else if(this.ghost){this.remove(this.ghost);this.ghost=null;}

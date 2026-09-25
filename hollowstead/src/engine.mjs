@@ -1,16 +1,16 @@
-import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-9';
+import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-10';
 import {
-  CLOCK_V1, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2, SUPPLY_CAPACITY,
-  cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createContainer,
+  CLOCK_V1, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2,
+  cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createChest, createContainer,
   containerId, duplicateUids, emptyEquipment, equippedLanternLit, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
   supplyLoad, wearStack,
-} from './inventory.mjs?v=harvest-6';
-import {repairIdCounter, validateV2World} from './serialization.mjs?v=harvest-6';
-import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange} from './contracts.mjs?v=harvest-6';
-import {pruneChests, releaseChests} from './chests.mjs?v=harvest-6';
-import {inventoryIntent} from './transactions.mjs?v=harvest-6';
-import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-6';
+} from './inventory.mjs?v=harvest-10';
+import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-10';
+import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange} from './contracts.mjs?v=harvest-10';
+import {pruneChests, releaseChests} from './chests.mjs?v=harvest-10';
+import {inventoryIntent} from './transactions.mjs?v=harvest-10';
+import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-10';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.z||0)-(b.z||0));
@@ -33,6 +33,80 @@ export function dropPresentation(drop, world){
     if(p)return {x:homeX+(p.x-homeX)*pull, z:homeZ+(p.z-homeZ)*pull, y:0, t:0};
   }
   return {x:homeX, z:homeZ, y:0, t:0};
+}
+/**
+ * Render-clock flight. The first sample anchors to the simulation so a join
+ * mid-flight does not start on the floor. Later samples keep that anchor, so a
+ * snapshot with the same flight.startedAt cannot send the sprite back.
+ * The shadow is not lifted; callers draw it at y = 0.
+ */
+export function createDropMotion(){
+  const flights=new Map(), dwells=new Map(), aims=new Map();
+  const actor=(world,id)=>typeof world?.player==='function'?world.player(id):world?.players?.find(entry=>entry.id===id);
+  const targetOf=(drop,world,bodyOf)=>{
+    const id=drop.flight?.playerId||drop.attract?.playerId;
+    const shown=typeof bodyOf==='function'?bodyOf(id):null;
+    if(shown&&Number.isFinite(shown.x)&&Number.isFinite(shown.z))return {x:shown.x,z:shown.z};
+    const body=actor(world,id);
+    return body?{x:body.x,z:body.z}:null;
+  };
+  const aimAt=(key,target,dt)=>{
+    if(!target)return null;
+    if(!(dt>0)){const snap={x:target.x,z:target.z};aims.set(key,snap);return snap;}
+    const prev=aims.get(key);
+    if(!prev){const snap={x:target.x,z:target.z};aims.set(key,snap);return snap;}
+    const k=Math.min(1,dt*22);
+    const next={x:prev.x+(target.x-prev.x)*k,z:prev.z+(target.z-prev.z)*k};
+    aims.set(key,next);
+    return next;
+  };
+  function sample(drop,world,clock,dt=0,bodyOf=null){
+    const homeX=drop?.x||0, homeZ=drop?.z||0, now=Number.isFinite(clock)?clock:0;
+    if(drop?.flight&&world){
+      dwells.delete(drop.id);
+      const duration=drop.flight.duration>0?drop.flight.duration:PICKUP.flight;
+      const simT=clamp((world.time-drop.flight.startedAt)/duration,0,1);
+      const key=`${drop.id}:${drop.flight.startedAt}:${drop.flight.playerId}`;
+      let state=flights.get(drop.id);
+      if(!state||state.key!==key){
+        state={key, originClock:now-simT*duration, homeX, homeZ};
+        flights.set(drop.id,state);
+        aims.delete(drop.id);
+      }
+      const t=clamp((now-state.originClock)/duration,0,1);
+      const ease=t*t*(3-2*t);
+      const body=aimAt(drop.id, targetOf(drop,world,bodyOf), dt);
+      const y=Math.sin(Math.PI*ease)*0.55;
+      if(!body)return {x:state.homeX, z:state.homeZ, y, t:ease};
+      return {x:state.homeX+(body.x-state.homeX)*ease, z:state.homeZ+(body.z-state.homeZ)*ease, y, t:ease};
+    }
+    flights.delete(drop?.id);
+    aims.delete(drop?.id);
+    if(drop?.attract&&world){
+      const dwell=drop.attract.dwell>0?drop.attract.dwell:PICKUP.dwell;
+      const elapsed=drop.attract.elapsed||0;
+      const simU=clamp(elapsed/dwell,0,1);
+      let state=dwells.get(drop.id);
+      const visual=state?Math.max(0, now-state.originClock):0;
+      if(!state||state.playerId!==drop.attract.playerId||elapsed+0.05<visual){
+        state={playerId:drop.attract.playerId, originClock:now-simU*dwell, homeX, homeZ};
+        dwells.set(drop.id,state);
+        aims.delete(`dwell:${drop.id}`);
+      }
+      const u=clamp((now-state.originClock)/dwell,0,1);
+      const pull=u*u*0.22;
+      const body=aimAt(`dwell:${drop.id}`, targetOf(drop,world,bodyOf), dt);
+      if(!body)return {x:state.homeX, z:state.homeZ, y:0, t:0};
+      return {x:state.homeX+(body.x-state.homeX)*pull, z:state.homeZ+(body.z-state.homeZ)*pull, y:0, t:0};
+    }
+    if(drop){dwells.delete(drop.id);aims.delete(`dwell:${drop.id}`);}
+    return {x:homeX, z:homeZ, y:0, t:0};
+  }
+  function retain(ids){
+    for(const id of [...flights.keys()])if(!ids.has(id)){flights.delete(id);aims.delete(id);}
+    for(const id of [...dwells.keys()])if(!ids.has(id)){dwells.delete(id);aims.delete(`dwell:${id}`);}
+  }
+  return {sample, retain};
 }
 export function random(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
 export function biome(x,z){return x>12&&z<10?'graveyard':z<-10||x<-16?'woods':'meadow';}
@@ -72,7 +146,7 @@ export class World {
   structure(type,x,z){
     const id=type==='hearth'?'heart':`b${this.idCounter++}`;
     const store=type==='chest'
-      ? createContainer(containerId('chest', id), 36)
+      ? createChest(id)
       : createContainer(containerId('chest', id), 0);
     return {id,type,x,z,hp:STRUCTURES[type].hp,maxHp:STRUCTURES[type].hp,fuel:type==='hearth'?150:type==='fire'?100:0,level:1,rotation:0,open:false,charges:3,growth:0,planted:false,store,cooldown:0};
   }
@@ -158,7 +232,7 @@ export class World {
       const quantity=Math.min(def.stackLimit, left);
       const stack=this.mintStack(itemId, quantity, def.kind==='equipment'?def.maxDurability:undefined);
       if(!stack)break;
-      const plan=planInsert(p.inventory, stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
+      const plan=planInsert(p.inventory, stack, {supplyCapacity:null, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
       if(!plan.ok){
         this.placeDrop(stack, p.x, p.z);
         left-=quantity;
@@ -175,14 +249,12 @@ export class World {
   stock(container,itemId,count){
     const def=itemDefinition(itemId);
     if(!def||!Number.isInteger(count)||count<=0)return 0;
-    const grow=this.buildings.some(building=>building.store===container);
-    const capped=this.players.some(player=>player.inventory===container);
     let left=count,accepted=0;
     while(left>0){
       const quantity=Math.min(def.stackLimit, left);
       const stack=this.mintStack(itemId, quantity, def.kind==='equipment'?def.maxDurability:undefined);
       if(!stack)break;
-      const plan=planInsert(container, stack, {supplyCapacity:capped?SUPPLY_CAPACITY:null, allowPartial:false, grow, acceptsItems:true, mintUid:()=>this.nextItemUid()});
+      const plan=planInsert(container, stack, {supplyCapacity:null, allowPartial:false, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
       if(!plan.ok)break;
       container.slots=plan.slots;container.revision=plan.revision;
       accepted+=plan.accepted;left-=plan.accepted;
@@ -239,7 +311,7 @@ export class World {
     const clones=[p.inventory, ...this.stores(p)].map(cloneContainer);
     const made=makeStack('preview-output', itemId, 1, def.kind==='equipment'?def.maxDurability:undefined);
     if(!made.ok)return 'Unknown recipe';
-    const plan=planInsert(clones[0], made.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:false, grow:false, acceptsItems:true, mintUid:()=>'preview-split'});
+    const plan=planInsert(clones[0], made.stack, {supplyCapacity:null, allowPartial:false, grow:false, acceptsItems:true, mintUid:()=>'preview-split'});
     return plan.ok?'':'Pack full — store or drop some supplies';
   }
   stationBuilding(p, recipeId, stationId){
@@ -267,7 +339,7 @@ export class World {
         const outputId=recipe.result||key;
         const def=itemDefinition(outputId);
         const made=def&&makeStack('preview-output', outputId, 1, def.kind==='equipment'?def.maxDurability:undefined);
-        const plan=made?.ok&&planInsert(clones[0], made.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:false, grow:false, acceptsItems:true, mintUid:()=>'preview-split'});
+        const plan=made?.ok&&planInsert(clones[0], made.stack, {supplyCapacity:null, allowPartial:false, grow:false, acceptsItems:true, mintUid:()=>'preview-split'});
         if(!plan||!plan.ok)return 'Pack full — store or drop some supplies';
       }
     }
@@ -283,7 +355,7 @@ export class World {
     const def=itemDefinition(outputId);
     const made=def&&makeStack(this.nextItemUid(), outputId, 1, def.kind==='equipment'?def.maxDurability:undefined);
     if(!made?.ok)return false;
-    const plan=planInsert(clones[0], made.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:false, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
+    const plan=planInsert(clones[0], made.stack, {supplyCapacity:null, allowPartial:false, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
     if(!plan.ok)return false;
     clones[0].slots=plan.slots;clones[0].revision=plan.revision;
     sources.forEach((live, index)=>{live.slots=clones[index].slots;live.revision=clones[index].revision;});
@@ -320,7 +392,7 @@ export class World {
     const index=source?.slots?.indexOf(stack)??-1;
     const qty=Math.min(quantity, stack?.quantity??0);
     if(index<0||!Number.isInteger(qty)||qty<=0)return 0;
-    const options={supplyCapacity:SUPPLY_CAPACITY, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()};
+    const options={supplyCapacity:null, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()};
     if(qty===stack.quantity){
       const whole=planInsert(p.inventory, cloneStack(stack), {...options, allowPartial:false});
       if(whole.ok){
@@ -373,7 +445,7 @@ export class World {
     const plan=planMove({
       source:p.inventory, destination:p.inventory, sourceSlot, destinationSlot, uid, quantity,
       sourceRevision, destinationRevision, mintUid:()=>this.nextItemUid(),
-      destSupplyCapacity:SUPPLY_CAPACITY, sourceSupplyCapacity:SUPPLY_CAPACITY,
+      destSupplyCapacity:null, sourceSupplyCapacity:null,
     });
     if(!plan.ok)return plan;
     p.inventory.slots=plan.sourceSlots;p.inventory.revision=plan.sourceRevision;
@@ -570,6 +642,7 @@ export class World {
     if(!building||building.type==='hearth'||this.chestSessions.has(building.id))return;
     for(const [itemId, count] of Object.entries(RECIPES[building.type].cost))this.give(p, itemId, Math.ceil(count*.5));
     this.dropContainer(building.store, building.x, building.z);
+    if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);
     this.buildings=this.buildings.filter(entry=>entry!==building);
     p.cooldown=.5;
   }
@@ -765,7 +838,7 @@ export class World {
     return true;
   }
   acceptsDrop(p, drop){
-    const plan=planInsert(p.inventory, drop.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>`view${this.previewUid++}`});
+    const plan=planInsert(p.inventory, drop.stack, {supplyCapacity:null, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>`view${this.previewUid++}`});
     return !!(plan.ok&&plan.accepted>0);
   }
   notePack(p){
@@ -789,7 +862,7 @@ export class World {
       if(this.time-drop.flight.startedAt+1e-9<duration)continue;
       const p=this.player(drop.flight.playerId);
       if(!p){delete drop.flight;continue;}
-      const plan=planInsert(p.inventory, drop.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
+      const plan=planInsert(p.inventory, drop.stack, {supplyCapacity:null, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
       if(!plan.ok||plan.accepted<=0){delete drop.flight;this.notePack(p);continue;}
       p.inventory.slots=plan.slots;p.inventory.revision=plan.revision;
       this.event('loot', p.x, p.z, `+${plan.accepted} ${label(drop.stack.itemId)}`);
@@ -913,7 +986,7 @@ export class World {
     }
     for(const e of this.enemies.filter(e=>e.hp<=0)){for(const[itemId, count]of Object.entries(ENEMIES[e.type].loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));this.kills++;this.event('kill',e.x,e.z);if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,'The Hollow King falls. Hold on until dawn.');}}
     this.enemies=this.enemies.filter(e=>e.hp>0);
-    for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth')this.status='defeat';}
+    for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth')this.status='defeat';}
     this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.stack?.quantity>0&&(d.flight||d.until>this.time));
     const active=this.players.filter(p=>p.online);if(active.length&&active.every(p=>(p.down||p.ghost)&&!p.charm)){this.wipe+=dt;if(this.wipe>6)this.status='defeat';}else this.wipe=0;
     this.discoverTimer-=dt;if(this.discoverTimer<=0){this.discoverTimer=.5;const seen=new Set(this.explored);for(const p of active){const gx=Math.floor((p.x+42)/4),gz=Math.floor((p.z+42)/4);for(let x=gx-2;x<=gx+2;x++)for(let z=gz-2;z<=gz+2;z++)if(x>=0&&z>=0&&x<21&&z<21)seen.add(z*21+x);}this.explored=[...seen];}
@@ -944,6 +1017,7 @@ export class World {
     return data;
   }
   static restore(data){
+    if(data&&typeof data==='object')settleStorage(data);
     if(!validateV2World(data).ok||data.clock!==CLOCK_V1)throw new Error('This save is not a Hollowstead expedition.');
     const world=new World(data.seed);
     for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);

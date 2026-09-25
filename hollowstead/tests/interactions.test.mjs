@@ -147,14 +147,24 @@ test('T16 field build list, exact targets, and first workbench progression',()=>
 
 test('T17 station lists: bench tools, fueled fire, and cauldron stew',()=>{
   const {w,p}=camp();
-  setPack(w,p,{wood:40,stone:20,fiber:20,berry:4,ore:8,ember:4,pumpkin:6,meat:4,mushroom:4});
-  const bench=w.structure('bench',p.x+1,p.z);w.buildings.push(bench);
+  const bench=w.structure('bench',p.x+1,p.z);
+  const stash=w.structure('chest',p.x+1.2,p.z+0.4);
+  w.buildings.push(bench,stash);
+  w.clearPack(p);
+  assert.equal(w.stock(stash.store,'wood',17),17);
+  assert.equal(w.stock(stash.store,'stone',7),7);
+  assert.equal(w.stock(stash.store,'fiber',14),14);
+  assert.equal(w.stock(stash.store,'berry',1),1);
+  assert.equal(w.stock(stash.store,'ore',5),5);
+  assert.equal(w.stock(stash.store,'ember',2),2);
   for(const recipe of WORKBENCH_CRAFT_RECIPES){
     const before=JSON.stringify(p.inventory.slots);
     assert.equal(act(w,p,{type:'craft',recipe}).code,'stationRequired',recipe);
     assert.equal(JSON.stringify(p.inventory.slots),before,recipe);
     assert.equal(act(w,p,{type:'craft',recipe,stationId:bench.id}).ok,true,recipe);
     assert.equal(qty(p.inventory,recipe),1,recipe);
+    const made=p.inventory.slots.find(stack=>stack?.itemId===recipe);
+    assert.equal(w.transferAll(p,made.uid,stash.store),true,recipe);
   }
   bench.hp=0;
   const held=qty(p.inventory,'wood');

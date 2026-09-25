@@ -1,6 +1,6 @@
-import {ACTION_RESULT_CACHE_LIMIT, INTENTS} from './contracts.mjs?v=harvest-6';
-import {containerId} from './inventory.mjs?v=harvest-6';
-import {chestIntent, moveItems} from './chests.mjs?v=harvest-6';
+import {ACTION_RESULT_CACHE_LIMIT, INTENTS} from './contracts.mjs?v=harvest-10';
+import {containerId, planSortSlots} from './inventory.mjs?v=harvest-10';
+import {chestIntent, moveItems} from './chests.mjs?v=harvest-10';
 
 export const TRANSACTION_PROTOCOL=1;
 const outcome=code=>({ok:code==='ok',code});
@@ -34,6 +34,15 @@ export function inventoryIntent(world,p,cmd){
   if(cmd.type==='buildingAction')return world.performBuildingAction(p, cmd.targetId, cmd.actionId);
   if(cmd.type==='setHarvestTarget')return world.setHarvestTarget(p, cmd);
   if(cmd.type==='lanternToggle')return world.action(p.id,{type:'lantern',uid:cmd.uid})||outcome('rejected');
+  if(cmd.type==='packSort'){
+    if(!Number.isSafeInteger(cmd.inventoryRevision)||cmd.inventoryRevision!==p.inventory.revision)return outcome('staleRevision');
+    const planned=planSortSlots(p.inventory.slots);
+    if(!planned.changed)return outcome('ok');
+    p.inventory.slots=planned.slots;
+    p.inventory.revision=cmd.inventoryRevision+1;
+    world.assertItems();
+    return outcome('ok');
+  }
   if(cmd.type==='dropItem'){
     const loc=world.locate(p,cmd.uid);
     if(!loc||loc.kind==='recovery')return outcome('notOwner');

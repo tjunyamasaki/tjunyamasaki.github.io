@@ -7,13 +7,13 @@
 import {
   CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, SUPPLY_ITEM_IDS, V2_PHASE,
   legacyEquipmentPlan, nextNightWaveTime, phaseMigrationDelta, phaseProgress, remapPhaseTime,
-} from './contracts.mjs?v=harvest-6';
+} from './contracts.mjs?v=harvest-10';
 import {
-  CHEST_PAGE_SLOTS, collectLocations, createBackpack, createContainer, createRecovery,
+  BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, collectLocations, cloneStack, createBackpack, createContainer, createRecovery,
   duplicateUids, emptyEquipment, itemDefinition, makeStack, planInsert, validateContainer,
   validateEquipment, validateStack, containerId,
-} from './inventory.mjs?v=harvest-6';
-import {STRUCTURES} from './content.mjs?v=harvest-6';
+} from './inventory.mjs?v=harvest-10';
+import {STRUCTURES} from './content.mjs?v=harvest-10';
 
 export {SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, CLOCK_V1, CLOCK_V2};
 
@@ -38,12 +38,73 @@ export function repairIdCounter(world){
   for(const building of world.buildings||[]){
     visit(building.id);
     building.store?.slots?.forEach(stack=>{if(stack)visit(stack.uid);});
+    building.overflow?.slots?.forEach(stack=>{if(stack)visit(stack.uid);});
   }
   for(const drop of world.drops||[]){visit(drop.id);if(drop.stack)visit(drop.stack.uid);}
   for(const enemy of world.enemies||[])visit(enemy.id);
   for(const node of world.nodeChanges||[])visit(node.id);
   world.idCounter=next;
   return world;
+}
+
+function settleBackpack(player, mint){
+  const inventory=player?.inventory;
+  if(!inventory?.slots||inventory.slots.length===BACKPACK_SLOT_COUNT)return false;
+  const stacks=inventory.slots.filter(Boolean);
+  const prior=(player.recovery?.slots||[]).filter(Boolean).map(cloneStack);
+  const pack=createBackpack(player.id);
+  const overflow=[];
+  for(const stack of stacks){
+    const plan=planInsert(pack, stack, {supplyCapacity:null, allowPartial:true, grow:false, acceptsItems:true, mintUid:mint});
+    if(!plan.ok){overflow.push(cloneStack(stack));continue;}
+    pack.slots=plan.slots;
+    pack.revision=plan.revision;
+    if(plan.remainder)overflow.push(plan.remainder);
+  }
+  pack.revision=Math.max(inventory.revision|0, pack.revision|0);
+  player.inventory=pack;
+  const kept=[...overflow, ...prior];
+  if(kept.length){
+    const recovery=createRecovery(player.id, kept.length);
+    kept.forEach((stack, index)=>{recovery.slots[index]=stack;});
+    recovery.revision=(player.recovery?.revision||0)+1;
+    player.recovery=recovery;
+  }else player.recovery=null;
+  return true;
+}
+
+function settleChest(building){
+  if(building?.type!=='chest'||!building.store?.slots)return false;
+  const slots=building.store.slots;
+  const overflow=building.overflow;
+  const overflowId=containerId('overflow', building.id);
+  const overflowOk=overflow==null||(overflow.id===overflowId&&Array.isArray(overflow.slots)&&overflow.slots.some(Boolean));
+  if(slots.length===CHEST_SLOT_COUNT&&overflowOk)return false;
+  const extras=[];
+  if(slots.length>CHEST_SLOT_COUNT)extras.push(...slots.slice(CHEST_SLOT_COUNT).filter(Boolean).map(cloneStack));
+  if(overflow?.slots)extras.push(...overflow.slots.filter(Boolean).map(cloneStack));
+  const active=slots.slice(0, CHEST_SLOT_COUNT).map(cloneStack);
+  while(active.length<CHEST_SLOT_COUNT)active.push(null);
+  building.store.slots=active;
+  if(extras.length){
+    const next=createContainer(overflowId, extras.length);
+    extras.forEach((stack, index)=>{next.slots[index]=stack;});
+    next.revision=(overflow?.revision||0)+1;
+    building.overflow=next;
+  }else building.overflow=null;
+  return true;
+}
+
+/** Fit legacy wide packs and grown chests without discarding stacks. Idempotent on the current shape. */
+export function settleStorage(world){
+  if(!world||typeof world!=='object')return false;
+  const used=new Set();
+  for(const row of collectLocations(world))if(row?.uid)used.add(row.uid);
+  const mint=mintFactory(world, used);
+  let changed=false;
+  for(const player of world.players||[])if(settleBackpack(player, mint))changed=true;
+  for(const building of world.buildings||[])if(settleChest(building))changed=true;
+  return changed;
 }
 
 function mintFactory(world, used){
@@ -100,7 +161,7 @@ export function validateV2World(data){
     if(!player||typeof player.id!=='string'||player.id.length===0)return {ok:false, code:'corrupt'};
     if(playerIds.has(player.id)||player.inventory?.id!==containerId('backpack',player.id))return {ok:false,code:'duplicate-owner'};
     playerIds.add(player.id);
-    const inventory=validateContainer(player.inventory, {exactSlots:24, supplyCapacity:120});
+    const inventory=validateContainer(player.inventory, {exactSlots:BACKPACK_SLOT_COUNT});
     if(!inventory.ok)return inventory;
     const equipment=validateEquipment(player.equipment);
     if(!equipment.ok)return equipment;
@@ -116,9 +177,15 @@ export function validateV2World(data){
     if(!building||!STRUCTURES[building.type]||typeof building.id!=='string'||entityIds.has(building.id)||building.store?.id!==containerId('chest',building.id))return {ok:false,code:'duplicate-owner'};
     entityIds.add(building.id);
     if(!building?.store||!Array.isArray(building.store.slots))return {ok:false, code:'corrupt'};
-    const limits=building.type==='chest'?{minSlots:CHEST_PAGE_SLOTS, multipleOf:6}:{};
+    const limits=building.type==='chest'?{exactSlots:CHEST_SLOT_COUNT}:{};
     const store=validateContainer(building.store, limits);
     if(!store.ok)return store;
+    if(building.overflow!=null){
+      if(building.type!=='chest'||building.overflow.id!==containerId('overflow', building.id))return {ok:false, code:'corrupt'};
+      const overflow=validateContainer(building.overflow);
+      if(!overflow.ok)return overflow;
+      if(!building.overflow.slots.some(Boolean))return {ok:false, code:'corrupt'};
+    }
   }
   for(const drop of data.drops){
     const stack=validateStack(drop?.stack);
@@ -162,7 +229,7 @@ function convertCounts(counts, {id, slotCount, supplyCapacity, grow, mint, allow
     if(!known.includes(itemId)&&!itemDefinition(itemId))return {ok:false, code:'unknown-item', itemId, message:RECOVERABLE};
     if(!known.includes(itemId))known.push(itemId);
   }
-  const container=slotCount===24&&id.startsWith('backpack:')?createBackpack(id.slice('backpack:'.length)):createContainer(id, slotCount);
+  const container=slotCount===BACKPACK_SLOT_COUNT&&id.startsWith('backpack:')?createBackpack(id.slice('backpack:'.length)):createContainer(id, slotCount);
   const overflow=[];
   for(const itemId of known){
     if(!Object.hasOwn(counts, itemId))continue;
@@ -226,7 +293,7 @@ export function migrateV1Save(document, options={}){
     if(!player||typeof player.id!=='string'||!player.inventory||typeof player.inventory!=='object'||Array.isArray(player.inventory))return fail('corrupt');
     if(!player.equipment||typeof player.equipment!=='object'||Array.isArray(player.equipment))return fail('corrupt');
     const packed=convertCounts(player.inventory, {
-      id:containerId('backpack', player.id), slotCount:24, supplyCapacity:120, grow:false, mint, allowEquipment:false,
+      id:containerId('backpack', player.id), slotCount:BACKPACK_SLOT_COUNT, supplyCapacity:null, grow:false, mint, allowEquipment:false,
     });
     if(!packed.ok)return fail(packed.code, packed.message);
     const equipmentPlan=legacyEquipmentPlan(player.equipment);
@@ -244,7 +311,7 @@ export function migrateV1Save(document, options={}){
     for(const extra of equipmentPlan.backpack){
       const made=makeStack(mint(), extra.itemId, 1, extra.durability);
       if(!made.ok)return fail(made.code);
-      const plan=planInsert(backpack, made.stack, {supplyCapacity:120, allowPartial:false, grow:false, acceptsItems:true, mintUid:mint});
+      const plan=planInsert(backpack, made.stack, {supplyCapacity:null, allowPartial:false, grow:false, acceptsItems:true, mintUid:mint});
       if(!plan.ok)overflow.push(made.stack);
       else{backpack.slots=plan.slots;backpack.revision=plan.revision;}
     }
@@ -270,11 +337,15 @@ export function migrateV1Save(document, options={}){
     const store=building.store&&typeof building.store==='object'&&!Array.isArray(building.store)?building.store:{};
     if(building.type==='chest'){
       const converted=convertCounts(store, {
-        id:containerId('chest', building.id), slotCount:CHEST_PAGE_SLOTS, supplyCapacity:null, grow:true, mint, allowEquipment:true,
+        id:containerId('chest', building.id), slotCount:CHEST_SLOT_COUNT, supplyCapacity:null, grow:false, mint, allowEquipment:true,
       });
       if(!converted.ok)return fail(converted.code, converted.message);
-      if(converted.overflow.length)return fail('chest');
       building.store=converted.container;
+      if(converted.overflow.length){
+        building.overflow=createContainer(containerId('overflow', building.id), converted.overflow.length);
+        converted.overflow.forEach((stack, index)=>{building.overflow.slots[index]=stack;});
+        building.overflow.revision=1;
+      }else building.overflow=null;
     }else{
       if(Object.keys(store).length)return fail('unsupported');
       building.store=createContainer(containerId('chest', building.id), 0);
@@ -321,8 +392,12 @@ export function planContinue(stored){
   const v1=stored?.v1??null;
   if(v2?.invalid)return {ok:false, code:'corrupt-v2', message:RECOVERABLE, write:null, preserveV1:true, recoverable:!!(v1&&!v1.invalid)};
   if(v2){
-    const valid=validateV2Save(v2);
-    if(valid.ok&&v2.world.clock===CLOCK_V1)return {ok:true, save:v2, write:null, preserveV1:true, recoverable:false};
+    let world;
+    try{world=structuredClone(v2.world);}catch{return {ok:false, code:'corrupt-v2', message:RECOVERABLE, write:null, preserveV1:true, recoverable:!!(v1&&!v1.invalid)};}
+    const changed=settleStorage(world);
+    const settled={...v2, world};
+    const valid=validateV2Save(changed?settled:v2);
+    if(valid.ok&&(changed?world.clock:v2.world.clock)===CLOCK_V1)return {ok:true, save:changed?settled:v2, write:changed?'v2':null, preserveV1:true, recoverable:false};
     if(valid.ok&&v2.world.clock===CLOCK_V2){
       return {ok:false, code:'clock', message:'This expedition was saved for a longer day and night that is not active yet. The original save was kept.', write:null, preserveV1:true, recoverable:true};
     }

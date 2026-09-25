@@ -1112,6 +1112,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | P3 | Complete | P3 agent | 36614c80a0fb1520532df7368983188b08c0099a. 73 Hollowstead + 17 ball-game tests passing. Pages run 36088851645 succeeded for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0 | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
 | P4 | Complete | P4 agent | a61545910636fc65f2fe487071ab2e8aa8ea892f (HUD rewrite f504b8031352223b161c20d377b7abadda5056b4). 81 Hollowstead + 17 ball-game tests passing. Pages run 36094379157 succeeded for 108481d958d253a47f92445abe3f15c6a2435121 | Real phone, rotation-during-drag, two-device chest, full first night, cauldron station, M10, and M11 were not run. Live clock stays 150/30/80. Night visuals stay P5 |
 | Floor pickup | Complete | proximity pickup | 5b79932cb6544780c23f05eb6097623ed8b20651. 94 Hollowstead + 17 ball-game tests passing. Pages run 36145733731 succeeded. Supersedes the P3 fresh-Gather pickup rule | Live clock stays 150/30/80. P5 and P6 not started |
+| Pack, chest, and pickup motion | Complete | follow-up on feat/hollowstead-coop | This commit. 99 Hollowstead + 17 ball-game tests passing | Do not restore 24 pack slots, the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Pack is 6 slots. Chests are 18 slots. Live clock stays 150/30/80. P5 and P6 not started |
 | P5 | Not started | Unassigned | — | — |
 | P6 | Not started | Unassigned | — | — |
 
@@ -1474,3 +1475,63 @@ Ending commit: This note. It changes only this log.
 Evidence / screenshots / deployment run:
 - GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36145733731 succeeded (conclusion success) for 5b79932cb6544780c23f05eb6097623ed8b20651. Hollowstead and ball-game tests passed in the workflow. The live page serves main.mjs?v=harvest-9.
 Exact next task: P5 — Night visuals and pacing. Do not start P6. Do not restore "press Gather on the pile." Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.
+
+Date: 2026-09-25
+Package / agent: Pack, chest, and pickup motion follow-up
+Starting commit: 3bb946c0f19e4f50f20e23c65a7d06721e197f68
+Ending commit: This commit on feat/hollowstead-coop.
+Files changed:
+- hollowstead/src/contracts.mjs
+- hollowstead/src/inventory.mjs
+- hollowstead/src/chests.mjs
+- hollowstead/src/transactions.mjs
+- hollowstead/src/serialization.mjs
+- hollowstead/src/engine.mjs
+- hollowstead/src/main.mjs
+- hollowstead/src/ui/inventory.mjs
+- hollowstead/src/renderer.mjs
+- hollowstead/src/canvas-renderer.mjs
+- hollowstead/src/network.mjs
+- hollowstead/src/transport.mjs
+- hollowstead/src/interactions.mjs
+- hollowstead/src/ui/actions.mjs
+- hollowstead/src/ui/catalog.mjs
+- hollowstead/style.css
+- hollowstead/index.html
+- hollowstead/README.md
+- hollowstead/tests/contracts.test.mjs
+- hollowstead/tests/items.test.mjs
+- hollowstead/tests/chests.test.mjs
+- hollowstead/tests/pickup.test.mjs
+- hollowstead/tests/ui.test.mjs
+- hollowstead/tests/interactions.test.mjs
+- hollowstead/tests/storage.test.mjs
+- hollowstead/IMPLEMENTATION_PLAN.md
+Implemented behavior:
+- Selecting an inventory or chest slot still opens it. Invoking a per-item action (equip, unequip, swap, eat, heal, drop, transfer, store, and the same controls from the keyboard) clears that selection when the action is issued. A rejected action stays unselected. A later snapshot or a quantity change does not clear a selection by itself.
+- The backpack is 6 slots. Inserts are limited by those slots and the per-stack maximum (20 for current stackable items). Equipment stays quantity 1. The old extra 120-supply backpack cap is not applied on insert, so a free slot or a legal stack is not rejected by that counter. SUPPLY_CAPACITY remains only as the legacy v1 fixture total.
+- A saved pack longer than 6 slots is not discarded. settleStorage moves the stacks that do not fit into the existing withdrawal-only recovery container and keeps that container visible until it is emptied. A second restore of an already settled 6-slot pack does not reshuffle it. New pickups, crafts, and harvests that do not fit stay on the floor or follow the existing all-or-nothing craft path. They do not enter a 7th pack slot.
+- Chests are a fixed 18 slots. They no longer grow by pages. Items already stored past slot 18 stay on that chest in a withdrawal-only overflow container (id overflow:<buildingId>) until emptied. New deposits that do not fit return the existing inventoryFull feedback ("No room for that") and change nothing. Destroying or dismantling the chest spills both the active slots and that overflow.
+- Chest panel buttons, sent as host-validated intents and safe to retry: Store all (the acting player's pack only, atomic per stack, partial success tells "Stored what fit", never equipped sockets and never recovery), Stack same items (same item id, up to the stack limit, durability-distinct equipment stays separate), Sort (stack, then group by item id, larger stacks first). The pack panel has Sort for the 6 pack slots only. Equipped sockets and recovery are not sorted. A guest cannot sort another player's pack. A chest operation requires the actor's open session.
+- Floor pickup rules are unchanged: attract 1.15, touch 0.42, dwell 0.65s, flight 0.28s, dropper cooldown 1.25s. Cancel returns the drawing to the original floor point. The stack enters the pack only when the flight ends. Both renderers sample a smoothstep from the fixed floor point into the player's current body on the render clock, including the existing hop. The shadow stays on the ground. A snapshot mid-flight does not re-anchor the sprite to the floor.
+Slot counts:
+- Pack: 6
+- Chest: 18
+- Stack limit: 20 for current stackable items
+- Recovery and chest overflow: withdrawal-only, no expiry, visible until empty
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 99 pass, 0 fail. Includes 6-slot rejection, recovery of a 7th stack, chest 18-slot rejection, store-all partial fit, stack and sort combining identical items without merging two damaged tools, stable sort order, and a guest who cannot sort another pack. Proximity pickup tests remain.
+- node --test ball-game/tests/*.test.mjs: 17 pass, 0 fail.
+- git diff --check and node --check on the changed modules.
+- Headed Chrome on this machine loaded /hollowstead/index.html?dev (WebGL, swiftshader). Day 01 stayed DAYLIGHT with about 2:30 remaining. Venture alone, open the pack: 6 slots, meta "Pack · 4 / 6", Sort present. Select Nightberries and Eat: the selection and the detail row clear, the stack goes from 3 to 2, hunger reaches 100. Chop the starter pine, stand inside the attract radius, and the wood pile's sprite is sampled on the render clock (ease advances while world.time stays on the flight's start tick, hop about 0.55, shadow y stays 0.018, no rewind to the floor). The stack enters the pack only after the flight. Place a chest, open it: 18 slots, meta "Chest · 0 / 18", buttons Store all, Stack same items, and Sort. Store all moves the four pack stacks into the chest ("Chest · 4 / 18", "Pack · 0 / 6"). A 390×844 viewport shows the same 6 pack slots, a 44px Sort button, and Eat clears the selection. A second phone, a guest browser, and the canvas renderer were not run in this pass.
+World units and seconds, exactly (unchanged pickup):
+- attract 1.15
+- touch 0.42
+- dwell 0.65
+- flight 0.28
+- drop cooldown 1.25
+Compatibility/migration notes:
+- Saves stay v2 with clock v1. Continue and World.restore call settleStorage before validation. RULES stay day 150, dusk 30, night 80, cycle 260. Do not call remapWorldClock. Do not enable 180/30/100 or night darkness. P5 and P6 are not started.
+- Do not restore 24 pack slots, the 120-supply backpack cap, chest page growth, or Gather-to-pickup.
+- Player entry cache query is harvest-10 on index.html (style.css and main.mjs) and on the nested modules those files import.
+Exact next task: P5 — Night visuals and pacing. Do not start P6. Do not restore 24 pack slots, the 120-supply backpack cap, chest page growth, or "press Gather on the pile." Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.

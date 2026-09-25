@@ -1,12 +1,12 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
-import {NODES,STRUCTURES,RULES} from './content.mjs?v=harvest-9';
-import {biome,distance,dropPresentation} from './engine.mjs?v=harvest-9';
-import {equippedLanternLit,itemSpriteKey} from './inventory.mjs?v=harvest-6';
+import {NODES,STRUCTURES,RULES} from './content.mjs?v=harvest-10';
+import {biome,distance,createDropMotion} from './engine.mjs?v=harvest-10';
+import {equippedLanternLit,itemSpriteKey} from './inventory.mjs?v=harvest-10';
 export class CanvasRenderer {
   constructor(canvas,theme){
     this.canvas=canvas;this.theme=theme;this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');
-    this.images=new Map();this.zoom=1;this.clock=0;this.lastEvent=0;this.seed=null;this.effects=[];this.floaters=[];this.focus={x:0,z:0,set:(x,y,z)=>{this.focus.x=x;this.focus.z=z;}};
+    this.images=new Map();this.zoom=1;this.clock=0;this.lastEvent=0;this.seed=null;this.effects=[];this.floaters=[];this.focus={x:0,z:0,set:(x,y,z)=>{this.focus.x=x;this.focus.z=z;}};this.dropMotion=createDropMotion();
     this.onResize=()=>this.resize();window.addEventListener('resize',this.onResize);this.resize();
   }
   async preload(){await Promise.all(Object.entries(this.theme.sprites).map(([key,def])=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{this.images.set(key,image);resolve();};image.onerror=()=>reject(new Error(`Missing sprite: ${key}`));image.src=def.src;})));}
@@ -55,10 +55,11 @@ export class CanvasRenderer {
     const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
     const drawn=entities.map(entry=>{
       if(entry.kind!=='drop')return entry;
-      const present=dropPresentation(entry.e,world);
+      const present=this.dropMotion.sample(entry.e,world,this.clock,dt);
       return {...entry, e:{...entry.e, x:present.x, z:present.z, lift:present.y, flightT:present.t||0}, depth:present.z};
     });
     drawn.sort((a,b)=>(a.depth??a.e.z)-(b.depth??b.e.z));for(const {e,key,kind}of drawn){if(kind==='drop'&&!this.theme.sprites[key])continue;if(Math.abs(e.x-this.focus.x)<halfX+4&&Math.abs(e.z-this.focus.z)<halfZ+4)this.drawSprite(key,e,kind,world,night,p);}
+    this.dropMotion.retain(new Set(world.drops.map(drop=>drop.id)));
     if(placement){c.globalAlpha=.65;this.drawSprite(placement.key,{x:placement.x,z:placement.z},'preview',world,0,p);c.globalAlpha=1;this.ellipse(placement.x,placement.z,.9,placement.valid?'#bbdca5':'#d67d79',false);}
     for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2){if(['loot','damage','heal','build','craft'].includes(ev.type))this.float(ev.text,ev.x,ev.z,ev.type==='damage'?'#f5c2a9':ev.type==='heal'?'#b9e2ba':'#fbe1ad');if(['hit','kill','hurt','impact','bolt'].includes(ev.type))this.effects.push({...ev,life:0});}this.lastEvent=ev.id;}
     this.effects=this.effects.filter(e=>{e.life+=dt;this.ellipse(e.x,e.z,.2+e.life*(e.type==='impact'?8:3),`rgba(246,194,131,${Math.max(0,1-e.life*2)})`,false);return e.life<.5;});

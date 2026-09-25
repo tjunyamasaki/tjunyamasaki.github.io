@@ -6,7 +6,7 @@ import {
   keyboardAction, keyboardPrimary, resolveMode, showsLantern, usableLantern,
 } from '../src/ui/actions.mjs';
 import {catalogModel, inCategory} from '../src/ui/catalog.mjs';
-import {adjustQuantity, gridStep, operationsFor, slotLabel} from '../src/ui/inventory.mjs';
+import {adjustQuantity, gridStep, itemActionClearsSelection, operationsFor, slotLabel} from '../src/ui/inventory.mjs';
 
 test('mode precedence puts panels above placement and combat', () => {
   assert.equal(resolveMode({ended: true, panel: 'inventory'}), 'end');
@@ -153,6 +153,13 @@ test('slot labels, quantities, and operations stay explicit', () => {
   assert.deepEqual(operationsFor({itemId: 'axe', where: 'equipment', chestOpen: true}), ['unequip', 'drop', 'transfer']);
   assert.deepEqual(operationsFor({itemId: 'wood', where: 'chest', chestOpen: true}), ['transfer']);
   assert.deepEqual(operationsFor({itemId: 'wood', where: 'recovery'}), ['take']);
+  assert.deepEqual(operationsFor({itemId: 'wood', where: 'overflow', chestOpen: true}), ['transfer']);
+  for (const op of ['equip', 'unequip', 'swap', 'eat', 'heal', 'drop', 'confirm-drop', 'transfer', 'take', 'store']) {
+    assert.equal(itemActionClearsSelection(op), true, op);
+  }
+  for (const op of ['cancel-drop', 'one', 'half', 'all', 'inc', 'dec']) {
+    assert.equal(itemActionClearsSelection(op), false, op);
+  }
   assert.equal(gridStep(0, 24, 4, 'arrowdown'), 4);
   assert.equal(gridStep(1, 24, 6, 'arrowleft'), 0);
 });

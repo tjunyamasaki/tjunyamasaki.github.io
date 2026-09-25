@@ -186,7 +186,7 @@ test('T15 dismantle cannot bypass a lease; destruction spills exactly once with 
   assert.equal(command(p,{type:'chestTransfer',chestId:chest.id,sessionId:session}).ok,false);
 });
 
-test('full backpack transfer is atomic; splits, socket swaps and explicit last-cell growth preserve ownership',()=>{
+test('full backpack transfer is atomic; splits and socket swaps preserve ownership; a full chest does not grow',()=>{
   const {w,p,chest,open,transfer}=camp();const session=open(p).sessionId;
   w.clearPack(p);w.stock(p.inventory,'stone',120);w.stock(chest.store,'berry',2);
   const berry=chest.store.slots.find(Boolean),before=copy([p.inventory,chest.store]);
@@ -201,10 +201,13 @@ test('full backpack transfer is atomic; splits, socket swaps and explicit last-c
   const beforeBad=copy([p.equipment,chest.store]);
   assert.equal(transfer(p,session,chest.store,eq(p),first.uid,1,{destinationSlot:1}).code,'incompatibleSocket');
   assert.equal(copy([p.equipment,chest.store]),beforeBad);
-  const slots=chest.store.slots;for(let i=0;i<slots.length-1;i++)if(!slots[i])slots[i]=w.mintStack('wood',20);
-  w.give(p,'spear',1);const spear=p.inventory.slots.find(s=>s?.itemId==='spear'),length=slots.length;
-  assert.equal(transfer(p,session,p.inventory,chest.store,spear.uid,1,{destinationSlot:length-1}).ok,true);
-  assert.equal(chest.store.slots.length,length+6);w.assertItems();
+  const slots=chest.store.slots;for(let i=0;i<slots.length;i++)if(!slots[i])slots[i]=w.mintStack('wood',20);
+  w.give(p,'spear',1);const spear=p.inventory.slots.find(s=>s?.itemId==='spear');
+  const beforeFull=copy([p.inventory,chest.store,p.equipment]);
+  assert.equal(transfer(p,session,p.inventory,chest.store,spear.uid,1).code,'inventoryFull');
+  assert.equal(chest.store.slots.length,18);
+  assert.equal(copy([p.inventory,chest.store,p.equipment]),beforeFull);
+  w.assertItems();
 });
 
 test('T11 withdrawItem is gone, so a locked chest cannot be emptied beside the session',()=>{

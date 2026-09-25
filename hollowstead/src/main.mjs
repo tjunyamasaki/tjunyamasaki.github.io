@@ -1,19 +1,19 @@
-import {World,clamp,distance,biome} from './engine.mjs?v=harvest-9';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-9';
-import {Renderer,loadTheme} from './renderer.mjs?v=harvest-9';
-import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-9';
-import {createNetwork} from './network.mjs?v=harvest-7';
-import {Sound} from './audio.mjs?v=harvest-7';
-import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-7';
-import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-7';
-import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-7';
-import {CHEST_PAGE_SLOTS,CHEST_RENEW_SECONDS,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-7';
+import {World,clamp,distance,biome} from './engine.mjs?v=harvest-10';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-10';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-10';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-10';
+import {createNetwork} from './network.mjs?v=harvest-10';
+import {Sound} from './audio.mjs?v=harvest-10';
+import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-10';
+import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-10';
+import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-10';
+import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-10';
 import {
   allowsCombat,allowsMovement,clusterFor,effectLine,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
-} from './ui/actions.mjs?v=harvest-9';
-import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-7';
-import {adjustQuantity,createInventoryPanel,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-8';
+} from './ui/actions.mjs?v=harvest-10';
+import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-10';
+import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-10';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -30,10 +30,10 @@ let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:
 let stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
 let connectionText='',saveText='';
 let localActions=null,localActionWorld=null,localClient=null;
-let chestSession=null,chestOpening=false,chestToken=0,chestRenewAt=0,chestRenewing=false,chestPage=0;
+let chestSession=null,chestOpening=false,chestToken=0,chestRenewAt=0,chestRenewing=false;
 let catalog={source:'field',stationId:null,stationType:null,tab:'build'};
 let catalogPending='';
-let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,dropConfirm=false,actionPending=false;
+let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,dropDraft=null,actionPending=false;
 let liveActions=[],holdKind=null,holdTarget=null,holdSource=null,dismantleStarted=0,ringFrame=0,captured=null;
 
 function profile(){try{return JSON.parse(localStorage.getItem(PROFILE)||'{}');}catch{return {};}}
@@ -73,7 +73,7 @@ async function openChest(chestId){
   cancelPlacement();cancelMaintenance();endContextHold();
   if(sheet==='menu'&&mode==='solo')paused=false;
   if(chestSession)releaseChestUI();
-  sheet='chest';$('sheet').hidden=false;$('sheet').dataset.sheet='chest';chestOpening=true;chestPage=0;clearSelection();
+  sheet='chest';$('sheet').hidden=false;$('sheet').dataset.sheet='chest';chestOpening=true;clearSelection();
   const token=chestToken;dirty=true;renderSheet();resetInput();
   void send({type:'setHarvestTarget',nodeId:'',mode:'cancel'},{quiet:true});
   const result=await send({type:'chestOpen',chestId},{quiet:true});
@@ -135,7 +135,7 @@ function currentMode(){
 }
 function cancelPlacement(){placement=null;}
 function cancelMaintenance(){maintenance=false;maintenanceTarget=null;endContextHold();}
-function clearSelection(){selection=null;dropConfirm=false;qtyMode='all';chosenQty=1;}
+function clearSelection(){selection=null;dropDraft=null;qtyMode='all';chosenQty=1;}
 function refresh(){dirty=true;ui();}
 function discardPanel(){inventoryPanel?.destroy();inventoryPanel=null;}
 function prepareWorld(resume=false){
@@ -229,6 +229,7 @@ function stackByKey(p,key){
   if(where==='socket')return {where:'equipment',socket:id,slot:EQUIPMENT_SLOTS.indexOf(id),key,stack:p.equipment[id]||null};
   if(where==='recovery'){const slot=Number(id);return {where:'recovery',slot,key,stack:p.recovery?.slots?.[slot]||null};}
   if(where==='chest'){const slot=Number(id),chest=chestBuilding();return {where:'chest',slot,key,stack:chest?.store.slots[slot]||null};}
+  if(where==='overflow'){const slot=Number(id),chest=chestBuilding();return {where:'overflow',slot,key,stack:chest?.overflow?.slots?.[slot]||null};}
   return null;
 }
 function locateUid(p,uid){
@@ -237,21 +238,26 @@ function locateUid(p,uid){
   if(pack>=0)return {where:'pack',slot:pack,key:`pack:${pack}`,stack:p.inventory.slots[pack]};
   for(const socket of EQUIPMENT_SLOTS)if(p.equipment[socket]?.uid===uid)return {where:'equipment',socket,slot:EQUIPMENT_SLOTS.indexOf(socket),key:`socket:${socket}`,stack:p.equipment[socket]};
   const chest=chestBuilding();
-  if(chest){const index=chest.store.slots.findIndex(slot=>slot?.uid===uid);if(index>=0)return {where:'chest',slot:index,key:`chest:${index}`,stack:chest.store.slots[index]};}
+  if(chest){
+    const index=chest.store.slots.findIndex(slot=>slot?.uid===uid);
+    if(index>=0)return {where:'chest',slot:index,key:`chest:${index}`,stack:chest.store.slots[index]};
+    const saved=chest.overflow?.slots?.findIndex(slot=>slot?.uid===uid)??-1;
+    if(saved>=0)return {where:'overflow',slot:saved,key:`overflow:${saved}`,stack:chest.overflow.slots[saved]};
+  }
   if(p.recovery){const index=p.recovery.slots.findIndex(slot=>slot?.uid===uid);if(index>=0)return {where:'recovery',slot:index,key:`recovery:${index}`,stack:p.recovery.slots[index]};}
   return null;
 }
 function chosenQuantity(stack){if(!stack)return 1;if(qtyMode==='all')return stack.quantity;return Math.min(stack.quantity,Math.max(1,chosenQty));}
-function rememberSelection(){const loc=selection?locateUid(me(),selection.uid):null;if(!loc){clearSelection();return;}selection={uid:loc.stack.uid,key:loc.key,where:loc.where};chosenQty=Math.min(loc.stack.quantity,Math.max(1,qtyMode==='all'?loc.stack.quantity:chosenQty));}
-function selectKey(key){const loc=stackByKey(me(),key);if(!loc?.stack)return;const same=selection?.uid===loc.stack.uid;selection={uid:loc.stack.uid,key:loc.key,where:loc.where};if(!same){qtyMode='all';chosenQty=loc.stack.quantity;dropConfirm=false;}refresh();}
-function containerInfo(p,loc){if(loc.where==='pack')return p.inventory;if(loc.where==='equipment')return {id:containerId('equipment',p.id),revision:p.equipmentRevision};if(loc.where==='recovery')return p.recovery;if(loc.where==='chest')return chestBuilding()?.store||null;return null;}
-async function withPending(cmd){actionPending=true;refresh();const result=await send(cmd);actionPending=false;rememberSelection();refresh();return result;}
+function selectKey(key){dropDraft=null;const loc=stackByKey(me(),key);if(!loc?.stack)return;const same=selection?.uid===loc.stack.uid;selection={uid:loc.stack.uid,key:loc.key,where:loc.where};if(!same){qtyMode='all';chosenQty=loc.stack.quantity;}refresh();}
+function containerInfo(p,loc){if(loc.where==='pack')return p.inventory;if(loc.where==='equipment')return {id:containerId('equipment',p.id),revision:p.equipmentRevision};if(loc.where==='recovery')return p.recovery;if(loc.where==='chest')return chestBuilding()?.store||null;if(loc.where==='overflow')return chestBuilding()?.overflow||null;return null;}
+async function withPending(cmd){actionPending=true;refresh();const result=await send(cmd);actionPending=false;if(selection&&!locateUid(me(),selection.uid))clearSelection();refresh();return result;}
 async function commitMove(from,to,quantity,{insert=false}={}){
-  const p=me();if(!p||!from?.stack||!to||to.where==='recovery'||actionPending)return;
+  const p=me();if(!p||!from?.stack||!to||to.where==='recovery'||to.where==='overflow'||actionPending)return;
   const source=containerInfo(p,from),dest=containerInfo(p,to);if(!source||!dest)return;
-  const chestSide=from.where==='chest'||to.where==='chest';
+  const chestSide=from.where==='chest'||to.where==='chest'||from.where==='overflow';
   const cmd={type:chestSide?'chestTransfer':'inventoryMove',sourceContainerId:source.id,sourceSlot:from.slot,destinationContainerId:dest.id,destinationSlot:insert?null:to.slot,uid:from.stack.uid,quantity,sourceRevision:source.revision,destinationRevision:dest.revision};
   if(chestSide){if(!chestSession)return;Object.assign(cmd,chestSession);}
+  selection=null;dropDraft=null;
   await withPending(cmd);
 }
 async function onSlot(key,empty){
@@ -268,33 +274,52 @@ async function moveKeys(fromKey,toKey){
   const quantity=from.stack.uid===selection?.uid?chosenQuantity(from.stack):from.stack.quantity;
   await commitMove(from,to,quantity);
 }
+async function sortPack(){
+  const p=me();if(!p||actionPending)return;
+  await withPending({type:'packSort',inventoryRevision:p.inventory.revision});
+}
+async function organizeChest(op){
+  const p=me(),chest=chestBuilding();if(!p||!chest||!chestSession||actionPending)return;
+  const type=op==='store'?'chestStoreAll':op==='stack'?'chestStack':'chestSort';
+  const cmd={type,chestId:chestSession.chestId,sessionId:chestSession.sessionId,destinationRevision:chest.store.revision};
+  if(type==='chestStoreAll')cmd.inventoryRevision=p.inventory.revision;
+  await withPending(cmd);
+}
 async function operate(op){
-  const p=me();if(!p||!selection||actionPending)return;
-  const loc=locateUid(p,selection.uid);if(!loc?.stack){clearSelection();dirty=true;return;}
-  if(op==='cancel-drop'){dropConfirm=false;refresh();return;}
-  if(op==='drop'){dropConfirm=true;refresh();return;}
+  const p=me();if(!p||actionPending)return;
+  if(op==='cancel-drop'){dropDraft=null;refresh();return;}
   if(op==='confirm-drop'){
-    const cmd={type:'dropItem',uid:loc.stack.uid,quantity:chosenQuantity(loc.stack),inventoryRevision:p.inventory.revision};
-    if(loc.where==='equipment')cmd.equipmentRevision=p.equipmentRevision;
-    dropConfirm=false;await withPending(cmd);return;
+    const draft=dropDraft;if(!draft)return;
+    dropDraft=null;selection=null;
+    const cmd={type:'dropItem',uid:draft.uid,quantity:draft.quantity,inventoryRevision:p.inventory.revision};
+    if(draft.where==='equipment')cmd.equipmentRevision=p.equipmentRevision;
+    await withPending(cmd);return;
   }
-  if(op==='equip'){await withPending({type:'equipItem',uid:loc.stack.uid,socket:equipmentSlotFor(loc.stack.itemId),inventoryRevision:p.inventory.revision,equipmentRevision:p.equipmentRevision});return;}
-  if(op==='unequip'){await withPending({type:'unequipItem',uid:loc.stack.uid,socket:loc.socket,inventoryRevision:p.inventory.revision,equipmentRevision:p.equipmentRevision});return;}
-  if(op==='eat'||op==='heal'){await withPending({type:'consumeItem',uid:loc.stack.uid,inventoryRevision:p.inventory.revision});return;}
-  if(op==='take'){await commitMove(loc,{where:'pack',slot:0,stack:null},chosenQuantity(loc.stack),{insert:true});return;}
+  if(!selection)return;
+  const loc=locateUid(p,selection.uid);if(!loc?.stack){clearSelection();dirty=true;return;}
+  if(op==='drop'){
+    const draft={uid:loc.stack.uid,quantity:chosenQuantity(loc.stack),where:loc.where,name:label(loc.stack.itemId)};
+    clearSelection();dropDraft=draft;refresh();return;
+  }
+  const captured={uid:loc.stack.uid,socket:loc.socket,where:loc.where,quantity:chosenQuantity(loc.stack),itemId:loc.stack.itemId};
+  if(itemActionClearsSelection(op)){selection=null;dropDraft=null;}
+  if(op==='equip'){await withPending({type:'equipItem',uid:captured.uid,socket:equipmentSlotFor(captured.itemId),inventoryRevision:p.inventory.revision,equipmentRevision:p.equipmentRevision});return;}
+  if(op==='unequip'){await withPending({type:'unequipItem',uid:captured.uid,socket:captured.socket,inventoryRevision:p.inventory.revision,equipmentRevision:p.equipmentRevision});return;}
+  if(op==='eat'||op==='heal'){await withPending({type:'consumeItem',uid:captured.uid,inventoryRevision:p.inventory.revision});return;}
+  if(op==='take'){await commitMove(loc,{where:'pack',slot:0,stack:null},captured.quantity,{insert:true});return;}
   if(op==='transfer'){
     const chest=chestBuilding();if(!chest||!chestSession)return;
-    const dest=loc.where==='chest'?{where:'pack',slot:0,stack:null}:{where:'chest',slot:0,stack:null};
-    await commitMove(loc,dest,chosenQuantity(loc.stack),{insert:true});
+    const dest=captured.where==='chest'||captured.where==='overflow'?{where:'pack',slot:0,stack:null}:{where:'chest',slot:0,stack:null};
+    await commitMove(loc,dest,captured.quantity,{insert:true});
   }
 }
-function onQuantity(op){const loc=selection&&locateUid(me(),selection.uid);if(!loc?.stack)return;qtyMode=op==='inc'||op==='dec'?'set':op;chosenQty=adjustQuantity(loc.stack.quantity,chosenQuantity(loc.stack),op);dropConfirm=false;refresh();}
+function onQuantity(op){const loc=selection&&locateUid(me(),selection.uid);if(!loc?.stack)return;qtyMode=op==='inc'||op==='dec'?'set':op;chosenQty=adjustQuantity(loc.stack.quantity,chosenQuantity(loc.stack),op);refresh();}
 function onShift(key){selectKey(key);if(!chestSession||!selection)return;qtyMode='all';const loc=locateUid(me(),selection.uid);if(loc)void operate('transfer');}
-function activateSelection(){if(!selection||dropConfirm)return;const loc=locateUid(me(),selection.uid);if(!loc?.stack)return;const ops=operationsFor({itemId:loc.stack.itemId,where:loc.where,chestOpen:!!chestSession});const preferred=['transfer','equip','eat','heal','take','unequip'].find(op=>ops.includes(op));if(preferred)void operate(preferred);}
+function activateSelection(){if(!selection||dropDraft)return;const loc=locateUid(me(),selection.uid);if(!loc?.stack)return;const ops=operationsFor({itemId:loc.stack.itemId,where:loc.where,chestOpen:!!chestSession});const preferred=['transfer','equip','eat','heal','take','unequip'].find(op=>ops.includes(op));if(preferred)void operate(preferred);}
 function ensurePanel(){
   if(inventoryPanel?.root?.isConnected)return;
   discardPanel();
-  inventoryPanel=createInventoryPanel($('sheet-content'),{onSlot:(key,empty)=>void onSlot(key,empty),onSelect:selectKey,onMove:(from,to)=>void moveKeys(from,to),onOperate:op=>void operate(op),onQuantity,onShift,onChestPage:delta=>{chestPage+=delta;dirty=true;renderSheet();},onActivate:activateSelection,onDragChange(){endContextHold();hold.attack=false;stick={x:0,z:0};}});
+  inventoryPanel=createInventoryPanel($('sheet-content'),{onSlot:(key,empty)=>void onSlot(key,empty),onSelect:selectKey,onMove:(from,to)=>void moveKeys(from,to),onOperate:op=>void operate(op),onQuantity,onShift,onPackSort:()=>void sortPack(),onChestOrganize:op=>void organizeChest(op),onActivate:activateSelection,onDragChange(){endContextHold();hold.attack=false;stick={x:0,z:0};}});
   sheetMarkup='';
 }
 function makeCell(key,stack,kind,index,mark=''){
@@ -310,26 +335,24 @@ function inventoryView(p){
   const recovery=(p.recovery?.slots||[]).flatMap((stack,index)=>stack?[makeCell(`recovery:${index}`,stack,'recovery',index)]:[]);
   let chestView=null;
   if(sheet==='chest'){
-    if(!chest)chestView={pending:true,page:0,pages:1,slots:[]};
+    if(!chest)chestView={pending:true,slots:[],overflow:[],occupied:0,slotMax:CHEST_SLOT_COUNT};
     else{
-      const pages=Math.max(1,Math.ceil(chest.store.slots.length/CHEST_PAGE_SLOTS));
-      chestPage=Math.min(Math.max(0,chestPage),pages-1);
-      const start=chestPage*CHEST_PAGE_SLOTS;
-      const pageSlots=[];
-      for(let index=0;index<CHEST_PAGE_SLOTS&&start+index<chest.store.slots.length;index++)pageSlots.push(makeCell(`chest:${start+index}`,chest.store.slots[start+index],'chest',start+index));
-      chestView={pending:chestOpening||actionPending,page:chestPage,pages,slots:pageSlots};
+      const slots=chest.store.slots.map((stack,index)=>makeCell(`chest:${index}`,stack,'chest',index));
+      const overflow=(chest.overflow?.slots||[]).flatMap((stack,index)=>stack?[makeCell(`overflow:${index}`,stack,'overflow',index)]:[]);
+      chestView={pending:chestOpening||actionPending,slots,overflow,occupied:chest.store.slots.filter(Boolean).length,slotMax:chest.store.slots.length};
     }
   }
   const loc=selection?locateUid(p,selection.uid):null;
   let detail=null;
-  if(loc?.stack){
+  if(dropDraft)detail={name:dropDraft.name,meta:' ',chosen:dropDraft.quantity,maxQuantity:dropDraft.quantity,ops:[],dropConfirm:true,confirmText:`Drop ${dropDraft.quantity} ${dropDraft.name}?`};
+  else if(loc?.stack){
     const where=loc.where;
     const ops=operationsFor({itemId:loc.stack.itemId,where,chestOpen:!!chestSession});
     const wear=EQUIPMENT[loc.stack.itemId]?`Condition ${Math.ceil(loc.stack.durability)} / ${EQUIPMENT[loc.stack.itemId].durability}`:'';
-    detail={name:label(loc.stack.itemId),meta:[effectLine(loc.stack.itemId),wear].filter(Boolean).join(' · ')||' ',chosen:chosenQuantity(loc.stack),maxQuantity:loc.stack.quantity,ops,dropConfirm,confirmText:`Drop ${chosenQuantity(loc.stack)} ${label(loc.stack.itemId)}?`};
+    detail={name:label(loc.stack.itemId),meta:[effectLine(loc.stack.itemId),wear].filter(Boolean).join(' · ')||' ',chosen:chosenQuantity(loc.stack),maxQuantity:loc.stack.quantity,ops,dropConfirm:false,confirmText:''};
   }
   const sprite=theme.sprites[p.character]||theme.sprites.ember;
-  return {portraitHTML:`${portrait(p.character)}<small>${escapeHtml(p.name)}</small>`,supply:world.loadCount(p),capacity:RULES.capacity,occupied:p.inventory.slots.filter(Boolean).length,slotMax:p.inventory.slots.length,charm:!!p.charm,sockets,slots,recovery,chest:chestView,selection:detail,pending:actionPending||chestOpening,pendingText:chestOpening?'Opening chest…':actionPending?'Waiting for camp…':'',sprite};
+  return {portraitHTML:`${portrait(p.character)}<small>${escapeHtml(p.name)}</small>`,occupied:p.inventory.slots.filter(Boolean).length,slotMax:p.inventory.slots.length,charm:!!p.charm,sockets,slots,recovery,chest:chestView,selection:detail,pending:actionPending||chestOpening,pendingText:chestOpening?'Opening chest…':actionPending?'Waiting for camp…':'',sprite};
 }
 const SOCKET_NAME={chop:'Chop',mine:'Mine',weapon:'Weapon',body:'Armor',light:'Light'};
 function guideHTML(){
@@ -339,7 +362,7 @@ function guideHTML(){
     ['Keep the fire alive','Feed the Heartfire from its Feed button. Cook opens that fire’s recipes. Firelight restores courage; darkness drains it, then your health. A Light button appears when you carry a usable lantern. Soul lanterns never go out.'],
     ['Eat, farm, recover','Open Inventory, select the food, and press Eat. A burning fire cooks pumpkins, mushrooms, and meat. A cauldron cooks stew. Plant a farm with a seed, then harvest it when it is ready. Bedrolls heal by day and spend hunger.'],
     ['Tend the camp','Build lists only what you can place from where you opened it. Choose Maintain camp to repair a damaged structure or hold Dismantle. The Heartfire cannot be dismantled. A chest someone else has open cannot be dismantled either.'],
-    ['Share a chest','One wanderer opens a chest at a time. The panel shows your pack and the chest together. Choose a quantity, then Transfer, or tap the destination slot. Food, materials, and worn gear can all move. Close the panel to let someone else in.'],
+    ['Share a chest','One wanderer opens a chest at a time. Your pack has six slots. A chest has eighteen. Store all moves what fits from your pack. Stack same items combines matching piles. Sort orders a chest or your pack and stacks matches. Choose a quantity, then Transfer, or tap the destination slot. Close the panel to let someone else in.'],
     ['Stand together','Hold Attack to use the weapon you have equipped. Dodge the glowing attack circles. Armor absorbs damage only while worn. Hold Revive beside a fallen friend for three seconds. Everyone has one last-chance charm. Fallen wanderers return at dawn if the camp survives.'],
     ['Break the curse','Survive five nights and defeat the Hollow King on night five. Guard the Heartfire: losing it ends the expedition. Awaken it with soul embers from the eastern graveyard and night creatures. After victory, you can keep surviving.'],
   ];
@@ -547,7 +570,7 @@ function setupControls(){
     const key=event.key.toLowerCase();
     if([' ','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key))event.preventDefault();
     if(key==='escape'){
-      const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!(selection&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement,maintaining:maintenance});
+      const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!((selection||dropDraft)&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement,maintaining:maintenance});
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();
       else if(step==='close-details'){clearSelection();refresh();}
       else if(step==='close-panel')closeSheet();
@@ -558,7 +581,10 @@ function setupControls(){
     }
     const named=keyboardAction(key);
     if((sheet==='inventory'||sheet==='chest')&&key.startsWith('arrow')){inventoryPanel?.focusStep(key);return;}
-    if((sheet==='inventory'||sheet==='chest')&&key==='enter'){inventoryPanel?.activateFocused();return;}
+    if((sheet==='inventory'||sheet==='chest')&&key==='enter'){
+      if(event.target?.closest?.('[data-op],[data-chest-op],[data-pack-op],[data-qty]'))return;
+      event.preventDefault();inventoryPanel?.activateFocused();return;
+    }
     keys.add(key);if(event.repeat)return;
     const modeName=currentMode();const actor=me();
     if(named==='inventory'){toggleInventory();return;}

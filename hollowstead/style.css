@@ -103,8 +103,9 @@
 .drag-ghost{position:fixed;width:48px;height:48px;z-index:80;pointer-events:none;display:grid;place-items:center}
 .drag-ghost .item-icon{width:40px;height:40px}
 .storage-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;min-height:14px}
-.storage-heading .chest-pages{margin:0;gap:6px}
-.storage-heading .chest-pages button{width:44px;height:44px;padding:0}
+.storage-tools{display:flex;flex-wrap:wrap;gap:4px;flex:none}
+.storage-tools button{min-width:44px;min-height:44px;padding:8px 10px}
+.chest-overflow{flex:none;max-height:34%;overflow:auto;overscroll-behavior:contain}
 .rpg-panel.with-chest .rpg-body{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) minmax(0,1fr);overflow:hidden}
 .rpg-panel.with-chest .bag-column,.rpg-panel.with-chest .chest-column{min-height:0;overflow:hidden}
 .rpg-panel.with-chest .bag-column>.slot-grid,.rpg-panel.with-chest .chest-column>.slot-grid{flex:1 1 0;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}

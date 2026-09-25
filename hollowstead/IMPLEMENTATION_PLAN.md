@@ -1194,7 +1194,8 @@ Tests and device checks actually run:
 - The pre-change count at 4f38deb was the existing P0 suites (21 Hollowstead tests and 17 ball-game tests). This continuation started from an already edited tree, so that before command was not repeated here.
 - Headless Chrome loaded the local page, started a solo camp, crafted an axe into the pack, equipped that same UID, ate one berry from the Eat button, and showed the existing hotbar. Continue loaded the committed v1-normal fixture: clock stayed v1, time stayed 335, worn axe/pick/spear and a lit torch survived, food counts matched, v2 was written, and v1 was left in place. WebGL was unavailable in that browser, so the canvas renderer drew the world. No phone and no two-device co-op pass.
 Evidence / screenshots / deployment run:
-- Implementation commit f25990e8ee7f0c55c578df76ab54d2318bc3349d. Local screenshots: title, day-one HUD with the old hotbar, pack after equipping the crafted axe, and the migrated day-two pack. The GitHub Pages run for this tip is recorded in the follow-up note below once that workflow finishes.
+- Implementation commit f25990e8ee7f0c55c578df76ab54d2318bc3349d. Local screenshots: title, day-one HUD with the old hotbar, pack after equipping the crafted axe, and the migrated day-two pack.
+- GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36079603258 succeeded for a4b2a765c5fe17eef2e0bf1a8705aa2fa498596a, the handoff tip that contains that implementation. Hollowstead and ball-game tests passed in that run. The live game and plan are that revision. This follow-up only records the URL.
 Remaining failures or unverified cases:
 - No automated failure remains in the Hollowstead or ball-game suites. M01–M18, a real phone, and a second device were not run. The chest panel is still the old grouped list. Exclusive chest locks, timed harvesting, and the 180/30/100 night are not in this package.
 Compatibility/migration notes:

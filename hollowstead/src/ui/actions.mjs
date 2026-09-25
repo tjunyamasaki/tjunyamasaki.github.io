@@ -197,9 +197,7 @@ export function describeContext(facts) {
       disabledReason: facts.toolLabel ? `Needs a ${facts.toolLabel}` : 'Needs a tool',
     })];
   }
-  if (facts.kind === 'drop') {
-    return [make('pickup', {targetId: facts.id, label: 'Pick up'})];
-  }
+  if (facts.kind === 'drop') return [];
   if (facts.kind === 'revive') {
     return [make('revive', {targetId: facts.id})];
   }

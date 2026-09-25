@@ -1,5 +1,20 @@
 // Simulation identifiers are deliberately independent of art, names and animations.
 export const RULES = Object.freeze({version:1, tick:1/20, radius:42, maxPlayers:4, day:150, dusk:30, night:80, cycle:260, capacity:120, reach:2.8, speed:4.2, finalNight:5});
+/**
+ * Loose floor piles. Measured in this world: movement clearance 0.33, structure
+ * occupancy 0.4, character billboard 1.65 wide (art padding included), interact
+ * reach 2.8, walk speed 4.2. Attract is about 3.5 body-clearances and well inside
+ * reach, so standing beside a pile starts a dwell without scooping from chop range.
+ * Touch matches the body. A full-speed walk crosses the attract diameter in about
+ * half a second, so the dwell is long enough that passing by does not collect.
+ */
+export const PICKUP = Object.freeze({
+  attract: 1.15,
+  touch: 0.42,
+  dwell: 0.65,
+  flight: 0.28,
+  dropCooldown: 1.25,
+});
 export const ITEMS = {
   wood:{name:'Twisted wood',icon:'wood'},stone:{name:'Flint',icon:'stone'},fiber:{name:'Dry grass',icon:'grass'},
   ore:{name:'Moon iron',icon:'ore'},ember:{name:'Soul ember',icon:'soul'},seed:{name:'Pumpkin seed',icon:'seed'},

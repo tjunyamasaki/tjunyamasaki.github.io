@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
-import {EQUIPMENT, NODES, RULES, STRUCTURES} from '../src/content.mjs';
+import {EQUIPMENT, NODES, PICKUP, RULES, STRUCTURES} from '../src/content.mjs';
 import {countItem} from '../src/inventory.mjs';
 import {
   CAULDRON_COOK_RECIPES, CONTEXT_ACTIONS, DISMANTLE_HOLD_SECONDS, FIELD_BUILD_RECIPES,
@@ -31,6 +31,14 @@ function hold(w,rows,seconds,dt=RULES.tick){
 function one(w,p,target,extra={}){hold(w,[{p,target,...extra}],RULES.tick);}
 function release(w,p,target){w.input(p.id,{x:0,z:0,act:false,attack:false,target});w.tick(RULES.tick);}
 function sim(w,seconds){let left=seconds;while(left>1e-8){const dt=Math.min(RULES.tick,left);w.tick(dt);left-=dt;}}
+function takePiles(w,p){
+  for(let guard=0;guard<12&&w.drops.length;guard++){
+    const drop=w.drops[0];
+    p.x=drop.x;p.z=drop.z;p.goal=null;
+    w.input(p.id,{x:0,z:0,act:false,attack:false,target:null});
+    sim(w,PICKUP.flight+RULES.tick*2);
+  }
+}
 function ready(node,w){return node.ready>w.time;}
 
 test('live clock stays 150/30/80',()=>{
@@ -102,17 +110,14 @@ test('T16 field build list, exact targets, and first workbench progression',()=>
   assert.equal(floorQty(w,'wood'),5);
   assert.equal(floorQty(w,'fiber'),1);
   assert.equal(qty(p.inventory,'wood'),startWood);
-  for(const drop of [...w.drops]){
-    release(w,p,drop.id);
-    hold(w,[{p,target:drop.id}],RULES.tick);
-  }
+  takePiles(w,p);
   assert.equal(qty(p.inventory,'wood'),startWood+5);
   assert.equal(w.drops.length,0);
   const rock=w.nodes.find(node=>node.type==='rock');
   stand(p,rock);
   hold(w,[{p,target:rock.id}],4.5);
   assert.equal(floorQty(w,'stone'),5);
-  for(const drop of [...w.drops]){release(w,p,drop.id);hold(w,[{p,target:drop.id}],RULES.tick);}
+  takePiles(w,p);
   assert.equal(qty(p.inventory,'stone'),7);
   const placed=act(w,p,{type:'build',recipe:'bench',x:p.x+1.6,z:p.z});
   assert.equal(placed.ok,true);
@@ -516,18 +521,24 @@ test('T24 chopped and mined yields stay on the floor until a new pickup',()=>{
   assert.equal(qty(p.inventory,'wood'),0);
   assert.equal(floorQty(w,'wood'),5);
   assert.equal(floorQty(w,'fiber'),1);
-  const stacks=w.drops.length;
-  hold(w,[{p,target:tree.id}],1);
-  assert.equal(w.drops.length,stacks);
-  assert.equal(qty(p.inventory,'wood'),0);
-  hold(w,[{p,target:null}],1);
-  assert.equal(w.drops.length,stacks);
-  assert.equal(qty(p.inventory,'wood'),0);
-  release(w,p,null);
   const wood=w.drops.find(drop=>drop.stack.itemId==='wood');
-  hold(w,[{p,target:wood.id}],RULES.tick);
-  assert.equal(qty(p.inventory,'wood'),5);
-  assert.equal(w.drops.includes(wood),false);
+  const spot={x:wood.x,z:wood.z,quantity:wood.stack.quantity};
+  one(w,p,tree.id);
+  assert.equal(qty(p.inventory,'wood'),0);
+  assert.equal(wood.stack.quantity,spot.quantity);
+  assert.equal(wood.x,spot.x);
+  assert.equal(wood.z,spot.z);
+  hold(w,[{p,target:tree.id}],0.4);
+  assert.equal(qty(p.inventory,'wood'),0);
+  assert.equal(w.drops.includes(wood),true);
+  p.x=30;p.z=30;
+  release(w,p,null);
+  sim(w,1);
+  assert.equal(w.drops.includes(wood),true);
+  assert.equal(wood.x,spot.x);
+  assert.equal(wood.z,spot.z);
+  assert.equal(wood.stack.quantity,spot.quantity);
+  assert.equal(qty(p.inventory,'wood'),0);
   assert.equal(floorQty(w,'fiber'),1);
 
   const rock=w.nodes.find(node=>node.type==='rock');
@@ -565,7 +576,7 @@ test('T24 chopped and mined yields stay on the floor until a new pickup',()=>{
 test('T26 a grave rolls its wraith and gathered total once',()=>{
   const {w,p}=camp();
   const grave=w.nodes.find(node=>node.type==='grave');
-  stand(p,grave);
+  p.x=grave.x;p.z=grave.z+2.5;
   w.grantEquipped(p,'pick',70);
   let calls=0;const rng=w.rng;w.rng=()=>{calls++;return rng();};
   const before=w.stats.gathered;

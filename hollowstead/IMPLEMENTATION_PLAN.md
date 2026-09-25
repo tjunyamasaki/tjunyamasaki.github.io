@@ -50,7 +50,7 @@ These are concrete implementation decisions where the request did not provide nu
 | Day / dusk / night | 180 / 30 / 100 seconds; 310 seconds per cycle |
 | Night waves | Three opportunities at 0%, 40%, and 80% of the night, retaining existing wave size and enemy cap |
 | Harvest progress | Host-owned elapsed work; shared by active contributors; reset when all contributors stop |
-| Tree / mining outputs | World drops; separate pickup action required |
+| Tree / mining outputs | World drops; proximity pickup (section 19), not a Gather press |
 | Other harvest outputs | Backpack insertion with overflow dropped, preserving their existing behavior |
 | Inventory and stations | Do not pause the world; only the existing solo menu pauses |
 | Chest crafting supplies | Unlocked chests and the actor's own locked chest may supply recipes; another player's locked chest may not |
@@ -438,7 +438,7 @@ On every transition, release held states, clear stale key state where appropriat
 | Soul lantern / ward | Repair when damaged | No generic submenu |
 | Downed teammate | Hold Revive | No |
 | Harvest node | Hold Chop/Mine/Gather | No |
-| Ground drop | Pick up | No |
+| Ground drop | Proximity pickup, no button | No |
 
 Do not add a generic Open → camp submenu for multi-option buildings. Stable button order matters: Feed/Cook/Awaken/Repair for Heartfire; Craft/Build/Repair for bench.
 
@@ -588,11 +588,9 @@ For backpack-output nodes with multiple contributors, choose the earliest still-
 
 Chopping/mining succeeds even with a full backpack because yields go to the floor. For backpack-output nodes, permit completion and drop overflow; avoid wasting a finished harvest solely because capacity changed.
 
-After tree/rock/ore/grave completion, release the interact hold/auto target for that harvest and require a new pickup activation. Otherwise the next tick would immediately collect the new drop and defeat the requested floor-drop behavior.
+After tree/rock/ore/grave completion, release the interact hold and auto target for that harvest. Completing a harvest still consumes that Gather activation. That press is not a pickup command.
 
-Track the activation that began work, not merely a Boolean button-down value. Completing a harvest consumes that activation. The host must observe a release/new activation before interpreting the same input as pickup; changing UI labels alone is insufficient.
-
-Picking up one stack is a discrete action. Picking multiple nearby stacks may be repeated through fresh activations; there is no invisible auto-vacuum.
+Floor piles are collected by proximity, specified in section 19. This supersedes the earlier rule that a fresh Gather press was required. Do not restore "press Gather on the pile." Holding Gather does not scoop piles outside the attract and touch radii. There is no pickup progress bar and no effort text.
 
 ### 10.3 Feedback without a progress HUD
 
@@ -862,7 +860,7 @@ Write tests for authoritative rules and actual regressions. Avoid snapshots of e
 | T21 | Hold release/movement/damage/attack/panel/tool loss cancels appropriately; work resets after final contributor stops |
 | T22 | Two contributors speed one harvest and produce exactly one yield; disconnect does not leave a ghost contributor |
 | T23 | Tool wear is time-based; breaking required pick cancels ore/grave; optional hand gathering continues correctly |
-| T24 | Tree/rock/ore/grave yield appears only on floor even with empty backpack; held harvest does not auto-pick it up |
+| T24 | Tree/rock/ore/grave yield appears on the floor; Gather does not scoop it from outside attract range |
 | T25 | Full pack still permits chopping; partial pickup leaves the exact remainder on floor |
 | T26 | Grave enemy roll and gathered stats are applied once per completed node |
 | T27 | Revive requires 3 actual valid seconds; packet spam does not accelerate it |
@@ -1074,7 +1072,7 @@ Cross-cutting review risks:
 | DOM rebuilding drops a user's touch | Stable action/grid elements; keyed updates; pointercancel handling |
 | Darkness is only a colored floor overlay | Apply illumination to billboards, effects, labels, and selection |
 | Night length increases enemy waves accidentally | Fractional three-wave schedule |
-| Harvest outputs auto-collect on the next held tick | Finish consumes/releases the previous harvest activation |
+| Harvest outputs auto-collect on the next held tick | Proximity dwell, touch, and flight only; Gather does not scoop outside those radii |
 | UI freezes while a request is ignored by cooldown | Explicit results and separate mutation timing |
 | Shared code changes break another game | Scoped modules plus ball-game CI unchanged |
 
@@ -1093,7 +1091,7 @@ Implementation complete means all of the following:
 - [ ] Field building cannot reveal or execute workbench-only construction.
 - [ ] Multi-option structures expose direct contextual circles.
 - [ ] Build placement and maintenance use action controls and have no old floating confirmation window.
-- [ ] Harvest/revive use host elapsed time; no effort/progress HUD; chopped/mined items stay on floor until pickup.
+- [ ] Harvest/revive use host elapsed time; no effort/progress HUD; chopped/mined items stay on the floor until proximity pickup (section 19), not a Gather press.
 - [ ] Night visibility, longer cycle, and all related timers are correct in both renderers.
 - [ ] Icon-only vertical vitals and top minimap fit real phone safe areas.
 - [ ] Existing saves migrate without item loss; new saves/rejoins round-trip accurately.
@@ -1113,6 +1111,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | P2 | Complete | P2 review | e17d4a687f11b330defd7676489c31579b5005b7. 62 Hollowstead + 17 ball-game tests passing | Live clock stays 150/30/80. Review left stations, timed harvest, and gameplay ping for P3 |
 | P3 | Complete | P3 agent | 36614c80a0fb1520532df7368983188b08c0099a. 73 Hollowstead + 17 ball-game tests passing. Pages run 36088851645 succeeded for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0 | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
 | P4 | Complete | P4 agent | a61545910636fc65f2fe487071ab2e8aa8ea892f (HUD rewrite f504b8031352223b161c20d377b7abadda5056b4). 81 Hollowstead + 17 ball-game tests passing. Pages run 36094379157 succeeded for 108481d958d253a47f92445abe3f15c6a2435121 | Real phone, rotation-during-drag, two-device chest, full first night, cauldron station, M10, and M11 were not run. Live clock stays 150/30/80. Night visuals stay P5 |
+| Floor pickup | Complete | proximity pickup | This commit. Supersedes the P3 rule that a fresh Gather press collected a floor pile | Live clock stays 150/30/80. P5 and P6 not started |
 | P5 | Not started | Unassigned | — | — |
 | P6 | Not started | Unassigned | — | — |
 
@@ -1411,3 +1410,59 @@ Evidence:
 - Browser preview occasionally timed out while inspecting or clicking the embedded game. Chest withdrawal after the landscape check was not confirmed. No physical-device or two-device session was run in this layout follow-up. Very small phone sizes and multi-page chest pagination were not visually exercised.
 
 Exact next task: P5 remains pending. Do not change pacing/night simulation as part of this layout follow-up. Retain these phone layout fixes when continuing later packages.
+
+Date: 2026-09-25
+Package / agent: Floor pickup / proximity pickup
+Starting commit: e3e2a7b0635ec2149f932f4a112e4b8b6c5cfe15
+Ending commit: This commit. It is the proximity-pickup change on feat/hollowstead-coop. A later deploy note may record the Pages run. Do not start P5 from an older tip.
+Files changed:
+- hollowstead/src/content.mjs
+- hollowstead/src/engine.mjs
+- hollowstead/src/renderer.mjs
+- hollowstead/src/canvas-renderer.mjs
+- hollowstead/src/ui/actions.mjs
+- hollowstead/src/contracts.mjs
+- hollowstead/src/main.mjs
+- hollowstead/index.html
+- hollowstead/README.md
+- hollowstead/tests/pickup.test.mjs
+- hollowstead/tests/interactions.test.mjs
+- hollowstead/tests/items.test.mjs
+- hollowstead/tests/ui.test.mjs
+- hollowstead/IMPLEMENTATION_PLAN.md
+Implemented behavior:
+- Loose floor piles are collected by proximity. Chop, mine, harvest, and revive channels are unchanged. The Gather button is not a pickup control. Holding Gather does not scoop a pile that is outside the attract and touch radii. There is no pickup progress bar and no effort text.
+- This supersedes the P3 rule that a tree or mining pile required a fresh Gather press. Later packages, including P5, must not restore "press Gather on the pile."
+- Measured against this world before choosing the numbers: movement clearance 0.33, structure occupancy 0.4, character billboard 1.65 wide, interact reach 2.8, walk speed 4.2. The constants live in PICKUP in content.mjs.
+- Attract radius: 1.15 world units. Entering it starts a host-owned dwell. The stack does not enter the inventory yet.
+- Dwell: 0.65 seconds of host elapsed time. Leaving the attract radius cancels the dwell. The pile stays at its original floor coordinates. Walking back in starts a fresh dwell.
+- Touch radius: 0.42 world units, about the body. Touch collects with no dwell. The host checks the position. A touch after re-entry is still instant unless that player's drop cooldown still blocks that stack.
+- Flight: 0.28 seconds. When dwell completes or touch commits, the stack is reserved to that player and the sprite travels from the floor position into the player's current body. Walking during the flight still delivers the stack. The inventory insert happens when the flight ends, so a snapshot cannot hold the same stack in the pack and on the floor.
+- While dwelling, the sprite eases up to 22 percent of the way toward the player. Cancelling the dwell returns the drawing to the original floor position. Authoritative drop.x and drop.z never move.
+- One owner. A cancelled dwell reserves nothing. If the insert overflows, the existing remainder stays on that same floor drop. A pack that cannot accept any of the stack never starts a flight and does not delete quantity.
+- Drop cooldown: 1.25 seconds, host-owned, per dropped stack and the player who dropped it. Only a manual drop sets it. Other players may attract or touch that stack immediately. After the cooldown the dropper uses the normal rules.
+- Guests do not grant pickups. The host simulates dwell, touch, reservation, and cooldown from authoritative positions. Snapshots include attract, flight, and the drop block so guests can draw the motion. A dwelling pile is still a normal floor stack; reconnect does not freeze a dwell or resurrect a collected stack. An in-flight drop is exempt from the floor expiry sweep.
+World units and seconds, exactly:
+- attract 1.15
+- touch 0.42
+- dwell 0.65
+- flight 0.28
+- drop cooldown 1.25
+Animation:
+- Both renderers call dropPresentation. WebGL moves the drop sprite and its shadow to the presented x/z, lifts the sprite by the flight arc (sine, peak 0.55), and shrinks it by up to 35 percent along the flight. The canvas renderer draws the shadow on the ground point, draws the sprite at the lifted point, uses the same shrink, and sorts by the visual z. Drop smoothing is instant, so a cancelled dwell does not drift.
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 94 pass, 0 fail. Includes dwell then collect, leave-radius cancel that keeps the stack, immediate touch, one stack for one player, dropper cooldown, another player taking a fresh drop, overflow that does not delete quantity, and held Gather outside the radii.
+- node --test ball-game/tests/*.test.mjs: 17 pass, 0 fail.
+- git diff --check and node --check on the changed modules.
+- Headless was not required. Headed Chrome on this machine loaded /hollowstead/index.html?dev, clicked Venture alone, and chopped or mined with the real channel. WebGL renderer (swiftshader) and, in a second launch with WebGL disabled, the canvas renderer. Day 01 stayed DAYLIGHT with about 2:30 remaining, so the live clock was still 150/30/80.
+- The pile did not enter the pack on the frames after the node finished. Walking away left it on the original coordinates at the original quantity. Standing inside the attract radius started a dwell and then a flight; the pack updated only after the flight. A manual dropItem stayed on the floor during the dropper cooldown and was not reabsorbed. A second player, a phone, and a guest browser were not run.
+Evidence / screenshots / deployment run:
+- Screenshots: /opt/cursor/artifacts/hollowstead_proximity_log_on_ground.png, hollowstead_proximity_log_in_flight.png, hollowstead_proximity_canvas_ground.png, hollowstead_proximity_canvas_flight.png, hollowstead_proximity_drop_not_reabsorbed.png.
+- Player entry cache query is harvest-9 (index.html and main.mjs). style.css stays harvest-8.
+- Deployment of this commit is recorded in a following note once the Pages workflow finishes.
+Remaining failures or unverified cases:
+- No automated failure remains in the Hollowstead or ball-game suites. A physical phone, a second device, and a guest watching the flight over WebRTC were not run. Do not treat the Chrome session as a device pass.
+Compatibility/migration notes:
+- Saves stay v2 with clock v1. Continue does not call remapWorldClock. RULES stay day 150, dusk 30, night 80, cycle 260. Renderer night boundaries stay t>150 and t>=180. Do not enable 180/30/100 or night darkness in this change. P5 still owns that clock and the night visuals.
+- Protocol stays hollowstead-2. Guests are not trusted for "I collected this." Pickup is host-simulated. Dwell state is not part of the save. Flight, attract, and the drop block travel in the world snapshot.
+Exact next task: P5 — Night visuals and pacing. Do not start P6. Do not restore "press Gather on the pile." Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.

@@ -14,7 +14,7 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 
 ## Survive
 
-1. Gather by hand. Tap a tree or rock to walk to it, or use the stick and hold **Gather**. A pine takes a few seconds; flint takes a little longer. Wood and flint land on the ground. Release Gather, then press again to pick them up. Grass, berries, pumpkins, and mushrooms go into your pack.
+1. Gather by hand. Tap a tree or rock to walk to it, or use the stick and hold **Gather**. A pine takes a few seconds; flint takes a little longer. Wood and flint land on the ground. Stay beside a pile and it comes to you; step onto it and it is picked up at once. Walk away and it stays where it fell. A stack you just dropped will not jump back into your pack for a moment; someone else can take it. Grass, berries, pumpkins, and mushrooms go into your pack.
 2. Place a workbench from **Build**. It does not need another station. Open the workbench to craft an axe and a pick, then tap **Equip**. Moon iron and haunted graves need a worn pick. Spare tools in your pack do nothing until worn. Cauldrons, soul lanterns, and wards are built from the workbench, not the field list.
 3. Cook at a burning fire. Grow pumpkins in farm plots, make bandages at a workbench, and build a cauldron for stew. Eat from your pack: open it and tap Eat on the stack you want.
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.

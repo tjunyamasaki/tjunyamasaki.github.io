@@ -106,7 +106,7 @@ test('context buttons are direct and ordered', () => {
   assert.equal(tree[0].id, 'chop');
   assert.equal(tree[0].enabled, true);
   const drop = describeContext({kind: 'drop', id: 'd'});
-  assert.equal(drop[0].id, 'pickup');
+  assert.deepEqual(drop, []);
   assert.equal(keyboardPrimary(heart, 'normal').id, 'feed');
 });
 

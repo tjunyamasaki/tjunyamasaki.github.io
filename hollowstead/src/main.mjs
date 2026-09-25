@@ -1,7 +1,7 @@
-import {World,clamp,distance,biome} from './engine.mjs?v=harvest-7';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-7';
-import {Renderer,loadTheme} from './renderer.mjs?v=harvest-7';
-import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-7';
+import {World,clamp,distance,biome} from './engine.mjs?v=harvest-9';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-9';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-9';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-9';
 import {createNetwork} from './network.mjs?v=harvest-7';
 import {Sound} from './audio.mjs?v=harvest-7';
 import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-7';
@@ -11,7 +11,7 @@ import {CHEST_PAGE_SLOTS,CHEST_RENEW_SECONDS,DISMANTLE_HOLD_SECONDS} from './con
 import {
   allowsCombat,allowsMovement,clusterFor,effectLine,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
-} from './ui/actions.mjs?v=harvest-7';
+} from './ui/actions.mjs?v=harvest-9';
 import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-7';
 import {adjustQuantity,createInventoryPanel,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-8';
 
@@ -334,7 +334,7 @@ function inventoryView(p){
 const SOCKET_NAME={chop:'Chop',mine:'Mine',weapon:'Weapon',body:'Armor',light:'Light'};
 function guideHTML(){
   const steps=[
-    ['Gather before dusk','Move with the left stick, or tap the ground. Tap a tree or rock to walk over and harvest it. Hold the action until it falls. Wood and flint land on the ground; pick them up with a new press. Grass, berries, pumpkins, and mushrooms go into your pack.'],
+    ['Gather before dusk','Move with the left stick, or tap the ground. Tap a tree or rock to walk over and harvest it. Hold the action until it falls. Wood and flint land on the ground. Stay beside a pile and it comes to you; step onto it and it is picked up at once. Walk away and it stays where it fell. Grass, berries, pumpkins, and mushrooms go into your pack.'],
     ['Build a workbench','Open Build and place a workbench. It does not need another station. Stand at it and press Craft to make an axe and a pick, then Equip them in Inventory. A tool in your pack does nothing until it is worn. Cauldrons, soul lanterns, and wards are on the workbench Build list.'],
     ['Keep the fire alive','Feed the Heartfire from its Feed button. Cook opens that fire’s recipes. Firelight restores courage; darkness drains it, then your health. A Light button appears when you carry a usable lantern. Soul lanterns never go out.'],
     ['Eat, farm, recover','Open Inventory, select the food, and press Eat. A burning fire cooks pumpkins, mushrooms, and meat. A cauldron cooks stew. Plant a farm with a seed, then harvest it when it is ready. Bedrolls heal by day and spend hunger.'],

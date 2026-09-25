@@ -1,7 +1,7 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
-import {NODES,STRUCTURES,RULES} from './content.mjs?v=harvest-6';
-import {biome,distance} from './engine.mjs?v=harvest-6';
+import {NODES,STRUCTURES,RULES} from './content.mjs?v=harvest-9';
+import {biome,distance,dropPresentation} from './engine.mjs?v=harvest-9';
 import {equippedLanternLit,itemSpriteKey} from './inventory.mjs?v=harvest-6';
 export class CanvasRenderer {
   constructor(canvas,theme){
@@ -19,13 +19,13 @@ export class CanvasRenderer {
   float(text,x,z,color='#f8dfb3'){if(!text)return;const el=document.createElement('div');el.className='world-label';el.textContent=text;el.style.color=color;document.getElementById('world-labels').append(el);this.floaters.push({el,x,z,life:0});}
   glow(x,z,r,opacity){const c=this.ctx,p=this.screenPoint(x,z);c.save();c.translate(p.x,p.y);c.scale(1,.72);const g=c.createRadialGradient(0,0,0,0,0,r*this.scale);g.addColorStop(0,`rgba(250,190,113,${opacity})`);g.addColorStop(.5,`rgba(250,190,113,${opacity*.4})`);g.addColorStop(1,'rgba(250,190,113,0)');c.fillStyle=g;c.beginPath();c.arc(0,0,r*this.scale,0,Math.PI*2);c.fill();c.restore();}
   drawSprite(key,e,kind,world,night,p){
-    const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||this.images.get('ember'),s=this.screenPoint(e.x,e.z);
+    const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||this.images.get('ember'),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
     const moving=e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=e.down||e.ghost?'down':kind==='enemy'?(e.windup>0?'attack':'walk'):e.action||'idle',clip=def.clips[clipName]||def.clips.idle;
     const frame=clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],cols=def.columns||1,rows=def.rows||1,sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
-    let w=(kind==='drop'?.85:def.size[0])*this.scale,h=(kind==='drop'?1.28:def.size[1])*this.scale;if(e.down||e.ghost){w*=.8;h*=.65;}
+    let w=(kind==='drop'?.85:def.size[0])*this.scale,h=(kind==='drop'?1.28:def.size[1])*this.scale;if(kind==='drop'&&e.flightT){const shrink=1-e.flightT*0.35;w*=shrink;h*=shrink;}if(e.down||e.ghost){w*=.8;h*=.65;}
     const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob*this.scale:kind==='enemy'&&key==='wraith'?(Math.sin(this.clock*3)*.1+.2)*this.scale:0;
     c.save();c.globalAlpha=e.ghost?.4:key==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
-    c.fillStyle='#211b2b30';c.beginPath();c.ellipse(s.x,s.y,w*.26,w*.10,0,0,Math.PI*2);c.fill();
+    c.fillStyle='#211b2b30';c.beginPath();c.ellipse(ground.x,ground.y,w*.26,w*.10,0,0,Math.PI*2);c.fill();
     c.translate(s.x,s.y-bob);if(kind==='player'&&e.dx<-.1)c.scale(-1,1);let tilt=moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;
     if(['attack','gather'].includes(e.action)&&e.actionUntil>world.time)tilt=motion.attackTilt*Math.sin((e.actionUntil-world.time)*12);c.rotate(-tilt);
     if(kind==='building'&&key==='gate'&&e.open)w*=.35;
@@ -53,7 +53,12 @@ export class CanvasRenderer {
     if(p.goal)this.ellipse(p.goal.x,p.goal.z,.2,'#eadaba',false);
     for(const e of world.enemies)if(e.windup>0){this.ellipse(e.tx,e.tz,e.type==='king'?4:1.9,`rgba(240,118,100,${.12+Math.sin(this.clock*12)*.06})`);this.ellipse(e.tx,e.tz,e.type==='king'?4:1.9,'#f1957b',false);}
     const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
-    entities.sort((a,b)=>a.e.z-b.e.z);for(const {e,key,kind}of entities){if(kind==='drop'&&!this.theme.sprites[key])continue;if(Math.abs(e.x-this.focus.x)<halfX+4&&Math.abs(e.z-this.focus.z)<halfZ+4)this.drawSprite(key,e,kind,world,night,p);}
+    const drawn=entities.map(entry=>{
+      if(entry.kind!=='drop')return entry;
+      const present=dropPresentation(entry.e,world);
+      return {...entry, e:{...entry.e, x:present.x, z:present.z, lift:present.y, flightT:present.t||0}, depth:present.z};
+    });
+    drawn.sort((a,b)=>(a.depth??a.e.z)-(b.depth??b.e.z));for(const {e,key,kind}of drawn){if(kind==='drop'&&!this.theme.sprites[key])continue;if(Math.abs(e.x-this.focus.x)<halfX+4&&Math.abs(e.z-this.focus.z)<halfZ+4)this.drawSprite(key,e,kind,world,night,p);}
     if(placement){c.globalAlpha=.65;this.drawSprite(placement.key,{x:placement.x,z:placement.z},'preview',world,0,p);c.globalAlpha=1;this.ellipse(placement.x,placement.z,.9,placement.valid?'#bbdca5':'#d67d79',false);}
     for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2){if(['loot','damage','heal','build','craft'].includes(ev.type))this.float(ev.text,ev.x,ev.z,ev.type==='damage'?'#f5c2a9':ev.type==='heal'?'#b9e2ba':'#fbe1ad');if(['hit','kill','hurt','impact','bolt'].includes(ev.type))this.effects.push({...ev,life:0});}this.lastEvent=ev.id;}
     this.effects=this.effects.filter(e=>{e.life+=dt;this.ellipse(e.x,e.z,.2+e.life*(e.type==='impact'?8:3),`rgba(246,194,131,${Math.max(0,1-e.life*2)})`,false);return e.life<.5;});

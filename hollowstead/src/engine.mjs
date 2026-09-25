@@ -1,4 +1,4 @@
-import {RULES, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-6';
+import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-9';
 import {
   CLOCK_V1, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2, SUPPLY_CAPACITY,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createContainer,
@@ -13,7 +13,27 @@ import {inventoryIntent} from './transactions.mjs?v=harvest-6';
 import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-6';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+export const distance=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.z||0)-(b.z||0));
+/** Visual position only. Authoritative drop.x/drop.z stay on the floor. */
+export function dropPresentation(drop, world){
+  const homeX=drop?.x||0, homeZ=drop?.z||0;
+  const actor=id=>typeof world?.player==='function'?world.player(id):world?.players?.find(q=>q.id===id);
+  if(drop?.flight&&world){
+    const p=actor(drop.flight.playerId);
+    const duration=drop.flight.duration>0?drop.flight.duration:PICKUP.flight;
+    const t=clamp((world.time-drop.flight.startedAt)/duration,0,1);
+    const ease=t*t*(3-2*t);
+    if(p)return {x:homeX+(p.x-homeX)*ease, z:homeZ+(p.z-homeZ)*ease, y:Math.sin(Math.PI*ease)*0.55, t:ease};
+  }
+  if(drop?.attract&&world){
+    const p=actor(drop.attract.playerId);
+    const dwell=drop.attract.dwell>0?drop.attract.dwell:PICKUP.dwell;
+    const u=clamp((drop.attract.elapsed||0)/dwell,0,1);
+    const pull=u*u*0.22;
+    if(p)return {x:homeX+(p.x-homeX)*pull, z:homeZ+(p.z-homeZ)*pull, y:0, t:0};
+  }
+  return {x:homeX, z:homeZ, y:0, t:0};
+}
 export function random(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
 export function biome(x,z){return x>12&&z<10?'graveyard':z<-10||x<-16?'woods':'meadow';}
 export function makeMap(seed){
@@ -36,7 +56,7 @@ export class World {
     this.buildings=[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
     this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=false;this.wipe=0;
     this.networkId=crypto.randomUUID();this.transactionRevision=0;this.chestSessions=new Map();
-    this.harvestWork=new Map();this.reviveWork=new Map();this.activations=new Map();this.dismantleHolds=new Map();this.toolNoticeAt=new Map();this.damagedAt=new Map();
+    this.harvestWork=new Map();this.reviveWork=new Map();this.activations=new Map();this.dismantleHolds=new Map();this.toolNoticeAt=new Map();this.damagedAt=new Map();this.pickupDwell=new Map();this.packNoticeAt=new Map();this.previewUid=1;
     this.stats={gathered:0,built:0,revives:0};this.inputs=new Map();this.rng=random(seed^0x1234);this.discoverTimer=0;
   }
   nextId(prefix){return prefix+(this.idCounter++);}
@@ -325,21 +345,26 @@ export class World {
     const cap=quantity==null?Math.min(5, loc.stack.quantity):quantity;
     if(!Number.isInteger(cap)||cap<=0||cap>loc.stack.quantity)return false;
     const x=p.x+p.dx,z=p.z+p.dz;
+    const lay=stack=>{
+      const drop=this.placeDrop(stack, x, z);
+      if(drop)drop.block={playerId:p.id, until:this.time+PICKUP.dropCooldown};
+      return !!drop;
+    };
     if(loc.kind==='equipment'){
       if(cap!==loc.stack.quantity)return false;
       if(loc.slot==='light')p.lantern=false;
       const stack=loc.stack;p.equipment[loc.slot]=null;p.equipmentRevision++;
-      this.placeDrop(stack, x, z);return true;
+      return lay(stack);
     }
     if(loc.kind!=='backpack'&&loc.kind!=='recovery')return false;
     if(cap===loc.stack.quantity){
       const stack=loc.stack;loc.container.slots[loc.slot]=null;loc.container.revision++;
-      this.placeDrop(stack, x, z);
+      if(!lay(stack))return false;
     }else{
       const piece=this.mintStack(loc.stack.itemId, cap, loc.stack.durability);
       if(!piece)return false;
       loc.stack.quantity-=cap;loc.container.revision++;
-      this.placeDrop(piece, x, z);
+      if(!lay(piece))return false;
     }
     if(loc.kind==='recovery')this.collapseRecovery(p);
     return true;
@@ -460,7 +485,6 @@ export class World {
     const inRange=entity=>distance(p,entity)<RULES.reach;
     const revive=this.players.find(q=>q.id!==p.id&&q.online&&q.down&&inRange(q));
     const candidates=[
-      ...this.drops.filter(inRange).map(e=>({kind:'drop',entity:e,label:`Pick up ${label(e.stack.itemId)}`})),
       ...this.nodes.filter(n=>!(n.ready>this.time)&&inRange(n)).map(e=>({kind:'node',entity:e,label:e.type==='tree'?'Chop':e.type==='rock'||e.type==='ore'||e.type==='grave'?'Mine':'Gather'})),
       ...this.buildings.filter(b=>b.hp>0&&inRange(b)).map(e=>({kind:'building',entity:e,label:this.buildingLabel(e)})),
       ...(revive?[{kind:'revive',entity:revive,label:'Revive teammate'}]:[]),
@@ -475,13 +499,7 @@ export class World {
     const t=this.target(p, explicit);if(!t)return {ok:false,code:'rejected'};
     const e=t.entity;
     if(t.kind==='revive')return {ok:true,code:'ok'};
-    if(t.kind==='drop'){
-      const state=this.syncActivation(p, true);
-      this.pickupDrop(p, e);
-      state.consumed=true;
-      p.cooldown=.2;
-      return {ok:true,code:'ok'};
-    }
+    if(t.kind==='drop')return {ok:false,code:'rejected'};
     if(t.kind==='node'){
       const started=this.setHarvestTarget(p, {mode:'auto', nodeId:e.id});
       return started.ok?started:{ok:false,code:'rejected'};
@@ -623,7 +641,7 @@ export class World {
   }
   advanceChannels(dt){
     for(const p of this.players)this.syncActivation(p, this.freshInput(p).act===true);
-    this.advanceHarvest(dt);this.advanceRevive(dt);this.advanceDismantle(dt);this.advancePickup();
+    this.advanceHarvest(dt);this.advanceRevive(dt);this.advanceDismantle(dt);this.advancePickup(dt);
   }
   advanceHarvest(dt){
     const wanted=new Map();
@@ -741,27 +759,82 @@ export class World {
       if(hold.elapsed+1e-9>=DISMANTLE_HOLD_SECONDS){this.finishDismantle(p, building);this.dismantleHolds.delete(id);}
     }
   }
-  advancePickup(){
-    for(const p of this.players){
-      if(!p.online||p.down||p.ghost||p.hp<=0)continue;
-      const raw=this.freshInput(p), state=this.activations.get(p.id);
-      if(!state?.held||state.consumed||raw.attack||Math.hypot(raw.x||0, raw.z||0)>.08)continue;
-      const id=typeof raw.target==='string'?raw.target:null;
-      const drop=id
-        ?this.drops.find(d=>d.id===id&&distance(p,d)<RULES.reach)||null
-        :this.drops.filter(d=>distance(p,d)<RULES.reach).sort((a,b)=>distance(p,a)-distance(p,b)||(a.id<b.id?-1:1))[0]||null;
-      if(!drop||(!id&&this.harvestChoice(p)))continue;
-      this.pickupDrop(p, drop);state.consumed=true;
+  canSeekDrop(p, drop){
+    if(!p?.online||p.down||p.ghost||!(p.hp>0)||!drop?.stack?.quantity||drop.flight)return false;
+    if(drop.block&&drop.block.playerId===p.id&&this.time<drop.block.until)return false;
+    return true;
+  }
+  acceptsDrop(p, drop){
+    const plan=planInsert(p.inventory, drop.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>`view${this.previewUid++}`});
+    return !!(plan.ok&&plan.accepted>0);
+  }
+  notePack(p){
+    const last=this.packNoticeAt.get(p.id)||-10;
+    if(this.time-last<2)return;
+    this.packNoticeAt.set(p.id, this.time);
+    this.tell(p,'Pack full — store or drop some supplies');
+  }
+  beginFlight(p, drop){
+    if(!drop?.stack?.quantity||drop.flight)return false;
+    if(!this.acceptsDrop(p, drop)){this.notePack(p);return false;}
+    drop.flight={playerId:p.id, startedAt:this.time, duration:PICKUP.flight};
+    delete drop.attract;
+    this.pickupDwell.delete(drop.id);
+    return true;
+  }
+  finishFlights(){
+    for(const drop of [...this.drops]){
+      if(!drop.flight)continue;
+      const duration=drop.flight.duration>0?drop.flight.duration:PICKUP.flight;
+      if(this.time-drop.flight.startedAt+1e-9<duration)continue;
+      const p=this.player(drop.flight.playerId);
+      if(!p){delete drop.flight;continue;}
+      const plan=planInsert(p.inventory, drop.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
+      if(!plan.ok||plan.accepted<=0){delete drop.flight;this.notePack(p);continue;}
+      p.inventory.slots=plan.slots;p.inventory.revision=plan.revision;
+      this.event('loot', p.x, p.z, `+${plan.accepted} ${label(drop.stack.itemId)}`);
+      if(plan.remainder){drop.stack=plan.remainder;delete drop.flight;delete drop.attract;}
+      else{this.drops=this.drops.filter(entry=>entry!==drop);this.pickupDwell.delete(drop.id);}
     }
   }
-  pickupDrop(p,drop){
-    const plan=planInsert(p.inventory, drop.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
-    if(!plan.ok||plan.accepted<=0){this.tell(p,'Pack full — store or drop some supplies');return false;}
-    p.inventory.slots=plan.slots;p.inventory.revision=plan.revision;
-    this.event('loot', p.x, p.z, `+${plan.accepted} ${label(drop.stack.itemId)}`);
-    if(plan.remainder)drop.stack=plan.remainder;
-    else this.drops=this.drops.filter(entry=>entry!==drop);
-    this.assertItems();return true;
+  // Host tick only. Guests never grant a pile; position comes from the host simulation.
+  advancePickup(dt){
+    this.finishFlights();
+    const nearer=(a,b,drop)=>distance(a,drop)-distance(b,drop)||(a.id<b.id?-1:a.id>b.id?1:0);
+    const live=new Set();
+    for(const drop of this.drops){
+      if(!drop.stack?.quantity)continue;
+      live.add(drop.id);
+      if(drop.block&&!(this.time<drop.block.until))delete drop.block;
+      if(drop.flight){delete drop.attract;continue;}
+      const seekers=this.players.filter(p=>this.canSeekDrop(p, drop)&&distance(p, drop)<PICKUP.attract&&this.acceptsDrop(p, drop));
+      const touch=seekers.filter(p=>distance(p, drop)<PICKUP.touch).sort((a,b)=>nearer(a,b,drop));
+      if(touch.some(p=>this.beginFlight(p, drop)))continue;
+      let timers=this.pickupDwell.get(drop.id)||new Map();
+      const inside=new Set();
+      for(const p of seekers){
+        if(distance(p, drop)<PICKUP.touch)continue;
+        inside.add(p.id);
+        timers.set(p.id, (timers.get(p.id)||0)+dt);
+      }
+      for(const id of [...timers.keys()])if(!inside.has(id))timers.delete(id);
+      const ready=[...timers.entries()].filter(([,elapsed])=>elapsed+1e-9>=PICKUP.dwell).map(([id])=>this.player(id)).filter(Boolean).sort((a,b)=>nearer(a,b,drop));
+      let flew=false;
+      for(const p of ready){
+        if(this.beginFlight(p, drop)){flew=true;break;}
+        timers.delete(p.id);
+      }
+      if(flew)continue;
+      if(timers.size){
+        this.pickupDwell.set(drop.id, timers);
+        const show=[...timers.entries()].sort((a,b)=>b[1]-a[1]||(a[0]<b[0]?-1:1))[0];
+        drop.attract={playerId:show[0], elapsed:show[1], dwell:PICKUP.dwell};
+      }else{
+        this.pickupDwell.delete(drop.id);
+        delete drop.attract;
+      }
+    }
+    for(const id of [...this.pickupDwell.keys()])if(!live.has(id))this.pickupDwell.delete(id);
   }
   attack(p){
     if(p.stamina<7){this.tell(p,'Catch your breath');return;}
@@ -806,7 +879,18 @@ export class World {
       else if(p.lantern)p.lantern=false;
       if(p.rest){if(phase==='night'||p.hunger<15)p.rest=false;else{p.hp=Math.min(100,p.hp+dt*3);p.courage=Math.min(100,p.courage+dt*4);}continue;}
       let input=this.inputs.get(p.id)||{x:0,z:0};if(this.time-input.at>.6)input={x:0,z:0};let x=input.x||0,z=input.z||0;
-      if(p.goal){const goal=p.goal;const goalTarget=this.nodes.find(n=>n.id===goal.target)||this.buildings.find(b=>b.id===goal.target)||this.drops.find(d=>d.id===goal.target);const d=distance(p,goal),stop=goalTarget?2.05:.25;if(d>stop){x=(goal.x-p.x)/d;z=(goal.z-p.z)/d;}else if(!goalTarget||(this.nodes.includes(goalTarget)&&goalTarget.ready>this.time))p.goal=null;else if(!this.nodes.includes(goalTarget)&&p.cooldown<=0){this.interact(p,goal.target);p.goal=null;}}
+      if(p.goal){
+        const goal=p.goal;
+        const node=this.nodes.find(n=>n.id===goal.target);
+        const building=this.buildings.find(b=>b.id===goal.target);
+        const drop=this.drops.find(d=>d.id===goal.target&&!d.flight);
+        const goalTarget=node||building||drop;
+        const d=distance(p,goal), stop=drop?PICKUP.touch*0.5:goalTarget?2.05:.25;
+        if(d>stop){x=(goal.x-p.x)/d;z=(goal.z-p.z)/d;}
+        else if(!goalTarget||(node&&node.ready>this.time))p.goal=null;
+        else if(drop)p.goal=null;
+        else if(!node&&p.cooldown<=0){this.interact(p,goal.target);p.goal=null;}
+      }
       const moving=Math.hypot(x,z)>.08;if(moving){p.dx=x;p.dz=z;const speed=RULES.speed*(p.dash>0?3:1)*(p.hunger<=0?.65:1);const moved=this.move(p,x*speed,z*speed,dt,obstacles);if(!moved&&p.goal){this.move(p,-z*speed,x*speed,dt,obstacles);}p.action=p.dash>0?'dash':'walk';}
       else if(this.time>p.actionUntil)p.action='idle';
       if(p.cooldown<=0){if(input.attack)this.attack(p);else if(input.act){const aimed=this.target(p, typeof input.target==='string'?input.target:null);if(aimed?.kind==='building')this.interact(p, aimed.entity.id);}}
@@ -830,7 +914,7 @@ export class World {
     for(const e of this.enemies.filter(e=>e.hp<=0)){for(const[itemId, count]of Object.entries(ENEMIES[e.type].loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));this.kills++;this.event('kill',e.x,e.z);if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,'The Hollow King falls. Hold on until dawn.');}}
     this.enemies=this.enemies.filter(e=>e.hp>0);
     for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth')this.status='defeat';}
-    this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.until>this.time&&d.stack?.quantity>0);
+    this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.stack?.quantity>0&&(d.flight||d.until>this.time));
     const active=this.players.filter(p=>p.online);if(active.length&&active.every(p=>(p.down||p.ghost)&&!p.charm)){this.wipe+=dt;if(this.wipe>6)this.status='defeat';}else this.wipe=0;
     this.discoverTimer-=dt;if(this.discoverTimer<=0){this.discoverTimer=.5;const seen=new Set(this.explored);for(const p of active){const gx=Math.floor((p.x+42)/4),gz=Math.floor((p.z+42)/4);for(let x=gx-2;x<=gx+2;x++)for(let z=gz-2;z<=gz+2;z++)if(x>=0&&z>=0&&x<21&&z<21)seen.add(z*21+x);}this.explored=[...seen];}
     if(this.status==='playing')this.advanceChannels(dt);
@@ -839,7 +923,7 @@ export class World {
   hurtQuiet(p,amount){if(p.down||p.ghost)return;p.hp-=amount;if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} has fallen`);}}
   resumeExpedition(){
     releaseChests(this);this.networkId=crypto.randomUUID();this.transactionRevision=0;
-    this.harvestWork.clear();this.reviveWork.clear();this.activations.clear();this.dismantleHolds.clear();this.damagedAt.clear();
+    this.harvestWork.clear();this.reviveWork.clear();this.activations.clear();this.dismantleHolds.clear();this.damagedAt.clear();this.pickupDwell.clear();this.packNoticeAt.clear();
     for(const p of this.players){p.online=p.id==='host';p.goal=null;p.rest=false;p.action='idle';p.actionUntil=0;}
     this.inputs.clear();
   }

@@ -1,6 +1,6 @@
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {NODES,STRUCTURES,RULES,phaseAt} from './content.mjs?v=harvest-6';
-import {random,biome,distance} from './engine.mjs?v=harvest-6';
+import {NODES,STRUCTURES,RULES,phaseAt} from './content.mjs?v=harvest-9';
+import {random,biome,distance,dropPresentation} from './engine.mjs?v=harvest-9';
 import {equippedLanternLit,itemSpriteKey} from './inventory.mjs?v=harvest-6';
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
   const response=await fetch(url);if(!response.ok)throw new Error('The harvest art could not be loaded. Please reload.');
@@ -69,16 +69,18 @@ export class Renderer {
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
       const id=kind+e.id;alive.add(id);let o=this.objects.get(id);if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=visible&&e.windup>0;if(o.health){o.health.back.visible=o.health.fill.visible=visible&&e.hp<e.maxHp;}if(!visible)continue;
+      const present=kind==='drop'?dropPresentation(e,world):null;
+      const tx=present?present.x:e.x, tz=present?present.z:e.z;
       const smooth=['player','enemy'].includes(kind)&&!demo?Math.min(1,dt*(e.id===localId?22:13)):1;
-      if(!o.initialized){o.x=e.x;o.z=e.z;o.initialized=true;}else{o.x+=(e.x-o.x)*smooth;o.z+=(e.z-o.z)*smooth;}
+      if(!o.initialized){o.x=tx;o.z=tz;o.initialized=true;}else{o.x+=(tx-o.x)*smooth;o.z+=(tz-o.z)*smooth;}
       const moving=e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=e.down||e.ghost?'down':kind==='enemy'?(e.windup>0?'attack':'walk'):e.action||'idle',clip=o.def.clips[clipName]||o.def.clips.idle;
       const frame=clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],cols=o.def.columns||1,rows=o.def.rows||1;
       o.sprite.material.map.offset.set((frame%cols)/cols,1-1/rows-Math.floor(frame/cols)/rows);
       const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob:kind==='enemy'&&key==='wraith'?.2+Math.sin(this.clock*3)*.1:0;
-      let sx=o.def.size[0],sy=o.def.size[1];if(kind==='drop'){sx=.85;sy=1.28;}
+      let sx=o.def.size[0],sy=o.def.size[1];if(kind==='drop'){sx=.85;sy=1.28;if(present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}}
       if(e.down||e.ghost){sx*=.8;sy*=.65;}
       if(o.hitUntil>this.clock){const squash=Math.sin((o.hitUntil-this.clock)*14)*(motion.hitSquash||0);sx*=1+squash;sy*=1-squash;}
-      o.sprite.scale.set(kind==='player'&&e.dx<-.1?-sx:sx,sy,1);o.sprite.position.set(o.x,bob,o.z);o.shadow.position.set(o.x,.018,o.z);o.sprite.material.rotation=moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;
+      o.sprite.scale.set(kind==='player'&&e.dx<-.1?-sx:sx,sy,1);o.sprite.position.set(o.x,bob+(present?.y||0),o.z);o.shadow.position.set(o.x,.018,o.z);o.sprite.material.rotation=moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;
       if(['attack','gather'].includes(e.action)&&e.actionUntil>world.time)o.sprite.material.rotation=motion.attackTilt*Math.sin((e.actionUntil-world.time)*12);
       o.sprite.material.color.set('#ffffff');if(night){o.sprite.material.color.lerp(new THREE.Color('#737b9f'),night*.7);if(world.lit(e))o.sprite.material.color.lerp(new THREE.Color('#fff0c8'),.6);}
       o.sprite.material.opacity=e.ghost?.4:key==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;

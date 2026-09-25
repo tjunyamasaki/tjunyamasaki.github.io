@@ -133,7 +133,7 @@ export const CONTEXT_ACTIONS = Object.freeze({
   bush: Object.freeze(['gather']),
   pumpkin: Object.freeze(['gather']),
   mushroom: Object.freeze(['gather']),
-  drop: Object.freeze(['pickup']),
+  drop: Object.freeze([]),
 });
 
 export const PLACEMENT_ACTIONS = Object.freeze(['place', 'cancel']);

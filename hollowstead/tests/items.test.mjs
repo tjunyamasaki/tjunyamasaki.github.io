@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {World} from '../src/engine.mjs';
-import {EQUIPMENT, ITEMS, NODES, RULES, phaseAt} from '../src/content.mjs';
+import {EQUIPMENT, ITEMS, NODES, PICKUP, RULES, phaseAt} from '../src/content.mjs';
 import {
   CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, V1_PHASE, V2_PHASE,
   nextNightWaveTime, phaseProgress, remapPhaseTime,
@@ -31,6 +31,7 @@ function hold(w,p,target,seconds,extra={}){
   }
 }
 function nearDurability(actual,expected){assert.ok(Math.abs(actual-expected)<1e-6,`${actual} vs ${expected}`);}
+function sim(w,seconds){let left=seconds;while(left>1e-8){const dt=Math.min(RULES.tick,left);w.tick(dt);left-=dt;}}
 function qty(container,itemId){return countItem(container,itemId);}
 function owned(world){return duplicateUids(collectLocations(world));}
 function stackOf(container,itemId){return container?.slots?.find(stack=>stack?.itemId===itemId);}
@@ -99,7 +100,8 @@ test('T01 two axes keep independent identity through craft, move, equip, drop, p
   assert.equal(p.equipment.chop,null);
   const drop=w.drops.find(entry=>entry.stack.uid===wornUid);
   nearDurability(drop.stack.durability,EQUIPMENT.axe.durability-1);
-  act(w,p,{type:'interact',target:drop.id});
+  p.goal=null;
+  sim(w,PICKUP.dropCooldown+PICKUP.dwell+PICKUP.flight+0.15);
   assert.equal(w.drops.some(entry=>entry.stack?.uid===wornUid),false);
   nearDurability(p.inventory.slots.find(stack=>stack?.uid===wornUid).durability,EQUIPMENT.axe.durability-1);
   const restored=World.restore(JSON.parse(JSON.stringify(w.snapshot())));
@@ -329,7 +331,8 @@ test('T08 moving the lit lantern turns it off and keeps its fuel',()=>{
   assert.equal(p.equipment.light,null);
   const dropped=w.drops.find(drop=>drop.stack.uid===spare.uid);
   assert.equal(dropped.stack.durability,50);
-  act(w,p,{type:'interact',target:dropped.id});
+  p.goal=null;
+  sim(w,PICKUP.dropCooldown+PICKUP.dwell+PICKUP.flight+0.15);
   assert.equal(p.lantern,false);
   assert.equal(p.inventory.slots.find(stack=>stack?.uid===spare.uid).durability,50);
 
@@ -415,7 +418,7 @@ test('T25 a full pack can still finish a chop, and pickup leaves the exact remai
   assert.equal(other.w.stock(other.p.inventory,'wood',115),115);
   const pile=other.w.mintStack('wood',12);
   const drop=other.w.placeDrop(pile,other.p.x,other.p.z);
-  act(other.w,other.p,{type:'interact',target:drop.id});
+  sim(other.w,PICKUP.flight+RULES.tick*2);
   assert.equal(qty(other.p.inventory,'wood'),120);
   const left=other.w.drops.find(entry=>entry.stack.itemId==='wood');
   assert.equal(left.stack.quantity,7);

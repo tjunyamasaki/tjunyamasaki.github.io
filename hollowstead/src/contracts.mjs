@@ -5,7 +5,8 @@
 // schedule, used only to migrate a saved campaign. Do not import World, the DOM,
 // the network, or a renderer from here.
 
-import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-12';
+import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-13';
+import {magicItems} from './magic/registry.mjs?v=harvest-13';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 
@@ -201,12 +202,20 @@ export function containerId(kind, ownerId){
 
 export function equipmentSlotFor(itemId){
   if(typeof itemId!=='string')return null;
+  if(Object.hasOwn(magicItems, itemId))return 'weapon';
   for(const slot of EQUIPMENT_SLOTS)if(EQUIPMENT_SLOT_ITEMS[slot].includes(itemId))return slot;
   return null;
 }
 
 export function itemDefinition(itemId){
   if(typeof itemId!=='string'||itemId==='__proto__'||itemId==='constructor'||itemId==='prototype')return null;
+  if(Object.hasOwn(magicItems, itemId)){
+    const item=magicItems[itemId];
+    return Object.freeze({
+      itemId, kind:'equipment', stackLimit:1, supplyUnits:0, equipmentSlot:'weapon',
+      maxDurability:item.durability, use:null, retainsAtZeroDurability:false,
+    });
+  }
   if(Object.hasOwn(EQUIPMENT, itemId)){
     return Object.freeze({
       itemId, kind:'equipment', stackLimit:1, supplyUnits:0, equipmentSlot:equipmentSlotFor(itemId),

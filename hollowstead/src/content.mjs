@@ -1,3 +1,4 @@
+import {magicItems} from './magic/registry.mjs?v=harvest-13';
 // Simulation identifiers are deliberately independent of art, names and animations.
 const DAY=180, DUSK=30, NIGHT=100;
 export const RULES = Object.freeze({version:1, tick:1/20, radius:42, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2, finalNight:5});
@@ -83,7 +84,7 @@ export const CHARACTERS = [
   {id:'vesper',name:'Vesper',detail:'The moonlit wanderer',color:'#bea1e0'},
   {id:'cinder',name:'Cinder',detail:'The reluctant grave robber',color:'#de817b'},
 ];
-export const label = key => ITEMS[key]?.name || EQUIPMENT[key]?.name || STRUCTURES[key]?.name || key;
+export const label = key => ITEMS[key]?.name || EQUIPMENT[key]?.name || magicItems[key]?.name || STRUCTURES[key]?.name || ENEMIES[key]?.name || key;
 export function phaseAt(time){const t=time%RULES.cycle;return t<RULES.day?'day':t<RULES.day+RULES.dusk?'dusk':'night';}
 export function dayAt(time){return Math.floor(time/RULES.cycle)+1;}
 export function phaseRemaining(time){const t=time%RULES.cycle;return (t<RULES.day?RULES.day:t<RULES.day+RULES.dusk?RULES.day+RULES.dusk:RULES.cycle)-t;}

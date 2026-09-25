@@ -1,17 +1,18 @@
-import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-12';
+import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-13';
 import {
   CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createChest, createContainer,
   containerId, duplicateUids, emptyEquipment, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
   supplyLoad, wearStack,
-} from './inventory.mjs?v=harvest-12';
-import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-12';
-import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-12';
-import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-12';
-import {pruneChests, releaseChests} from './chests.mjs?v=harvest-12';
-import {inventoryIntent} from './transactions.mjs?v=harvest-12';
-import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-12';
+} from './inventory.mjs?v=harvest-13';
+import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-13';
+import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-13';
+import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-13';
+import {pruneChests, releaseChests} from './chests.mjs?v=harvest-13';
+import {inventoryIntent} from './transactions.mjs?v=harvest-13';
+import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-13';
+import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, readPendingKnock, restoreMagicFields} from './magic/registry.mjs?v=harvest-13';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.z||0)-(b.z||0));
@@ -126,9 +127,11 @@ export function makeMap(seed){
   return nodes;
 }
 export class World {
-  constructor(seed=(Math.random()*0xffffffff)>>>0){
-    this.version=SAVE_VERSION_V2;this.clock=CLOCK_V2;this.seed=seed;this.time=0;this.status='lobby';this.players=[];this.nodes=makeMap(seed);
-    this.buildings=[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
+  constructor(seed=(Math.random()*0xffffffff)>>>0, options={}){
+    this.version=SAVE_VERSION_V2;this.clock=CLOCK_V2;this.seed=seed;this.time=0;this.status='lobby';this.players=[];
+    this.showcase=options?.showcase===true;
+    this.nodes=this.showcase?[]:makeMap(seed);
+    this.buildings=this.showcase?[]:[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
     this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=false;this.wipe=0;
     this.networkId=crypto.randomUUID();this.transactionRevision=0;this.chestSessions=new Map();
     this.harvestWork=new Map();this.reviveWork=new Map();this.activations=new Map();this.dismantleHolds=new Map();this.toolNoticeAt=new Map();this.damagedAt=new Map();this.pickupDwell=new Map();this.packNoticeAt=new Map();this.previewUid=1;
@@ -159,6 +162,10 @@ export class World {
     p={id,name:String(name).replace(/[<>\x00-\x1f]/g,'').trim().slice(0,18)||'Wanderer',character:CHARACTERS.some(c=>c.id===character)?character:'ember',x:2+this.players.length*.8,z:1.8,dx:0,dz:1,hp:100,hunger:90,courage:100,stamina:100,inventory:createBackpack(id),equipment:emptyEquipment(),equipmentRevision:0,recovery:null,cooldown:0,dash:0,dashCooldown:0,down:0,ghost:false,revive:0,charm:1,online:true,lantern:false,rest:false,action:'idle',actionUntil:0,notice:'',noticeAt:0,goal:null};
     this.players.push(p);
     this.give(p,'wood',3);this.give(p,'stone',2);this.give(p,'fiber',3);this.give(p,'berry',3);
+    if(this.showcase){
+      p.hp=100;p.hunger=100;p.courage=100;
+      p.inventory.slots=p.inventory.slots.map(()=>null);p.inventory.revision++;
+    }
     return p;
   }
   leave(id){releaseChests(this,id);const p=this.player(id);if(p){p.online=false;p.goal=null;this.inputs.delete(id);}}
@@ -911,11 +918,159 @@ export class World {
     for(const id of [...this.pickupDwell.keys()])if(!live.has(id))this.pickupDwell.delete(id);
   }
   attack(p){
+    const weapon=p.equipment.weapon;
+    const magic=weapon&&weapon.durability>0?magicModuleFor(weapon.itemId):null;
+    if(magic)return this.attackMagic(p, weapon, magic);
     if(p.stamina<7){this.tell(p,'Catch your breath');return;}
-    const weapon=p.equipment.weapon,armed=!!(weapon&&weapon.durability>0&&equipmentSlotFor(weapon.itemId)==='weapon'),range=armed?3.3:2;
-    const enemy=this.enemies.filter(entry=>distance(entry,p)<range).sort((a,b)=>distance(a,p)-distance(b,p))[0];
+    const armed=!!(weapon&&weapon.durability>0&&equipmentSlotFor(weapon.itemId)==='weapon'),range=armed?3.3:2;
+    const enemy=this.enemies.filter(entry=>!isMagicAlly(entry)&&distance(entry,p)<range).sort((a,b)=>distance(a,p)-distance(b,p))[0];
     p.stamina-=7;p.cooldown=armed?.55:.65;p.rest=false;p.action='attack';p.actionUntil=this.time+.32;this.event('swing',p.x,p.z);
     if(enemy){p.dx=(enemy.x-p.x)/Math.max(.1,distance(enemy,p));p.dz=(enemy.z-p.z)/Math.max(.1,distance(enemy,p));const damage=armed?EQUIPMENT[weapon.itemId].damage:9;enemy.hp-=damage;enemy.x+=p.dx*.32;enemy.z+=p.dz*.32;this.event('damage',enemy.x,enemy.z,String(damage));if(armed)this.wearEquipped(p,'weapon',1);}
+  }
+  attackMagic(p, weapon, magic){
+    const profile=magicAttackProfile(weapon.itemId);
+    const stamina=profile?.stamina??0;
+    if(stamina>0&&p.stamina<stamina){this.tell(p,'Catch your breath');return;}
+    if(p.cooldown>0.05)return;
+    const before=this.magicSnapshot();
+    const durabilityBefore=weapon.durability;
+    const staminaBefore=p.stamina;
+    const cooldownBefore=p.cooldown;
+    p.rest=false;
+    const result=magic.use(this, p);
+    const worn=p.equipment.weapon;
+    const acted=result!=null||p.cooldown!==cooldownBefore||p.action==='attack'||worn!==weapon||(worn&&worn.durability!==durabilityBefore);
+    if(!acted)return;
+    if(stamina>0&&p.stamina===staminaBefore)p.stamina=Math.max(0, p.stamina-stamina);
+    if(worn&&worn.uid===weapon.uid&&worn.durability===durabilityBefore)this.wearEquipped(p,'weapon', profile?.durabilityCost??1);
+    if(p.cooldown===cooldownBefore)p.cooldown=profile?.cooldown??0.55;
+    if(p.action!=='attack'){p.action='attack';p.actionUntil=Math.max(p.actionUntil||0, this.time+.32);}
+    this.event('swing',p.x,p.z);
+    this.consumeMagicPayloads(before, RULES.tick);
+  }
+  magicSnapshot(){
+    return new Map(this.enemies.filter(enemy=>!isMagicAlly(enemy)).map(enemy=>[enemy.id,{hp:enemy.hp,x:enemy.x,z:enemy.z,root:enemy.magicRootRemaining||0}]));
+  }
+  stepMagic(dt){
+    if(!magicModules.length)return;
+    const before=this.magicSnapshot();
+    for(const mod of magicModules) mod.step(this, dt);
+    this.consumeMagicPayloads(before, dt);
+  }
+  consumeMagicPayloads(before, dt){
+    const obstacles=this.obstacles();
+    this.consumeMagicQueues(dt, obstacles, before);
+    this.consumeSummonHits(before);
+    for(const enemy of this.enemies){
+      if(isMagicAlly(enemy)){
+        delete enemy.pendingHit;delete enemy.pendingBurn;delete enemy.pendingKnock;
+        continue;
+      }
+      const prev=before.get(enemy.id);
+      const hpDropped=!!(prev&&enemy.hp<prev.hp-1e-6);
+      const moved=!!(prev&&Math.hypot(enemy.x-prev.x, enemy.z-prev.z)>1e-3);
+      if(enemy.pendingHit!=null){
+        const hit=readPendingHit(enemy);
+        if(!hpDropped&&hit>0){enemy.hp-=hit;this.event('damage', enemy.x, enemy.z, String(Math.ceil(hit)));}
+        delete enemy.pendingHit;
+      }
+      if(enemy.pendingKnock!=null){
+        const knock=readPendingKnock(enemy);
+        if(!moved&&knock)this.move(enemy, knock.dx/Math.max(dt, 0.05), knock.dz/Math.max(dt, 0.05), dt, obstacles);
+        delete enemy.pendingKnock;
+      }
+      if(enemy.pendingBurn!=null){
+        const burn=readPendingBurn(enemy);
+        if(burn)enemy.burn=burn;
+        delete enemy.pendingBurn;
+      }
+      if(enemy.burn&&enemy.burn.remaining>0){
+        const amount=enemy.burn.dps*dt;
+        if(amount>0)enemy.hp-=amount;
+        enemy.burn.remaining-=dt;
+        if(enemy.burn.remaining<=0)delete enemy.burn;
+      }
+    }
+  }
+  takeMagicQueue(key){
+    const value=this[key];
+    if(Array.isArray(value)){this[key]=[];return value;}
+    if(value&&typeof value==='object'){this[key]=null;return [value];}
+    return [];
+  }
+  consumeSummonHits(before){
+    const summons=this.magicSummons;
+    if(!Array.isArray(summons))return;
+    for(const summon of summons){
+      if(!summon?.pendingHit)continue;
+      const hit=summon.pendingHit;
+      delete summon.pendingHit;
+      const enemy=this.enemies.find(entry=>entry.id===hit?.targetId);
+      if(!enemy||isMagicAlly(enemy)||!(enemy.hp>0))continue;
+      const prev=before.get(enemy.id);
+      if(prev&&enemy.hp<prev.hp-1e-6)continue;
+      const amount=Number(hit.amount??hit.damage??0);
+      if(!(amount>0))continue;
+      enemy.hp-=amount;
+      this.event('damage', enemy.x, enemy.z, String(Math.ceil(amount)));
+    }
+  }
+  consumeMagicQueues(dt, obstacles, before=new Map()){
+    const hits=this.takeMagicQueue('pendingHit');
+    const knocks=this.takeMagicQueue('pendingKnock');
+    const burns=this.takeMagicQueue('pendingBurn');
+    const roots=this.takeMagicQueue('pendingRoot');
+    const step=Math.max(dt, 0.05);
+    const covered=new Map();
+    for(const enemy of this.enemies){
+      if(isMagicAlly(enemy)||enemy.pendingHit==null)continue;
+      const amount=readPendingHit(enemy);
+      const prev=before.get(enemy.id);
+      const already=!!(prev&&enemy.hp<prev.hp-1e-6);
+      delete enemy.pendingHit;
+      if(already){if(amount>0)covered.set(enemy.id, amount);continue;}
+      if(!(amount>0)||!(enemy.hp>0))continue;
+      const hp=enemy.hp;
+      enemy.hp-=amount;
+      if(enemy.hp<hp)this.event('damage', enemy.x, enemy.z, String(Math.ceil(amount)));
+      covered.set(enemy.id, amount);
+    }
+    for(const hit of hits){
+      const enemy=this.enemies.find(entry=>entry.id===hit?.targetId);
+      if(!enemy||isMagicAlly(enemy)||!(enemy.hp>0))continue;
+      const amount=Number(hit.amount??hit.damage??0);
+      if(!(amount>0))continue;
+      const owed=covered.get(enemy.id)||0;
+      if(owed+1e-6>=amount){covered.set(enemy.id, owed-amount);continue;}
+      const prev=enemy.hp;
+      enemy.hp-=amount;
+      if(enemy.hp<prev)this.event('damage', enemy.x, enemy.z, String(Math.ceil(amount)));
+    }
+    for(const knock of knocks){
+      const enemy=this.enemies.find(entry=>entry.id===knock?.targetId);
+      if(!enemy||isMagicAlly(enemy))continue;
+      const dx=Number(knock.dx)||0, dz=Number(knock.dz)||0;
+      if(!dx&&!dz)continue;
+      this.move(enemy, dx/step, dz/step, step, obstacles);
+    }
+    for(const burn of burns){
+      const enemy=this.enemies.find(entry=>entry.id===burn?.targetId);
+      if(!enemy||isMagicAlly(enemy))continue;
+      const spec=readPendingBurn({pendingBurn:burn});
+      if(spec)enemy.burn=spec;
+    }
+    for(const root of roots){
+      const enemy=this.enemies.find(entry=>entry.id===root?.targetId);
+      if(!enemy||isMagicAlly(enemy))continue;
+      const remaining=Number(root.remaining??root.seconds??root.duration);
+      if(remaining>0)enemy.magicRootRemaining=Math.max(enemy.magicRootRemaining||0, remaining);
+    }
+  }
+  tickRoot(enemy, dt){
+    if(!(enemy.magicRootRemaining>0))return false;
+    enemy.magicRootRemaining=Math.max(0, enemy.magicRootRemaining-dt);
+    if(Number.isFinite(enemy.magicRootX)&&Number.isFinite(enemy.magicRootZ)){enemy.x=enemy.magicRootX;enemy.z=enemy.magicRootZ;}
+    return true;
   }
   lit(p){return inSafeLight(collectLightSources(this), p.x, p.z);}
   armNextWave(){
@@ -932,7 +1087,7 @@ export class World {
     if(can(x,z)){p.x=x;p.z=z;return true;}
     let moved=false;if(can(x,p.z)){p.x=x;moved=true;}if(can(p.x,z)){p.z=z;moved=true;}return moved;
   }
-  hurt(p,amount){if(p.dash>0||p.down||p.ghost)return;this.damagedAt.set(p.id,this.time);if(p.equipment.body?.itemId==='armor'&&p.equipment.body.durability>0){this.wearEquipped(p,'body',amount);amount*=.55;}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
+  hurt(p,amount){if(this.showcase||p.dash>0||p.down||p.ghost)return;this.damagedAt.set(p.id,this.time);if(p.equipment.body?.itemId==='armor'&&p.equipment.body.durability>0){this.wearEquipped(p,'body',amount);amount*=.55;}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
   revivePlayer(p){p.down=0;p.ghost=false;p.hp=50;p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}this.event('heal',p.x,p.z,'Back on your feet');}
   spawnEnemy(type,x,z){const def=ENEMIES[type],scale=1+(this.players.filter(p=>p.online).length-1)*.35;this.enemies.push({id:this.nextId('e'),type,x,z,hp:def.hp*scale,maxHp:def.hp*scale,cooldown:1,windup:0,slam:0,tx:x,tz:z,slowed:0});}
   spawnWave(){
@@ -944,21 +1099,24 @@ export class World {
   }
   tick(dt=RULES.tick){
     pruneChests(this);if(this.status!=='playing')return;dt=clamp(dt,0,.1);const before=phaseAt(this.time),oldDay=dayAt(this.time);this.time+=dt;const phase=phaseAt(this.time);
-    if(before!==phase){this.event('phase',0,0,phase==='day'?'Dawn. You made it.':phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='night'){this.spawnWave();this.armNextWave();}if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);this.enemies=this.enemies.filter(e=>e.type==='king');}}
-    if(dayAt(this.time)!==oldDay&&this.bossSlain&&!this.endless){this.status='victory';this.event('announce',0,0,'The curse is broken. Your fire still burns.');return;}
-    if(phase==='night'&&this.time>=this.nextSpawn){if(this.enemies.length<22)this.spawnWave();this.armNextWave();}
+    if(before!==phase){this.event('phase',0,0,phase==='day'?'Dawn. You made it.':phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='night'&&!this.showcase){this.spawnWave();this.armNextWave();}else if(phase==='night')this.armNextWave();if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);this.enemies=this.enemies.filter(e=>e.type==='king'||isMagicAlly(e));}}
+    if(!this.showcase&&dayAt(this.time)!==oldDay&&this.bossSlain&&!this.endless){this.status='victory';this.event('announce',0,0,'The curse is broken. Your fire still burns.');return;}
+    if(phase==='night'&&this.time>=this.nextSpawn){if(!this.showcase&&this.enemies.length<22)this.spawnWave();this.armNextWave();}
     for(const n of this.nodes)if(n.ready&&n.ready<this.time){n.ready=0;n.hits=NODES[n.type].hits;}
     const obstacles=this.obstacles();
     for(const p of this.players){
       if(!p.online)continue;p.cooldown=Math.max(0,p.cooldown-dt);p.dash=Math.max(0,p.dash-dt);p.dashCooldown=Math.max(0,p.dashCooldown-dt);
       if(p.ghost)continue;
       if(p.down){p.down-=dt;if(p.down<=0){p.down=0;p.ghost=true;p.revive=0;this.reviveWork.delete(p.id);this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}continue;}
-      p.hunger=Math.max(0,p.hunger-dt*(p.rest?.45:.075));p.stamina=Math.min(100,p.stamina+dt*(p.rest?25:15));
-      const light=phase!=='night'||this.lit(p);p.courage=clamp(p.courage+dt*(light?.6:-3),0,100);
-      if(p.hunger<=0)this.hurtQuiet(p,dt*1.2);if(!light&&p.courage<20)this.hurtQuiet(p,dt*(p.courage<=0?6:2));
+      if(!this.showcase){
+        p.hunger=Math.max(0,p.hunger-dt*(p.rest?.45:.075));
+        const light=phase!=='night'||this.lit(p);p.courage=clamp(p.courage+dt*(light?.6:-3),0,100);
+        if(p.hunger<=0)this.hurtQuiet(p,dt*1.2);if(!light&&p.courage<20)this.hurtQuiet(p,dt*(p.courage<=0?6:2));
+      }
+      p.stamina=Math.min(100,p.stamina+dt*(p.rest?25:15));
       if(p.lantern&&p.equipment.light?.itemId==='torch'&&p.equipment.light.durability>0)this.wearEquipped(p,'light',dt);
       else if(p.lantern)p.lantern=false;
-      if(p.rest){if(phase==='night'||p.hunger<15)p.rest=false;else{p.hp=Math.min(100,p.hp+dt*3);p.courage=Math.min(100,p.courage+dt*4);}continue;}
+      if(p.rest){if(this.showcase||phase==='night'||p.hunger<15)p.rest=false;else{p.hp=Math.min(100,p.hp+dt*3);p.courage=Math.min(100,p.courage+dt*4);continue;}}
       let input=this.inputs.get(p.id)||{x:0,z:0};if(this.time-input.at>.6)input={x:0,z:0};let x=input.x||0,z=input.z||0;
       if(p.goal){
         const goal=p.goal;
@@ -975,33 +1133,51 @@ export class World {
       const moving=Math.hypot(x,z)>.08;if(moving){p.dx=x;p.dz=z;const speed=RULES.speed*(p.dash>0?3:1)*(p.hunger<=0?.65:1);const moved=this.move(p,x*speed,z*speed,dt,obstacles);if(!moved&&p.goal){this.move(p,-z*speed,x*speed,dt,obstacles);}p.action=p.dash>0?'dash':'walk';}
       else if(this.time>p.actionUntil)p.action='idle';
       if(p.cooldown<=0){if(input.attack)this.attack(p);else if(input.act){const aimed=this.target(p, typeof input.target==='string'?input.target:null);if(aimed?.kind==='building')this.interact(p, aimed.entity.id);}}
+      if(this.showcase){p.hp=100;p.hunger=100;p.courage=100;p.down=0;p.ghost=false;}
     }
+    this.stepMagic(dt);
     for(const b of this.buildings){
       b.cooldown=Math.max(0,b.cooldown-dt);if(['hearth','fire'].includes(b.type))b.fuel=Math.max(0,b.fuel-dt*(phase==='day'?.18:1));
       if(b.type==='farm'&&b.planted)b.growth=Math.min(100,b.growth+dt*(phase==='day'?1:.35));
-      if(b.type==='trap'&&b.charges>0&&b.cooldown<=0){const enemy=this.enemies.find(enemy=>distance(enemy,b)<1.1);if(enemy){enemy.hp-=65;enemy.slowed=3;b.charges--;b.cooldown=1;this.event('damage',enemy.x,enemy.z,'65');}}
-      if(b.type==='ward'&&b.cooldown<=0){const enemy=this.enemies.find(enemy=>distance(enemy,b)<6);if(enemy){enemy.hp-=18;b.cooldown=2;this.event('bolt',enemy.x,enemy.z,'18',{sx:b.x,sz:b.z});}}
+      if(b.type==='trap'&&b.charges>0&&b.cooldown<=0){const enemy=this.enemies.find(enemy=>!isMagicAlly(enemy)&&distance(enemy,b)<1.1);if(enemy){enemy.hp-=65;enemy.slowed=3;b.charges--;b.cooldown=1;this.event('damage',enemy.x,enemy.z,'65');}}
+      if(b.type==='ward'&&b.cooldown<=0){const enemy=this.enemies.find(enemy=>!isMagicAlly(enemy)&&distance(enemy,b)<6);if(enemy){enemy.hp-=18;b.cooldown=2;this.event('bolt',enemy.x,enemy.z,'18',{sx:b.x,sz:b.z});}}
     }
     for(const e of this.enemies){
-      if(e.hp<=0)continue;const def=ENEMIES[e.type];e.cooldown-=dt;e.slowed=Math.max(0,e.slowed-dt);
+      if(e.hp<=0)continue;
+      if(isMagicAlly(e))continue;
+      if(this.tickRoot(e, dt)){
+        e.cooldown=Math.max(0, e.cooldown-dt);
+        if(e.windup>0){
+          const def=ENEMIES[e.type];
+          e.windup-=dt;
+          if(e.windup<=0&&def){
+            const people=this.players.filter(p=>p.online&&!p.down&&!p.ghost);
+            for(const person of people)if(Math.hypot(person.x-e.tx,person.z-e.tz)<(e.type==='king'?4:1.9))this.hurt(person,def.damage);
+            for(const building of this.buildings)if(Math.hypot(building.x-e.tx,building.z-e.tz)<(e.type==='king'?4:1.4))building.hp-=def.damage;
+            this.event('impact',e.tx,e.tz,'');e.cooldown=def.period;
+          }
+        }
+        continue;
+      }
+      const def=ENEMIES[e.type];if(!def)continue;e.cooldown-=dt;e.slowed=Math.max(0,e.slowed-dt);
       const people=this.players.filter(p=>p.online&&!p.down&&!p.ghost).sort((a,b)=>distance(a,e)-distance(b,e));
-      const hearth=this.buildings.find(b=>b.type==='hearth');const target=people[0]&&distance(people[0],e)<12?people[0]:hearth;if(!target)continue;
+      const hearth=this.buildings.find(b=>b.type==='hearth');const near=people[0]&&distance(people[0],e)<12?people[0]:null;const target=near||hearth||(this.showcase?people[0]:null);if(!target)continue;
       if(e.windup>0){e.windup-=dt;if(e.windup<=0){for(const person of people)if(Math.hypot(person.x-e.tx,person.z-e.tz)<(e.type==='king'?4:1.9))this.hurt(person,def.damage);for(const building of this.buildings)if(Math.hypot(building.x-e.tx,building.z-e.tz)<(e.type==='king'?4:1.4))building.hp-=def.damage;this.event('impact',e.tx,e.tz,'');e.cooldown=def.period;}continue;}
       const d=distance(e,target);const barricade=this.buildings.find(b=>['wall','gate'].includes(b.type)&&!b.open&&distance(b,e)<1.65);
       if(barricade&&e.cooldown<=0){barricade.hp-=def.damage;e.cooldown=def.period;this.event('hit',barricade.x,barricade.z);continue;}
       if(d<def.range+.5&&e.cooldown<=0){e.tx=target.x;e.tz=target.z;e.windup=e.type==='king'?1.35:.6;continue;}
       if(d>def.range*.8){const speed=def.speed*(e.slowed>0?.3:1);const moved=this.move(e,(target.x-e.x)/d*speed,(target.z-e.z)/d*speed,dt,obstacles);if(!moved){const wall=this.buildings.filter(b=>b.type!=='trap'&&distance(b,e)<2).sort((a,b)=>distance(a,e)-distance(b,e))[0];if(wall&&e.cooldown<=0){wall.hp-=def.damage;e.cooldown=def.period;}else this.move(e,-(target.z-e.z)/d*speed,(target.x-e.x)/d*speed,dt,obstacles);}}
     }
-    for(const e of this.enemies.filter(e=>e.hp<=0)){for(const[itemId, count]of Object.entries(ENEMIES[e.type].loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));this.kills++;this.event('kill',e.x,e.z);if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,'The Hollow King falls. Hold on until dawn.');}}
+    for(const e of this.enemies.filter(e=>e.hp<=0)){const loot=ENEMIES[e.type]?.loot;if(loot)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));if(!isMagicAlly(e))this.kills++;this.event('kill',e.x,e.z);if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,'The Hollow King falls. Hold on until dawn.');}}
     this.enemies=this.enemies.filter(e=>e.hp>0);
-    for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth')this.status='defeat';}
+    for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth'&&!this.showcase)this.status='defeat';}
     this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.stack?.quantity>0&&(d.flight||d.until>this.time));
     const active=this.players.filter(p=>p.online);if(active.length&&active.every(p=>(p.down||p.ghost)&&!p.charm)){this.wipe+=dt;if(this.wipe>6)this.status='defeat';}else this.wipe=0;
     this.discoverTimer-=dt;if(this.discoverTimer<=0){this.discoverTimer=.5;const seen=new Set(this.explored);for(const p of active){const gx=Math.floor((p.x+42)/4),gz=Math.floor((p.z+42)/4);for(let x=gx-2;x<=gx+2;x++)for(let z=gz-2;z<=gz+2;z++)if(x>=0&&z>=0&&x<21&&z<21)seen.add(z*21+x);}this.explored=[...seen];}
     if(this.status==='playing')this.advanceChannels(dt);
     pruneChests(this);this.assertItems();
   }
-  hurtQuiet(p,amount){if(p.down||p.ghost)return;p.hp-=amount;if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} has fallen`);}}
+  hurtQuiet(p,amount){if(this.showcase||p.down||p.ghost)return;p.hp-=amount;if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} has fallen`);}}
   resumeExpedition(){
     releaseChests(this);this.networkId=crypto.randomUUID();this.transactionRevision=0;
     this.harvestWork.clear();this.reviveWork.clear();this.activations.clear();this.dismantleHolds.clear();this.damagedAt.clear();this.pickupDwell.clear();this.packNoticeAt.clear();
@@ -1020,6 +1196,7 @@ export class World {
       nodeChanges:this.nodes.filter(n=>n.ready||n.hits!==NODES[n.type].hits).map(n=>({id:n.id, hits:n.hits, ready:n.ready})),
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
+      ...magicSnapshotFields(this),
     };
     if(purpose==='network'){pruneChests(this);data.chestBusy=[...this.chestSessions.values()].map(s=>({...s}));data.worldId=this.networkId;data.transactionRevision=this.transactionRevision;}
     return data;
@@ -1034,6 +1211,7 @@ export class World {
     if(typeof data.worldId==='string')world.networkId=data.worldId;
     world.transactionRevision=data.transactionRevision||0;
     for(const session of data.chestBusy||[])world.chestSessions.set(session.chestId,{...session});
+    restoreMagicFields(world, data);
     repairIdCounter(world);world.assertItems();return world;
   }
   static fromSave(document){

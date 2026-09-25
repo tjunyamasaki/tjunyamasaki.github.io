@@ -1,8 +1,9 @@
 // RPG inventory surface. Renders slots and reports taps, drags, and quantities.
 // It never writes player inventories, equipment, or chest contents.
 
-import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-12';
-import {equipmentSlotFor} from '../inventory.mjs?v=harvest-12';
+import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-13';
+import {equipmentSlotFor} from '../inventory.mjs?v=harvest-13';
+import {itemDefinition} from '../contracts.mjs?v=harvest-13';
 
 export const SOCKET_LABELS = Object.freeze({
   chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light',
@@ -370,5 +371,5 @@ export function createInventoryPanel(root, hooks) {
 }
 
 export function stackMaxDurability(itemId) {
-  return EQUIPMENT[itemId]?.durability || null;
+  return itemDefinition(itemId)?.maxDurability || EQUIPMENT[itemId]?.durability || null;
 }

@@ -1115,6 +1115,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Pack, chest, and pickup motion | Complete | follow-up on feat/hollowstead-coop | 2e41d385f008a10e200a08846e0516db17226487. 99 Hollowstead + 17 ball-game tests passing | Slot counts superseded by the 12/24 follow-up. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
 | Pack 12 and chest 24 | Complete | follow-up on feat/hollowstead-coop | This commit. 99 Hollowstead + 17 ball-game tests passing | No separate stack action. Pack is 12 slots. Chests are 24 slots. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
 | P5 | Complete | P5 agent | a07f48616a658a1edd34540e6a667b5ff6b53a31. 104 Hollowstead + 17 ball-game tests passing. Pages run 36170883617 succeeded | Real phone and a four-player scene were not run. M14 is unverified |
+| Showcase and magic weapons | Complete | showcase agent | Showcase commit on feat/hollowstead-coop. 108 Hollowstead + 17 ball-game tests passing. Cache query harvest-13 | P6 not started. A real phone and a second device were not used |
 | P6 | Not started | Unassigned | — | — |
 
 For each handoff, append:
@@ -1649,3 +1650,27 @@ Compatibility/migration notes:
 - Pack stays 12 slots. Chests stay 24 slots. Floor pickup stays proximity: attract 1.15, touch 0.42, dwell 0.65s, flight 0.28s, dropper cooldown 1.25s. Item actions still clear the selection. Do not restore a 120-supply bag cap, chest pages, a Stack same items button, or Gather-to-pickup.
 - Torch durability remains 180. That number is fuel, not the day length. Hearth starting fuel remains 150.
 Exact next task: P6 — Integration and release. Do not start P6 in this package. Pack stays 12 slots and chests stay 24. Do not add a separate stack button, restore the 120-supply backpack cap, restore chest page growth, or restore "press Gather on the pile."
+
+Date: 2026-09-25
+Package / agent: Showcase mode and four magic weapons. P6 was not started.
+Starting commit: 6bfd10d2f728059d87322137432ba612be3757a1
+Ending commit: SHOWCASE_COMMIT
+Files changed: hollowstead showcase UI, engine hooks, both renderers, magic registry/loader, and the four weapon modules with their art (barrow-rattle, cinder-staff, widows-needle, spirit-fan).
+Implemented behavior:
+- Title-screen Showcase and ?showcase start a solo empty world. Flat ground still renders. No resource nodes, camps, pre-placed trees, rocks, buildings, drops, or waves. Health, hunger, and courage stay at 100 and damage does not apply to the player. Spawned mobs can still be hurt and killed. Campaign, multiplayer, and ?dev are unchanged.
+- The panel lists materials, food, gear, buildings, nature, mobs, and magic from the live tables plus registered magic packs. Collectables go into the 12-slot pack, or onto the ground if the pack is full. Equipment is not auto-equipped. Trees, rocks, buildings, and mobs arm placement; the next ground tap places one and then clears the ghost. Remove deletes the tapped object, mob, skeleton, or projectile. Clear removes everything spawned this session and leaves the player.
+- Barrow Rattle summons skeletons on world.magicSummons. They hunt hostile mobs and are drawn from idle, walk, and attack frames. Cinder Staff throws a firebolt for 8 damage plus a 2-second burn the module applies itself. Widow's Needle pins a hostile in a cone for 2.5 seconds and the engine applies each pending hit once. Spirit Fan deals 5 cone damage and knocks the target back. Attack uses the pack while that weapon is equipped. step runs once per tick. Network snapshots include the magic lists so a guest frame is not empty.
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 108 pass, 0 fail.
+- node --test ball-game/tests/*.test.mjs: 17 pass, 0 fail.
+- git diff --check and node --check on the changed modules.
+- Headless Chrome opened /hollowstead/?showcase, put wood in the pack, placed a crooked pine, removed it, placed a Briarling, equipped Cinder Staff from the pack, and attacked. The Briarling dropped from 48 to 40 and the staff durability dropped from 90 to 89. A real phone was not used.
+Evidence / screenshots:
+- /opt/cursor/artifacts/hollowstead-showcase-list.png
+- /opt/cursor/artifacts/hollowstead-showcase-tree.png
+- /opt/cursor/artifacts/hollowstead-showcase-attack.png
+Could not verify: a physical phone, a second browser joining a camp while magic is in flight, and the burn tick beyond the first 8-point impact in the browser. Night darkness was not changed.
+Compatibility/migration notes:
+- Pack stays 12 slots. Chests stay 24. Sort still stacks items. There is no separate stack button. Floor pickup stays attract 1.15, touch 0.42, dwell 0.65s, flight 0.28s, dropper cooldown 1.25s. Clock stays day 180, dusk 30, night 100.
+- Hard refresh with style.css?v=harvest-13 and src/main.mjs?v=harvest-13.
+Exact next task: P6 — Integration and release. Do not start P6.

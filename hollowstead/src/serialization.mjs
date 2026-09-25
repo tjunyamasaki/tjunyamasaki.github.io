@@ -6,13 +6,13 @@
 import {
   CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, SUPPLY_ITEM_IDS, V2_PHASE,
   legacyEquipmentPlan, nextNightWaveTime, phaseMigrationDelta, phaseProgress, remapPhaseTime,
-} from './contracts.mjs?v=harvest-12';
+} from './contracts.mjs?v=harvest-13';
 import {
   BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, collectLocations, cloneStack, createBackpack, createContainer, createRecovery,
   duplicateUids, emptyEquipment, itemDefinition, makeStack, planInsert, validateContainer,
   validateEquipment, validateStack, containerId,
-} from './inventory.mjs?v=harvest-12';
-import {STRUCTURES} from './content.mjs?v=harvest-12';
+} from './inventory.mjs?v=harvest-13';
+import {STRUCTURES} from './content.mjs?v=harvest-13';
 
 export {SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, CLOCK_V1, CLOCK_V2};
 

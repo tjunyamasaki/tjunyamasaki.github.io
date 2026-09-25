@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#292532"><meta name="description" content="Gather by day. Keep the fire alive at night. A Halloween co-op survival expedition for 1–4 players.">
   <title>Hollowstead — A little light. A long night.</title>
-  <link rel="icon" type="image/svg+xml" href="./themes/harvest/sprites/pumpkin.svg"><link rel="stylesheet" href="./style.css?v=harvest-12">
+  <link rel="icon" type="image/svg+xml" href="./themes/harvest/sprites/pumpkin.svg"><link rel="stylesheet" href="./style.css?v=harvest-13">
 </head>
 <body>
   <canvas id="world" aria-label="Hollowstead survival world"></canvas><div class="vignette" aria-hidden="true"></div><div id="world-labels" aria-hidden="true"></div>
@@ -18,7 +18,7 @@
       <label class="name-field"><span>YOUR NAME</span><input id="player-name" maxlength="18" value="Wanderer" autocomplete="nickname" aria-label="Your name"></label>
       <button id="host" class="primary wide">Gather your friends <span>↗</span></button>
       <div class="join-row"><input id="room-input" placeholder="CAMP CODE" maxlength="5" autocomplete="off" autocapitalize="characters" aria-label="Camp code"><button id="join">Join camp →</button></div>
-      <div class="front-secondary"><button id="solo" class="text-button">Venture alone</button><button id="continue" class="text-button" hidden>Continue expedition ↗</button></div>
+      <div class="front-secondary"><button id="solo" class="text-button">Venture alone</button><button id="showcase" class="text-button">Showcase</button><button id="continue" class="text-button" hidden>Continue expedition ↗</button></div>
       <label id="saved-option" class="saved-option" hidden><input type="checkbox" id="host-save"> Host my saved expedition</label>
       <p class="status" id="front-status" role="status"></p>
     </section>
@@ -51,11 +51,12 @@
         <div class="stamina-track" aria-hidden="true"><i id="stamina-bar"></i></div>
       </div>
     </div>
+    <aside id="showcase-panel" hidden aria-label="Showcase spawns"></aside>
     <nav class="hotbar" aria-label="Game actions"><button type="button" id="hotbar-inventory" aria-label="Inventory"><span aria-hidden="true">▣</span><small>Pack <kbd>I</kbd></small></button><button type="button" id="hotbar-build" aria-label="Build"><span aria-hidden="true">⌂</span><small>Build <kbd>B</kbd></small></button></nav>
     <div id="downed" hidden><h2>A light is fading.</h2><p id="downed-text"></p><button id="use-charm" class="primary" type="button">Use your last charm</button></div>
   </div>
   <section id="sheet" class="sheet" hidden role="dialog" aria-modal="false" aria-labelledby="sheet-title"><header><div><span class="eyebrow" id="sheet-kicker">FIELD NOTES</span><h2 id="sheet-title">Your pack</h2></div><div class="sheet-tools"><button id="sheet-menu" class="close-button gear-button" type="button" aria-label="Open game menu">⚙</button><button id="close-sheet" class="close-button" type="button" aria-label="Close panel">✕</button></div></header><div id="sheet-tabs"></div><div id="sheet-content"></div></section>
   <section id="end-screen" hidden><div class="end-card"><p id="end-kicker" class="eyebrow">THE EXPEDITION ENDS</p><h2 id="end-title">The last light.</h2><p id="end-text"></p><div id="end-stats"></div><button id="endless" class="primary wide" hidden>Keep surviving →</button><button id="new-expedition" class="primary wide">Another expedition →</button><button id="end-home" class="text-button">Return to the clearing</button></div></section>
-  <script type="module" src="./src/main.mjs?v=harvest-12"></script>
+  <script type="module" src="./src/main.mjs?v=harvest-13"></script>
 </body>
 </html>

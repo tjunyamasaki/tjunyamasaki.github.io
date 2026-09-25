@@ -1,11 +1,12 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
-import {STRUCTURES, RULES} from './content.mjs?v=harvest-12';
-import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-12';
-import {equippedLanternLit, itemSpriteKey} from './inventory.mjs?v=harvest-12';
+import {STRUCTURES, RULES} from './content.mjs?v=harvest-13';
+import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-13';
+import {equippedLanternLit, itemSpriteKey} from './inventory.mjs?v=harvest-13';
+import {equippedMagicKey, magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-13';
 import {
   brightnessAt, canInspect, entityBrightness, frameLighting, labelOpacity, shadeHex, warningVisible,
-} from './lighting.mjs?v=harvest-12';
+} from './lighting.mjs?v=harvest-13';
 export class CanvasRenderer {
   constructor(canvas,theme){
     this.canvas=canvas;this.theme=theme;this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');
@@ -20,7 +21,7 @@ export class CanvasRenderer {
   pick(x,y,world){
     const viewer=this.localId&&world.player?world.player(this.localId):null;
     let best=null,dist=44;
-    for(const e of [...world.nodes.filter(n=>!n.ready),...world.buildings,...world.drops,...world.enemies]){
+    for(const e of [...world.nodes.filter(n=>!n.ready),...world.buildings,...world.drops,...world.enemies,...magicVisuals(world).map(entry=>entry.entity)]){
       if(this.view&&!canInspect(this.view, e.x, e.z, viewer, RULES.reach))continue;
       const s=this.screenPoint(e.x,e.z,.6),d=Math.hypot(x-s.x,y-s.y);if(d<dist){best=e;dist=d;}
     }
@@ -32,8 +33,8 @@ export class CanvasRenderer {
   glow(x,z,r,opacity){const c=this.ctx,p=this.screenPoint(x,z),feather=this.view?.lighting.ambientFraction||1.2;c.save();c.translate(p.x,p.y);c.scale(1,.72);const radius=r*feather*this.scale;const g=c.createRadialGradient(0,0,radius*0.55,0,0,radius);g.addColorStop(0,`rgba(250,190,113,${opacity})`);g.addColorStop(.55,`rgba(250,190,113,${opacity*.35})`);g.addColorStop(1,'rgba(250,190,113,0)');c.fillStyle=g;c.beginPath();c.arc(0,0,radius,0,Math.PI*2);c.fill();c.restore();}
   drawSprite(key,e,kind,world,frame,p){
     const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||this.images.get('ember'),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
-    const moving=e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=e.down||e.ghost?'down':kind==='enemy'?(e.windup>0?'attack':'walk'):e.action||'idle',clip=def.clips[clipName]||def.clips.idle;
-    const frameIndex=clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],cols=def.columns||1,rows=def.rows||1,sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
+    const special=magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0?'attack':'walk'):e.action||'idle'),clip=def.clips[clipName]||def.clips.walk||def.clips.attack||def.clips.idle;
+    const cols=def.columns||1,rows=def.rows||1,frameIndex=Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
     let w=(kind==='drop'?.85:def.size[0])*this.scale,h=(kind==='drop'?1.28:def.size[1])*this.scale;if(kind==='drop'&&e.flightT){const shrink=1-e.flightT*0.35;w*=shrink;h*=shrink;}if(e.down||e.ghost){w*=.8;h*=.65;}
     const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob*this.scale:kind==='enemy'&&key==='wraith'?(Math.sin(this.clock*3)*.1+.2)*this.scale:0;
     const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e));
@@ -42,13 +43,14 @@ export class CanvasRenderer {
     const fade=labelOpacity(display, frame.darkness, frame.lighting);
     c.save();c.globalAlpha=e.ghost?.4:key==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
     c.fillStyle='#211b2b30';c.beginPath();c.ellipse(ground.x,ground.y,w*.26,w*.10,0,0,Math.PI*2);c.fill();
-    c.translate(s.x,s.y-bob);if(kind==='player'&&e.dx<-.1)c.scale(-1,1);let tilt=moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;
-    if(['attack','gather'].includes(e.action)&&e.actionUntil>world.time)tilt=motion.attackTilt*Math.sin((e.actionUntil-world.time)*12);c.rotate(-tilt);
+    c.translate(s.x,s.y-bob);if((kind==='player'&&e.dx<-.1)||(kind==='magic'&&e.facing===-1))c.scale(-1,1);let tilt=Number.isFinite(e.aim)?-e.aim:moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;
+    if(!Number.isFinite(e.aim)&&['attack','gather'].includes(e.action)&&e.actionUntil>world.time)tilt=motion.attackTilt*Math.sin((e.actionUntil-world.time)*12);c.rotate(-tilt);
     if(kind==='building'&&key==='gate'&&e.open)w*=.35;
     if(kind!=='preview')c.filter=`brightness(${Math.min(1, Math.max(0, display))})`;
     c.drawImage(img,(frameIndex%cols)*sw,Math.floor(frameIndex/cols)*sh,sw,sh,-w*def.anchor[0],-h*(1-def.anchor[1]),w,h);c.filter='none';c.restore();
     if((kind==='enemy'||kind==='building')&&e.hp<e.maxHp&&fade>0.04){const y=s.y-h*(key==='hearth'?.62:kind==='enemy'?key==='crawler'?.38:.82:.37);c.save();c.globalAlpha=fade;c.fillStyle='#2a2533';c.fillRect(s.x-21,y,42,4);c.fillStyle=kind==='enemy'?'#df9383':'#d2c395';c.fillRect(s.x-20,y+1,40*Math.max(0,e.hp/e.maxHp),2);c.restore();}
     if(kind==='player'&&e.id!==p.id&&fade>0.05){c.save();c.globalAlpha=fade;c.font='10px Arial';c.textAlign='center';c.fillStyle='#f4e4c8';c.fillText(e.name,s.x,s.y-h-4);c.restore();}
+    if(kind==='player'){let key=equippedMagicKey(e);if(e.action==='attack'&&key&&this.images.get(`${key}:use`))key=`${key}:use`;if(key&&this.images.get(key))this.drawSprite(key,{...e,action:e.action==='attack'?'attack':'idle',x:e.x+(e.dx<-.1?-0.45:0.45),z:e.z,lift:0.85},'magic',world,frame,p);}
     if(kind==='building'&&['hearth','fire'].includes(key)&&e.fuel>0){for(let i=0;i<5;i++){const t=(this.clock*.45+i*.23)%1;c.globalAlpha=(1-t)*.55;c.fillStyle='#ffce85';c.beginPath();c.arc(s.x+Math.sin(i*3+this.clock)*10,s.y-h*.4-t*35,1.5,0,Math.PI*2);c.fill();}c.globalAlpha=1;}
   }
   render(world,localId,dt,{target=null,placement=null,demo=false}={}){
@@ -85,7 +87,7 @@ export class CanvasRenderer {
     if(target&&!placement){const fade=this.reveal(target.x, target.z);if(fade>0.05){c.save();c.globalAlpha=fade;c.setLineDash([5,4]);c.lineDashOffset=-this.clock*6;this.ellipse(target.x,target.z,1,'#edc48c',false);c.setLineDash([]);c.restore();}}
     if(p.goal){const fade=Math.max(this.reveal(p.goal.x, p.goal.z), distance(p, p.goal)<8?.28:0);if(fade>0.04){c.save();c.globalAlpha=fade;this.ellipse(p.goal.x,p.goal.z,.2,'#eadaba',false);c.restore();}}
     for(const e of world.enemies)if(e.windup>0){const radius=e.type==='king'?4:1.9;if(!warningVisible(frame, e.tx, e.tz, radius, p))continue;const alpha=frame.darkness>0.5?.16:.28;this.ellipse(e.tx,e.tz,radius,`rgba(240,118,100,${alpha+Math.sin(this.clock*12)*.04})`);this.ellipse(e.tx,e.tz,radius,`rgba(241,149,123,${frame.darkness>0.5?.45:.8})`,false);}
-    const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
+    const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...magicVisuals(world).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
     const drawn=entities.map(entry=>{
       if(entry.kind!=='drop')return entry;
       const present=this.dropMotion.sample(entry.e,world,this.clock,dt);

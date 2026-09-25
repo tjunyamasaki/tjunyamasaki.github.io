@@ -2,8 +2,9 @@
 // Emits intent descriptions for the local player. Never reads a guest-supplied
 // actor id and never mutates the world. The host rechecks every command.
 
-import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-12';
-import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-12';
+import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-13';
+import {magicItems} from '../magic/registry.mjs?v=harvest-13';
+import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-13';
 
 const SPECS = Object.freeze({
   feed: {icon: '▥', label: 'Feed', activation: 'tap'},
@@ -298,6 +299,8 @@ export function clusterFor(mode, {context = null, placement = null, maintenance 
 }
 
 export function effectLine(itemId) {
+  const magic = magicItems[itemId];
+  if (magic) return magic.blurb || (magic.damage ? `${magic.damage} damage` : 'Magic weapon');
   const item = ITEMS[itemId];
   if (!item) return '';
   const parts = [];

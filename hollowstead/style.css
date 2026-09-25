@@ -141,3 +141,14 @@
   .hotbar{bottom:calc(12px + env(safe-area-inset-bottom))}
   .sheet{top:8px;bottom:8px;left:auto;right:max(8px,env(safe-area-inset-right));width:min(460px,56vw);max-height:none;height:auto;border-radius:12px}
 }
+#showcase-panel{position:fixed;z-index:36;top:calc(118px + env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));width:min(280px,46vw);max-height:min(42dvh,380px);display:flex;flex-direction:column;gap:6px;padding:8px;background:#2e2835f2;border:1px solid #c5ab794a;border-radius:12px;box-shadow:0 12px 40px #17111f66;pointer-events:auto;touch-action:manipulation}
+#showcase-panel[hidden]{display:none!important}
+#showcase-panel .showcase-head,#showcase-panel .showcase-cats{display:flex;gap:6px;flex:none}
+#showcase-panel .showcase-cats{overflow-x:auto;scrollbar-width:none}
+#showcase-panel .showcase-head button,#showcase-panel .showcase-list button,#showcase-panel .chip{min-height:44px}
+#showcase-panel .showcase-list{overflow:auto;display:flex;flex-direction:column;gap:4px;min-height:0;overscroll-behavior:contain;touch-action:pan-y}
+#showcase-panel .showcase-list button{text-align:left;padding:8px 10px}
+#showcase-panel .showcase-note{margin:0}
+.front-secondary{flex-wrap:wrap}
+@media(max-width:600px){#showcase-panel{top:calc(108px + env(safe-area-inset-top));bottom:auto;left:112px;right:86px;width:auto;max-height:min(36dvh,300px)}}
+@media(max-height:520px){#showcase-panel{top:8px;bottom:auto;max-height:30dvh;width:min(220px,34vw);left:auto;right:max(8px,env(safe-area-inset-right))}}

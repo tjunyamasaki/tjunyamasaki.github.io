@@ -1,19 +1,22 @@
-import {World,clamp,distance,biome} from './engine.mjs?v=harvest-12';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-12';
-import {Renderer,loadTheme} from './renderer.mjs?v=harvest-12';
-import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-12';
-import {createNetwork} from './network.mjs?v=harvest-12';
-import {Sound} from './audio.mjs?v=harvest-12';
-import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-12';
-import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-12';
-import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-12';
-import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-12';
+import {World,clamp,distance,biome} from './engine.mjs?v=harvest-13';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-13';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-13';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-13';
+import {createNetwork} from './network.mjs?v=harvest-13';
+import {Sound} from './audio.mjs?v=harvest-13';
+import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-13';
+import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-13';
+import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-13';
+import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-13';
 import {
   allowsCombat,allowsMovement,clusterFor,effectLine,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
-} from './ui/actions.mjs?v=harvest-12';
-import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-12';
-import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-12';
+} from './ui/actions.mjs?v=harvest-13';
+import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-13';
+import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-13';
+import {loadMagicModules} from './magic/load.mjs?v=harvest-13';
+import {installMagicSprites} from './magic/registry.mjs?v=harvest-13';
+import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-13';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -25,6 +28,7 @@ async function bounded(promise){let timer;try{return await Promise.race([promise
 
 let theme,renderer,sound,world,network=null,mode='front',localId='host',character='ember',room='',paused=false,remotePaused=false,hiddenPause=false,linkLost=false;
 let sheet=null,category='all',selected=null,placement=null,maintenance=false,maintenanceTarget=null;
+let showcaseCategory='materials',showcaseTool='',showcaseMarkupCache='';
 let lastNotice=0,lastEvent=0,lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,saveTime=0,pingTime=0,lastMode='normal';
 let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:0},dirty=true;
 let stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
@@ -97,7 +101,7 @@ function maintainChest(){
     });
   }
 }
-function save(manual=false){if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;try{localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));saveText='Saved on this browser';if(manual)toast('Expedition saved');dirty=true;}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
+function save(manual=false){if(world?.showcase){if(manual)toast('Showcase stays on this screen');return;}if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;try{localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));saveText='Saved on this browser';if(manual)toast('Expedition saved');dirty=true;}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
 function syncSaveOption(){const plan=continuePlan(),visible=!!(plan.ok||plan.recoverable);$('continue').hidden=!visible;$('saved-option').hidden=!visible;}
 function resetInput(){keys.clear();stick={x:0,z:0};hold={act:false,attack:false};pointer=null;const stickEl=$('stick');if(stickEl)stickEl.style.transform='';const player=world?.player(localId);if(player)world.input(localId,{x:0,z:0,act:false,attack:false});network?.input({x:0,z:0,act:false,attack:false});}
 function endContextHold(){
@@ -146,15 +150,16 @@ function prepareWorld(resume=false){
 function enterGame(){
   $('front').hidden=true;$('game').hidden=false;$('end-screen').hidden=true;closeSheet();$('room-panel').hidden=true;document.body.classList.add('playing');
   linkLost=false;cancelPlacement();cancelMaintenance();
-  if(mode==='solo'){connectionText='Expedition saved locally';saveText='Saved on this browser';showStatus('Expedition saved locally');}
+  if(world?.showcase){connectionText='Showcase';saveText='Not saved';showStatus('');}
+  else if(mode==='solo'){connectionText='Expedition saved locally';saveText='Saved on this browser';showStatus('Expedition saved locally');}
   else{connectionText=connectionText||'Connected to camp';saveText=mode==='guest'?'Kept by the host':'Saved on this browser';}
-  if(mode!=='guest'){world.start();save();}lastEnd='';announce(dayAt(world.time)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
+  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase);announce(world?.showcase?'An empty clearing. Spawn whatever you want to see.':dayAt(world.time)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
 }
 async function goHome(){
-  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;cancelPlacement();cancelMaintenance();clearSelection();closeSheet();$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;$('room-panel').hidden=true;$('home-panel').hidden=false;$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();demoWorld();
+  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;$('room-panel').hidden=true;$('home-panel').hidden=false;$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();demoWorld();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
-function setBusy(value){busy=value;for(const id of ['host','join','solo','continue'])$(id).disabled=value;}
+function setBusy(value){busy=value;for(const id of ['host','join','solo','continue','showcase']){const el=$(id);if(el)el.disabled=value;}}
 function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status;world=World.restore(data);dirty=true;if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');$('home-panel').hidden=true;$('room-panel').hidden=false;$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
 async function hostCamp(){
   if(busy)return;setBusy(true);sound.unlock();storeProfile();showStatus('Opening the camp…');
@@ -166,6 +171,48 @@ async function joinCamp(){
   try{world=new World();mode='guest';network=makeNetwork();await bounded(network.join(room,$('player-name').value,character));}catch(error){await network?.stop();network=null;mode='front';setBusy(false);showStatus(error.message,true);}
 }
 function solo(resume=false){sound.unlock();storeProfile();try{prepareWorld(resume);mode='solo';room='';enterGame();}catch(error){showStatus(error.message,true);}}
+function showShowcase(open){const panel=$('showcase-panel');if(!panel)return;panel.hidden=!open;if(open)paintShowcase();}
+function paintShowcase(){
+  const panel=$('showcase-panel');if(!panel||panel.hidden||!world?.showcase)return;
+  const html=showcaseMarkup({active:showcaseCategory,tool:showcaseTool});
+  if(html===showcaseMarkupCache)return;
+  showcaseMarkupCache=html;panel.innerHTML=html;
+}
+function startShowcase(){
+  sound.unlock();storeProfile();
+  world=new World((Math.random()*0xffffffff)>>>0,{showcase:true});
+  world.addPlayer('host',$('player-name').value,character);
+  mode='solo';room='';showcaseCategory='materials';showcaseTool='';showcaseMarkupCache='';
+  cancelPlacement();cancelMaintenance();clearSelection();
+  enterGame();
+}
+function armShowcase(kind,id){
+  const p=me();if(!p)return;
+  showcaseTool='';
+  if(kind==='item'){
+    cancelPlacement();
+    const result=grantShowcaseItem(world,p,id);
+    if(!result.ok){toast('That cannot be carried');return;}
+    toast(result.dropped?`${showcaseSpawnName(kind,id)} dropped at your feet`:`${showcaseSpawnName(kind,id)} added to the pack`);
+    dirty=true;return;
+  }
+  cancelMaintenance();endContextHold();
+  placement={key:id,kind,showcase:true,x:Math.round((p.x+p.dx*3)*2)/2,z:Math.round((p.z+p.dz*3)*2)/2,rotation:0,valid:false,anchored:false,pending:false,reason:'',stationId:null};
+  selected=null;refresh();
+}
+function commitShowcase(x,z){
+  if(!placement?.showcase)return;
+  const p=me();if(!p)return;
+  const point={x,z};
+  const reason=showcasePlaceReason(world,p,placement.kind,placement.key,point.x,point.z);
+  placement.x=point.x;placement.z=point.z;placement.anchored=true;placement.valid=!reason;placement.reason=reason||'';
+  if(reason){toast(reason);refresh();return;}
+  const result=placeShowcase(world,p,placement.kind,placement.key,point.x,point.z);
+  if(!result.ok){toast(result.reason||'Cannot place that here');return;}
+  toast(`${showcaseSpawnName(placement.kind,placement.key)} placed`);
+  cancelPlacement();
+  refresh();
+}
 async function copyInvite(){const url=new URL(location.href);url.search='';url.searchParams.set('camp',room);try{await navigator.clipboard.writeText(url.href);mode==='front'||$('game').hidden?showStatus('Invite link copied. Send it to your friends.'):toast('Invite link copied');}catch{const text=`Camp code: ${room}`;$('game').hidden?showStatus(text):toast(text);}}
 function currentTarget(){const p=me();if(!p)return null;return world.target(p,selected)?.entity?world.target(p,selected):null;}
 function contextFacts(p){
@@ -208,6 +255,7 @@ async function runAction(action){
   if(action.command)await send(action.command);
 }
 async function confirmPlace(){
+  if(placement?.showcase){commitShowcase(placement.x,placement.z);return;}
   if(!placement||placement.pending)return;
   if(!placement.valid){toast(placement.reason||'Cannot place that here');return;}
   const pending=placement;pending.pending=true;refresh();
@@ -349,7 +397,7 @@ function inventoryView(p){
   else if(loc?.stack){
     const where=loc.where;
     const ops=operationsFor({itemId:loc.stack.itemId,where,chestOpen:!!chestSession});
-    const wear=EQUIPMENT[loc.stack.itemId]?`Condition ${Math.ceil(loc.stack.durability)} / ${EQUIPMENT[loc.stack.itemId].durability}`:'';
+    const wear=stackMaxDurability(loc.stack.itemId)?`Condition ${Math.ceil(loc.stack.durability)} / ${stackMaxDurability(loc.stack.itemId)}`:'';
     detail={name:label(loc.stack.itemId),meta:[effectLine(loc.stack.itemId),wear].filter(Boolean).join(' · ')||' ',chosen:chosenQuantity(loc.stack),maxQuantity:loc.stack.quantity,ops,dropConfirm:false,confirmText:''};
   }
   const sprite=theme.sprites[p.character]||theme.sprites.ember;
@@ -481,9 +529,11 @@ function ui(){
     if(p.down||p.ghost){$('downed-text').textContent=p.charm?'Use your one last-chance charm, or let a teammate hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds until your supplies drop.`:'Your supplies are on the ground. You return at dawn if the camp survives.';$('use-charm').hidden=!p.charm;if(sheet)closeSheet();cancelPlacement();cancelMaintenance();inventoryPanel?.cancelDrag();}
     const boss=world.enemies.find(e=>e.type==='king');$('boss-bar').hidden=!boss;document.body.classList.toggle('boss',!!boss);if(boss)$('boss-bar').querySelector('em').style.width=`${boss.hp/boss.maxHp*100}%`;
     if(placement){
-      if(placement.stationId&&!world.buildings.some(b=>b.id===placement.stationId&&b.hp>0)){cancelPlacement();toast('That workbench is gone');}
+      if(placement.showcase){if(!placement.anchored){placement.x=Math.round((p.x+p.dx*3)*2)/2;placement.z=Math.round((p.z+p.dz*3)*2)/2;}const why=showcasePlaceReason(world,p,placement.kind,placement.key,placement.x,placement.z);placement.valid=!why;placement.reason=why||'';}
+      else if(placement.stationId&&!world.buildings.some(b=>b.id===placement.stationId&&b.hp>0)){cancelPlacement();toast('That workbench is gone');}
       else{if(!placement.anchored){placement.x=Math.round((p.x+p.dx*3)*2)/2;placement.z=Math.round((p.z+p.dz*3)*2)/2;}const why=world.canBuild(p,placement.key,placement.x,placement.z,placement.stationId);placement.valid=!why;placement.reason=why||'';}
     }
+    if(world?.showcase)paintShowcase();
     if(sheet==='catalog'&&catalog.source==='station'){const station=world.buildings.find(b=>b.id===catalog.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(maintenance&&maintenanceTarget&&!world.buildings.some(b=>b.id===maintenanceTarget&&b.hp>0))maintenanceTarget=null;
     paintCluster(currentMode(),p);drawMap($('minimap'));
@@ -499,7 +549,7 @@ function aimEntity(){
 function setupControls(){
   $('characters').innerHTML=CHARACTERS.map(c=>`<button class="character" type="button" data-character="${c.id}" aria-label="${c.name}, ${c.detail}" aria-pressed="${c.id===character}">${portrait(c.id)}<small>${c.name}</small></button>`).join('');
   $('characters').onclick=e=>{const b=e.target.closest('[data-character]');if(!b)return;character=b.dataset.character;for(const el of $('characters').children)el.setAttribute('aria-pressed',el===b);if(mode==='front')world.players[0].character=character;storeProfile();};
-  $('host').onclick=hostCamp;$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
+  $('host').onclick=hostCamp;$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('sheet-menu').onclick=()=>openSheet('menu');$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   $('hotbar-inventory').onclick=toggleInventory;$('hotbar-build').onclick=toggleFieldBuild;$('use-charm').onclick=()=>send({type:'interact'});
@@ -533,6 +583,13 @@ function setupControls(){
     if(!pointerStart||Math.hypot(e.clientX-pointerStart.x,e.clientY-pointerStart.y)>12||!['solo','host','guest'].includes(mode)||$('game').hidden)return;
     const modeName=currentMode();if(!allowsMovement(modeName)&&modeName!=='normal')return;
     const point=renderer.worldPoint(e.clientX,e.clientY);if(!point)return;
+    if(world?.showcase&&showcaseTool==='remove'){
+      const picked=renderer.pick(e.clientX,e.clientY,world);
+      if(picked&&removeShowcaseTarget(world,picked))toast('Removed');
+      else toast('Nothing there to remove');
+      dirty=true;return;
+    }
+    if(placement?.showcase){commitShowcase(Math.round(point.x*2)/2,Math.round(point.z*2)/2);return;}
     if(placement){placement.x=Math.round(point.x*2)/2;placement.z=Math.round(point.z*2)/2;placement.anchored=true;refresh();return;}
     const picked=renderer.pick(e.clientX,e.clientY,world);
     if(maintenance){maintenanceTarget=picked&&world.buildings.includes(picked)?picked.id:null;selected=maintenanceTarget;dirty=true;return;}
@@ -571,11 +628,11 @@ function setupControls(){
     const key=event.key.toLowerCase();
     if([' ','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key))event.preventDefault();
     if(key==='escape'){
-      const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!((selection||dropDraft)&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement,maintaining:maintenance});
+      const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!((selection||dropDraft)&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement||showcaseTool==='remove',maintaining:maintenance});
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();
       else if(step==='close-details'){clearSelection();refresh();}
       else if(step==='close-panel')closeSheet();
-      else if(step==='cancel-placement'){cancelPlacement();dirty=true;}
+      else if(step==='cancel-placement'){cancelPlacement();showcaseTool='';showcaseMarkupCache='';dirty=true;}
       else if(step==='cancel-maintenance'){cancelMaintenance();dirty=true;}
       else openSheet('menu');
       return;
@@ -634,9 +691,21 @@ function frame(now){
   const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement,demo:$('game').hidden});requestAnimationFrame(frame);
 }
 async function init(){
-  theme=await loadTheme();try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;
-  paintClock();demoWorld();setupControls();syncSaveOption();const params=new URLSearchParams(location.search),code=params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showStatus('A place by the fire is waiting. Choose a name and join.');}
+  await loadMagicModules();
+  theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;
+  paintClock();demoWorld();setupControls();syncSaveOption();const params=new URLSearchParams(location.search);
+  const code=params.has('showcase')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showStatus('A place by the fire is waiting. Choose a name and join.');}
+  $('showcase-panel')?.addEventListener('click',event=>{
+    const cat=event.target.closest('[data-showcase-cat]');
+    const spawn=event.target.closest('[data-showcase-spawn]');
+    const tool=event.target.closest('[data-showcase-tool]');
+    if(cat){showcaseCategory=cat.dataset.showcaseCat;showcaseMarkupCache='';paintShowcase();return;}
+    if(tool?.dataset.showcaseTool==='clear'){clearShowcaseWorld(world);cancelPlacement();showcaseTool='';if(sheet)closeSheet();toast('The clearing is empty');showcaseMarkupCache='';paintShowcase();return;}
+    if(tool?.dataset.showcaseTool==='remove'){showcaseTool=showcaseTool==='remove'?'':'remove';if(showcaseTool)cancelPlacement();showcaseMarkupCache='';paintShowcase();return;}
+    if(spawn){const value=spawn.dataset.showcaseSpawn,split=value.indexOf(':');armShowcase(value.slice(0,split),value.slice(split+1));showcaseMarkupCache='';paintShowcase();}
+  });
   $('loading').hidden=true;$('front').hidden=false;requestAnimationFrame(frame);
-  if(params.has('dev'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},renderer,send,solo,openSheet,save,setTime(t){world.time=t;},get network(){return network;}};
+  if(params.has('dev')||params.has('showcase'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,setTime(t){world.time=t;},get network(){return network;}};
+  if(params.has('showcase'))startShowcase();
 }
 init().catch(error=>{$('load-status').textContent=`The woods could not be loaded. ${error.message} Try reloading in a browser with WebGL enabled.`;$('loading').querySelector('p').textContent='The lantern went out.';console.error(error);});

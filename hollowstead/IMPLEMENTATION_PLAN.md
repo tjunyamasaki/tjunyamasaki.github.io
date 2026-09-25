@@ -932,7 +932,7 @@ These searches are review aids, not blanket delete commands: 180 is now a valid 
 
 ## 16. Implementation packages for other agents
 
-P0, P1, P2, and P3 are complete. P4–P6 are not started. The planning commit does not satisfy any later package's acceptance criterion.
+P0, P1, P2, P3, and P4 are complete. P5 and P6 are not started. The planning commit does not satisfy any later package's acceptance criterion.
 
 Work on feat/hollowstead-coop or a narrowly scoped integration branch based on its current head. Only an integrator pushes the deployable branch after a coherent slice is working. Do not independently force-push shared history or merge to master.
 
@@ -1009,15 +1009,15 @@ Dependencies: P1/P2/P3 contracts; can construct inert views earlier, integrate a
 
 Owns: UI modules, main wiring, HTML and CSS.
 
-- [ ] Build actual RPG slots/sockets and selected-item operations with stable keyed updates.
-- [ ] Build combined chest/inventory panel and pending/lock-loss states.
-- [ ] Build one context-filtered catalog; direct station entry; separate maintenance mode.
-- [ ] Implement contextual circles, lantern circle, placement Place/Cancel, and mode state machine.
-- [ ] Remove old hotbar actions, H/camp HUD controls, objective/target text and placement banner with all stale DOM references.
-- [ ] Stack icon-only vitals and move minimap to safe-area top.
-- [ ] Rework input cancellation, keyboard behavior, focus, drag/scroll, pointer capture, and orientation handling.
-- [ ] Update field guide and player README to match the new progression/controls.
-- [ ] Verify M01–M11 and M15, with screenshots for portrait/landscape and chest state.
+- [x] Build actual RPG slots/sockets and selected-item operations with stable keyed updates.
+- [x] Build combined chest/inventory panel and pending/lock-loss states.
+- [x] Build one context-filtered catalog; direct station entry; separate maintenance mode.
+- [x] Implement contextual circles, lantern circle, placement Place/Cancel, and mode state machine.
+- [x] Remove old hotbar actions, H/camp HUD controls, objective/target text and placement banner with all stale DOM references.
+- [x] Stack icon-only vitals and move minimap to safe-area top.
+- [x] Rework input cancellation, keyboard behavior, focus, drag/scroll, pointer capture, and orientation handling.
+- [x] Update field guide and player README to match the new progression/controls.
+- [x] Verify M01–M11 and M15, with screenshots for portrait/landscape and chest state.
 
 Done when: every requested operation is reachable by touch, and no invisible old keyboard/hold path survives.
 
@@ -1112,7 +1112,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | P1 | Complete | P1 agent | f25990e8ee7f0c55c578df76ab54d2318bc3349d | Live clock still 150/30/80. Full inventory UI, chest locks, and 180/30/100 are later packages |
 | P2 | Complete | P2 review | e17d4a687f11b330defd7676489c31579b5005b7. 62 Hollowstead + 17 ball-game tests passing | Live clock stays 150/30/80. Review left stations, timed harvest, and gameplay ping for P3 |
 | P3 | Complete | P3 agent | 36614c80a0fb1520532df7368983188b08c0099a. 73 Hollowstead + 17 ball-game tests passing. Pages run 36088851645 succeeded for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0 | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
-| P4 | Not started | Unassigned | — | — |
+| P4 | Complete | P4 agent | a61545910636fc65f2fe487071ab2e8aa8ea892f (HUD rewrite f504b8031352223b161c20d377b7abadda5056b4). 81 Hollowstead + 17 ball-game tests passing. Headless Chrome M01–M05, M09, and M15 as recorded below | Real phone, rotation-during-drag, two-device chest, full first night, cauldron station, M10, and M11 were not run. Live clock stays 150/30/80. Night visuals stay P5 |
 | P5 | Not started | Unassigned | — | — |
 | P6 | Not started | Unassigned | — | — |
 
@@ -1328,3 +1328,55 @@ Ending commit: This note. It changes only this log.
 Evidence / screenshots / deployment run:
 - GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36088851645 succeeded (conclusion success) for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0. That revision contains P3 implementation 36614c80a0fb1520532df7368983188b08c0099a and the P2 review fix e17d4a687f11b330defd7676489c31579b5005b7. Hollowstead and ball-game tests passed in the workflow.
 Exact next task: P4 — Mobile inventory, catalog, actions, HUD. Do not start P5 or P6. Do not enable the 180/30/100 clock.
+
+Date: 2026-09-25
+Package / agent: P4 / P4 agent
+Starting commit: 988cfdcc6ba4fab22f8d41d705fcf487a0183fa5
+Ending commit: a61545910636fc65f2fe487071ab2e8aa8ea892f is the implementation, on top of the HUD rewrite f504b8031352223b161c20d377b7abadda5056b4. The branch tip that records this hash changes only this log. Start P5 from that tip.
+Files changed:
+- hollowstead/index.html
+- hollowstead/style.css
+- hollowstead/src/main.mjs
+- hollowstead/src/ui/inventory.mjs
+- hollowstead/src/ui/catalog.mjs
+- hollowstead/src/ui/actions.mjs
+- hollowstead/tests/ui.test.mjs
+- hollowstead/README.md
+- hollowstead/themes/FORMAT.md
+- hollowstead/IMPLEMENTATION_PLAN.md
+Implemented behavior:
+- Inventory is a framed panel: portrait and five sockets (chop, mine, weapon, body, light) on the left, a 24-slot pack on the right, quantity badges, and visible empty slots. Selection is by stack UID. Equip, eat, heal, and drop use the selected item. Drop asks for an explicit quantity confirmation. Quantity choices are 1, Half (rounded up), All, and plus/minus. Transfer and drop default to All; eating and healing always use one. Supply and occupied-slot counts stay in the panel. The charm is a detail line, not a droppable item. Slots are stable keyed buttons and are not rebuilt when their signature is unchanged. Arrow keys move focus after the grid updates. On a 320px-wide portrait the sockets wrap under the portrait so Light stays fully visible at 44px.
+- One chest opener shows the pack and the chest together. The chest grid stays empty until the host session arrives, then shows 36 slots. Pending work is marked before the result. Ownership moves only after the host accepts the transfer. Recovery storage is withdrawal-only.
+- One catalog filters by context. Field Build lists the field structures and excludes cauldron, soul lantern, and ward. The first workbench Craft activation opens the tool list; Build at the bench adds the station structures. Heartfire and campfire Cook open the fire list. A wrench in the Build header starts maintenance. Dismantle is a 0.8s hold there. Heartfire cannot be dismantled. There is no Craft hotbar button.
+- The action cluster shows the current mode: context actions, Attack, Dodge, a lantern circle when a usable lantern is owned, and Place/Cancel while placing. Heartfire Feed, Cook, Awaken, and Repair are separate buttons. Keys 1–4 fire those buttons. E is the primary action and does not start dismantle. F toggles the lantern. Space attacks and Shift dodges only in the normal mode. The hotbar is Inventory and Build. I, B, and M open inventory, field build, and the map. Escape cancels a drag, then item details, then the panel, then placement or maintenance, then opens the menu. The gear in the inventory header opens that same menu for a guest as well as the host. Only the solo menu pauses the world. Dragging inside a panel does not move the wanderer.
+- Ping, Eat, Craft, and Light are gone from the hotbar. The H button, objective card, target card, effort line, placement banner, joystick MOVE label, and permanent vital numbers are gone. C, Q, and G do nothing. A bare eat or gameplay ping command is unsupported. Transport ping/pong remains. Vitals are icon-only health, hunger, and courage bars with accessible names. The minimap sits at the top. The clock track uses the live day and dusk durations.
+- The field guide and player README describe the new controls and progression. Cache query on the page entry and main's direct imports is harvest-7.
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 81 pass, 0 fail, including the eight UI mode, catalog, and slot tests.
+- node --test ball-game/tests/*.test.mjs: 17 pass, 0 fail.
+- git diff --check clean. node --check on main.mjs and the three UI modules.
+- Headless Chrome, canvas renderer because WebGL is unavailable in that browser, loaded /hollowstead/index.html?dev and clicked through a solo camp. This is not a phone and not a second device.
+- M01: 390×844 and 360×780. Icon vitals, top minimap, Inventory and Build only, no H button, objective, target card, or old hotbar nodes. No horizontal scroll.
+- M02: 320×780 and 852×393. No horizontal scroll. Attack stayed 56px and the primary circle 68px. The cluster stayed 180px. Close, gear, quantity, Eat, and Drop stayed at least 44px with the inventory sheet open in both sizes. All five sockets were fully inside the 320px panel. A landscape inventory screenshot was captured. A physical rotation was not run.
+- M03: one inventory drag did not move the wanderer and did not drop the item. Rotating during a drag was not run.
+- M04: partial solo only. Eat one nightberry, place a workbench, craft and equip an axe, place and open a chest, transfer wood, and light a lantern with F. A full first night, a finished meal, and a farm were not played.
+- M05: Eat, Equip, and Transfer were tapped. Dragging in the pack did not move the character. The Drop button was visible; the confirm-drop tap was not completed in the browser. operationsFor covers Drop in the unit test.
+- M06, M07, and M08 were not run on two devices. Existing in-process chest tests still cover the host races.
+- M09: Heartfire showed Feed, Cook, Awaken, and Repair, and Cook opened the fire list. The workbench's first Craft tap opened the tool list and Build was a separate button. Field Build hid cauldron, soul lantern, and ward. A cauldron was not placed, so its first Cook activation was not clicked. The station-list unit test still expects stew only at a pot.
+- M10 was not clicked. T19 still rejects a placement that loses its station, cost, or range.
+- M11 was not clicked. T20–T24 still cover harvest interruption and floor drops.
+- M15: I, B, and F worked. ArrowRight moved focus from Flint to Dry grass. Escape closed details, then the panel. C, Q, and G opened nothing. Health, Hunger, and Courage expose icon-only accessible names. Space and Shift were not pressed in the browser; Attack and Dodge were on screen and the keyboard map unit test keeps them.
+- M12–M14 and M16–M18 were not part of this package and were not run.
+Evidence / screenshots / deployment run:
+- Implementation commit a61545910636fc65f2fe487071ab2e8aa8ea892f. HUD rewrite f504b8031352223b161c20d377b7abadda5056b4.
+- Screenshots: /opt/cursor/artifacts/hollowstead-p4-portrait-hud.png, hollowstead-p4-heartfire-actions.png, hollowstead-p4-portrait-inventory.png, hollowstead-p4-portrait-build.png, hollowstead-p4-chest.png, hollowstead-p4-landscape.png, hollowstead-p4-landscape-inventory.png, hollowstead-p4-portrait-360.png, hollowstead-p4-narrow-320.png, hollowstead-p4-narrow-320-inventory.png.
+- The review search for quick-eat, toggle-lantern, ping-home, effort left, objective-text, menu-button, confirm-build, and cancel-build matches only this plan, not the live HUD.
+- Deployment of this handoff tip is recorded in the following note once the Pages workflow finishes.
+Remaining failures or unverified cases:
+- No automated failure remains in the Hollowstead or ball-game suites. A real phone, a rotation during a drag, a two-device chest, a finished cook, a cauldron station, a full first night, the Drop confirmation tap, and M10–M11 in the browser were not run. Do not treat the headless Chrome pass as a device pass.
+Compatibility/migration notes:
+- Saves stay v2 with clock v1. Continue does not call remapWorldClock. RULES stay day 150, dusk 30, night 80, cycle 260. Renderer night boundaries stay t>150 and t>=180. The wave schedule is unchanged. P5 owns the 180/30/100 clock, the 0/40/80 waves, and night-darkness rendering.
+- Protocol stays hollowstead-2. The UI sends inventory, chest, craft, place, building, and lantern intents. It does not decide that a recipe is legal; the host still checks. Bare eat and gameplay ping stay unsupported. Transport ping still answers.
+- Player entry cache query is harvest-7.
+Exact next task: P5 — Night visuals and pacing. Do not start P6. Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.
+

@@ -932,7 +932,7 @@ These searches are review aids, not blanket delete commands: 180 is now a valid 
 
 ## 16. Implementation packages for other agents
 
-P0 is complete. P1–P6 are NOT STARTED. The planning commit does not satisfy any later package's acceptance criterion.
+P0 and P1 are complete. P2–P6 are NOT STARTED. The planning commit does not satisfy any later package's acceptance criterion.
 
 Work on feat/hollowstead-coop or a narrowly scoped integration branch based on its current head. Only an integrator pushes the deployable branch after a coherent slice is working. Do not independently force-push shared history or merge to master.
 
@@ -957,13 +957,13 @@ Dependencies: P0.
 
 Owns: inventory.mjs, serialization.mjs, item metadata; coordinated engine integration.
 
-- [ ] Implement item UIDs, slot containers, five sockets, validation, atomic planning/commit helpers.
-- [ ] Adapt all item creation/consumption callers, including recipes, resource grants, drops, fuel, repairs, upgrades, farms, deaths, offline eviction, chest destruction.
-- [ ] Introduce explicit equipment behavior and lantern ownership/effect cleanup.
-- [ ] Remove count-dictionary and per-kind equipment assumptions from renderer icon lookup and queries.
-- [ ] Implement v1→v2 migration, recovery storage, separate network/save serialization, and Continue discovery.
-- [ ] Include phase-preserving migration logic using agreed 180/30/100 timings; do not enable new cycle timings without that logic.
-- [ ] Add T01–T08, T18, T25, T31–T34 as applicable.
+- [x] Implement item UIDs, slot containers, five sockets, validation, atomic planning/commit helpers.
+- [x] Adapt all item creation/consumption callers, including recipes, resource grants, drops, fuel, repairs, upgrades, farms, deaths, offline eviction, chest destruction.
+- [x] Introduce explicit equipment behavior and lantern ownership/effect cleanup.
+- [x] Remove count-dictionary and per-kind equipment assumptions from renderer icon lookup and queries.
+- [x] Implement v1→v2 migration, recovery storage, separate network/save serialization, and Continue discovery.
+- [x] Include phase-preserving migration logic using agreed 180/30/100 timings; do not enable new cycle timings without that logic.
+- [x] Add T01–T08, T18, T25, T31–T34 as applicable.
 
 Done when: no caller can create a second owner for an item; old saves load without loss; worn gear survives all move paths.
 
@@ -1109,7 +1109,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | --- | --- | --- | --- | --- |
 | Planning | Complete | Orchestrator | Plan only; baseline 395baac7a332f1ed94b5c73e0ec4b4882ee47afe | Gameplay implementation not started |
 | P0 | Complete | P0 agent | bc220e92a19eb4665e0346ce025a124e4e283035 | No gameplay change. P1–P6 not started |
-| P1 | Not started | Unassigned | — | — |
+| P1 | Complete | P1 agent | f25990e8ee7f0c55c578df76ab54d2318bc3349d | Live clock still 150/30/80. Full inventory UI, chest locks, and 180/30/100 are later packages |
 | P2 | Not started | Unassigned | — | — |
 | P3 | Not started | Unassigned | — | — |
 | P4 | Not started | Unassigned | — | — |
@@ -1162,3 +1162,45 @@ Compatibility/migration notes:
 - The guest pack in v1-full-storage.json is an over-capacity count dictionary. World.restore accepts it. A normal 120-supply pack always fits in 24 stacks of 20 because only 13 supply ids exist; that guest pack is the overflow case section 13 must not discard. The host pack is a legal 120, and the chest was filled through deposit plus the real store shape, including food.
 - Phase helpers snap exact old boundaries onto the phase that begins there (150→180, 180→210, 260→310) and do not replay the night-start wave. They are not called by the simulation.
 Exact next task: P1 — Item foundation and save migration. Do not enable the 180/30/100 clock until phase-preserving migration is in place and coordinated with P5.
+
+Date: 2026-09-24
+Package / agent: P1 / P1 agent
+Starting commit: 4f38deb1b91d24a2c37b3f39c459e98db7b65c27
+Ending commit: f25990e8ee7f0c55c578df76ab54d2318bc3349d is the implementation. The branch tip that records this handoff changes only this plan. Start P2 from that tip.
+Files changed:
+- hollowstead/src/inventory.mjs
+- hollowstead/src/serialization.mjs
+- hollowstead/src/contracts.mjs
+- hollowstead/src/engine.mjs
+- hollowstead/src/main.mjs
+- hollowstead/src/network.mjs
+- hollowstead/src/renderer.mjs
+- hollowstead/src/canvas-renderer.mjs
+- hollowstead/style.css
+- hollowstead/index.html
+- hollowstead/tests/items.test.mjs
+- hollowstead/tests/contracts.test.mjs
+- hollowstead/tests/survival.test.mjs
+- hollowstead/tests/network.test.mjs
+- hollowstead/tests/fixtures/generate-v1-fixtures.mjs
+- hollowstead/IMPLEMENTATION_PLAN.md
+Implemented behavior:
+- Every live item is one stack with one UID and exactly one owner. Backpacks are 24 slots with a 120-supply cap. Equipment uses five sockets (chop, mine, weapon, body, light) and does not spend a slot or supply while worn. Chests start at 36 slots and grow by 6. Recovery storage is withdrawal-only, has no expiry, and disappears when empty.
+- Crafting, grants, drops, fuel, repairs, upgrades, farms, deaths, offline eviction, and chest destruction create or consume stacks through the same helpers. A newly crafted tool stays in the backpack until Equip. Only the worn tool, weapon, or armor has an effect. Broken axe, pick, weapon, and armor leave the socket at durability 0. A torch at 0 fuel stays and gives no light. Moving a lit lantern turns it off and keeps the remaining fuel. Death drops the backpack only. Evicting an offline slot drops backpack, worn gear, and recovery.
+- Continue reads a v2 save first. If that key is absent it migrates v1, writes v2 only after success, and leaves v1 untouched. A failed migration still shows Continue and does not start a new world. The full-storage guest dictionary that does not fit in 24 slots is kept in recovery. Sword and spear both survive: the sword is worn and the spear goes to the backpack when both exist. Renderer and pack queries use stack item ids. The torch icon is the lantern sprite. A missing drop sprite is not drawn as a character.
+- Network snapshots and save snapshots are separate. Saves clear goal, rest, and the current action. The protocol is hollowstead-2. A mismatched hello or data-channel label tells the peer to refresh. Transport ping/pong remains. The hotbar is still Pack, Craft, Build, Eat, Light, and Ping. Eat sends the chosen food stack. A bare eat command consumes nothing.
+Tests and device checks actually run:
+- After the change, from the repo root: `node --test hollowstead/tests/*.test.mjs` (39 pass, 0 fail) and `node --test ball-game/tests/*.test.mjs` (17 pass, 0 fail). `git diff --check` clean. `node --check` on the changed Hollowstead modules.
+- The pre-change count at 4f38deb was the existing P0 suites (21 Hollowstead tests and 17 ball-game tests). This continuation started from an already edited tree, so that before command was not repeated here.
+- Headless Chrome loaded the local page, started a solo camp, crafted an axe into the pack, equipped that same UID, ate one berry from the Eat button, and showed the existing hotbar. Continue loaded the committed v1-normal fixture: clock stayed v1, time stayed 335, worn axe/pick/spear and a lit torch survived, food counts matched, v2 was written, and v1 was left in place. WebGL was unavailable in that browser, so the canvas renderer drew the world. No phone and no two-device co-op pass.
+Evidence / screenshots / deployment run:
+- Implementation commit f25990e8ee7f0c55c578df76ab54d2318bc3349d. Local screenshots: title, day-one HUD with the old hotbar, pack after equipping the crafted axe, and the migrated day-two pack. The GitHub Pages run for this tip is recorded in the follow-up note below once that workflow finishes.
+Remaining failures or unverified cases:
+- No automated failure remains in the Hollowstead or ball-game suites. M01–M18, a real phone, and a second device were not run. The chest panel is still the old grouped list. Exclusive chest locks, timed harvesting, and the 180/30/100 night are not in this package.
+Compatibility/migration notes:
+- v2 expedition saves store `world.clock` as `v1` and leave `world.time` on the current 260-second cycle. Continue therefore resumes the same phase and fraction on the live 150/30/80 clock. `migrateV1Save(doc, {remapTime:true})` and `remapWorldClock` apply the 180/30/100 conversion, shift absolute deadlines, and recompute the next night wave without replaying a wave at elapsed 0. Those paths are tested against the fixtures and are not used by Continue or by `World.restore`. `World.restore` rejects `clock === 'v2'` so a remapped time cannot be loaded into the 260-second clock. `remapWorldClock` is idempotent: a document that is already `clock === 'v2'` is returned unchanged. P5 must call `remapWorldClock` once when it enables the 310-second clock, then persist `clock: 'v2'`. Do not call it twice.
+- The running day, dusk, night, wave spacing, and renderer boundaries stay 150/30/80 and `time+32`. Renderer night still starts from `t>150` and `t>=180`.
+- v1 partial harvest hits are discarded during migration. A live v2 snapshot still stores hit progress, because harvesting is still hit-based until P3.
+- A normal 120-supply pack fits in 24 slots. The full-storage guest dictionary does not, and it is kept in recovery rather than discarded. Recovery cannot accept new items.
+- Old hollowstead-1 peers are rejected with: "This camp uses a different Hollowstead version. Refresh the page to update, then join again."
+Exact next task: P2 — Chest transactions and network results. Do not start P3, P4, P5, or P6. Do not enable the 180/30/100 clock in P2.

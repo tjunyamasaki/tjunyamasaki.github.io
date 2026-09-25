@@ -26,7 +26,7 @@
 #connection-banner{top:calc(8px + env(safe-area-inset-top));z-index:56}
 #announcement{z-index:3}
 #downed{z-index:55}
-.bottom-controls{left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));align-items:flex-end;gap:8px}
+.bottom-controls{left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:calc(74px + env(safe-area-inset-bottom));align-items:flex-end;gap:8px}
 #joystick{width:120px;height:120px;flex:none}
 #joystick small{display:none}
 #stick{left:50%;top:50%;margin-left:-25.5px;margin-top:-25.5px}
@@ -48,66 +48,84 @@
 #lantern-button .fuel-arc circle{fill:none;stroke:#edb47a;stroke-width:2.5;stroke-linecap:round}
 #lantern-button.is-lit{border-color:var(--orange);box-shadow:0 0 12px #edb47a88}
 #action-cluster .stamina-track{position:absolute;left:auto;right:0;bottom:-8px;width:68px;height:3px;pointer-events:none}
-.hotbar{bottom:calc(188px + env(safe-area-inset-bottom));gap:6px;padding:4px;pointer-events:auto}
-.hotbar button{width:92px;min-width:88px;min-height:48px;padding:6px 8px}
+.hotbar{bottom:calc(8px + env(safe-area-inset-bottom));width:max-content;max-width:none;justify-content:center;gap:4px;padding:3px;border-radius:12px;pointer-events:auto}
+.hotbar button{width:52px;min-width:52px;height:48px;min-height:48px;padding:4px}
 .hotbar button>span{font-size:20px}
-.hotbar small{white-space:nowrap}
+.hotbar small{font-size:8px;margin-top:3px;white-space:nowrap}
+.hotbar kbd{display:none}
 .sheet{top:max(12px,env(safe-area-inset-top));bottom:max(12px,env(safe-area-inset-bottom));right:max(12px,env(safe-area-inset-right));pointer-events:auto}
 .sheet>header{flex:none;gap:8px}
 .sheet-tools{display:flex;gap:8px;flex:none}
 .sheet-tools .close-button{width:44px;height:44px;min-width:44px;min-height:44px}
 .sheet #sheet-tabs{flex:none}
+.sheet #sheet-tabs:empty{display:none}
 .sheet #sheet-tabs .chip{min-height:44px}
 .sheet #sheet-content{flex:1;min-height:0}
 .sheet[data-sheet="inventory"] #sheet-content,.sheet[data-sheet="chest"] #sheet-content{overflow:hidden;display:flex;flex-direction:column}
+/* Storage gets a definite viewport height; grids share the remaining space. */
+.sheet:is([data-sheet="inventory"],[data-sheet="chest"]){top:max(8px,env(safe-area-inset-top));bottom:max(8px,env(safe-area-inset-bottom));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));width:auto;height:auto;max-height:none;border-radius:12px}
+.sheet:is([data-sheet="inventory"],[data-sheet="chest"])>header{padding:10px 12px;min-height:64px}
+.sheet:is([data-sheet="inventory"],[data-sheet="chest"]) h2{font-size:23px;margin:0}
+.sheet:is([data-sheet="inventory"],[data-sheet="chest"]) #sheet-kicker{display:none}
+.sheet:is([data-sheet="inventory"],[data-sheet="chest"]) #sheet-content{padding:0 10px 10px}
 .rpg-panel{display:flex;flex-direction:column;flex:1;min-height:0;gap:8px}
 .rpg-body{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
-.equip-column{display:flex;gap:8px;align-items:center;overflow-x:auto;flex:none}
-.character-card{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
-.character-card .portrait{width:36px;height:54px}
-.character-card small{font-size:10px;max-width:72px;text-align:center}
-.socket-grid{display:grid;grid-template-columns:repeat(5,44px);gap:6px;flex:none;width:max-content}
+.equip-column{display:flex;gap:6px;align-items:center;overflow-x:auto;flex:none;min-width:0}
+.character-card{display:flex;align-items:center;justify-content:center;width:40px;flex:none}
+.character-card .portrait{width:29px;height:44px}
+.character-card small{display:none}
+.socket-grid.slot-grid{display:grid;grid-template-columns:repeat(5,44px);gap:4px;flex:none;width:max-content}
 .socket-grid .item-slot{width:44px;height:44px;max-width:44px;min-width:44px;aspect-ratio:auto}
 .bag-column,.chest-column{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0}
 .bag-meta,.charm-line{margin:0;color:var(--muted);font-size:11px}
 .charm-line:empty,.pending-line:empty{display:none}
 .pending-line{margin:0;color:var(--orange);font-size:12px}
-.slot-grid{display:grid;grid-template-columns:repeat(6,minmax(44px,1fr));gap:6px;touch-action:pan-y}
-.item-slot{position:relative;aspect-ratio:1;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center;border:1px solid #dac29a66;background:#211c2844;overflow:hidden}
+.slot-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;align-items:start;gap:4px;width:100%;max-width:356px;touch-action:pan-y}
+.item-slot{position:relative;width:100%;aspect-ratio:1;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center;border:1px solid #dac29a66;background:#211c2844;overflow:hidden}
 .item-slot.is-selected{outline:2px solid var(--orange);outline-offset:1px}
 .item-slot.is-equipped{box-shadow:inset 0 0 0 2px var(--mint)}
-.item-slot .item-icon,.slot-icon .item-icon{width:70%;height:70%;margin:0;object-fit:contain;pointer-events:none}
+.slot-icon{position:absolute;inset:4px;display:grid;place-items:center;pointer-events:none}
+.item-slot .item-icon{width:100%;height:100%;min-width:0;min-height:0;margin:0;object-fit:contain;pointer-events:none}
 .slot-mark{font:8px ui-monospace,monospace;letter-spacing:.3px;color:var(--muted);text-align:center;line-height:1.2}
 .qty-badge{position:absolute;right:3px;bottom:2px;font-size:10px;line-height:1;color:var(--cream);text-shadow:0 1px 2px #120f16}
 .item-slot .wear{position:absolute;left:4px;right:4px;bottom:3px;height:3px;margin:0;background:#bcb39933;border-radius:2px}
 .item-slot .wear em{display:block;height:100%;background:var(--orange)}
-.item-details{flex:none;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--border);padding-top:8px}
-.detail-copy{flex:1 1 140px;min-width:0}
+.item-details{flex:none;display:flex;flex-wrap:wrap;gap:6px;align-items:center;border-top:1px solid var(--border);padding-top:8px}
+.detail-copy{flex:1 1 100%;min-width:0}
 .detail-copy b{display:block;font-size:14px}
 .detail-copy p{margin:2px 0 0;color:var(--muted);font-size:11px}
-.qty-row,.detail-ops{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.qty-row button,.detail-ops button,.maintain-button{min-width:44px;min-height:44px;padding:8px 10px}
+.qty-row,.detail-ops{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.qty-row{flex:1 1 100%;flex-wrap:nowrap}
+.qty-row b{min-width:22px;text-align:center;font-size:12px}
+.qty-row button,.detail-ops button,.maintain-button{min-width:44px;min-height:44px;padding:8px}
 .maintain-button{width:100%;margin-bottom:8px}
 .confirm-copy{flex:1 1 100%;margin:0;font-size:12px}
 .drag-ghost{position:fixed;width:48px;height:48px;z-index:80;pointer-events:none;display:grid;place-items:center}
 .drag-ghost .item-icon{width:40px;height:40px}
-.rpg-panel.with-chest .rpg-body{overflow:hidden}
-.rpg-panel.with-chest .bag-column,.rpg-panel.with-chest .chest-column{flex:1 1 0;min-height:72px;overflow:hidden}
-.rpg-panel.with-chest .bag-column .slot-grid,.rpg-panel.with-chest .chest-column .slot-grid,.rpg-panel.with-chest .recovery-grid{flex:1 1 auto;min-height:96px;max-height:28dvh;overflow-y:auto;overscroll-behavior:contain;align-content:start}
-@media(min-width:800px){
-  .rpg-body{flex-direction:row;align-items:stretch}
-  .equip-column{flex-direction:column;align-items:center;width:168px;overflow:visible}
-  .socket-grid{grid-template-columns:repeat(2,44px)}
-  .bag-column{flex:1}
-  .rpg-panel.with-chest .chest-column{flex:1}
-  .rpg-panel.with-chest .bag-column .slot-grid,.rpg-panel.with-chest .chest-column .slot-grid{max-height:none}
+.storage-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;min-height:14px}
+.storage-heading .chest-pages{margin:0;gap:6px}
+.storage-heading .chest-pages button{width:44px;height:44px;padding:0}
+.rpg-panel.with-chest .rpg-body{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) minmax(0,1fr);overflow:hidden}
+.rpg-panel.with-chest .bag-column,.rpg-panel.with-chest .chest-column{min-height:0;overflow:hidden}
+.rpg-panel.with-chest .bag-column>.slot-grid,.rpg-panel.with-chest .chest-column>.slot-grid{flex:1 1 0;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.rpg-panel.with-chest .charm-line{display:none}
+.rpg-panel.with-chest .recovery-block{flex:none;max-height:40%;overflow:auto;overscroll-behavior:contain}
+.rpg-panel.with-chest .recovery-block .section-label{margin:4px 0 6px;font-size:8px;letter-spacing:1px}
+@media(min-width:700px){
+  .sheet:is([data-sheet="inventory"],[data-sheet="chest"]){left:auto;width:min(820px,calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
+  .rpg-panel.with-chest .rpg-body{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto minmax(0,1fr);gap:10px 16px}
+  .rpg-panel.with-chest .equip-column{grid-column:1 / -1}
+  .item-details{flex-wrap:nowrap}
+  .detail-copy{flex:1 1 120px}
+  .qty-row{flex:0 0 auto}
+  .detail-ops{flex:0 0 auto}
 }
 @media(max-width:900px){#minimap{width:76px;height:76px}}
 @media(max-width:700px){
   .sheet{top:auto;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));width:auto;height:auto;max-height:min(78dvh,720px);border-radius:16px 16px 10px 10px}
 }
-@media(max-width:640px){
-  #inv-grid,.chest-grid,.recovery-grid{grid-template-columns:repeat(4,minmax(44px,1fr))}
+@media(max-width:359px){
+  #inv-grid,.chest-grid,.recovery-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
 }
 @media(max-width:380px){#joystick{width:104px;height:104px}}
 @media(max-width:340px){
@@ -116,13 +134,9 @@
   .game-top .clock small{font-size:8px;letter-spacing:.4px}
   .game-top .day-track{max-width:96px}
   #minimap{width:72px;height:72px}
-  .equip-column{flex-wrap:wrap;overflow-x:visible}
 }
-@media(max-width:420px){.hotbar kbd{display:none}}
-@media(min-width:421px){.hotbar kbd{display:inline}}
 @media(max-height:520px) and (min-width:601px){
-  .hotbar{bottom:max(16px,env(safe-area-inset-bottom))}
+  .bottom-controls{bottom:calc(12px + env(safe-area-inset-bottom))}
+  .hotbar{bottom:calc(12px + env(safe-area-inset-bottom))}
   .sheet{top:8px;bottom:8px;left:auto;right:max(8px,env(safe-area-inset-right));width:min(460px,56vw);max-height:none;height:auto;border-radius:12px}
-  .rpg-panel.with-chest .rpg-body{flex-direction:row}
-  .rpg-panel.with-chest .bag-column .slot-grid,.rpg-panel.with-chest .chest-column .slot-grid{max-height:none}
 }

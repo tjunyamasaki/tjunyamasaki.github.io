@@ -96,13 +96,15 @@ export function createInventoryPanel(root, hooks) {
         <p id="inv-charm" class="charm-line"></p>
       </section>
       <section id="inv-chest" class="chest-column" hidden aria-label="Chest">
-        <div id="chest-meta" class="bag-meta"></div>
-        <div id="chest-grid" class="slot-grid chest-grid" role="grid"></div>
-        <div class="chest-pages">
-          <button type="button" id="chest-prev" aria-label="Previous chest page">←</button>
-          <small id="chest-page"></small>
-          <button type="button" id="chest-next" aria-label="Next chest page">→</button>
+        <div class="storage-heading">
+          <div id="chest-meta" class="bag-meta"></div>
+          <div id="chest-pages" class="chest-pages" hidden>
+            <button type="button" id="chest-prev" aria-label="Previous chest page">←</button>
+            <small id="chest-page"></small>
+            <button type="button" id="chest-next" aria-label="Next chest page">→</button>
+          </div>
         </div>
+        <div id="chest-grid" class="slot-grid chest-grid" role="grid"></div>
       </section>
     </div>
     <footer id="inv-details" class="item-details" hidden>
@@ -216,7 +218,7 @@ export function createInventoryPanel(root, hooks) {
       portraitSig = view.portraitHTML || '';
       portrait.innerHTML = portraitSig;
     }
-    const metaText = `${view.occupied} / ${view.slotMax} slots · ${view.supply} / ${view.capacity} supplies`;
+    const metaText = `Pack · ${view.occupied} / ${view.slotMax} slots · ${view.supply} / ${view.capacity} supplies`;
     if (metaSig !== metaText) { metaSig = metaText; meta.textContent = metaText; }
     const charmText = `Last-chance charm, ${view.charm ? 'available' : 'spent'}`;
     if (charmSig !== charmText) { charmSig = charmText; charm.textContent = charmText; }
@@ -226,10 +228,11 @@ export function createInventoryPanel(root, hooks) {
     if (view.recovery?.length) syncGroup(recoveryGrid, view.recovery);
     chestWrap.hidden = !view.chest;
     if (view.chest) {
-      const chestLine = view.chest.pending ? 'Waiting for camp…' : `Chest · page ${view.chest.page + 1} / ${view.chest.pages}`;
+      const chestLine = view.chest.pending ? 'Waiting for camp…' : 'Chest';
       if (chestMeta.textContent !== chestLine) chestMeta.textContent = chestLine;
       syncGroup(chestGrid, view.chest.slots);
       chestPage.textContent = `${view.chest.page + 1} / ${view.chest.pages}`;
+      panel.querySelector('#chest-pages').hidden = view.chest.pages <= 1;
       panel.querySelector('#chest-prev').disabled = view.chest.page <= 0 || view.pending;
       panel.querySelector('#chest-next').disabled = view.chest.page >= view.chest.pages - 1 || view.pending;
     }

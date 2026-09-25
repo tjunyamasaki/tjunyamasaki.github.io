@@ -13,7 +13,7 @@ import {
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
 } from './ui/actions.mjs?v=harvest-7';
 import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-7';
-import {adjustQuantity,createInventoryPanel,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-7';
+import {adjustQuantity,createInventoryPanel,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-8';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

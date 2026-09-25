@@ -66,7 +66,8 @@
 .character-card{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
 .character-card .portrait{width:36px;height:54px}
 .character-card small{font-size:10px;max-width:72px;text-align:center}
-.socket-grid{display:grid;grid-template-columns:repeat(5,44px);gap:6px;flex:none}
+.socket-grid{display:grid;grid-template-columns:repeat(5,44px);gap:6px;flex:none;width:max-content}
+.socket-grid .item-slot{width:44px;height:44px;max-width:44px;min-width:44px;aspect-ratio:auto}
 .bag-column,.chest-column{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0}
 .bag-meta,.charm-line{margin:0;color:var(--muted);font-size:11px}
 .charm-line:empty,.pending-line:empty{display:none}
@@ -92,7 +93,7 @@
 .drag-ghost .item-icon{width:40px;height:40px}
 .rpg-panel.with-chest .rpg-body{overflow:hidden}
 .rpg-panel.with-chest .bag-column,.rpg-panel.with-chest .chest-column{flex:1 1 0;min-height:72px;overflow:hidden}
-.rpg-panel.with-chest .bag-column .slot-grid,.rpg-panel.with-chest .chest-column .slot-grid,.rpg-panel.with-chest .recovery-grid{flex:1;min-height:52px;max-height:24dvh;overflow-y:auto;overscroll-behavior:contain}
+.rpg-panel.with-chest .bag-column .slot-grid,.rpg-panel.with-chest .chest-column .slot-grid,.rpg-panel.with-chest .recovery-grid{flex:1 1 auto;min-height:96px;max-height:28dvh;overflow-y:auto;overscroll-behavior:contain;align-content:start}
 @media(min-width:800px){
   .rpg-body{flex-direction:row;align-items:stretch}
   .equip-column{flex-direction:column;align-items:center;width:168px;overflow:visible}
@@ -115,6 +116,7 @@
   .game-top .clock small{font-size:8px;letter-spacing:.4px}
   .game-top .day-track{max-width:96px}
   #minimap{width:72px;height:72px}
+  .equip-column{flex-wrap:wrap;overflow-x:visible}
 }
 @media(max-width:420px){.hotbar kbd{display:none}}
 @media(min-width:421px){.hotbar kbd{display:inline}}

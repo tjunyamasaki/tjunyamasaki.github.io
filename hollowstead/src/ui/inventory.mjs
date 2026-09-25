@@ -298,7 +298,7 @@ export function createInventoryPanel(root, hooks) {
     }
     if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 12) return;
     drag.active = true;
-    drag.slot.setPointerCapture?.(event.pointerId);
+    try { drag.slot.setPointerCapture?.(event.pointerId); } catch { /* Synthetic or cancelled pointers still finish the drag. */ }
     ghost.innerHTML = drag.slot.querySelector('.slot-icon')?.innerHTML || '';
     ghost.hidden = false;
     ghost.style.left = `${event.clientX + 8}px`;
@@ -337,8 +337,9 @@ export function createInventoryPanel(root, hooks) {
     if (index < 0) index = 0;
     const cols = columnsOf(buttons[index].closest('.slot-grid'));
     const next = gridStep(index, buttons.length, cols, key);
-    buttons[next].focus();
-    hooks.onSelect(buttons[next].dataset.slotKey);
+    const slotKey = buttons[next].dataset.slotKey;
+    hooks.onSelect(slotKey);
+    panel.querySelector(`[data-slot-key="${CSS.escape(slotKey)}"]`)?.focus();
   }
   function activateFocused() { hooks.onActivate(); }
 

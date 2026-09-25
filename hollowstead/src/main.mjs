@@ -80,7 +80,7 @@ async function openChest(chestId){
   chestOpening=false;
   if(token!==chestToken||sheet!=='chest'){if(result?.ok)void send({type:'chestClose',chestId,sessionId:result.sessionId},{quiet:true});return;}
   if(!result?.ok){toast(commandError(result));sheet='inventory';$('sheet').dataset.sheet='inventory';dirty=true;renderSheet();return;}
-  chestSession={chestId,sessionId:result.sessionId};chestRenewAt=world.time+CHEST_RENEW_SECONDS;dirty=true;
+  chestSession={chestId,sessionId:result.sessionId};chestRenewAt=world.time+CHEST_RENEW_SECONDS;refresh();
 }
 function maintainChest(){
   if(!chestSession||sheet!=='chest')return;
@@ -136,6 +136,7 @@ function currentMode(){
 function cancelPlacement(){placement=null;}
 function cancelMaintenance(){maintenance=false;maintenanceTarget=null;endContextHold();}
 function clearSelection(){selection=null;dropConfirm=false;qtyMode='all';chosenQty=1;}
+function refresh(){dirty=true;ui();}
 function discardPanel(){inventoryPanel?.destroy();inventoryPanel=null;}
 function prepareWorld(resume=false){
   if(resume){const plan=continuePlan();if(!plan.ok)throw new Error(plan.message);const resumed=World.fromSave(plan.save);if(plan.write==='v2')localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify(plan.save));world=resumed;world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This saved expedition is missing its host.');p.online=true;if(world.status!=='playing')world.status='playing';}
@@ -209,9 +210,9 @@ async function runAction(action){
 async function confirmPlace(){
   if(!placement||placement.pending)return;
   if(!placement.valid){toast(placement.reason||'Cannot place that here');return;}
-  const pending=placement;pending.pending=true;dirty=true;
+  const pending=placement;pending.pending=true;refresh();
   const result=await send({type:'placeBuilding',recipeId:pending.key,x:pending.x,z:pending.z,rotation:pending.rotation||0,stationId:pending.stationId??null});
-  if(placement!==pending)return;pending.pending=false;if(result?.ok)placement=null;dirty=true;
+  if(placement!==pending)return;pending.pending=false;if(result?.ok)placement=null;refresh();
 }
 function placeRecipe(key){
   const p=me();if(!p)return;
@@ -219,7 +220,7 @@ function placeRecipe(key){
   if(sheet==='menu'&&mode==='solo')paused=false;
   sheet=null;$('sheet').hidden=true;clearSelection();cancelMaintenance();endContextHold();
   placement={key,x:Math.round((p.x+p.dx*3)*2)/2,z:Math.round((p.z+p.dz*3)*2)/2,rotation:0,valid:false,anchored:false,pending:false,reason:'',stationId:catalog.source==='station'?catalog.stationId:null};
-  selected=null;dirty=true;
+  selected=null;refresh();
 }
 function stackByKey(p,key){
   if(!p||!key)return null;
@@ -242,9 +243,9 @@ function locateUid(p,uid){
 }
 function chosenQuantity(stack){if(!stack)return 1;if(qtyMode==='all')return stack.quantity;return Math.min(stack.quantity,Math.max(1,chosenQty));}
 function rememberSelection(){const loc=selection?locateUid(me(),selection.uid):null;if(!loc){clearSelection();return;}selection={uid:loc.stack.uid,key:loc.key,where:loc.where};chosenQty=Math.min(loc.stack.quantity,Math.max(1,qtyMode==='all'?loc.stack.quantity:chosenQty));}
-function selectKey(key){const loc=stackByKey(me(),key);if(!loc?.stack)return;const same=selection?.uid===loc.stack.uid;selection={uid:loc.stack.uid,key:loc.key,where:loc.where};if(!same){qtyMode='all';chosenQty=loc.stack.quantity;dropConfirm=false;}dirty=true;}
+function selectKey(key){const loc=stackByKey(me(),key);if(!loc?.stack)return;const same=selection?.uid===loc.stack.uid;selection={uid:loc.stack.uid,key:loc.key,where:loc.where};if(!same){qtyMode='all';chosenQty=loc.stack.quantity;dropConfirm=false;}refresh();}
 function containerInfo(p,loc){if(loc.where==='pack')return p.inventory;if(loc.where==='equipment')return {id:containerId('equipment',p.id),revision:p.equipmentRevision};if(loc.where==='recovery')return p.recovery;if(loc.where==='chest')return chestBuilding()?.store||null;return null;}
-async function withPending(cmd){actionPending=true;dirty=true;const result=await send(cmd);actionPending=false;rememberSelection();dirty=true;return result;}
+async function withPending(cmd){actionPending=true;refresh();const result=await send(cmd);actionPending=false;rememberSelection();refresh();return result;}
 async function commitMove(from,to,quantity,{insert=false}={}){
   const p=me();if(!p||!from?.stack||!to||to.where==='recovery'||actionPending)return;
   const source=containerInfo(p,from),dest=containerInfo(p,to);if(!source||!dest)return;
@@ -256,7 +257,7 @@ async function commitMove(from,to,quantity,{insert=false}={}){
 async function onSlot(key,empty){
   if(actionPending)return;
   if(!selection){if(!empty)selectKey(key);return;}
-  if(key===selection.key){clearSelection();dirty=true;return;}
+  if(key===selection.key){clearSelection();refresh();return;}
   const from=locateUid(me(),selection.uid),to=stackByKey(me(),key);
   if(!from?.stack||!to)return;
   await commitMove(from,to,chosenQuantity(from.stack));
@@ -270,8 +271,8 @@ async function moveKeys(fromKey,toKey){
 async function operate(op){
   const p=me();if(!p||!selection||actionPending)return;
   const loc=locateUid(p,selection.uid);if(!loc?.stack){clearSelection();dirty=true;return;}
-  if(op==='cancel-drop'){dropConfirm=false;dirty=true;return;}
-  if(op==='drop'){dropConfirm=true;dirty=true;return;}
+  if(op==='cancel-drop'){dropConfirm=false;refresh();return;}
+  if(op==='drop'){dropConfirm=true;refresh();return;}
   if(op==='confirm-drop'){
     const cmd={type:'dropItem',uid:loc.stack.uid,quantity:chosenQuantity(loc.stack),inventoryRevision:p.inventory.revision};
     if(loc.where==='equipment')cmd.equipmentRevision=p.equipmentRevision;
@@ -287,7 +288,7 @@ async function operate(op){
     await commitMove(loc,dest,chosenQuantity(loc.stack),{insert:true});
   }
 }
-function onQuantity(op){const loc=selection&&locateUid(me(),selection.uid);if(!loc?.stack)return;qtyMode=op==='inc'||op==='dec'?'set':op;chosenQty=adjustQuantity(loc.stack.quantity,chosenQuantity(loc.stack),op);dropConfirm=false;dirty=true;}
+function onQuantity(op){const loc=selection&&locateUid(me(),selection.uid);if(!loc?.stack)return;qtyMode=op==='inc'||op==='dec'?'set':op;chosenQty=adjustQuantity(loc.stack.quantity,chosenQuantity(loc.stack),op);dropConfirm=false;refresh();}
 function onShift(key){selectKey(key);if(!chestSession||!selection)return;qtyMode='all';const loc=locateUid(me(),selection.uid);if(loc)void operate('transfer');}
 function activateSelection(){if(!selection||dropConfirm)return;const loc=locateUid(me(),selection.uid);if(!loc?.stack)return;const ops=operationsFor({itemId:loc.stack.itemId,where:loc.where,chestOpen:!!chestSession});const preferred=['transfer','equip','eat','heal','take','unequip'].find(op=>ops.includes(op));if(preferred)void operate(preferred);}
 function ensurePanel(){
@@ -309,7 +310,7 @@ function inventoryView(p){
   const recovery=(p.recovery?.slots||[]).flatMap((stack,index)=>stack?[makeCell(`recovery:${index}`,stack,'recovery',index)]:[]);
   let chestView=null;
   if(sheet==='chest'){
-    if(!chest)chestView={pending:true,page:0,pages:1,slots:Array.from({length:6},(_,index)=>makeCell(`chest:${index}`,null,'chest',index))};
+    if(!chest)chestView={pending:true,page:0,pages:1,slots:[]};
     else{
       const pages=Math.max(1,Math.ceil(chest.store.slots.length/CHEST_PAGE_SLOTS));
       chestPage=Math.min(Math.max(0,chestPage),pages-1);
@@ -481,7 +482,7 @@ function setupControls(){
   const cluster=$('action-cluster');
   cluster.addEventListener('pointerdown',event=>{
     const button=event.target.closest('button');if(!button||button.classList.contains('is-off'))return;
-    event.preventDefault();button.setPointerCapture?.(event.pointerId);sound?.unlock();
+    event.preventDefault();try{button.setPointerCapture?.(event.pointerId);}catch{}sound?.unlock();
     if(button.id==='attack'){if(!allowsCombat(currentMode()))return;hold.attack=true;captured={pointerId:event.pointerId,kind:'attack'};void send({type:'attack'});return;}
     if(button.id==='dodge'){const actor=me();if(!actor||actor.dashCooldown>0||actor.stamina<28||actor.down||actor.ghost)return;void send({type:'dash'});return;}
     if(button.id==='lantern-button'){if(usableLantern(me()))void send({type:'lanternToggle'});return;}
@@ -499,7 +500,7 @@ function setupControls(){
   };
   cluster.addEventListener('pointerup',releasePointer);cluster.addEventListener('pointercancel',releasePointer);cluster.addEventListener('lostpointercapture',()=>releasePointer());
   const joystick=$('joystick');
-  joystick.addEventListener('pointerdown',e=>{if(!allowsMovement(currentMode()))return;e.preventDefault();pointer=e.pointerId;joystick.setPointerCapture(pointer);sound.unlock();moveStick(e);});
+  joystick.addEventListener('pointerdown',e=>{if(!allowsMovement(currentMode()))return;e.preventDefault();pointer=e.pointerId;try{joystick.setPointerCapture(pointer);}catch{}sound.unlock();moveStick(e);});
   joystick.addEventListener('pointermove',e=>{if(e.pointerId===pointer)moveStick(e);});
   for(const type of ['pointerup','pointercancel','lostpointercapture'])joystick.addEventListener(type,e=>{if(pointer===e.pointerId){pointer=null;stick={x:0,z:0};$('stick').style.transform='';}});
   function moveStick(e){const r=joystick.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,z=e.clientY-r.top-r.height/2,l=Math.hypot(x,z),scale=Math.min(1,42/Math.max(1,l));$('stick').style.transform=`translate(${x*scale}px,${z*scale}px)`;stick={x:clamp(x/42,-1,1),z:clamp(z/42,-1,1)};}
@@ -508,14 +509,14 @@ function setupControls(){
     if(!pointerStart||Math.hypot(e.clientX-pointerStart.x,e.clientY-pointerStart.y)>12||!['solo','host','guest'].includes(mode)||$('game').hidden)return;
     const modeName=currentMode();if(!allowsMovement(modeName)&&modeName!=='normal')return;
     const point=renderer.worldPoint(e.clientX,e.clientY);if(!point)return;
-    if(placement){placement.x=Math.round(point.x*2)/2;placement.z=Math.round(point.z*2)/2;placement.anchored=true;dirty=true;return;}
+    if(placement){placement.x=Math.round(point.x*2)/2;placement.z=Math.round(point.z*2)/2;placement.anchored=true;refresh();return;}
     const picked=renderer.pick(e.clientX,e.clientY,world);
     if(maintenance){maintenanceTarget=picked&&world.buildings.includes(picked)?picked.id:null;selected=maintenanceTarget;dirty=true;return;}
     if(modeName!=='normal')return;
     if(picked&&world.nodes.includes(picked)){selected=picked.id;void send({type:'setHarvestTarget',nodeId:picked.id,mode:'auto'});return;}
     if(picked&&world.drops.includes(picked)){selected=picked.id;void send({type:'move',x:picked.x,z:picked.z,target:picked.id});return;}
     if(picked&&world.enemies.includes(picked)){selected=picked.id;if(distance(me(),picked)<3.4)void send({type:'attack'});else void send({type:'move',x:picked.x,z:picked.z});return;}
-    if(picked&&world.buildings.includes(picked)){selected=picked.id;if(distance(me(),picked)>=RULES.reach)void send({type:'move',x:picked.x,z:picked.z});dirty=true;return;}
+    if(picked&&world.buildings.includes(picked)){selected=picked.id;if(distance(me(),picked)>=RULES.reach)void send({type:'move',x:picked.x,z:picked.z});refresh();return;}
     selected=null;void send({type:'move',x:point.x,z:point.z});
   });
   $('sheet-tabs').onclick=event=>{
@@ -548,7 +549,7 @@ function setupControls(){
     if(key==='escape'){
       const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!(selection&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement,maintaining:maintenance});
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();
-      else if(step==='close-details'){clearSelection();dirty=true;}
+      else if(step==='close-details'){clearSelection();refresh();}
       else if(step==='close-panel')closeSheet();
       else if(step==='cancel-placement'){cancelPlacement();dirty=true;}
       else if(step==='cancel-maintenance'){cancelMaintenance();dirty=true;}

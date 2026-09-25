@@ -1,12 +1,15 @@
-import {RULES, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs';
+import {RULES, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-5';
 import {
   CLOCK_V1, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2, SUPPLY_CAPACITY,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createContainer,
   containerId, duplicateUids, emptyEquipment, equippedLanternLit, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
   supplyLoad, wearStack,
-} from './inventory.mjs';
-import {repairIdCounter, validateV2World} from './serialization.mjs';
+} from './inventory.mjs?v=harvest-5';
+import {repairIdCounter, validateV2World} from './serialization.mjs?v=harvest-5';
+import {INTENTS, inSupplyChestRange} from './contracts.mjs?v=harvest-5';
+import {pruneChests, releaseChests} from './chests.mjs?v=harvest-5';
+import {inventoryIntent} from './transactions.mjs?v=harvest-5';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -31,6 +34,7 @@ export class World {
     this.version=SAVE_VERSION_V2;this.clock=CLOCK_V1;this.seed=seed;this.time=0;this.status='lobby';this.players=[];this.nodes=makeMap(seed);
     this.buildings=[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
     this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=false;this.wipe=0;
+    this.networkId=crypto.randomUUID();this.transactionRevision=0;this.chestSessions=new Map();
     this.stats={gathered:0,built:0,revives:0};this.inputs=new Map();this.rng=random(seed^0x1234);this.discoverTimer=0;
   }
   nextId(prefix){return prefix+(this.idCounter++);}
@@ -60,7 +64,7 @@ export class World {
     this.give(p,'wood',3);this.give(p,'stone',2);this.give(p,'fiber',3);this.give(p,'berry',3);
     return p;
   }
-  leave(id){const p=this.player(id);if(p){p.online=false;p.goal=null;this.inputs.delete(id);}}
+  leave(id){releaseChests(this,id);const p=this.player(id);if(p){p.online=false;p.goal=null;this.inputs.delete(id);}}
   player(id){return this.players.find(p=>p.id===id);}
   start(){if(this.status==='lobby')this.status='playing';}
   event(type,x,z,text='',extra={}){this.events.push({id:++this.eventId,type,x,z,text,at:this.time,...extra});if(this.events.length>25)this.events.shift();}
@@ -175,12 +179,15 @@ export class World {
     const current=p.equipment[slot];
     if(!current||!(amount>0))return;
     const worn=wearStack(current, amount);
-    p.equipment[slot]=worn.stack;p.equipmentRevision++;
+    p.equipment[slot]=worn.stack;
+    // Ownership revisions track socket changes, not continuously burning fuel.
+    // Transfers always read current host durability rather than a client copy.
+    if(worn.removed)p.equipmentRevision++;
     if(slot==='light'&&!(p.equipment.light?.durability>0))p.lantern=false;
   }
   collapseRecovery(p){if(p.recovery&&!p.recovery.slots.some(Boolean))p.recovery=null;}
   nearby(p,type,range=4){return this.buildings.find(b=>(b.type===type||(type==='fire'&&['hearth','fire'].includes(b.type)))&&b.hp>0&&distance(p,b)<range&&(type!=='fire'||b.fuel>0));}
-  stores(p){return this.buildings.filter(b=>b.type==='chest'&&distance(p,b)<5).map(b=>b.store);}
+  stores(p){pruneChests(this);return this.buildings.filter(b=>b.type==='chest'&&b.hp>0&&inSupplyChestRange(distance(p,b))&&(!this.chestSessions.has(b.id)||this.chestSessions.get(b.id).ownerId===p.id)).map(b=>b.store);}
   available(p,itemId){return this.count(p, itemId)+this.stores(p).reduce((total, store)=>total+countItem(store, itemId), 0);}
   canPay(p,cost){return Object.entries(cost).every(([itemId, need])=>Number.isInteger(need)&&this.available(p, itemId)>=need);}
   takeCost(clones,cost){
@@ -377,9 +384,13 @@ export class World {
     this.assertItems();return plan;
   }
   action(id,cmd){
-    const p=this.player(id);if(!p||!p.online||this.status!=='playing'||!cmd||typeof cmd!=='object')return;
-    if(p.down||p.ghost){if(cmd.type==='interact'&&p.charm>0){p.charm--;this.revivePlayer(p);this.event('heal',p.x,p.z,'Last charm');}return;}
-    if(p.cooldown>.05&&!['move','ping','lantern','dash'].includes(cmd.type))return;
+    const p=this.player(id);if(!p||!p.online||!cmd||typeof cmd!=='object'||Array.isArray(cmd))return {ok:false,code:'unavailable'};
+    pruneChests(this);
+    if(cmd.type==='chestClose')return inventoryIntent(this,p,cmd);
+    if(this.status!=='playing')return {ok:false,code:'unavailable'};
+    if(p.down||p.ghost){if(cmd.type==='interact'&&p.charm>0){p.charm--;this.revivePlayer(p);this.event('heal',p.x,p.z,'Last charm');return {ok:true,code:'ok'};}return {ok:false,code:'unavailable'};}
+    if(Object.hasOwn(INTENTS,cmd.type))return inventoryIntent(this,p,cmd);
+    if(p.cooldown>.05&&!['move','ping','lantern','dash'].includes(cmd.type))return {ok:false,code:'cooldown'};
     switch(cmd.type){
       case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){p.goal={x:clamp(cmd.x,-41,41),z:clamp(cmd.z,-41,41),target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
       case 'craft':{
@@ -403,7 +414,7 @@ export class World {
         p.inventory.slots=consumed.slots;p.inventory.revision=consumed.revision;
         p.hunger=clamp(p.hunger+(item.food||0),0,100);p.hp=clamp(p.hp+(item.heal||0),1,100);p.courage=clamp(p.courage+(item.courage||0),0,100);p.cooldown=.4;this.event('heal',p.x,p.z,item.food?'Delicious':'+35 health');break;
       }
-      case 'eat':this.tell(p,'Choose food in your pack');break;
+      case 'eat':return {ok:false,code:'unsupported'};
       case 'interact':this.interact(p, cmd.target);break;
       case 'attack':this.attack(p);break;
       case 'dash':if(p.stamina>=28&&p.dashCooldown<=0){p.stamina-=28;p.dash=.24;p.dashCooldown=1.1;p.rest=false;this.event('dash',p.x,p.z);}break;
@@ -427,15 +438,6 @@ export class World {
         if(!removed?.ok)this.tell(p, removed?.code==='inventoryFull'?'Pack full — store or drop some supplies':'Cannot unequip that');
         break;
       }
-      case 'deposit':{
-        const chest=this.buildings.find(b=>b.id===cmd.target&&b.type==='chest'&&distance(p,b)<4);if(!chest)return;
-        for(const stack of [...p.inventory.slots])if(stack&&isMaterial(stack.itemId))this.transferAll(p, stack.uid, chest.store, {grow:true});
-        this.tell(p,'Materials stored — nearby crafting uses this chest');p.cooldown=.3;break;
-      }
-      case 'withdraw':{
-        const chest=this.buildings.find(b=>b.id===cmd.target&&b.type==='chest'&&distance(p,b)<4);if(!chest||!itemDefinition(cmd.item))return;
-        this.withdrawItem(p, chest, cmd.item, 10);p.cooldown=.2;break;
-      }
       case 'recover':{
         const stack=p.recovery?.slots?.find(slot=>slot?.uid===cmd.uid);
         if(!stack)return;
@@ -453,6 +455,7 @@ export class World {
       }
       case 'dismantle':{
         const building=this.buildings.find(b=>b.id===cmd.target&&b.type!=='hearth'&&distance(p,b)<4);if(!building)return;
+        if(this.chestSessions.has(building.id))return {ok:false,code:'chestInUse'};
         for(const [itemId, count] of Object.entries(RECIPES[building.type].cost))this.give(p, itemId, Math.ceil(count*.5));
         this.dropContainer(building.store, building.x, building.z);this.buildings=this.buildings.filter(entry=>entry!==building);p.cooldown=.5;break;
       }
@@ -462,9 +465,10 @@ export class World {
         building.level++;building.maxHp+=300;building.hp=building.maxHp;building.fuel=Math.min(360, building.fuel+120);this.event('build',building.x,building.z,`Heartfire • level ${building.level}`);p.cooldown=.5;break;
       }
       case 'ping':this.event('ping',p.x,p.z,`${p.name}: ${['Here!','Need help!','Back to camp!'].includes(cmd.text)?cmd.text:'Here!'}`,{player:p.id});p.cooldown=.2;break;
-      default:break;
+      default:return {ok:false,code:'unsupported'};
     }
     this.assertItems();
+    return {ok:true,code:'ok'};
   }
   upgradeCost(){return this.buildings.find(b=>b.type==='hearth')?.level===1?{wood:10,stone:8,ember:4}:{wood:15,ore:6,ember:8};}
   target(p,id){
@@ -519,7 +523,7 @@ export class World {
     if(can(x,z)){p.x=x;p.z=z;return true;}
     let moved=false;if(can(x,p.z)){p.x=x;moved=true;}if(can(p.x,z)){p.z=z;moved=true;}return moved;
   }
-  hurt(p,amount){if(p.dash>0||p.down||p.ghost)return;if(p.equipment.body?.itemId==='armor'&&p.equipment.body.durability>0){this.wearEquipped(p,'body',amount);amount*=.55;}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
+  hurt(p,amount){if(p.dash>0||p.down||p.ghost)return;if(p.equipment.body?.itemId==='armor'&&p.equipment.body.durability>0){this.wearEquipped(p,'body',amount);amount*=.55;}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
   revivePlayer(p){p.down=0;p.ghost=false;p.hp=50;p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}this.event('heal',p.x,p.z,'Back on your feet');}
   spawnEnemy(type,x,z){const def=ENEMIES[type],scale=1+(this.players.filter(p=>p.online).length-1)*.35;this.enemies.push({id:this.nextId('e'),type,x,z,hp:def.hp*scale,maxHp:def.hp*scale,cooldown:1,windup:0,slam:0,tx:x,tz:z,slowed:0});}
   spawnWave(){
@@ -530,7 +534,7 @@ export class World {
     else this.event('announce',0,0,`Night ${day} • the woods are waking`);
   }
   tick(dt=RULES.tick){
-    if(this.status!=='playing')return;dt=clamp(dt,0,.1);const before=phaseAt(this.time),oldDay=dayAt(this.time);this.time+=dt;const phase=phaseAt(this.time);
+    pruneChests(this);if(this.status!=='playing')return;dt=clamp(dt,0,.1);const before=phaseAt(this.time),oldDay=dayAt(this.time);this.time+=dt;const phase=phaseAt(this.time);
     if(before!==phase){this.event('phase',0,0,phase==='day'?'Dawn. You made it.':phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='night'){this.spawnWave();this.nextSpawn=this.time+32;}if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);this.enemies=this.enemies.filter(e=>e.type==='king');}}
     if(dayAt(this.time)!==oldDay&&this.bossSlain&&!this.endless){this.status='victory';this.event('announce',0,0,'The curse is broken. Your fire still burns.');return;}
     if(phase==='night'&&this.time>=this.nextSpawn){if(this.enemies.length<22)this.spawnWave();this.nextSpawn=this.time+32;}
@@ -574,10 +578,11 @@ export class World {
     this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.until>this.time&&d.stack?.quantity>0);
     const active=this.players.filter(p=>p.online);if(active.length&&active.every(p=>(p.down||p.ghost)&&!p.charm)){this.wipe+=dt;if(this.wipe>6)this.status='defeat';}else this.wipe=0;
     this.discoverTimer-=dt;if(this.discoverTimer<=0){this.discoverTimer=.5;const seen=new Set(this.explored);for(const p of active){const gx=Math.floor((p.x+42)/4),gz=Math.floor((p.z+42)/4);for(let x=gx-2;x<=gx+2;x++)for(let z=gz-2;z<=gz+2;z++)if(x>=0&&z>=0&&x<21&&z<21)seen.add(z*21+x);}this.explored=[...seen];}
-    this.assertItems();
+    pruneChests(this);this.assertItems();
   }
-  hurtQuiet(p,amount){if(p.down||p.ghost)return;p.hp-=amount;if(p.hp<=0){p.hp=0;p.down=40;p.revive=0;this.event('announce',p.x,p.z,`${p.name} has fallen`);}}
+  hurtQuiet(p,amount){if(p.down||p.ghost)return;p.hp-=amount;if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;this.event('announce',p.x,p.z,`${p.name} has fallen`);}}
   resumeExpedition(){
+    releaseChests(this);this.networkId=crypto.randomUUID();this.transactionRevision=0;
     for(const p of this.players){p.online=p.id==='host';p.goal=null;p.rest=false;p.action='idle';p.actionUntil=0;}
     this.inputs.clear();
   }
@@ -594,7 +599,7 @@ export class World {
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
     };
-    if(purpose==='network')data.chestBusy=[];
+    if(purpose==='network'){pruneChests(this);data.chestBusy=[...this.chestSessions.values()].map(s=>({...s}));data.worldId=this.networkId;data.transactionRevision=this.transactionRevision;}
     return data;
   }
   static restore(data){
@@ -603,10 +608,14 @@ export class World {
     for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     world.version=SAVE_VERSION_V2;world.clock=CLOCK_V1;
     for(const change of data.nodeChanges||[]){const node=world.nodes.find(entry=>entry.id===change.id);if(node){node.hits=change.hits;node.ready=change.ready;}}
+    if(typeof data.worldId==='string')world.networkId=data.worldId;
+    world.transactionRevision=data.transactionRevision||0;
+    for(const session of data.chestBusy||[])world.chestSessions.set(session.chestId,{...session});
     repairIdCounter(world);world.assertItems();return world;
   }
   static fromSave(document){
     if(!document?.world)throw new Error('This save is not a Hollowstead expedition.');
-    return World.restore(document.world);
+    const {chestBusy,worldId,transactionRevision,...saved}=document.world;
+    return World.restore(saved);
   }
 }

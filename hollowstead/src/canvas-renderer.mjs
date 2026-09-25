@@ -1,8 +1,8 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
-import {NODES,STRUCTURES,RULES} from './content.mjs';
-import {biome,distance} from './engine.mjs';
-import {equippedLanternLit,itemSpriteKey} from './inventory.mjs';
+import {NODES,STRUCTURES,RULES} from './content.mjs?v=harvest-5';
+import {biome,distance} from './engine.mjs?v=harvest-5';
+import {equippedLanternLit,itemSpriteKey} from './inventory.mjs?v=harvest-5';
 export class CanvasRenderer {
   constructor(canvas,theme){
     this.canvas=canvas;this.theme=theme;this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');

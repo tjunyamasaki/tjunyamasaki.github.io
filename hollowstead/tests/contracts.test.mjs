@@ -86,10 +86,7 @@ test('runtime clock stays on the v1 baseline while the protocol is hollowstead-2
   assert.deepEqual(V2_PHASE, {day: 180, dusk: 30, night: 100, cycle: 310});
   assert.equal(V2_PHASE.cycle, V2_PHASE.day + V2_PHASE.dusk + V2_PHASE.night);
   assert.notEqual(V2_PHASE.cycle, RULES.cycle);
-  for (const file of ['content.mjs', 'engine.mjs', 'main.mjs', 'renderer.mjs', 'canvas-renderer.mjs']) {
-    const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
-    assert.equal(source.includes('contracts.mjs'), false, file);
-  }
+  assert.equal(new World(1).clock, 'v1');
   const network = readFileSync(new URL('../src/network.mjs', import.meta.url), 'utf8');
   assert.equal(network.includes('contracts.mjs'), true);
   assert.match(network, /Refresh the page to update/);

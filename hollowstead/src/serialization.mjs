@@ -7,12 +7,13 @@
 import {
   CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, SUPPLY_ITEM_IDS, V2_PHASE,
   legacyEquipmentPlan, nextNightWaveTime, phaseMigrationDelta, phaseProgress, remapPhaseTime,
-} from './contracts.mjs';
+} from './contracts.mjs?v=harvest-5';
 import {
   CHEST_PAGE_SLOTS, collectLocations, createBackpack, createContainer, createRecovery,
   duplicateUids, emptyEquipment, itemDefinition, makeStack, planInsert, validateContainer,
   validateEquipment, validateStack, containerId,
-} from './inventory.mjs';
+} from './inventory.mjs?v=harvest-5';
+import {STRUCTURES} from './content.mjs?v=harvest-5';
 
 export {SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, CLOCK_V1, CLOCK_V2};
 
@@ -94,20 +95,26 @@ export function validateV2World(data){
   if(!data||data.version!==SAVE_VERSION_V2||(data.clock!==CLOCK_V1&&data.clock!==CLOCK_V2))return {ok:false, code:'corrupt'};
   if(!Array.isArray(data.players)||data.players.length>4||!Number.isFinite(data.time)||data.time<0)return {ok:false, code:'corrupt'};
   if(!Array.isArray(data.buildings)||data.buildings.length>500||!Array.isArray(data.drops)||!Array.isArray(data.nodeChanges))return {ok:false, code:'corrupt'};
+  const playerIds=new Set(),entityIds=new Set();
   for(const player of data.players){
     if(!player||typeof player.id!=='string'||player.id.length===0)return {ok:false, code:'corrupt'};
+    if(playerIds.has(player.id)||player.inventory?.id!==containerId('backpack',player.id))return {ok:false,code:'duplicate-owner'};
+    playerIds.add(player.id);
     const inventory=validateContainer(player.inventory, {exactSlots:24, supplyCapacity:120});
     if(!inventory.ok)return inventory;
     const equipment=validateEquipment(player.equipment);
     if(!equipment.ok)return equipment;
     if(!Number.isInteger(player.equipmentRevision)||player.equipmentRevision<0)return {ok:false, code:'corrupt'};
     if(player.recovery!=null){
+      if(player.recovery.id!==containerId('recovery',player.id))return {ok:false,code:'corrupt'};
       const recovery=validateContainer(player.recovery);
       if(!recovery.ok)return recovery;
     }
     if(typeof player.lantern!=='boolean')return {ok:false, code:'corrupt'};
   }
   for(const building of data.buildings){
+    if(!building||!STRUCTURES[building.type]||typeof building.id!=='string'||entityIds.has(building.id)||building.store?.id!==containerId('chest',building.id))return {ok:false,code:'duplicate-owner'};
+    entityIds.add(building.id);
     if(!building?.store||!Array.isArray(building.store.slots))return {ok:false, code:'corrupt'};
     const limits=building.type==='chest'?{minSlots:CHEST_PAGE_SLOTS, multipleOf:6}:{};
     const store=validateContainer(building.store, limits);
@@ -117,11 +124,23 @@ export function validateV2World(data){
     const stack=validateStack(drop?.stack);
     if(!stack.ok)return stack;
     if(typeof drop.id!=='string'||!Number.isFinite(drop.x)||!Number.isFinite(drop.z)||!Number.isFinite(drop.until))return {ok:false, code:'corrupt'};
+    if(entityIds.has(drop.id))return {ok:false,code:'duplicate-owner'};
+    entityIds.add(drop.id);
   }
   for(const change of data.nodeChanges){
     if(!change||typeof change.id!=='string'||!Number.isFinite(change.hits)||!Number.isFinite(change.ready))return {ok:false, code:'corrupt'};
   }
   if(duplicateUids(collectLocations(data)).length)return {ok:false, code:'duplicate'};
+  if(data.worldId!=null&&(typeof data.worldId!=='string'||data.worldId.length>64))return {ok:false,code:'corrupt'};
+  if(data.transactionRevision!=null&&(!Number.isSafeInteger(data.transactionRevision)||data.transactionRevision<0))return {ok:false,code:'corrupt'};
+  if(data.chestBusy!=null){
+    if(!Array.isArray(data.chestBusy)||data.chestBusy.length>4)return {ok:false,code:'corrupt'};
+    const owners=new Set(),chests=new Set();
+    for(const session of data.chestBusy){
+      if(!session||!playerIds.has(session.ownerId)||owners.has(session.ownerId)||chests.has(session.chestId)||!data.buildings.some(b=>b.id===session.chestId&&b.type==='chest')||typeof session.sessionId!=='string'||session.sessionId.length>64||!Number.isFinite(session.openedAt)||!Number.isFinite(session.expiresAt))return {ok:false,code:'corrupt'};
+      owners.add(session.ownerId);chests.add(session.chestId);
+    }
+  }
   return {ok:true};
 }
 
@@ -151,7 +170,9 @@ function convertCounts(counts, {id, slotCount, supplyCapacity, grow, mint, allow
     const def=itemDefinition(itemId);
     if(!def)return {ok:false, code:'unknown-item', itemId, message:RECOVERABLE};
     if(!allowEquipment&&def.kind==='equipment')return {ok:false, code:'unknown-item', itemId, message:RECOVERABLE};
-    if(!Number.isInteger(count)||count<=0)return {ok:false, code:'bad-count', itemId, message:RECOVERABLE};
+    if(!Number.isSafeInteger(count)||count<0)return {ok:false, code:'bad-count', itemId, message:RECOVERABLE};
+    // v1 drop/withdraw left zero-valued entries behind in otherwise valid saves.
+    if(count===0)continue;
     let left=count;
     while(left>0){
       const quantity=Math.min(def.stackLimit, left);

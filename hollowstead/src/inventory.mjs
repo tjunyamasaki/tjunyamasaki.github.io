@@ -1,11 +1,11 @@
 // Stack, container, and equipment primitives. No DOM, network, rendering, or World.
 
-import {EQUIPMENT, ITEMS} from './content.mjs';
+import {EQUIPMENT, ITEMS} from './content.mjs?v=harvest-5';
 import {
   BACKPACK_SLOT_COUNT, CHEST_GROWTH_SLOTS, CHEST_PAGE_SLOTS, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,
   EQUIPMENT_SLOTS, RESULT_CODES, SAVE_VERSION_V2, SUPPLY_CAPACITY, SUPPLY_ITEM_IDS,
   containerId, equipmentSlotFor, itemDefinition,
-} from './contracts.mjs';
+} from './contracts.mjs?v=harvest-5';
 
 export {
   BACKPACK_SLOT_COUNT, CHEST_GROWTH_SLOTS, CHEST_PAGE_SLOTS, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,
@@ -109,7 +109,7 @@ export function findStack(container, uid){
 
 export function validateContainer(container, {exactSlots=null, minSlots=null, multipleOf=null, supplyCapacity=null}={}){
   if(!container||typeof container!=='object'||typeof container.id!=='string'||container.id.length===0||container.id.length>96)return {ok:false, code:'corrupt'};
-  if(!Number.isInteger(container.revision)||container.revision<0)return {ok:false, code:'corrupt'};
+  if(!Number.isSafeInteger(container.revision)||container.revision<0)return {ok:false, code:'corrupt'};
   if(!Array.isArray(container.slots))return {ok:false, code:'corrupt'};
   if(exactSlots!=null&&container.slots.length!==exactSlots)return {ok:false, code:'corrupt'};
   if(minSlots!=null&&container.slots.length<minSlots)return {ok:false, code:'corrupt'};

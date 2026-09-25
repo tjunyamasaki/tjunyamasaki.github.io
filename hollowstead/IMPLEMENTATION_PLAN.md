@@ -1110,7 +1110,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Planning | Complete | Orchestrator | Plan only; baseline 395baac7a332f1ed94b5c73e0ec4b4882ee47afe | Gameplay implementation not started |
 | P0 | Complete | P0 agent | bc220e92a19eb4665e0346ce025a124e4e283035 | No gameplay change. P1–P6 not started |
 | P1 | Complete | P1 agent | f25990e8ee7f0c55c578df76ab54d2318bc3349d | Live clock still 150/30/80. Full inventory UI, chest locks, and 180/30/100 are later packages |
-| P2 | Not started | Unassigned | — | — |
+| P2 | Implemented; release review in progress | P2 review/implementation | 61 Hollowstead + 17 ball-game tests passing | Live UI/deployment verification pending; P3–P5 unchanged |
 | P3 | Not started | Unassigned | — | — |
 | P4 | Not started | Unassigned | — | — |
 | P5 | Not started | Unassigned | — | — |
@@ -1205,3 +1205,37 @@ Compatibility/migration notes:
 - A normal 120-supply pack fits in 24 slots. The full-storage guest dictionary does not, and it is kept in recovery rather than discarded. Recovery cannot accept new items.
 - Old hollowstead-1 peers are rejected with: "This camp uses a different Hollowstead version. Refresh the page to update, then join again."
 Exact next task: P2 — Chest transactions and network results. Do not start P3, P4, P5, or P6. Do not enable the 180/30/100 clock in P2.
+
+
+Date: 2026-09-25
+Package / agent: P0/P1 review and P2 / Codex
+Starting commit: d266399ad1fb8a4a23844d30938af998f4b6b413
+Ending commit: This P2 implementation commit; deployment/browser evidence is recorded in the following handoff entry.
+Review findings and corrections:
+- P0 contracts and synthetic fixtures matched the current implementation. The 56-test baseline passed (39 Hollowstead, 17 ball-game). Removed the obsolete P0 test assumption that runtime modules cannot import the contract; live clock behavior remains explicitly tested.
+- Fixed P1 migration rejecting zero-count entries legitimately left by v1 drop/withdraw. Zero counts are skipped; negative/unknown values remain failures; v1 backup is unchanged.
+- Fixed continuous lantern/armor/tool durability wear advancing the socket ownership revision. Ownership changes/breakage advance it; continuous wear does not. Transfers read the latest host durability, so a lit lantern is movable without stale-revision loops or fuel restoration.
+- Added validation of canonical container IDs and unique actors/buildings/drop IDs, preventing corrupt saves from aliasing transaction destinations.
+- Restored structure icons in the P1 item-icon adapter; recipe cards still support the existing replaceable structure sprites.
+Implemented P2 behavior:
+- Host-owned 12-second chest leases, renewed every 3 simulation seconds, with one opener and one open chest per player. Close, range loss, downing, disconnect, destruction, expiry, room stop, and saved-game resume release access.
+- Exact-container, UID, quantity, revision, ownership, range and session validation. Atomic moves/splits/swaps support backpack, chest and equipment sockets. A null destinationSlot requests automatic insertion; numeric equipment slots use EQUIPMENT_SLOTS order. Recovery is withdrawal-only through inventoryMove.
+- Another player's locked chest cannot pay any crafting, building, fuel, repair, awakening, planting or rearming cost. Dismantling requires an unlocked chest; destruction spills once.
+- Removed external legacy deposit/withdraw and revision-free inventory mutation routes. Existing ordinary world controls remain until P3/P4. Gameplay Ping is deliberately still P3 work; transport ping/pong continues. N07 is covered for heartbeat and legacy inventory paths, while its gameplay-Ping removal clause remains with P3.
+- Per-connection request IDs with a monotonic high-water mark, a 64-result cache, explicit failures/rate limits, and world IDs. Repeated/evicted requests cannot execute twice; previous-campaign requests cannot mutate a new campaign.
+- Client promises settle only after the acknowledged world revision is installed. Pending commands retry the same ID and resolve on timeout/disconnect. Host pause rejects new mutations except closing a chest.
+- Backpressure-aware snapshot writer completes an existing frame before starting another, resumes through bufferedamountlow, prioritizes action results, and explicitly reports over-limit snapshots. Protocol remains hollowstead-2 with transaction capability 1; P1-v2 and v1 peers get a refresh message instead of joining incompatible interfaces.
+- Minimal integration into the existing chest sheet: both storage lists, worn gear, Store/Take, quantity choice, paging, acknowledgements, renewal and close/cancellation. This is not the P4 RPG grid/layout replacement. Other HUD, hit-based harvesting and 150/30/80 timing remain unchanged.
+- Updated player chest instructions and coherent harvest-5 module/cache URLs.
+Files added: src/chests.mjs, src/transactions.mjs, src/transport.mjs, tests/chests.test.mjs, tests/chest-network.test.mjs, tests/transactions.test.mjs, tests/network-harness.mjs.
+Tests actually run:
+- node --test hollowstead/tests/*.test.mjs ball-game/tests/*.test.mjs: 78 pass (61 Hollowstead, 17 ball-game), no failures.
+- Targeted cases cover T09–T15, all item kinds, latest lit-lantern fuel, locked shared costs, socket swaps, full-pack rollback, session lifecycle, malformed commands, replay after cache eviction, pause/rejoin/late join, result-before-snapshot, and actual writer backpressure across large Unicode frames.
+- Protocol integration uses production createNetwork with paired in-memory channels. It does not verify internet NAT traversal or a physical second device.
+- git diff --check clean; changed JS syntax checked.
+Compatibility notes:
+- Save schema stays v2 with clock v1; no 180/30/100 migration is enabled. Save files omit world/transaction identity and chest sessions. World.fromSave discards any transient chest data; World.restore retains network-visible chestBusy for guest UI.
+- Request envelope: requestId = host-issued actionSessionId + ':' + monotonically increasing positive sequence; worldId must match the latest installed snapshot. Results add worldId/worldRevision; network snapshots add worldId/transactionRevision. Sessions/results are never persisted.
+- dropItem accepts equipmentRevision when dropping a socket item; equip/unequip require both ownership revisions. Socket durability is always authoritative.
+- P3 must retain these host checks when replacing legacy world commands. P4 should reuse send()/the transaction client rather than mutate containers or assume an acknowledgement is already visible in a snapshot.
+Exact next task after release checks: P3. Do not enable P4/P5 behavior as part of P2.

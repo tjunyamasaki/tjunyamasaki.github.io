@@ -1,11 +1,13 @@
-import {World,clamp,distance,biome} from './engine.mjs';
-import {RULES,ITEMS,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs';
-import {Renderer,loadTheme} from './renderer.mjs';
-import {CanvasRenderer} from './canvas-renderer.mjs';
-import {createNetwork} from './network.mjs';
-import {Sound} from './audio.mjs';
-import {SAVE_KEYS,planContinue} from './serialization.mjs';
-import {EQUIPMENT_SLOTS,itemSpriteKey} from './inventory.mjs';
+import {World,clamp,distance,biome} from './engine.mjs?v=harvest-5';
+import {RULES,ITEMS,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-5';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-5';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-5';
+import {createNetwork} from './network.mjs?v=harvest-5';
+import {Sound} from './audio.mjs?v=harvest-5';
+import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-5';
+import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-5';
+import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-5';
+import {CHEST_RENEW_SECONDS} from './contracts.mjs?v=harvest-5';
 const $=id=>document.getElementById(id),escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const PROFILE=SAVE_KEYS.profile;
 let identity=crypto.randomUUID();try{identity=sessionStorage.getItem('hollowstead.identity')||identity;sessionStorage.setItem('hollowstead.identity',identity);}catch{}
@@ -13,6 +15,8 @@ async function bounded(promise){let timer;try{return await Promise.race([promise
 let theme,renderer,sound,world,network=null,mode='front',localId='host',character='ember',room='',paused=false,remotePaused=false,hiddenPause=false;
 let sheet=null,category='all',campTarget=null,selected=null,placement=null,lastNotice=0,lastEvent=0,lastStatus='',lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,saveTime=0,pingTime=0;
 let sheetMarkup='',tabsMarkup='';
+let localActions=null,localActionWorld=null,localClient=null;
+let chestSession=null,chestOpening=false,chestToken=0,chestRenewAt=0,chestRenewing=false,chestMoving=false,chestAmount='all',chestPage=0;
 let toastTimer,announceTimer,dirty=true,stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
 function profile(){try{return JSON.parse(localStorage.getItem(PROFILE)||'{}');}catch{return {};}}
 function readStored(key){try{const raw=localStorage.getItem(key);if(!raw)return null;const data=JSON.parse(raw);return data&&typeof data==='object'?data:{invalid:true};}catch{return {invalid:true};}}
@@ -21,17 +25,91 @@ function storeProfile(){try{localStorage.setItem(PROFILE,JSON.stringify({name:$(
 function showStatus(text,error=false){$('front-status').textContent=text;$('front-status').style.color=error?'var(--red)':'var(--orange)';lastStatus=text;$('network-status').textContent=text;}
 function toast(text){$('toast').textContent=text;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3200);}
 function announce(text){$('announcement').textContent=text;$('announcement').classList.add('visible');clearTimeout(announceTimer);announceTimer=setTimeout(()=>$('announcement').classList.remove('visible'),4100);}
-function icon(key){const spriteKey=itemSpriteKey(key),src=spriteKey&&theme.sprites[spriteKey]?.src;if(!src)return '';return `<img class="item-icon" src="${escape(src)}" alt="" draggable="false">`;}
+function icon(key){const spriteKey=itemSpriteKey(key)||(STRUCTURES[key]?key:null),src=spriteKey&&theme.sprites[spriteKey]?.src;if(!src)return '';return `<img class="item-icon" src="${escape(src)}" alt="" draggable="false">`;}
 function groupsOf(container){const groups=[];for(const stack of container?.slots||[]){if(!stack)continue;const group=groups.find(entry=>entry.itemId===stack.itemId);if(group)group.quantity+=stack.quantity;else groups.push({itemId:stack.itemId,quantity:stack.quantity});}return groups;}
 function quickEat(){const p=me();if(!p)return;const stack=['stew','roast','pumpkin','berry','mushroom','meat'].map(itemId=>p.inventory.slots.find(slot=>slot?.itemId===itemId)).find(Boolean);if(stack)send({type:'use',uid:stack.uid,inventoryRevision:p.inventory.revision});else send({type:'eat'});}
 function portrait(key){return `<span class="portrait" style="background-image:url('${theme.sprites[key]?.src||theme.sprites.ember.src}');background-size:${(theme.sprites[key]?.columns||1)*100}% ${(theme.sprites[key]?.rows||1)*100}%"></span>`;}
 function me(){return world.player(localId);}
-function send(cmd){if(mode==='guest')network?.action(cmd);else if(mode==='solo'||mode==='host')world.action(localId,cmd);dirty=true;sound.unlock();}
+function commandError(result){return result.message||({chestInUse:'Chest in use',sessionExpired:'Chest access ended',wrongSession:'Chest access changed',outOfRange:'Move closer to the chest',inventoryFull:'No room for that transfer',staleRevision:'Items changed. Try again.',notOwner:'That item is not available',unknownItem:'That item is no longer here',incompatibleSocket:'That item does not fit this equipment slot',pending:'Wait for the current action',timeout:'Action not confirmed. Check the current inventory before trying again.',disconnected:'Connection closed',worldChanged:'The expedition changed',rateLimited:'Please wait a moment',notReady:'Waiting for the camp',paused:'The host has paused the expedition'})[result.code]||'That action is not available';}
+function send(cmd,{quiet=false}={}){
+  const p=me();
+  // Temporary P1 interface adapter: all inventory mutations use P2 intents.
+  if(p&&cmd.type==='use')cmd={...cmd,type:'consumeItem'};
+  if(p&&cmd.type==='equip')cmd={...cmd,type:'equipItem',socket:equipmentSlotFor(world.locate(p,cmd.uid)?.stack.itemId)};
+  if(p&&cmd.type==='unequip')cmd={...cmd,type:'unequipItem'};
+  if(p&&cmd.type==='drop')cmd={...cmd,type:'dropItem',quantity:Math.min(world.locate(p,cmd.uid)?.stack.quantity||0,5),inventoryRevision:p.inventory.revision,equipmentRevision:p.equipmentRevision};
+  if(p&&cmd.type==='recover'){
+    const slot=p.recovery?.slots.findIndex(s=>s?.uid===cmd.uid),stack=p.recovery?.slots[slot];
+    if(!stack)return Promise.resolve({ok:false,code:'unknownItem'});
+    cmd={type:'inventoryMove',sourceContainerId:p.recovery.id,sourceSlot:slot,destinationContainerId:p.inventory.id,destinationSlot:null,uid:stack.uid,quantity:stack.quantity,sourceRevision:p.recovery.revision,destinationRevision:p.inventory.revision};
+  }
+  let promise;
+  if(mode==='guest')promise=network?.action(cmd);
+  else if(mode==='solo'||mode==='host'){
+    if(localActionWorld!==world){
+      localClient?.close('worldChanged');localActionWorld=world;
+      localActions=createActionSession({getWorld:()=>world,actorId:localId});
+      localClient=createActionClient({send:value=>{const reply=localActions.execute(value);localClient.acceptResult(reply);localClient.acceptFrame({worldId:world.networkId,transactionRevision:world.transactionRevision});}});
+      localClient.start(localActions.sessionId);localClient.acceptFrame({worldId:world.networkId,transactionRevision:world.transactionRevision});
+    }
+    promise=localClient.request(cmd);
+  }
+  dirty=true;sound.unlock();
+  return (promise||Promise.resolve({ok:false,code:'notReady'})).then(result=>{dirty=true;if(!result.ok&&!quiet&&!['cooldown','unavailable'].includes(result.code))toast(commandError(result));return result;});
+}
+function releaseChestUI(){
+  chestToken++;const old=chestSession;chestSession=null;chestMoving=false;chestRenewing=false;
+  if(old)void send({type:'chestClose',chestId:old.chestId,sessionId:old.sessionId},{quiet:true});
+}
+async function openChest(chestId){
+  if(chestOpening)return;
+  closeSheet();openSheet('chest');chestOpening=true;chestPage=0;const token=chestToken;
+  const result=await send({type:'chestOpen',chestId},{quiet:true});chestOpening=false;
+  if(token!==chestToken||sheet!=='chest'){
+    if(result.ok)void send({type:'chestClose',chestId,sessionId:result.sessionId},{quiet:true});
+    return;
+  }
+  if(!result.ok){openSheet('pack');toast(commandError(result));return;}
+  chestSession={chestId,sessionId:result.sessionId};chestRenewAt=world.time+CHEST_RENEW_SECONDS;dirty=true;maintainChest();
+}
+function maintainChest(){
+  if(!chestSession)return;
+  const lock=world.chestSessions.get(chestSession.chestId),p=me();
+  if(!lock||lock.sessionId!==chestSession.sessionId||lock.ownerId!==localId||p?.down||p?.ghost){
+    if(p?.down||p?.ghost)closeSheet();else openSheet('pack');toast('Chest access ended');return;
+  }
+  if(world.time>=chestRenewAt&&!chestRenewing){
+    chestRenewing=true;chestRenewAt=world.time+CHEST_RENEW_SECONDS;
+    const current=chestSession;
+    void send({type:'chestRenew',...current},{quiet:true}).then(result=>{chestRenewing=false;if(chestSession===current&&!result.ok){openSheet('pack');toast(commandError(result));}});
+  }
+}
+async function transferChest(uid,from){
+  if(!chestSession||chestMoving)return;
+  const p=me(),chest=world.buildings.find(b=>b.id===chestSession.chestId);if(!p||!chest)return;
+  const source=from==='chest'?chest.store:from==='equipment'?{id:containerId('equipment',p.id),revision:p.equipmentRevision,slots:EQUIPMENT_SLOTS.map(s=>p.equipment[s])}:p.inventory;
+  const destination=from==='chest'?p.inventory:chest.store;
+  const sourceSlot=source.slots.findIndex(s=>s?.uid===uid),stack=source.slots[sourceSlot];if(!stack)return;
+  const quantity=chestAmount==='all'?stack.quantity:chestAmount==='half'?Math.ceil(stack.quantity/2):1;
+  chestMoving=true;dirty=true;const current=chestSession;
+  await send({type:'chestTransfer',...current,sourceContainerId:source.id,sourceSlot,destinationContainerId:destination.id,destinationSlot:null,uid,quantity,sourceRevision:source.revision,destinationRevision:destination.revision});
+  if(chestSession===current)chestMoving=false;dirty=true;
+}
+function chestPanel(p){
+  if(!chestSession)return '<p class="muted">Opening chest…</p>';
+  const chest=world.buildings.find(b=>b.id===chestSession.chestId);if(!chest)return '';
+  const pages=Math.max(1,Math.ceil(chest.store.slots.length/36));chestPage=Math.min(chestPage,pages-1);
+  const row=(stack,from)=>`<div class="chest-item">${icon(stack.itemId)}<div><b>${escape(label(stack.itemId))}</b><small>${stack.quantity}${stack.durability==null?'':` · ${Math.ceil(stack.durability)} / ${EQUIPMENT[stack.itemId].durability}`}</small></div><button data-transfer="${escape(stack.uid)}" data-from="${from}" ${chestMoving?'disabled':''}>${from==='chest'?'Take':'Store'}</button></div>`;
+  const pack=p.inventory.slots.filter(Boolean).map(s=>row(s,'pack')).join('')||'<p class="muted">Empty pack</p>';
+  const gear=EQUIPMENT_SLOTS.map(s=>p.equipment[s]).filter(Boolean).map(s=>row(s,'equipment')).join('');
+  const stored=chest.store.slots.slice(chestPage*36,(chestPage+1)*36).filter(Boolean).map(s=>row(s,'chest')).join('')||'<p class="muted">Empty chest page</p>';
+  return `<div class="chest-amount" aria-label="Transfer quantity">${[['one','1'],['half','Half'],['all','All']].map(([value,label])=>`<button data-chest-amount="${value}" aria-pressed="${chestAmount===value}">${label}</button>`).join('')}<small role="status">${chestMoving?'Waiting for camp…':''}</small></div><div class="chest-panes"><section><h3>Your pack · ${world.loadCount(p)}/120</h3><div class="chest-scroll">${pack}${gear?'<h4>Worn equipment</h4>'+gear:''}</div></section><section><h3>Supply chest</h3><div class="chest-scroll">${stored}</div><div class="chest-pages"><button data-chest-page="-1" aria-label="Previous chest page" ${chestPage<=0?'disabled':''}>←</button><small>${chestPage+1} / ${pages}</small><button data-chest-page="1" aria-label="Next chest page" ${chestPage>=pages-1?'disabled':''}>→</button></div></section></div>`;
+}
 function save(manual=false){if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;try{localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));if(manual)toast('Expedition saved');else if(mode==='solo')$('network-status').textContent='Expedition saved';}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
 function syncSaveOption(){const plan=continuePlan(),visible=!!(plan.ok||plan.recoverable);$('continue').hidden=!visible;$('saved-option').hidden=!visible;}
 function resetInput(){keys.clear();stick={x:0,z:0};hold={act:false,attack:false};pointer=null;$('stick').style.transform='';if(world?.player(localId))world.input(localId,{x:0,z:0,act:false,attack:false});network?.input({x:0,z:0,act:false,attack:false});}
 function prepareWorld(resume=false){
-  if(resume){const plan=continuePlan();if(!plan.ok)throw new Error(plan.message);const resumed=World.restore(plan.save.world);if(plan.write==='v2')localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify(plan.save));world=resumed;world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This saved expedition is missing its host.');p.online=true;if(world.status!=='playing')world.status='playing';}
+  if(resume){const plan=continuePlan();if(!plan.ok)throw new Error(plan.message);const resumed=World.fromSave(plan.save);if(plan.write==='v2')localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify(plan.save));world=resumed;world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This saved expedition is missing its host.');p.online=true;if(world.status!=='playing')world.status='playing';}
   else{world=new World();world.addPlayer('host',$('player-name').value,character);}
   localId='host';lastEvent=world.eventId;lastNotice=0;lastEnd='';selected=null;placement=null;resetInput();paused=false;remotePaused=false;saveTime=0;dirty=true;
 }
@@ -59,18 +137,19 @@ async function copyInvite(){const url=new URL(location.href);url.search='';url.s
 function currentTarget(){const p=me();if(!p)return null;return world.target(p,selected)?.entity||null;}
 function interact(){
   const p=me();if(!p)return;const t=world.target(p,selected);
-  if(!p.down&&!p.ghost&&t?.kind==='building'&&['chest','bench','pot','hearth','fire'].includes(t.entity.type)){campTarget=t.entity.id;openSheet('camp');hold.act=false;return;}
+  if(!p.down&&!p.ghost&&t?.kind==='building'&&t.entity.type==='chest'){void openChest(t.entity.id);hold.act=false;return;}
+  if(!p.down&&!p.ghost&&t?.kind==='building'&&['bench','pot','hearth','fire'].includes(t.entity.type)){campTarget=t.entity.id;openSheet('camp');hold.act=false;return;}
   send({type:'interact',target:t?.entity.id});hold.act=true;
 }
 function costHTML(cost,p){return Object.entries(cost).map(([k,n])=>`<span class="${world.available(p,k)<n?'missing':''}">${world.available(p,k)}/${n} ${escape(label(k))}</span>`).join('');}
-function openSheet(name){if(sheet==='menu'&&mode==='solo')paused=false;resetInput();sheet=name;category='all';$('sheet').hidden=false;if(name==='menu'&&mode==='solo')paused=true;dirty=true;renderSheet();}
-function closeSheet(){if(sheet==='menu'&&mode==='solo')paused=false;sheet=null;$('sheet').hidden=true;dirty=true;}
+function openSheet(name){if(name!=='chest'&&(chestSession||chestOpening))releaseChestUI();if(sheet==='menu'&&mode==='solo')paused=false;resetInput();sheet=name;category='all';$('sheet').hidden=false;if(name==='menu'&&mode==='solo')paused=true;dirty=true;renderSheet();}
+function closeSheet(){if(chestSession||chestOpening)releaseChestUI();if(sheet==='menu'&&mode==='solo')paused=false;sheet=null;$('sheet').hidden=true;dirty=true;}
 function renderSheet(){
   if(!sheet)return;const p=me();let title='',kicker='THE WANDERER’S COMPANION',tabs='',html='';
   if(sheet==='guide'){
     title='A field guide';html=`<p class="guide-intro">The woods are unkind.<br>Your friends don’t have to be.</p>`+[
       ['Gather before dusk','Move with the left stick, or tap the ground. Tap a tree or rock to walk over and harvest it. Hold Gather to keep working. Craft an axe and pick first.'],
-      ['Build a home','Use Build, tap an open spot near you, then confirm. A workbench unlocks advanced gear. A supply chest shares materials with anyone crafting within five paces.'],
+      ['Build a home','Use Build, tap an open spot near you, then confirm. A workbench unlocks advanced gear. Nearby crafting uses unlocked chests. An open chest is reserved for its user until they close it.'],
       ['Keep the fire alive','Feed the Heartfire wood before night. Firelight restores courage; darkness drains it, then your health. Hand lanterns use fuel only while switched on. Soul lanterns never go out.'],
       ['Eat, farm, recover','Eat from your pack or the quick Eat button. A burning fire cooks pumpkins, mushrooms and meat. A cauldron makes stew. Plant farm plots with seeds; harvest and replant. Bedrolls heal by day at the cost of hunger.'],
       ['Stand together','Hold Attack near an enemy. The weapon you have equipped is used; a spare in your pack does nothing until you tap Equip. Dodge out of the glowing attack circles. Armor absorbs damage only while worn. Walls block raiders, traps need rearming, and totems attack automatically.'],
@@ -84,6 +163,7 @@ function renderSheet(){
   }else if(sheet==='map'){
     title='The Hollow Harvest';kicker=`DAY ${dayAt(world.time)} · SHARED EXPLORATION`;html='<canvas id="full-map" width="600" height="600" aria-label="Explored world map"></canvas><p class="map-legend">✦ Heartfire &nbsp; ● Wanderers &nbsp; ◆ Camp structures<br>Amber · pumpkin meadows<br>Green · crooked woods<br>Violet · haunted graveyard<br>Dark areas are unexplored. Travel together to reveal them.</p><button class="wide" data-command="ping-home">Call everyone back to camp ⚑</button>';
   }else if(!p){return;}
+  else if(sheet==='chest'){title='Shared supplies';kicker='CHEST & INVENTORY';html=chestPanel(p);}
   else if(sheet==='pack'){
     const occupied=p.inventory.slots.filter(Boolean).length;
     title='Your pack';kicker='TAKE ONLY WHAT YOU CAN CARRY';html=`<div class="pack-summary"><span>${world.loadCount(p)} / ${RULES.capacity} supplies</span><span>${occupied} / 24 slots</span><span>${world.stores(p).length?'Shared chest in reach':'No chest nearby'}</span></div><div class="pack-grid">`+p.inventory.slots.filter(Boolean).map(stack=>{const item=ITEMS[stack.itemId];const wear=typeof stack.durability==='number'?`<progress max="${EQUIPMENT[stack.itemId].durability}" value="${stack.durability}"></progress>`:'';return `<div class="pack-slot">${icon(stack.itemId)}${stack.quantity>1?`<b>${stack.quantity}</b>`:''}<span>${escape(label(stack.itemId))}</span>${wear}<div class="slot-actions">${EQUIPMENT[stack.itemId]?`<button data-equip="${escape(stack.uid)}">Equip</button>`:''}${item?.food||item?.heal?`<button data-use="${escape(stack.uid)}">${item.food?'Eat':'Heal'}</button>`:''}<button data-drop="${escape(stack.uid)}">Drop ${Math.min(stack.quantity,5)}</button></div></div>`;}).join('')+'</div>';
@@ -107,10 +187,9 @@ function renderSheet(){
       if(b.type==='bench')html+='<button data-command="crafting">Craft equipment</button><button data-command="building">Build advanced structures</button>';
       if(b.type==='pot')html+='<button data-command="cooking">Cook food</button>';
       if(b.hp<b.maxHp)html+='<button data-command="repair">Repair · 1 wood</button>';
-      if(b.type==='chest')html+='<button data-command="deposit">Store all materials</button>';
       html+='</div>';
       if(b.type==='hearth'&&b.level<3)html+=`<p class="section-label">NEXT AWAKENING · +300 HEALTH & MORE LIGHT</p><div class="cost">${costHTML(world.upgradeCost(),p)}</div>`;
-      if(b.type==='chest'){const stored=groupsOf(b.store);html+='<p class="muted small">Nearby crafting uses these supplies automatically. Tap to take up to 10.</p><div class="pack-grid" style="margin-top:16px">'+stored.map(group=>`<button class="pack-slot" data-withdraw="${escape(group.itemId)}">${icon(group.itemId)}<b>${group.quantity}</b><span>${escape(label(group.itemId))}</span></button>`).join('')+'</div>';if(!stored.length)html+='<p class="empty">Ready for your first supplies.</p>';}
+      if(b.type==='chest')html+='<button data-command="open-chest">Open chest</button>';
       if(b.type!=='hearth')html+='<p class="section-label">RECOVER MATERIALS</p><button data-command="dismantle">Dismantle for half the materials</button>';
     }
   }
@@ -138,6 +217,7 @@ function drawMap(canvas,full=false){
   if(full){ctx.font='13px monospace';ctx.fillStyle='#e0caaa';ctx.textAlign='center';ctx.fillText('N',size/2,20);ctx.font='12px Georgia';ctx.fillText('HEARTFIRE',size/2,size/2+23);}
 }
 function ui(){
+  maintainChest();
   if($('room-panel').hidden===false){$('roster').innerHTML=world.players.filter(p=>p.online).map(p=>`<div class="roster-row">${portrait(p.character)}<span>${escape(p.name)}</span><small>${p.id==='host'?'HOST':'READY'}</small></div>`).join('')+Array.from({length:Math.max(0,4-world.players.filter(p=>p.online).length)},()=>'<div class="roster-row"><span class="party-dot" style="opacity:.3"></span><span class="muted small">Waiting for a wanderer…</span></div>').join('');}
   const p=me();if(!$('game').hidden&&p){
     for(const[key,v]of [['hp',p.hp],['hunger',p.hunger],['courage',p.courage]]){$(key+'-value').textContent=Math.ceil(v);$(key+'-bar').style.width=clamp(v,0,100)+'%';}
@@ -184,13 +264,15 @@ function setupControls(){
     if(b.dataset.equip)send({type:'equip',uid:b.dataset.equip,inventoryRevision:actor?.inventory.revision,equipmentRevision:actor?.equipmentRevision});
     if(b.dataset.unequip)send({type:'unequip',socket:b.dataset.unequip,uid:b.dataset.uid,inventoryRevision:actor?.inventory.revision,equipmentRevision:actor?.equipmentRevision});
     if(b.dataset.recover)send({type:'recover',uid:b.dataset.recover});
-    if(b.dataset.withdraw)send({type:'withdraw',target:campTarget,item:b.dataset.withdraw});
+    if(b.dataset.transfer)void transferChest(b.dataset.transfer,b.dataset.from);
+    if(b.dataset.chestAmount){chestAmount=b.dataset.chestAmount;dirty=true;}
+    if(b.dataset.chestPage){chestPage+=Number(b.dataset.chestPage);dirty=true;}
     const cmd=b.dataset.command;if(!cmd)return;
     if(cmd==='resume')closeSheet();if(cmd==='save')save(true);if(cmd==='home')void goHome();if(cmd==='invite')void copyInvite();if(cmd==='guide')openSheet('guide');
     if(cmd==='sound'){sound.enabled=!sound.enabled;sound.unlock();storeProfile();dirty=true;}
     if(cmd==='zoom-in')renderer.setZoom(renderer.zoom+.15);if(cmd==='zoom-out')renderer.setZoom(renderer.zoom-.15);
     if(cmd==='ping-home'){send({type:'ping',text:'Back to camp!'});closeSheet();}
-    if(cmd==='fuel')send({type:'interact',target:campTarget});if(cmd==='upgrade')send({type:'upgrade'});if(cmd==='repair')send({type:'repair',target:campTarget});if(cmd==='deposit')send({type:'deposit',target:campTarget});
+    if(cmd==='fuel')send({type:'interact',target:campTarget});if(cmd==='upgrade')send({type:'upgrade'});if(cmd==='repair')send({type:'repair',target:campTarget});if(cmd==='open-chest')void openChest(campTarget);
     if(cmd==='dismantle'){send({type:'dismantle',target:campTarget});closeSheet();}
     if(cmd==='cooking'){openSheet('craft');category='cook';dirty=true;renderSheet();}if(cmd==='crafting')openSheet('craft');if(cmd==='building')openSheet('build');
   };
@@ -199,7 +281,7 @@ function setupControls(){
     if(key==='escape'){if(placement){placement=null;$('placement').hidden=true;}else if(sheet)closeSheet();else openSheet('menu');return;}if(sheet)return;
     if(key==='e')interact();if(key===' ')send({type:'attack'});if(key==='shift')send({type:'dash'});if(key==='q')quickEat();if(key==='f')send({type:'lantern'});if(key==='g')send({type:'ping',text:'Here!'});const panels={i:'pack',c:'craft',b:'build',m:'map'};if(panels[key])openSheet(panels[key]);
   });window.addEventListener('keyup',e=>{keys.delete(e.key.toLowerCase());if(e.key.toLowerCase()==='e')hold.act=false;});
-  window.addEventListener('blur',resetInput);document.addEventListener('visibilitychange',()=>{resetInput();hiddenPause=document.hidden;if(mode==='host'){network?.pause(hiddenPause);if(hiddenPause)save();}if(mode==='solo'&&hiddenPause)save();});window.addEventListener('pagehide',()=>{save();void network?.stop();});
+  window.addEventListener('blur',()=>{resetInput();if(sheet==='chest')closeSheet();});document.addEventListener('visibilitychange',()=>{resetInput();if(document.hidden&&sheet==='chest')closeSheet();hiddenPause=document.hidden;if(mode==='host'){network?.pause(hiddenPause);if(hiddenPause)save();}if(mode==='solo'&&hiddenPause)save();});window.addEventListener('pagehide',()=>{save();void network?.stop();});
   $('room-input').addEventListener('keydown',e=>{if(e.key==='Enter')joinCamp();});$('player-name').addEventListener('change',storeProfile);
 }
 function frame(now){

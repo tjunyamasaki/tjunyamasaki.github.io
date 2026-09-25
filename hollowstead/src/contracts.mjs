@@ -4,7 +4,7 @@
 // The running clock stays on content.mjs 150/30/80 until P5 enables 180/30/100.
 // Do not import World, the DOM, the network, or a renderer from here.
 
-import {EQUIPMENT, ITEMS, RULES} from './content.mjs';
+import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-5';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 
@@ -154,7 +154,7 @@ export const INTENTS = Object.freeze({
   consumeItem: intent('consumeItem', ['requestId', 'uid', 'inventoryRevision']),
   equipItem: intent('equipItem', ['requestId', 'uid', 'socket', 'inventoryRevision', 'equipmentRevision']),
   unequipItem: intent('unequipItem', ['requestId', 'uid', 'socket', 'inventoryRevision', 'equipmentRevision']),
-  dropItem: intent('dropItem', ['requestId', 'uid', 'quantity', 'inventoryRevision']),
+  dropItem: intent('dropItem', ['requestId', 'uid', 'quantity', 'inventoryRevision'], ['equipmentRevision']),
   chestOpen: intent('chestOpen', ['requestId', 'chestId']),
   chestRenew: intent('chestRenew', ['requestId', 'chestId', 'sessionId']),
   chestClose: intent('chestClose', ['requestId', 'chestId', 'sessionId']),

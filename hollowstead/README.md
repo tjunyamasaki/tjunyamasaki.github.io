@@ -15,7 +15,7 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 ## Survive
 
 1. Craft an axe and pick. Tap a resource to walk to it and gather, or use the stick and hold **Gather**. Moon iron and haunted graves require a pick.
-2. Build a workbench, a shared supply chest and defenses. Recipes use your pack and nearby chests. Equipment is used automatically and wears out.
+2. Build a workbench, a shared supply chest and defenses. Recipes use your pack and nearby unlocked chests. Equip tools, weapons, and armor from your pack; spare gear has no effect until worn.
 3. Cook at a burning fire. Grow pumpkins in farm plots, make healing bandages, and build a cauldron for nourishing stew.
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
 5. Hold **Attack** to use your best weapon. Dodge the glowing enemy attack circles. Repair walls, rearm traps, and use wards to help defend the camp.
@@ -23,6 +23,10 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 7. Awaken the Heartfire with soul embers. The fifth night brings the Hollow King. Defeat him and survive until dawn to break the curse, then choose to keep surviving if you wish.
 
 Losing the Heartfire ends the expedition. If everyone falls and has spent their charm, the expedition also ends.
+
+## Shared chests
+
+Only one wanderer can open a chest at a time. Its panel shows your pack, worn gear, and the chest together. Choose 1, Half, or All, then Store or Take to move materials, food, or equipment. Worn gear keeps its durability; storing a lit lantern switches it off. Close the panel to release the chest. Other players cannot spend its supplies while you have it open.
 
 ## Controls
 

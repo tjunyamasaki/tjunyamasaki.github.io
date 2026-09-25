@@ -6,29 +6,7 @@ import {createNetwork,PROTOCOL} from '../src/network.mjs';
 import {countItem} from '../src/inventory.mjs';
 import {PROTOCOL_V2} from '../src/contracts.mjs';
 // In-memory signaling/transport; live Firebase/NAT traversal needs a browser check.
-function harness(){
- const rooms=new Map(),events=new Map(),pcs=new Map();let serial=0;
- const key=(...parts)=>parts.join('/');
- const listen=(k,cb)=>{if(!events.has(k))events.set(k,new Set());events.get(k).add(cb);return()=>events.get(k).delete(cb);};
- const emit=(k,data)=>{for(const cb of events.get(k)||[])queueMicrotask(()=>cb(data));};
- class Channel{
-  constructor(label){this.label=label;this.readyState='connecting';this.bufferedAmount=0;}
-  send(data){if(this.readyState!=='open')throw Error('closed');queueMicrotask(()=>this.other.onmessage?.({data}));}
-  close(){if(this.readyState==='closed')return;this.readyState='closed';this.onclose?.();if(this.other?.readyState!=='closed'){this.other.readyState='closed';this.other.onclose?.();}}
- }
- class PC{
-  constructor(){this.id=String(++serial);pcs.set(this.id,this);this.channels=[];this.connectionState='new';}
-  createDataChannel(label){const c=new Channel(label);this.channels.push(c);return c;}
-  async createOffer(){return{type:'offer',sdp:this.id};}
-  async createAnswer(){return{type:'answer',sdp:this.id};}
-  async setLocalDescription(d){this.localDescription=d;}
-  async setRemoteDescription(d){this.currentRemoteDescription=d;if(d.type==='answer'){const peer=pcs.get(d.sdp);for(const channel of this.channels){const other=new Channel(channel.label);channel.other=other;other.other=channel;peer.channels.push(other);peer.ondatachannel?.({channel:other});channel.readyState=other.readyState='open';queueMicrotask(()=>{channel.onopen?.();other.onopen?.();});}this.connectionState=peer.connectionState='connected';}}
-  close(){if(this.connectionState==='closed')return;this.connectionState='closed';for(const c of this.channels)c.close();this.onconnectionstatechange?.();}
- }
- const signal={ICE_CONFIG:{},initFirebase(){},async createRoom(){rooms.set('ABCDE',{});return 'ABCDE';},async roomExists(code){return rooms.has(code);},listenNewGuests(code,cb){return listen(key(code,'new'),v=>cb(v.id,v.info));},async registerGuest(code,id,name){emit(key(code,'new'),{id,info:{name}});},listenAnswer(c,id,cb){return listen(key(c,id,'answer'),cb);},listenOffer(c,id,cb){return listen(key(c,id,'offer'),cb);},listenRejected(c,id,cb){return listen(key(c,id,'reject'),cb);},async writeOffer(c,id,d){emit(key(c,id,'offer'),d);},async writeAnswer(c,id,d){emit(key(c,id,'answer'),d);},async rejectGuest(c,id,d){emit(key(c,id,'reject'),d);},listenIce(){return()=>{};},async pushIce(){},createIceBuffer(){return{async add(){},async markRemoteSet(){}};},async deleteRoom(c){rooms.delete(c);},async deleteGuest(){}};
- return {signal,PC,rooms,events};
-}
-const flush=()=>new Promise(resolve=>setImmediate(resolve));
+import {harness,flush} from './network-harness.mjs';
 test('host and guest exchange lobby, actions, chunked state, pause and cleanup',async()=>{
  const h=harness(),world=new World(37);world.addPlayer('host','Host');let id,frame,paused,left=false;const opts={signaling:h.signal,PeerConnection:h.PC};
  const host=createNetwork({...opts,getWorld:()=>world});const guest=createNetwork({...opts,onReady:x=>id=x,onFrame:f=>frame=f,onPause:p=>paused=p,onLeave:()=>left=true});

@@ -35,7 +35,7 @@ export function chestIntent(world, player, cmd){
     if(!session)return result('ok');
     if(session.ownerId!==player.id)return result('notOwner');
     if(cmd.sessionId!==session.sessionId)return result('wrongSession');
-    world.chestSessions.delete(chest.id);
+    world.chestSessions.delete(cmd.chestId);
     return result('ok');
   }
   if(!chest)return result('missingChest');

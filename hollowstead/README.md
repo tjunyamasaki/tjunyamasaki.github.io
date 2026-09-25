@@ -18,7 +18,7 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 2. Build a workbench, a shared supply chest and defenses. Recipes use your pack and nearby unlocked chests. Equip tools, weapons, and armor from your pack; spare gear has no effect until worn.
 3. Cook at a burning fire. Grow pumpkins in farm plots, make healing bandages, and build a cauldron for nourishing stew.
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
-5. Hold **Attack** to use your best weapon. Dodge the glowing enemy attack circles. Repair walls, rearm traps, and use wards to help defend the camp.
+5. Hold **Attack** to use the weapon you have equipped. Dodge the glowing enemy attack circles. Repair walls, rearm traps, and use wards to help defend the camp.
 6. Hold **Gather** beside a fallen friend to revive them. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable.
 7. Awaken the Heartfire with soul embers. The fifth night brings the Hollow King. Defeat him and survive until dawn to break the curse, then choose to keep surviving if you wish.
 

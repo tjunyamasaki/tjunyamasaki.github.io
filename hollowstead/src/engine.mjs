@@ -303,18 +303,6 @@ export class World {
     source.revision++;
     return plan.accepted;
   }
-  withdrawItem(p,chest,itemId,limit){
-    let left=limit;
-    while(left>0){
-      const stack=chest.store.slots.find(slot=>slot?.itemId===itemId);
-      if(!stack)break;
-      const requested=Math.min(left, stack.quantity);
-      const taken=this.takeInto(p, chest.store, stack, requested);
-      if(!taken)break;
-      left-=taken;
-      if(taken<requested)break;
-    }
-  }
   dropOwned(p,uid,quantity){
     const loc=this.locate(p, uid);
     if(!loc)return false;

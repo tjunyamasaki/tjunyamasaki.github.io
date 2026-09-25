@@ -107,6 +107,7 @@ test('T12 close/expiry/range/downing/disconnect/removal/load all release chest s
     if(reason==='disconnect')w.leave(p.id);
     if(reason==='removal')w.buildings=w.buildings.filter(b=>b!==chest);
     if(reason==='stop')w.status='defeat';
+    if(reason==='removal'||reason==='stop')w.tick();
     if(reason==='save'){
       const network=World.restore(structuredClone(w.snapshot()));
       assert.equal(network.chestSessions.get(chest.id).sessionId,session);
@@ -114,7 +115,15 @@ test('T12 close/expiry/range/downing/disconnect/removal/load all release chest s
       const resumed=World.fromSave({world:{...saved,chestBusy:w.snapshot().chestBusy}});
       assert.equal(resumed.chestSessions.size,0);continue;
     }
-    w.snapshot();assert.equal(w.chestSessions.size,0,reason);
+    if(reason==='expiry'||reason==='range'){
+      const stack=p.inventory.slots.find(slot=>slot?.itemId==='wood'),before=stack.quantity;
+      const denied=command(p,{type:'chestTransfer',chestId:chest.id,sessionId:session,sourceContainerId:p.inventory.id,destinationContainerId:chest.store.id,sourceSlot:p.inventory.slots.indexOf(stack),destinationSlot:null,uid:stack.uid,quantity:1,sourceRevision:p.inventory.revision,destinationRevision:chest.store.revision});
+      assert.equal(denied.ok,false,reason);
+      assert.equal(stack.quantity,before,reason);
+      assert.equal(countItem(chest.store,'wood'),0,reason);
+    }
+    // Release is already true. snapshot() also prunes, so it must not be the only proof.
+    assert.equal(w.chestSessions.size,0,reason);
     if(!['removal','stop'].includes(reason))assert.equal(open(q).ok,true,reason);
   }
 });
@@ -161,8 +170,12 @@ test('locked supplies cannot fuel, repair, upgrade, plant or rearm through old i
 test('T15 dismantle cannot bypass a lease; destruction spills exactly once with durability intact',()=>{
   const {w,p,q,chest,open,command}=camp();w.stock(chest.store,'torch',1);chest.store.slots.find(Boolean).durability=12.3;
   const session=open(p).sessionId;
+  const hearth=w.buildings.find(b=>b.type==='hearth');
+  assert.equal(command(p,{type:'dismantle',target:hearth.id}).ok,false);
+  assert.equal(w.buildings.some(b=>b.id===hearth.id),true);
   assert.equal(command(q,{type:'dismantle',target:chest.id}).code,'chestInUse');
   assert.equal(command(p,{type:'dismantle',target:chest.id}).code,'chestInUse');
+  assert.equal(countItem(chest.store,'torch'),1);
   chest.hp=0;w.tick();assert.equal(w.chestSessions.size,0);
   assert.equal(w.drops.filter(d=>d.stack.itemId==='torch').length,1);
   assert.equal(w.drops.find(d=>d.stack.itemId==='torch').stack.durability,12.3);
@@ -189,6 +202,17 @@ test('full backpack transfer is atomic; splits, socket swaps and explicit last-c
   w.give(p,'spear',1);const spear=p.inventory.slots.find(s=>s?.itemId==='spear'),length=slots.length;
   assert.equal(transfer(p,session,p.inventory,chest.store,spear.uid,1,{destinationSlot:length-1}).ok,true);
   assert.equal(chest.store.slots.length,length+6);w.assertItems();
+});
+
+test('T11 withdrawItem is gone, so a locked chest cannot be emptied beside the session',()=>{
+  const {w,p,q,chest,open}=camp();
+  open(p);
+  w.stock(chest.store,'wood',4);
+  const before=countItem(chest.store,'wood');
+  assert.equal(typeof w.withdrawItem,'undefined');
+  assert.equal(w.action(q.id,{type:'withdraw',target:chest.id,item:'wood',limit:10}).code,'unsupported');
+  assert.equal(countItem(chest.store,'wood'),before);
+  assert.equal(w.chestSessions.get(chest.id).ownerId,p.id);
 });
 
 test('equipment and transfer actions ignore combat cooldown without resetting it',()=>{

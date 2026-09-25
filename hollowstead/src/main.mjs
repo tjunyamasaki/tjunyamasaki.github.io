@@ -81,8 +81,23 @@ function maintainChest(){
   if(world.time>=chestRenewAt&&!chestRenewing){
     chestRenewing=true;chestRenewAt=world.time+CHEST_RENEW_SECONDS;
     const current=chestSession;
-    void send({type:'chestRenew',...current},{quiet:true}).then(result=>{chestRenewing=false;if(chestSession===current&&!result.ok){openSheet('pack');toast(commandError(result));}});
+    void send({type:'chestRenew',...current},{quiet:true}).then(result=>{
+      chestRenewing=false;
+      if(chestSession!==current||result.ok)return;
+      // Pause freezes the lease. A full client queue or a rate limit is not session loss.
+      if(result.code==='paused'||result.code==='pending'||result.code==='rateLimited'){chestRenewAt=world.time;return;}
+      openSheet('pack');toast(commandError(result));
+    });
   }
+}
+async function dismantleOpenChest(){
+  const current=chestSession;if(!current)return;
+  const closed=await send({type:'chestClose',chestId:current.chestId,sessionId:current.sessionId},{quiet:true});
+  if(chestSession!==current)return;
+  if(!closed.ok){toast(commandError(closed));return;}
+  chestToken++;chestSession=null;chestMoving=false;chestRenewing=false;
+  const removed=await send({type:'dismantle',target:current.chestId});
+  if(removed.ok)closeSheet();
 }
 async function transferChest(uid,from){
   if(!chestSession||chestMoving)return;
@@ -103,7 +118,8 @@ function chestPanel(p){
   const pack=p.inventory.slots.filter(Boolean).map(s=>row(s,'pack')).join('')||'<p class="muted">Empty pack</p>';
   const gear=EQUIPMENT_SLOTS.map(s=>p.equipment[s]).filter(Boolean).map(s=>row(s,'equipment')).join('');
   const stored=chest.store.slots.slice(chestPage*36,(chestPage+1)*36).filter(Boolean).map(s=>row(s,'chest')).join('')||'<p class="muted">Empty chest page</p>';
-  return `<div class="chest-amount" aria-label="Transfer quantity">${[['one','1'],['half','Half'],['all','All']].map(([value,label])=>`<button data-chest-amount="${value}" aria-pressed="${chestAmount===value}">${label}</button>`).join('')}<small role="status">${chestMoving?'Waiting for camp…':''}</small></div><div class="chest-panes"><section><h3>Your pack · ${world.loadCount(p)}/120</h3><div class="chest-scroll">${pack}${gear?'<h4>Worn equipment</h4>'+gear:''}</div></section><section><h3>Supply chest</h3><div class="chest-scroll">${stored}</div><div class="chest-pages"><button data-chest-page="-1" aria-label="Previous chest page" ${chestPage<=0?'disabled':''}>←</button><small>${chestPage+1} / ${pages}</small><button data-chest-page="1" aria-label="Next chest page" ${chestPage>=pages-1?'disabled':''}>→</button></div></section></div>`;
+  const upkeep=`<div class="camp-actions">${chest.hp<chest.maxHp?'<button data-command="repair-chest">Repair · 1 wood</button>':''}<button data-command="dismantle-chest">Dismantle for half the materials</button></div>`;
+  return `<div class="chest-amount" aria-label="Transfer quantity">${[['one','1'],['half','Half'],['all','All']].map(([value,label])=>`<button data-chest-amount="${value}" aria-pressed="${chestAmount===value}">${label}</button>`).join('')}<small role="status">${chestMoving?'Waiting for camp…':''}</small></div><div class="chest-panes"><section><h3>Your pack · ${world.loadCount(p)}/120</h3><div class="chest-scroll">${pack}${gear?'<h4>Worn equipment</h4>'+gear:''}</div></section><section><h3>Supply chest</h3><div class="chest-scroll">${stored}</div><div class="chest-pages"><button data-chest-page="-1" aria-label="Previous chest page" ${chestPage<=0?'disabled':''}>←</button><small>${chestPage+1} / ${pages}</small><button data-chest-page="1" aria-label="Next chest page" ${chestPage>=pages-1?'disabled':''}>→</button></div></section></div>${upkeep}`;
 }
 function save(manual=false){if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;try{localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));if(manual)toast('Expedition saved');else if(mode==='solo')$('network-status').textContent='Expedition saved';}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
 function syncSaveOption(){const plan=continuePlan(),visible=!!(plan.ok||plan.recoverable);$('continue').hidden=!visible;$('saved-option').hidden=!visible;}
@@ -272,7 +288,7 @@ function setupControls(){
     if(cmd==='sound'){sound.enabled=!sound.enabled;sound.unlock();storeProfile();dirty=true;}
     if(cmd==='zoom-in')renderer.setZoom(renderer.zoom+.15);if(cmd==='zoom-out')renderer.setZoom(renderer.zoom-.15);
     if(cmd==='ping-home'){send({type:'ping',text:'Back to camp!'});closeSheet();}
-    if(cmd==='fuel')send({type:'interact',target:campTarget});if(cmd==='upgrade')send({type:'upgrade'});if(cmd==='repair')send({type:'repair',target:campTarget});if(cmd==='open-chest')void openChest(campTarget);
+    if(cmd==='fuel')send({type:'interact',target:campTarget});if(cmd==='upgrade')send({type:'upgrade'});if(cmd==='repair')send({type:'repair',target:campTarget});if(cmd==='repair-chest')send({type:'repair',target:chestSession?.chestId});if(cmd==='dismantle-chest')void dismantleOpenChest();if(cmd==='open-chest')void openChest(campTarget);
     if(cmd==='dismantle'){send({type:'dismantle',target:campTarget});closeSheet();}
     if(cmd==='cooking'){openSheet('craft');category='cook';dirty=true;renderSheet();}if(cmd==='crafting')openSheet('craft');if(cmd==='building')openSheet('build');
   };

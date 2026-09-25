@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
+import {phaseAt} from '../src/content.mjs';
 import {createNetwork} from '../src/network.mjs';
 import {harness,flush} from './network-harness.mjs';
 
@@ -22,7 +23,17 @@ test('N01/N03–N05 real protocol wrapper: two peers race for chest, move items,
     assert.equal(a.frame.count(a.frame.player(a.id),'wood'),1);
     const attempted=await b.net.action({type:'inventoryMove',playerId:a.id,sourceContainerId:actor.inventory.id,sourceSlot:0,destinationContainerId:b.frame.player(b.id).inventory.id,destinationSlot:20,uid:wood.uid,quantity:1,sourceRevision:actor.inventory.revision,destinationRevision:b.frame.player(b.id).inventory.revision});
     assert.equal(attempted.code,'notOwner');assert.equal(w.count(w.player(b.id),'wood'),3);
-    const late=await join();assert.equal(late.frame.chestSessions.get(chest.id).ownerId,a.id);
+    w.grantEquipped(w.player(a.id),'spear',55);
+    w.dropNew('stone',2,6,6);
+    w.time=160;
+    w.chestSessions.get(chest.id).expiresAt=w.time+12;
+    const late=await join();
+    assert.equal(late.frame.chestSessions.get(chest.id).ownerId,a.id);
+    assert.equal(late.frame.player(a.id).equipment.weapon.itemId,'spear');
+    assert.equal(late.frame.player(a.id).equipment.weapon.durability,55);
+    assert.equal(late.frame.drops.some(drop=>drop.stack.itemId==='stone'&&drop.stack.quantity===2),true);
+    assert.equal(late.frame.time,160);
+    assert.equal(phaseAt(late.frame.time),'dusk');
     const wire=h.traffic.find(x=>x.message.type==='hello').channel;
     wire.send('{bad JSON');wire.send(JSON.stringify({type:'action',value:{requestId:'forged'}}));await flush();
     assert.equal(w.chestSessions.get(chest.id).ownerId,a.id);

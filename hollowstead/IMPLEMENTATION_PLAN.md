@@ -1110,7 +1110,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Planning | Complete | Orchestrator | Plan only; baseline 395baac7a332f1ed94b5c73e0ec4b4882ee47afe | Gameplay implementation not started |
 | P0 | Complete | P0 agent | bc220e92a19eb4665e0346ce025a124e4e283035 | No gameplay change. P1–P6 not started |
 | P1 | Complete | P1 agent | f25990e8ee7f0c55c578df76ab54d2318bc3349d | Live clock still 150/30/80. Full inventory UI, chest locks, and 180/30/100 are later packages |
-| P2 | Implemented; release review in progress | P2 review/implementation | 61 Hollowstead + 17 ball-game tests passing | Live UI/deployment verification pending; P3–P5 unchanged |
+| P2 | Complete | P2 review | Review fixes on 653eb983e14027e689421f19fe0f750e60a927e1. 62 Hollowstead + 17 ball-game tests passing | Gameplay ping, hit harvesting, and station ids remain P3. Live clock stays 150/30/80 |
 | P3 | Not started | Unassigned | — | — |
 | P4 | Not started | Unassigned | — | — |
 | P5 | Not started | Unassigned | — | — |
@@ -1239,3 +1239,32 @@ Compatibility notes:
 - dropItem accepts equipmentRevision when dropping a socket item; equip/unequip require both ownership revisions. Socket durability is always authoritative.
 - P3 must retain these host checks when replacing legacy world commands. P4 should reuse send()/the transaction client rather than mutate containers or assume an acknowledgement is already visible in a snapshot.
 Exact next task after release checks: P3. Do not enable P4/P5 behavior as part of P2.
+
+Date: 2026-09-25
+Package / agent: P2 review / review agent
+Starting commit: 653eb983e14027e689421f19fe0f750e60a927e1
+Ending commit: this P2 review-fix commit. The following P3 handoff records its hash.
+Files changed:
+- hollowstead/src/engine.mjs
+- hollowstead/src/chests.mjs
+- hollowstead/src/main.mjs
+- hollowstead/README.md
+- hollowstead/tests/chests.test.mjs
+- hollowstead/tests/chest-network.test.mjs
+- hollowstead/IMPLEMENTATION_PLAN.md
+Review findings and corrections:
+- Removed World.withdrawItem. It was not a network command, but it emptied a locked chest without a session. Deposit and withdraw commands were already unsupported. T11 now asserts the method is absent and a withdraw command does not move wood.
+- chestClose releases by the commanded chest id, including when the building is already gone.
+- A paused, pending, or rate-limited renew no longer closes the chest pane or sends chestClose. Those results are not session loss. Real rejections still close the pane.
+- The open chest panel can repair a damaged chest and dismantle only after the host accepts the close. A failed close does not dismantle. Another player's new lock still returns chestInUse.
+- T12 asserts down, quiet down, and disconnect release the session before any snapshot. Expiry and out-of-range transfers change no quantities, and that proof does not call snapshot. Removal and room-stop use tick pruning, which is the host lifecycle, not the serializer. T15 now rejects Heartfire dismantle. N04 late join asserts a worn spear, a stone drop, dusk phase at time 160, and the busy chest.
+- Checked and left in place: connection-bound actor ids, no optimistic chest transfers, lock-aware pay, one opener, 12s lease and 3s renew, save snapshots omit chestBusy, network snapshots keep it, protocol mismatch, result cache, and the transport ping. Gameplay ping and hit harvesting stay for P3 on purpose.
+- Player README line 5 now says the equipped weapon is used.
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 62 pass, 0 fail.
+- node --test ball-game/tests/*.test.mjs: 17 pass, 0 fail.
+- git diff --check clean. node --check on the changed modules.
+- No browser pass in this review commit. The chest repair and dismantle buttons are on the existing chest sheet.
+Compatibility notes:
+- Clock remains 150/30/80. No 180/30/100 change. Protocol remains hollowstead-2.
+Exact next task: P3 — Context rules, recipes, timed interactions. Do not start P4, P5, or P6.

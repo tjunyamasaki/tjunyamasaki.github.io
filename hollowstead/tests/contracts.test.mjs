@@ -114,9 +114,9 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(itemDefinition('stew').use, 'eat');
   assert.equal(itemDefinition('__proto__'), null);
   assert.equal(itemDefinition('constructor'), null);
-  assert.equal(BACKPACK_SLOT_COUNT, 6);
+  assert.equal(BACKPACK_SLOT_COUNT, 12);
   assert.equal(SUPPLY_CAPACITY, 120);
-  assert.equal(CHEST_SLOT_COUNT, 18);
+  assert.equal(CHEST_SLOT_COUNT, 24);
   assert.deepEqual(splitStackQuantities(45), [20, 20, 5]);
   assert.equal(splitStackQuantities(0), null);
 
@@ -150,7 +150,7 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.deepEqual(INTENTS.placeBuilding.optional, ['stationId']);
   assert.deepEqual(INTENTS.setHarvestTarget.required, ['requestId', 'nodeId', 'mode']);
   assert.deepEqual(INTENTS.chestStoreAll.required, ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']);
-  assert.deepEqual(INTENTS.chestStack.required, ['requestId', 'chestId', 'sessionId', 'destinationRevision']);
+  assert.equal(Object.hasOwn(INTENTS, 'chestStack'), false);
   assert.deepEqual(INTENTS.chestSort.required, ['requestId', 'chestId', 'sessionId', 'destinationRevision']);
   assert.deepEqual(INTENTS.packSort.required, ['requestId', 'inventoryRevision']);
   assert.equal(INTENTS.dropItem.required.includes('inventoryRevision'), true);

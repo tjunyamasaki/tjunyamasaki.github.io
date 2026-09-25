@@ -577,9 +577,10 @@ test('T24 chopped and mined yields stay on the floor until a new pickup',()=>{
   const grass=w.nodes.find(node=>node.type==='grass'&&!(node.ready>w.time));
   stand(p,grass);
   w.clearPack(p);
-  assert.equal(w.stock(p.inventory,'fiber',120),120);
+  const full=p.inventory.slots.length*20;
+  assert.equal(w.stock(p.inventory,'fiber',full),full);
   hold(w,[{p,target:grass.id}],0.9);
-  assert.equal(qty(p.inventory,'fiber'),120);
+  assert.equal(qty(p.inventory,'fiber'),full);
   assert.equal(floorQty(w,'fiber'),1+4);
 });
 

@@ -180,17 +180,18 @@ test('T03 rejected transfers leave both containers unchanged',()=>{
 test('T04 slot count limits the backpack, and worn gear uses no pack slot',()=>{
   const {w,p}=camp();
   w.clearPack(p);
-  assert.equal(p.inventory.slots.length,6);
-  assert.equal(w.stock(p.inventory,'wood',120),120);
+  assert.equal(p.inventory.slots.length,12);
+  const full=p.inventory.slots.length*20;
+  assert.equal(w.stock(p.inventory,'wood',full),full);
   assert.equal(w.stock(p.inventory,'stone',1),0);
-  assert.equal(supplyLoad(p.inventory),120);
-  assert.equal(p.inventory.slots.filter(Boolean).length,6);
+  assert.equal(supplyLoad(p.inventory),full);
+  assert.equal(p.inventory.slots.filter(Boolean).length,12);
   assert.ok(w.grantEquipped(p,'axe',70));
-  assert.equal(supplyLoad(p.inventory),120);
-  assert.equal(p.inventory.slots.length,6);
+  assert.equal(supplyLoad(p.inventory),full);
+  assert.equal(p.inventory.slots.length,12);
   assert.equal(p.equipment.chop.itemId,'axe');
   w.clearPack(p);
-  for(let i=0;i<6;i++)p.inventory.slots[i]=w.mintStack('spear',1,EQUIPMENT.spear.durability);
+  for(let i=0;i<p.inventory.slots.length;i++)p.inventory.slots[i]=w.mintStack('spear',1,EQUIPMENT.spear.durability);
   assert.equal(w.stock(p.inventory,'fiber',1),0);
   assert.equal(qty(p.inventory,'fiber'),0);
   assert.equal(w.drops.some(drop=>drop.stack.itemId==='fiber'),false);
@@ -198,8 +199,8 @@ test('T04 slot count limits the backpack, and worn gear uses no pack slot',()=>{
   assert.equal(w.drops.some(drop=>drop.stack.itemId==='berry'),true);
   assert.equal(qty(p.inventory,'berry'),0);
   assert.ok(w.grantEquipped(p,'pick',70));
-  assert.equal(p.inventory.slots.filter(Boolean).length,6);
-  assert.equal(p.inventory.slots.length,6);
+  assert.equal(p.inventory.slots.filter(Boolean).length,12);
+  assert.equal(p.inventory.slots.length,12);
   assert.equal(supplyLoad(p.inventory),0);
   assert.equal(owned(w).length,0);
 });
@@ -374,7 +375,7 @@ test('T18 craft is all or nothing, and success creates a new item',()=>{
   const {w,p}=camp();
   w.clearPack(p);
   const uids=new Set();
-  for(let i=0;i<6;i++){const stack=w.mintStack('axe',1,70);p.inventory.slots[i]=stack;uids.add(stack.uid);}
+  for(let i=0;i<p.inventory.slots.length;i++){const stack=w.mintStack('axe',1,70);p.inventory.slots[i]=stack;uids.add(stack.uid);}
   const chest=w.structure('chest',p.x+1,p.z);
   const bench=w.structure('bench',p.x+1.5,p.z+1.2);
   w.buildings.push(chest,bench);
@@ -384,7 +385,7 @@ test('T18 craft is all or nothing, and success creates a new item',()=>{
   const blocked=act(w,p,{type:'craft',recipe:'axe',stationId:bench.id});
   assert.equal(blocked.code,'inventoryFull');
   assert.equal(JSON.stringify(chest.store),before);
-  assert.equal(p.inventory.slots.filter(stack=>stack?.itemId==='axe').length,6);
+  assert.equal(p.inventory.slots.filter(stack=>stack?.itemId==='axe').length,12);
   p.inventory.slots[0]=null;
   assert.equal(act(w,p,{type:'craft',recipe:'axe',stationId:bench.id}).ok,true);
   assert.equal(qty(chest.store,'wood'),2);
@@ -399,7 +400,8 @@ test('T18 craft is all or nothing, and success creates a new item',()=>{
 test('T25 a full pack can still finish a chop, and pickup leaves the exact remainder',()=>{
   const {w,p}=camp();
   w.clearPack(p);
-  assert.equal(w.stock(p.inventory,'wood',120),120);
+  const full=p.inventory.slots.length*20;
+  assert.equal(w.stock(p.inventory,'wood',full),full);
   const tree=w.nodes.find(node=>node.type==='tree');
   p.x=tree.x;p.z=tree.z+1;
   const hits=tree.hits;
@@ -413,21 +415,22 @@ test('T25 a full pack can still finish a chop, and pickup leaves the exact remai
   hold(w,p,tree.id,3);
   assert.ok(tree.ready>w.time);
   assert.equal(tree.hits,0);
-  assert.equal(qty(p.inventory,'wood'),120);
+  assert.equal(qty(p.inventory,'wood'),full);
   assert.equal(qty(p.inventory,'fiber'),0);
   assert.equal(w.drops.filter(drop=>drop.stack.itemId==='wood').reduce((total,drop)=>total+drop.stack.quantity,0),5);
   assert.equal(w.drops.filter(drop=>drop.stack.itemId==='fiber').reduce((total,drop)=>total+drop.stack.quantity,0),1);
 
   const other=camp();
   other.w.clearPack(other.p);
-  assert.equal(other.w.stock(other.p.inventory,'wood',115),115);
+  const otherFull=other.p.inventory.slots.length*20;
+  assert.equal(other.w.stock(other.p.inventory,'wood',otherFull-5),otherFull-5);
   const pile=other.w.mintStack('wood',12);
   const drop=other.w.placeDrop(pile,other.p.x,other.p.z);
   sim(other.w,PICKUP.flight+RULES.tick*2);
-  assert.equal(qty(other.p.inventory,'wood'),120);
+  assert.equal(qty(other.p.inventory,'wood'),otherFull);
   const left=other.w.drops.find(entry=>entry.stack.itemId==='wood');
   assert.equal(left.stack.quantity,7);
-  assert.equal(qty(other.p.inventory,'wood')+left.stack.quantity,127);
+  assert.equal(qty(other.p.inventory,'wood')+left.stack.quantity,otherFull+7);
   assert.equal(owned(w).length,0);
   assert.equal(owned(other.w).length,0);
 });
@@ -592,21 +595,22 @@ test('T31 v1 migration preserves items without moving the live clock',()=>{
   const [host,guest]=[fullWorld.player('host'),fullWorld.player('guest')];
   assert.equal(host.equipment.weapon.itemId,'sword');
   assert.equal(host.equipment.weapon.durability,140);
-  assert.equal(host.inventory.slots.length,6);
-  assert.equal(stackOf(host.recovery,'spear').durability,36);
-  assert.equal(qty(host.inventory,'spear')+qty(host.recovery,'spear'),1);
+  assert.equal(host.inventory.slots.length,12);
+  assert.equal(host.recovery,null);
+  assert.equal(stackOf(host.inventory,'spear').durability,36);
+  assert.equal(qty(host.inventory,'spear'),1);
   assert.equal(host.equipment.light.durability,167.5);
   assert.deepEqual(durabilityRows(host),v1Durability(full.world.players[0]));
-  assert.equal(guest.inventory.slots.length,6);
-  assert.equal(guest.inventory.slots.filter(Boolean).length,6);
-  assert.ok(guest.recovery.slots.length>6);
+  assert.equal(guest.inventory.slots.length,12);
+  assert.equal(guest.inventory.slots.filter(Boolean).length,12);
+  assert.ok(guest.recovery.slots.length>12);
   for(const itemId of Object.keys(ITEMS)){
     const mine=qty(guest.inventory,itemId)+qty(guest.recovery,itemId);
     assert.equal(mine,100,itemId);
   }
-  assert.equal(guest.recovery.slots.reduce((total,stack)=>total+(stack?1:0),0)>6,true);
+  assert.equal(guest.recovery.slots.reduce((total,stack)=>total+(stack?1:0),0)>12,true);
   const chest=fullWorld.buildings.find(building=>building.type==='chest');
-  assert.equal(chest.store.slots.length,18);
+  assert.equal(chest.store.slots.length,24);
   assert.ok(chest.overflow.slots.some(Boolean));
   assert.equal(qty(chest.store,'berry')+qty(chest.overflow,'berry'),80);
   assert.equal(qty(chest.store,'bandage')+qty(chest.overflow,'bandage'),80);
@@ -659,13 +663,13 @@ test('T32 corrupt migration keeps the original, and overflow can be withdrawn',(
   assert.equal(JSON.stringify(guest.recovery.slots),recoverySlots);
   const woodIndex=guest.inventory.slots.findIndex(stack=>stack?.itemId==='wood');
   guest.inventory.slots[woodIndex]=null;
-  const stone=guest.recovery.slots.find(stack=>stack?.itemId==='stone');
-  const stoneUid=stone.uid, stoneQty=stone.quantity;
+  const ember=guest.recovery.slots.find(stack=>stack?.itemId==='ember');
+  const emberUid=ember.uid, emberQty=ember.quantity;
   guest.cooldown=0;
-  world.action(guest.id,{type:'recover',uid:stoneUid});
-  assert.equal(guest.recovery.slots.some(stack=>stack?.uid===stoneUid),false);
-  assert.equal(guest.inventory.slots.find(stack=>stack?.uid===stoneUid).quantity,stoneQty);
-  assert.equal(qty(guest.inventory,'stone')+qty(guest.recovery,'stone'),100);
+  world.action(guest.id,{type:'recover',uid:emberUid});
+  assert.equal(guest.recovery.slots.some(stack=>stack?.uid===emberUid),false);
+  assert.equal(guest.inventory.slots.find(stack=>stack?.uid===emberUid).quantity,emberQty);
+  assert.equal(qty(guest.inventory,'ember')+qty(guest.recovery,'ember'),100);
   assert.notEqual(guest.recovery,null);
   assert.equal(owned(world).length,0);
 

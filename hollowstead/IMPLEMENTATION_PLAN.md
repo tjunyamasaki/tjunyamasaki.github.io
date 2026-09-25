@@ -1112,7 +1112,8 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | P3 | Complete | P3 agent | 36614c80a0fb1520532df7368983188b08c0099a. 73 Hollowstead + 17 ball-game tests passing. Pages run 36088851645 succeeded for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0 | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
 | P4 | Complete | P4 agent | a61545910636fc65f2fe487071ab2e8aa8ea892f (HUD rewrite f504b8031352223b161c20d377b7abadda5056b4). 81 Hollowstead + 17 ball-game tests passing. Pages run 36094379157 succeeded for 108481d958d253a47f92445abe3f15c6a2435121 | Real phone, rotation-during-drag, two-device chest, full first night, cauldron station, M10, and M11 were not run. Live clock stays 150/30/80. Night visuals stay P5 |
 | Floor pickup | Complete | proximity pickup | 5b79932cb6544780c23f05eb6097623ed8b20651. 94 Hollowstead + 17 ball-game tests passing. Pages run 36145733731 succeeded. Supersedes the P3 fresh-Gather pickup rule | Live clock stays 150/30/80. P5 and P6 not started |
-| Pack, chest, and pickup motion | Complete | follow-up on feat/hollowstead-coop | This commit. 99 Hollowstead + 17 ball-game tests passing | Do not restore 24 pack slots, the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Pack is 6 slots. Chests are 18 slots. Live clock stays 150/30/80. P5 and P6 not started |
+| Pack, chest, and pickup motion | Complete | follow-up on feat/hollowstead-coop | 2e41d385f008a10e200a08846e0516db17226487. 99 Hollowstead + 17 ball-game tests passing | Slot counts superseded by the 12/24 follow-up. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
+| Pack 12 and chest 24 | Complete | follow-up on feat/hollowstead-coop | This commit. 99 Hollowstead + 17 ball-game tests passing | No separate stack action. Pack is 12 slots. Chests are 24 slots. Do not restore the 120-supply backpack cap, chest page growth, or Gather-to-pickup. Live clock stays 150/30/80. P5 and P6 not started |
 | P5 | Not started | Unassigned | — | — |
 | P6 | Not started | Unassigned | — | — |
 
@@ -1535,3 +1536,54 @@ Compatibility/migration notes:
 - Do not restore 24 pack slots, the 120-supply backpack cap, chest page growth, or Gather-to-pickup.
 - Player entry cache query is harvest-10 on index.html (style.css and main.mjs) and on the nested modules those files import.
 Exact next task: P5 — Night visuals and pacing. Do not start P6. Do not restore 24 pack slots, the 120-supply backpack cap, chest page growth, or "press Gather on the pile." Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.
+
+Date: 2026-09-25
+Package / agent: Pack 12 and chest 24 UI follow-up
+Starting commit: 2e41d385f008a10e200a08846e0516db17226487
+Ending commit: This commit on feat/hollowstead-coop.
+Files changed:
+- hollowstead/src/contracts.mjs
+- hollowstead/src/inventory.mjs
+- hollowstead/src/chests.mjs
+- hollowstead/src/transactions.mjs
+- hollowstead/src/serialization.mjs
+- hollowstead/src/engine.mjs
+- hollowstead/src/main.mjs
+- hollowstead/src/ui/inventory.mjs
+- hollowstead/src/renderer.mjs
+- hollowstead/src/canvas-renderer.mjs
+- hollowstead/src/network.mjs
+- hollowstead/src/transport.mjs
+- hollowstead/src/interactions.mjs
+- hollowstead/src/ui/actions.mjs
+- hollowstead/src/ui/catalog.mjs
+- hollowstead/style.css
+- hollowstead/index.html
+- hollowstead/README.md
+- hollowstead/tests/contracts.test.mjs
+- hollowstead/tests/items.test.mjs
+- hollowstead/tests/chests.test.mjs
+- hollowstead/tests/pickup.test.mjs
+- hollowstead/tests/interactions.test.mjs
+- hollowstead/tests/storage.test.mjs
+- hollowstead/IMPLEMENTATION_PLAN.md
+Implemented behavior:
+- The pack is 12 slots. A chest is 24 slots. Slots remain the capacity limit. The per-stack maximum stays 20. The old 120-supply backpack cap is still not applied on insert, and chests still do not grow by pages.
+- Items that do not fit are not deleted. Recovery and chest overflow stay withdrawal-only. A save whose pack length is not 12 is resettled once into 12 slots; stacks that fit stay in the pack and the rest stay in recovery. A second restore of an already 12-slot pack does not reshuffle it. Existing chest overflow is not pulled forward into the newly available slots. A legacy chest longer than 24 keeps indexes 0–23 in the active chest and moves the rest into overflow:<buildingId>.
+- The inventory sheet hugs the 12-slot grid, the equipment sockets, and the actions. It is bottom-anchored, stays on screen, and scrolls inside the panel when the screen is short. Touch targets stay at least 44px. Touches inside the open panel do not move the character.
+- With a chest open in portrait, the chest grid sits directly under the pack grid. The gap is the Store all / Sort heading. At 700px and wider the two grids sit side by side under the equipment row. Store all and Sort stay usable.
+- The Stack same items button is gone, and the chestStack intent is no longer accepted. Sort on the pack and Sort on the chest both stack identical items and then order them. Two damaged tools stay separate. The host stack helper remains only because Sort calls it.
+Slot counts:
+- Pack: 12
+- Chest: 24
+- Stack limit: 20 for current stackable items
+- Recovery and chest overflow: withdrawal-only, no expiry, visible until empty
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 99 pass, 0 fail. Sort still combines identical stacks and does not merge two damaged tools. A separate chestStack command is unsupported.
+- node --test ball-game/tests/*.test.mjs: 17 pass, 0 fail.
+- git diff --check and node --check on the changed modules.
+- Headless Chrome (swiftshader) loaded /hollowstead/index.html?dev. Venture alone. At 390×844 the pack shows 12 slots, meta "Pack · 4 / 12", a 329px-tall sheet, 55px slots, and a 44px Sort button, with the equipment row at 44px. Opening a chest shows 24 slots, meta "Chest · 0 / 24", Store all and Sort, and no Stack same items button. The chest grid starts 56px under the pack grid. The last chest slot sits inside the sheet. Pointer events on the panel move the player 0. At 360×800 the pack still shows 12 slots at 50px. At 844×390 and 700×360 the chest sheet stays inside the viewport, equipment sockets are 44px, and the body scrolls (43px and 48px) so the last chest row becomes fully visible. A second phone, a guest browser, and the canvas renderer were not run in this pass.
+Compatibility/migration notes:
+- Saves stay v2 with clock v1. RULES stay day 150, dusk 30, night 80, cycle 260. Do not call remapWorldClock. Do not enable 180/30/100 or night darkness. Pickup radii and timing are unchanged. P5 and P6 are not started.
+- Player entry cache query is harvest-11 on index.html (style.css and main.mjs) and on the nested modules those files import.
+Exact next task: P5 — Night visuals and pacing. Do not start P6. Pack stays 12 slots and chests stay 24. Do not add a separate stack button, restore the 120-supply backpack cap, restore chest page growth, or restore "press Gather on the pile." Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.

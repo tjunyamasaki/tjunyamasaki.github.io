@@ -1,6 +1,6 @@
 // Authoritative chest leases and item moves. No browser, transport, or World import.
-import {CHEST_LEASE_SECONDS, CHEST_SLOT_COUNT, EQUIPMENT_SLOTS, inReach} from './contracts.mjs?v=harvest-10';
-import {cloneContainer, cloneSlots, cloneStack, containerId, planInsert, planMove, planSortSlots, planStackSlots, validateEquipment} from './inventory.mjs?v=harvest-10';
+import {CHEST_LEASE_SECONDS, CHEST_SLOT_COUNT, EQUIPMENT_SLOTS, inReach} from './contracts.mjs?v=harvest-11';
+import {cloneContainer, cloneSlots, cloneStack, containerId, planInsert, planMove, planSortSlots, validateEquipment} from './inventory.mjs?v=harvest-11';
 
 const result=(code, extra={})=>({ok:code==='ok', code, ...extra});
 const near=(a,b)=>inReach(Math.hypot(a.x-b.x,a.z-b.z));
@@ -59,7 +59,7 @@ export function chestIntent(world, player, cmd){
   }
   if(cmd.type==='chestTransfer')return moveItems(world,player,cmd,chest);
   if(cmd.type==='chestStoreAll')return storeAll(world,player,cmd,chest);
-  if(cmd.type==='chestStack'||cmd.type==='chestSort')return organizeChest(world,chest,cmd);
+  if(cmd.type==='chestSort')return organizeChest(world,chest,cmd);
   return result('unsupported');
 }
 
@@ -186,7 +186,7 @@ export function storeAll(world, player, cmd, chest){
 function organizeChest(world, chest, cmd){
   if(!Number.isSafeInteger(cmd.destinationRevision)||chest.store.revision!==cmd.destinationRevision)return result('staleRevision');
   const active=activeContainer({kind:'chest', container:chest.store}).slots;
-  const planned=cmd.type==='chestStack'?planStackSlots(active):planSortSlots(active);
+  const planned=planSortSlots(active);
   if(!planned.changed)return result('ok');
   chest.store.slots=planned.slots;
   chest.store.revision=cmd.destinationRevision+1;

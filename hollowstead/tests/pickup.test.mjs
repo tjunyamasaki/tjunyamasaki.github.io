@@ -196,12 +196,13 @@ test('after the cooldown the dropper uses the normal dwell',()=>{
 test('a full pack does not delete a pile, and overflow keeps the remainder',()=>{
   const blocked=camp();
   blocked.w.clearPack(blocked.p);
-  assert.equal(blocked.w.stock(blocked.p.inventory,'wood',120),120);
+  const blockedFull=blocked.p.inventory.slots.length*20;
+  assert.equal(blocked.w.stock(blocked.p.inventory,'wood',blockedFull),blockedFull);
   const stuck=blocked.w.mintStack('wood',4);
   const pile=blocked.w.placeDrop(stuck,blocked.p.x,blocked.p.z);
   const spot={x:pile.x,z:pile.z};
   sim(blocked.w,1.5);
-  assert.equal(qty(blocked.p.inventory,'wood'),120);
+  assert.equal(qty(blocked.p.inventory,'wood'),blockedFull);
   assert.equal(pile.stack.uid,stuck.uid);
   assert.equal(pile.stack.quantity,4);
   assert.equal(pile.x,spot.x);
@@ -211,16 +212,17 @@ test('a full pack does not delete a pile, and overflow keeps the remainder',()=>
 
   const {w,p}=camp();
   w.clearPack(p);
-  assert.equal(w.stock(p.inventory,'wood',115),115);
+  const full=p.inventory.slots.length*20;
+  assert.equal(w.stock(p.inventory,'wood',full-5),full-5);
   const stack=w.mintStack('wood',12);
   const drop=w.placeDrop(stack,p.x,p.z);
   sim(w,PICKUP.flight+RULES.tick*2);
-  assert.equal(qty(p.inventory,'wood'),120);
+  assert.equal(qty(p.inventory,'wood'),full);
   const left=w.drops.find(entry=>entry.stack.itemId==='wood');
   assert.equal(left.stack.quantity,7);
   assert.equal(left.x,drop.x);
   assert.equal(left.z,drop.z);
-  assert.equal(qty(p.inventory,'wood')+left.stack.quantity,127);
+  assert.equal(qty(p.inventory,'wood')+left.stack.quantity,full+7);
   assert.equal(duplicateUids(collectLocations(w)).length,0);
 });
 

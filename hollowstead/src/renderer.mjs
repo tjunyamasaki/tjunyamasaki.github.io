@@ -1,7 +1,7 @@
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {NODES,STRUCTURES,RULES,phaseAt} from './content.mjs?v=harvest-10';
-import {random,biome,distance,createDropMotion} from './engine.mjs?v=harvest-10';
-import {equippedLanternLit,itemSpriteKey} from './inventory.mjs?v=harvest-10';
+import {NODES,STRUCTURES,RULES,phaseAt} from './content.mjs?v=harvest-11';
+import {random,biome,distance,createDropMotion} from './engine.mjs?v=harvest-11';
+import {equippedLanternLit,itemSpriteKey} from './inventory.mjs?v=harvest-11';
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
   const response=await fetch(url);if(!response.ok)throw new Error('The harvest art could not be loaded. Please reload.');
   const theme=await response.json();theme.url=url;for(const def of Object.values(theme.sprites))def.src=new URL(def.src,url).href;

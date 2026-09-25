@@ -1,8 +1,8 @@
 // RPG inventory surface. Renders slots and reports taps, drags, and quantities.
 // It never writes player inventories, equipment, or chest contents.
 
-import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-10';
-import {equipmentSlotFor} from '../inventory.mjs?v=harvest-10';
+import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-11';
+import {equipmentSlotFor} from '../inventory.mjs?v=harvest-11';
 
 export const SOCKET_LABELS = Object.freeze({
   chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light',
@@ -109,11 +109,10 @@ export function createInventoryPanel(root, hooks) {
       <section id="inv-chest" class="chest-column" hidden aria-label="Chest">
         <div class="storage-heading">
           <div id="chest-meta" class="bag-meta"></div>
-        </div>
-        <div class="storage-tools" id="chest-tools">
-          <button type="button" data-chest-op="store">Store all</button>
-          <button type="button" data-chest-op="stack">Stack same items</button>
-          <button type="button" data-chest-op="sort">Sort</button>
+          <div class="storage-tools" id="chest-tools">
+            <button type="button" data-chest-op="store">Store all</button>
+            <button type="button" data-chest-op="sort">Sort</button>
+          </div>
         </div>
         <div id="chest-grid" class="slot-grid chest-grid" role="grid"></div>
         <div id="chest-overflow" class="recovery-block chest-overflow" hidden>

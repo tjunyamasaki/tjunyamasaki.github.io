@@ -4,7 +4,7 @@
 // The running clock stays on content.mjs 150/30/80 until P5 enables 180/30/100.
 // Do not import World, the DOM, the network, or a renderer from here.
 
-import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-10';
+import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-11';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 
@@ -47,11 +47,11 @@ export const CLOCK_V2 = 'v2';
 export const NIGHT_WAVE_FRACTIONS = Object.freeze([0, 0.4, 0.8]);
 const PHASE_EDGE_EPSILON = 1e-8;
 
-export const BACKPACK_SLOT_COUNT = 6;
+export const BACKPACK_SLOT_COUNT = 12;
 export const STACK_LIMIT = 20;
 /** Legacy v1 supply counter. A backpack is limited by its slots and stack size, not this number. */
 export const SUPPLY_CAPACITY = RULES.capacity;
-export const CHEST_SLOT_COUNT = 18;
+export const CHEST_SLOT_COUNT = 24;
 export const DROP_LIFETIME_SECONDS = 600;
 export const CHEST_LEASE_SECONDS = 12;
 export const CHEST_RENEW_SECONDS = 3;
@@ -160,7 +160,6 @@ export const INTENTS = Object.freeze({
   chestClose: intent('chestClose', ['requestId', 'chestId', 'sessionId']),
   chestTransfer: intent('chestTransfer', ['requestId', 'chestId', 'sessionId', 'sourceContainerId', 'sourceSlot', 'destinationContainerId', 'destinationSlot', 'uid', 'quantity', 'sourceRevision', 'destinationRevision']),
   chestStoreAll: intent('chestStoreAll', ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']),
-  chestStack: intent('chestStack', ['requestId', 'chestId', 'sessionId', 'destinationRevision']),
   chestSort: intent('chestSort', ['requestId', 'chestId', 'sessionId', 'destinationRevision']),
   packSort: intent('packSort', ['requestId', 'inventoryRevision']),
   craftRecipe: intent('craftRecipe', ['requestId', 'recipeId', 'stationId']),

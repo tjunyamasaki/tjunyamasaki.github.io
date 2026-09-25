@@ -188,7 +188,7 @@ test('T15 dismantle cannot bypass a lease; destruction spills exactly once with 
 
 test('full backpack transfer is atomic; splits and socket swaps preserve ownership; a full chest does not grow',()=>{
   const {w,p,chest,open,transfer}=camp();const session=open(p).sessionId;
-  w.clearPack(p);w.stock(p.inventory,'stone',120);w.stock(chest.store,'berry',2);
+  w.clearPack(p);w.stock(p.inventory,'stone',p.inventory.slots.length*20);w.stock(chest.store,'berry',2);
   const berry=chest.store.slots.find(Boolean),before=copy([p.inventory,chest.store]);
   assert.equal(transfer(p,session,chest.store,p.inventory,berry.uid).code,'inventoryFull');
   assert.equal(copy([p.inventory,chest.store]),before);
@@ -205,7 +205,7 @@ test('full backpack transfer is atomic; splits and socket swaps preserve ownersh
   w.give(p,'spear',1);const spear=p.inventory.slots.find(s=>s?.itemId==='spear');
   const beforeFull=copy([p.inventory,chest.store,p.equipment]);
   assert.equal(transfer(p,session,p.inventory,chest.store,spear.uid,1).code,'inventoryFull');
-  assert.equal(chest.store.slots.length,18);
+  assert.equal(chest.store.slots.length,24);
   assert.equal(copy([p.inventory,chest.store,p.equipment]),beforeFull);
   w.assertItems();
 });

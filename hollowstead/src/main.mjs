@@ -1,19 +1,19 @@
-import {World,clamp,distance,biome} from './engine.mjs?v=harvest-10';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-10';
-import {Renderer,loadTheme} from './renderer.mjs?v=harvest-10';
-import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-10';
-import {createNetwork} from './network.mjs?v=harvest-10';
-import {Sound} from './audio.mjs?v=harvest-10';
-import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-10';
-import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-10';
-import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-10';
-import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-10';
+import {World,clamp,distance,biome} from './engine.mjs?v=harvest-11';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-11';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-11';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-11';
+import {createNetwork} from './network.mjs?v=harvest-11';
+import {Sound} from './audio.mjs?v=harvest-11';
+import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-11';
+import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-11';
+import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-11';
+import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-11';
 import {
   allowsCombat,allowsMovement,clusterFor,effectLine,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
-} from './ui/actions.mjs?v=harvest-10';
-import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-10';
-import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-10';
+} from './ui/actions.mjs?v=harvest-11';
+import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-11';
+import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-11';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -280,7 +280,8 @@ async function sortPack(){
 }
 async function organizeChest(op){
   const p=me(),chest=chestBuilding();if(!p||!chest||!chestSession||actionPending)return;
-  const type=op==='store'?'chestStoreAll':op==='stack'?'chestStack':'chestSort';
+  if(op!=='store'&&op!=='sort')return;
+  const type=op==='store'?'chestStoreAll':'chestSort';
   const cmd={type,chestId:chestSession.chestId,sessionId:chestSession.sessionId,destinationRevision:chest.store.revision};
   if(type==='chestStoreAll')cmd.inventoryRevision=p.inventory.revision;
   await withPending(cmd);
@@ -362,7 +363,7 @@ function guideHTML(){
     ['Keep the fire alive','Feed the Heartfire from its Feed button. Cook opens that fire’s recipes. Firelight restores courage; darkness drains it, then your health. A Light button appears when you carry a usable lantern. Soul lanterns never go out.'],
     ['Eat, farm, recover','Open Inventory, select the food, and press Eat. A burning fire cooks pumpkins, mushrooms, and meat. A cauldron cooks stew. Plant a farm with a seed, then harvest it when it is ready. Bedrolls heal by day and spend hunger.'],
     ['Tend the camp','Build lists only what you can place from where you opened it. Choose Maintain camp to repair a damaged structure or hold Dismantle. The Heartfire cannot be dismantled. A chest someone else has open cannot be dismantled either.'],
-    ['Share a chest','One wanderer opens a chest at a time. Your pack has six slots. A chest has eighteen. Store all moves what fits from your pack. Stack same items combines matching piles. Sort orders a chest or your pack and stacks matches. Choose a quantity, then Transfer, or tap the destination slot. Close the panel to let someone else in.'],
+    ['Share a chest','One wanderer opens a chest at a time. Your pack has twelve slots. A chest has twenty-four. Store all moves what fits from your pack. Sort orders a chest or your pack and stacks matching piles. Choose a quantity, then Transfer, or tap the destination slot. Close the panel to let someone else in.'],
     ['Stand together','Hold Attack to use the weapon you have equipped. Dodge the glowing attack circles. Armor absorbs damage only while worn. Hold Revive beside a fallen friend for three seconds. Everyone has one last-chance charm. Fallen wanderers return at dawn if the camp survives.'],
     ['Break the curse','Survive five nights and defeat the Hollow King on night five. Guard the Heartfire: losing it ends the expedition. Awaken it with soul embers from the eastern graveyard and night creatures. After victory, you can keep surviving.'],
   ];

@@ -1,16 +1,16 @@
-import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-10';
+import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-11';
 import {
   CLOCK_V1, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createChest, createContainer,
   containerId, duplicateUids, emptyEquipment, equippedLanternLit, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
   supplyLoad, wearStack,
-} from './inventory.mjs?v=harvest-10';
-import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-10';
-import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange} from './contracts.mjs?v=harvest-10';
-import {pruneChests, releaseChests} from './chests.mjs?v=harvest-10';
-import {inventoryIntent} from './transactions.mjs?v=harvest-10';
-import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-10';
+} from './inventory.mjs?v=harvest-11';
+import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-11';
+import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange} from './contracts.mjs?v=harvest-11';
+import {pruneChests, releaseChests} from './chests.mjs?v=harvest-11';
+import {inventoryIntent} from './transactions.mjs?v=harvest-11';
+import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-11';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.z||0)-(b.z||0));

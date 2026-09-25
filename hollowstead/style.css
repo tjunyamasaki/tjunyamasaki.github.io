@@ -62,25 +62,25 @@
 .sheet #sheet-tabs .chip{min-height:44px}
 .sheet #sheet-content{flex:1;min-height:0}
 .sheet[data-sheet="inventory"] #sheet-content,.sheet[data-sheet="chest"] #sheet-content{overflow:hidden;display:flex;flex-direction:column}
-/* Storage gets a definite viewport height; grids share the remaining space. */
-.sheet:is([data-sheet="inventory"],[data-sheet="chest"]){top:max(8px,env(safe-area-inset-top));bottom:max(8px,env(safe-area-inset-bottom));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));width:auto;height:auto;max-height:none;border-radius:12px}
+/* Pack and chest panels hug their slots and scroll inside when the screen is short. */
+.sheet:is([data-sheet="inventory"],[data-sheet="chest"]){top:auto;bottom:max(8px,env(safe-area-inset-bottom));left:auto;right:max(8px,env(safe-area-inset-right));width:min(420px,calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));height:auto;max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));border-radius:12px;overflow:hidden;touch-action:manipulation}
 .sheet:is([data-sheet="inventory"],[data-sheet="chest"])>header{padding:10px 12px;min-height:64px}
 .sheet:is([data-sheet="inventory"],[data-sheet="chest"]) h2{font-size:23px;margin:0}
 .sheet:is([data-sheet="inventory"],[data-sheet="chest"]) #sheet-kicker{display:none}
-.sheet:is([data-sheet="inventory"],[data-sheet="chest"]) #sheet-content{padding:0 10px 10px}
-.rpg-panel{display:flex;flex-direction:column;flex:1;min-height:0;gap:8px}
-.rpg-body{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
+.sheet:is([data-sheet="inventory"],[data-sheet="chest"]) #sheet-content{padding:0 10px 10px;flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;overscroll-behavior:contain;touch-action:pan-y}
+.rpg-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:8px}
+.rpg-body{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y}
 .equip-column{display:flex;gap:6px;align-items:center;overflow-x:auto;flex:none;min-width:0}
 .character-card{display:flex;align-items:center;justify-content:center;width:40px;flex:none}
 .character-card .portrait{width:29px;height:44px}
 .character-card small{display:none}
 .socket-grid.slot-grid{display:grid;grid-template-columns:repeat(5,44px);gap:4px;flex:none;width:max-content}
 .socket-grid .item-slot{width:44px;height:44px;max-width:44px;min-width:44px;aspect-ratio:auto}
-.bag-column,.chest-column{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0}
+.bag-column,.chest-column{display:flex;flex-direction:column;gap:6px;min-width:0;flex:none}
 .bag-meta,.charm-line{margin:0;color:var(--muted);font-size:11px}
 .charm-line:empty,.pending-line:empty{display:none}
 .pending-line{margin:0;color:var(--orange);font-size:12px}
-.slot-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;align-items:start;gap:4px;width:100%;max-width:356px;touch-action:pan-y}
+.slot-grid{display:grid;grid-template-columns:repeat(6,minmax(44px,1fr));grid-auto-rows:max-content;align-content:start;align-items:start;gap:4px;width:100%;touch-action:pan-y}
 .item-slot{position:relative;width:100%;aspect-ratio:1;min-width:44px;min-height:44px;padding:0;display:grid;place-items:center;border:1px solid #dac29a66;background:#211c2844;overflow:hidden}
 .item-slot.is-selected{outline:2px solid var(--orange);outline-offset:1px}
 .item-slot.is-equipped{box-shadow:inset 0 0 0 2px var(--mint)}
@@ -102,20 +102,20 @@
 .confirm-copy{flex:1 1 100%;margin:0;font-size:12px}
 .drag-ghost{position:fixed;width:48px;height:48px;z-index:80;pointer-events:none;display:grid;place-items:center}
 .drag-ghost .item-icon{width:40px;height:40px}
-.storage-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;min-height:14px}
+.storage-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;flex-wrap:wrap;min-height:44px}
 .storage-tools{display:flex;flex-wrap:wrap;gap:4px;flex:none}
 .storage-tools button{min-width:44px;min-height:44px;padding:8px 10px}
 .chest-overflow{flex:none;max-height:34%;overflow:auto;overscroll-behavior:contain}
-.rpg-panel.with-chest .rpg-body{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) minmax(0,1fr);overflow:hidden}
-.rpg-panel.with-chest .bag-column,.rpg-panel.with-chest .chest-column{min-height:0;overflow:hidden}
-.rpg-panel.with-chest .bag-column>.slot-grid,.rpg-panel.with-chest .chest-column>.slot-grid{flex:1 1 0;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.rpg-panel.with-chest .rpg-body{gap:6px;overflow:auto}
+.rpg-panel.with-chest .bag-column,.rpg-panel.with-chest .chest-column{flex:none;min-height:auto;overflow:visible}
+.rpg-panel.with-chest .bag-column>.slot-grid,.rpg-panel.with-chest .chest-column>.slot-grid{flex:none;min-height:auto;max-height:none;overflow:visible}
 .rpg-panel.with-chest .charm-line{display:none}
 .rpg-panel.with-chest .recovery-block{flex:none;max-height:40%;overflow:auto;overscroll-behavior:contain}
 .rpg-panel.with-chest .recovery-block .section-label{margin:4px 0 6px;font-size:8px;letter-spacing:1px}
 @media(min-width:700px){
-  .sheet:is([data-sheet="inventory"],[data-sheet="chest"]){left:auto;width:min(820px,calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
-  .rpg-panel.with-chest .rpg-body{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto minmax(0,1fr);gap:10px 16px}
-  .rpg-panel.with-chest .equip-column{grid-column:1 / -1}
+  .sheet[data-sheet="chest"]{width:min(760px,calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
+  .rpg-panel.with-chest .rpg-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto auto;align-content:start;gap:8px 16px}
+  .rpg-panel.with-chest .equip-column{grid-column:1 / -1;min-height:44px;overflow:visible}
   .item-details{flex-wrap:nowrap}
   .detail-copy{flex:1 1 120px}
   .qty-row{flex:0 0 auto}
@@ -126,7 +126,7 @@
   .sheet{top:auto;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));width:auto;height:auto;max-height:min(78dvh,720px);border-radius:16px 16px 10px 10px}
 }
 @media(max-width:359px){
-  #inv-grid,.chest-grid,.recovery-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  #inv-grid,.chest-grid,.recovery-grid{grid-template-columns:repeat(5,minmax(44px,1fr))}
 }
 @media(max-width:380px){#joystick{width:104px;height:104px}}
 @media(max-width:340px){

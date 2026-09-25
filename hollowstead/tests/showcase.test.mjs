@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
 import {ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES} from '../src/content.mjs';
 import {makeStack} from '../src/inventory.mjs';
-import {collectMagicSprites, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-13';
+import {collectMagicSprites, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-14';
 import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseCategories} from '../src/showcase.mjs';
 
 test('showcase world has no nodes and the player takes no damage or hunger loss', () => {
@@ -68,7 +68,7 @@ test('showcase list follows the live content tables and can place, remove, and c
 });
 
 test('each present magic module exports magicPack, use, and step', async () => {
-  const names = ['barrow-rattle', 'cinder-staff', 'widows-needle', 'spirit-fan'];
+  const names = ['barrow-rattle', 'cinder-staff', 'widows-needle', 'spirit-fan', 'mourning-bell'];
   let present = 0;
   for (const name of names) {
     try {
@@ -82,11 +82,11 @@ test('each present magic module exports magicPack, use, and step', async () => {
       if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error;
     }
   }
-  assert.ok(present >= 0);
+  assert.equal(present, 5);
 });
 
 async function loadMagic(){
-  const names = ['barrow-rattle', 'cinder-staff', 'widows-needle', 'spirit-fan'];
+  const names = ['barrow-rattle', 'cinder-staff', 'widows-needle', 'spirit-fan', 'mourning-bell'];
   for(const name of names){
     const url = new URL(`../src/magic/${name}.mjs`, import.meta.url);
     const mod = await import(url);
@@ -108,10 +108,10 @@ function arm(player, itemId, durability){
 test('present magic weapons hit hostiles once and a placed skeleton can be removed', async () => {
   await loadMagic();
   const magic = showcaseCategories().find(category => category.id === 'magic').entries.map(entry => entry.id);
-  for(const id of ['barrow-rattle', 'cinder-staff', 'widows-needle', 'spirit-fan']) assert.equal(magic.includes(id), true);
+  for(const id of ['barrow-rattle', 'cinder-staff', 'widows-needle', 'spirit-fan', 'mourning-bell']) assert.equal(magic.includes(id), true);
   assert.equal(magicMobEntries().some(entry => entry.id === 'skeleton'), true);
   const sprites = new Set(collectMagicSprites().map(([key]) => key));
-  for(const key of ['cinder-staff-bolt', 'widows-needle-dart', 'widows-needle-pin', 'spirit-fan:sweep:0', 'assets/magic/barrow-rattle/skeleton-idle-0.png', 'assets/magic/barrow-rattle/skeleton-walk-2.png', 'assets/magic/barrow-rattle/skeleton-attack-3.png']){
+  for(const key of ['barrow-rattle', 'cinder-staff', 'widows-needle', 'spirit-fan', 'mourning-bell', 'gravecraft-skeleton']){
     assert.equal(sprites.has(key), true, key);
   }
 

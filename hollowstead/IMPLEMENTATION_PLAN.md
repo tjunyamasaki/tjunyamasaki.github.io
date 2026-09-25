@@ -1674,3 +1674,34 @@ Compatibility/migration notes:
 - Pack stays 12 slots. Chests stay 24. Sort still stacks items. There is no separate stack button. Floor pickup stays attract 1.15, touch 0.42, dwell 0.65s, flight 0.28s, dropper cooldown 1.25s. Clock stays day 180, dusk 30, night 100.
 - Hard refresh with style.css?v=harvest-13 and src/main.mjs?v=harvest-13.
 Exact next task: P6 — Integration and release. Do not start P6.
+
+
+### Magic collection refresh — Gravecraft (2026-09-25)
+
+Status: Implemented; deployment/visual verification follows in the next log entry.
+Branch: `feat/hollowstead-coop`. Cache version: `harvest-14`; dynamic magic imports
+now retain the loader's version query so returning browsers receive pack changes.
+
+- Replaced all four active weapon item assets with a shared illustrated Halloween
+  collection and added Mourning Bell. Exact built-in imagegen prompts and replacement
+  instructions: `assets/magic/gravecraft/PROMPTS.json` and `ART_DIRECTION.md`.
+- Replaced rotating effect panels with shared world-space flame trails, silk darts
+  and bindings, fan ribbons/leaves, summoning seals and expanding bell rings.
+  Both WebGL and Canvas use the same presentation commands. WebGL uses one bounded
+  reusable vertex buffer. Six active magic textures replace the old frame images.
+- Added individual held weapon poses, replicated cast timestamps, bounded render
+  interpolation, a matching skeleton atlas, stable sprite IDs and summon movement
+  smoothing. Magic colors and anchors can be replaced independently of combat.
+- Mourning Bell is available in Showcase > Magic and works through normal inventory
+  equip/drop/chest flows. It winds up for .28s, expands to radius 5 over .65s, and
+  hits each hostile once for 9 damage plus 1.2 knockback. Cooldown 2.4s, durability65.
+  Allies/players are excluded; magicWaves and hit IDs survive snapshots/restores.
+- Existing four weapons retain their combat stats. Cinder impact fade is .55s.
+  Item cards show the actual weapon art. Clear removes active cast presentation.
+- Local verification: 114 Hollowstead tests and 17 ball-game tests pass. Tests cover
+  bell delay/range/damage, ally protection, cooldown/breakage, snapshot continuation,
+  effect purity and finite coordinates, cast interpolation, alpha and atlas cells.
+  The Three geometry smoke check produced 1,536 finite vertices with vertex alpha.
+- Browser cannot reach the workspace localhost from its cloud environment; visual
+  checks will use the deployed branch. No physical phone or second human player
+  has been used. P6 remains unstarted.

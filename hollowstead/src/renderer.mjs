@@ -1,12 +1,15 @@
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {STRUCTURES, RULES} from './content.mjs?v=harvest-13';
-import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-13';
-import {equippedLanternLit, itemSpriteKey} from './inventory.mjs?v=harvest-13';
-import {equippedMagicKey, magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-13';
+import {STRUCTURES, RULES} from './content.mjs?v=harvest-14';
+import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-14';
+import {equippedLanternLit, itemSpriteKey} from './inventory.mjs?v=harvest-14';
+import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-14';
+import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-14';
+import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-14';
+import {MagicMesh} from './magic/effects-three.mjs?v=harvest-14';
 import {
   LIGHT_FIELD_ORIGIN, LIGHT_FIELD_SIZE, LIGHT_FIELD_SPAN, brightnessAt, canInspect, entityBrightness,
   frameLighting, labelOpacity, linearFromDisplay, spriteTint, warningVisible, writeLightField,
-} from './lighting.mjs?v=harvest-13';
+} from './lighting.mjs?v=harvest-14';
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
   const response=await fetch(url);if(!response.ok)throw new Error('The harvest art could not be loaded. Please reload.');
   const theme=await response.json();theme.url=url;for(const def of Object.values(theme.sprites))def.src=new URL(def.src,url).href;
@@ -14,7 +17,7 @@ export async function loadTheme(url=new URL('../themes/harvest/theme.json',impor
 }
 export class Renderer {
   constructor(canvas,theme){
-    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);
+    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);
     this.scene.fog=new THREE.FogExp2(theme.palette.background,.009);this.camera=new THREE.OrthographicCamera(-15,15,15,-15,.1,180);
     this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.setPixelRatio(Math.min(devicePixelRatio,1.6));this.gl.outputColorSpace=THREE.SRGBColorSpace;
     this.objects=new Map();this.textures=new Map();this.materials=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
@@ -100,47 +103,44 @@ export class Renderer {
   effect(event){
     if(event.type==='hit')for(const o of this.objects.values())if(Math.hypot(o.x-event.x,o.z-event.z)<.2)o.hitUntil=this.clock+.22;
     if(['loot','damage','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
-    if(['hit','kill','hurt','build','craft','impact','bolt'].includes(event.type)){
+    if(!event.magicPack&&['hit','kill','hurt','build','craft','impact','bolt'].includes(event.type)){
       const mat=new THREE.MeshBasicMaterial({color:event.type==='hurt'?0xd97773:event.type==='bolt'?0xa7e5d8:0xf4c486,transparent:true,depthWrite:false});const mesh=new THREE.Mesh(new THREE.RingGeometry(.06,.2,10),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z});
     }
   }
   reveal(x,z){if(!this.view)return 1;return labelOpacity(brightnessAt(this.view.sources, x, z, this.view.darkness, this.view.lighting), this.view.darkness, this.view.lighting);}
   syncHeldWeapon(player, body){
-    let key=equippedMagicKey(player),id='held'+player.id;
-    if(player.action==='attack'&&key&&this.theme.sprites[`${key}:use`])key=`${key}:use`;
-    if(!key||!this.theme.sprites[key]){const old=this.objects.get(id);if(old)this.remove(old);return null;}
-    let o=this.objects.get(id);if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}
-    const clipName=player.action==='attack'?'attack':'idle',clip=o.def.clips[clipName]||o.def.clips.idle||{frames:[0]};
-    const frameIndex=clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],cols=o.def.columns||1,rows=o.def.rows||1;
-    o.sprite.material.map.offset.set((frameIndex%cols)/cols,1-1/rows-Math.floor(frameIndex/cols)/rows);
-    const side=player.dx<-.1?-1:1;
-    o.x=body.x+side*0.55;o.z=body.z;o.initialized=true;
-    o.sprite.position.set(o.x,0.85,o.z);o.sprite.scale.set(side*o.def.size[0]*0.72,o.def.size[1]*0.72,1);
-    o.sprite.visible=body.sprite.visible;o.shadow.visible=false;o.sprite.material.opacity=body.sprite.material.opacity;o.sprite.material.rotation=0;
-    o.sprite.material.color.copy(body.sprite.material.color);
+    const pose=!player.down&&!player.ghost?heldWeaponPose(player,this.magicFrame.time,this.theme):null,id='held'+player.id;
+    if(!pose||!this.theme.sprites[pose.key]){const old=this.objects.get(id);if(old)this.remove(old);return null;}
+    let o=this.objects.get(id);if(!o||o.key!==pose.key){if(o)this.remove(o);o=this.sprite(pose.key,id);}
+    o.x=body.x+pose.x;o.z=body.z+pose.z;o.initialized=true;
+    o.sprite.position.set(o.x,pose.y,o.z);o.sprite.scale.set(pose.side*o.def.size[0]*pose.scale,o.def.size[1]*pose.scale,1);
+    o.sprite.visible=body.sprite.visible;o.shadow.visible=false;o.sprite.material.opacity=body.sprite.material.opacity;
+    o.sprite.material.rotation=pose.rotation;o.sprite.renderOrder=2;
+    o.sprite.material.color.copy(body.sprite.material.color).lerp(new THREE.Color('#ffffff'),.25);
     return id;
   }
   render(world,localId,dt,{target=null,placement=null,demo=false}={}){
-    this.clock+=dt;this.localId=localId;if(this.seed!==world.seed){this.terrain(world.seed);for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
+    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;if(this.seed!==world.seed){this.terrain(world.seed);for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
     const p=world.player(localId)||world.players[0]||{x:0,z:2};const fx=demo?0:p.x,fz=demo?-1:p.z;
     this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);this.camera.position.set(this.focus.x,28,this.focus.z+27);this.camera.lookAt(this.focus.x,0,this.focus.z);this.camera.updateMatrixWorld();
     const frame=frameLighting(world, this.theme);this.view=frame;this.paintField(frame);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...magicVisuals(world).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
       const id=kind+e.id;alive.add(id);let o=this.objects.get(id);if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
       const present=kind==='drop'?this.dropMotion.sample(e,world,this.clock,dt,id=>{const body=this.objects.get('player'+id);return body?.initialized?{x:body.x,z:body.z}:null;}):null;
       const tx=present?present.x:e.x, tz=present?present.z:e.z;
-      const smooth=['player','enemy'].includes(kind)&&!demo?Math.min(1,dt*(e.id===localId?22:13)):1;
+      const smooth=['player','enemy','magic'].includes(kind)&&!demo?Math.min(1,dt*(e.id===localId?22:13)):1;
       if(!o.initialized){o.x=tx;o.z=tz;o.initialized=true;}else{o.x+=(tx-o.x)*smooth;o.z+=(tz-o.z)*smooth;}
       const special=magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0?'attack':'walk'):e.action||'idle'),clip=o.def.clips[clipName]||o.def.clips.walk||o.def.clips.attack||o.def.clips.idle;
-      const cols=o.def.columns||1,rows=o.def.rows||1,frameIndex=Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length];
+      const cols=o.def.columns||1,rows=o.def.rows||1,frameIndex=key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,o.def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length];
       o.sprite.material.map.offset.set((frameIndex%cols)/cols,1-1/rows-Math.floor(frameIndex/cols)/rows);
       const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob:kind==='enemy'&&key==='wraith'?.2+Math.sin(this.clock*3)*.1:0;
       let sx=o.def.size[0],sy=o.def.size[1];if(kind==='drop'){sx=.85;sy=1.28;if(present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}}
       if(e.down||e.ghost){sx*=.8;sy*=.65;}
+      if(key==='gravecraft-skeleton')sy*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
       if(o.hitUntil>this.clock){const squash=Math.sin((o.hitUntil-this.clock)*14)*(motion.hitSquash||0);sx*=1+squash;sy*=1-squash;}
       const flip=(kind==='player'&&e.dx<-.1)||(kind==='magic'&&e.facing===-1);
       o.sprite.scale.set(flip?-sx:sx,sy,1);o.sprite.position.set(o.x,bob+(present?.y||0),o.z);o.shadow.position.set(o.x,.018,o.z);
@@ -153,7 +153,7 @@ export class Renderer {
       const lampStrength=lamp>frame.lighting.ambientNight?Math.min(1,(lamp-frame.lighting.ambientNight)/Math.max(0.01, frame.lighting.litBrightness-frame.lighting.ambientNight)):0;
       this.shadeSprite(o.sprite.material, display, lampStrength, frame.darkness, frame.lighting);
       if(kind==='building'&&key==='farm'&&e.growth>=100&&display>0.55)o.sprite.material.color.lerp(new THREE.Color('#efd394'), .45);
-      o.sprite.material.opacity=e.ghost?.4:key==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
+      o.sprite.material.opacity=e.ghost?.4:key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):key==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
       const fade=labelOpacity(display, frame.darkness, frame.lighting);
       if(kind==='building'&&STRUCTURES[key].light){const lit=key==='lantern'||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
       if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);}
@@ -171,6 +171,7 @@ export class Renderer {
     for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2)this.effect(ev);this.lastEvent=ev.id;}
     this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);e.mesh.scale.setScalar(1+e.life*(e.type==='impact'?12:4));e.mesh.material.opacity=Math.max(0,1-e.life*2)*fade;if(e.life>.5){this.scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();return false;}return true;});
     this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*this.reveal(f.x, f.z));if(f.life>1.8){f.el.remove();return false;}return true;});
+    this.magicMesh.update(buildMagicEffects(world,this.magicFrame,this.theme));
     this.gl.render(this.scene,this.camera);
   }
 }

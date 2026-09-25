@@ -2,8 +2,8 @@
 // A reason string is displayed when the caller already has one. This module
 // does not inspect inventories or decide that a recipe may be performed.
 
-import {RECIPES} from '../content.mjs?v=harvest-13';
-import {contextRecipeIds} from '../interactions.mjs?v=harvest-13';
+import {RECIPES} from '../content.mjs?v=harvest-14';
+import {contextRecipeIds} from '../interactions.mjs?v=harvest-14';
 
 const BUILD_CAMP = new Set(['fire', 'bench', 'chest', 'lantern', 'bed']);
 const BUILD_DEFENSE = new Set(['wall', 'gate', 'trap', 'ward']);

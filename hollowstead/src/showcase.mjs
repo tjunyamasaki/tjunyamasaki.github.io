@@ -1,6 +1,6 @@
 // Solo showcase sandbox. The spawn list is built from the live content tables.
-import { ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES, label } from './content.mjs?v=harvest-13';
-import { clearMagicLists, deleteMagicEntity, magicItems, magicMobById, magicMobEntries } from './magic/registry.mjs?v=harvest-13';
+import { ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES, label } from './content.mjs?v=harvest-14';
+import { clearMagicLists, deleteMagicEntity, magicItems, magicMobById, magicMobEntries } from './magic/registry.mjs?v=harvest-14';
 
 const PLACE_RANGE = 5.5;
 
@@ -40,12 +40,12 @@ function escapeHtml(value){
   return String(value).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 }
 
-export function showcaseMarkup({active = 'materials', tool = ''} = {}){
+export function showcaseMarkup({active = 'materials', tool = '', icon = () => ''} = {}){
   const categories = showcaseCategories();
   const current = categories.find(category => category.id === active) || categories[0];
   const chips = categories.map(category => `<button type="button" class="chip ${category.id === current.id ? 'active' : ''}" data-showcase-cat="${category.id}">${escapeHtml(category.label)}</button>`).join('');
   const rows = current.entries.length
-    ? current.entries.map(entry => `<button type="button" data-showcase-spawn="${escapeHtml(entry.kind)}:${escapeHtml(entry.id)}">${escapeHtml(entry.name)}</button>`).join('')
+    ? current.entries.map(entry => `<button type="button" data-showcase-spawn="${escapeHtml(entry.kind)}:${escapeHtml(entry.id)}">${current.id==='magic'?icon(entry.id):''}<span>${escapeHtml(entry.name)}</span></button>`).join('')
     : '<p class="muted small">Nothing in this list yet.</p>';
   const removing = tool === 'remove';
   return `<div class="showcase-head"><button type="button" data-showcase-tool="remove" aria-pressed="${removing ? 'true' : 'false'}">${removing ? 'Remove armed' : 'Remove'}</button><button type="button" data-showcase-tool="clear">Clear</button></div><div class="showcase-cats">${chips}</div><div class="showcase-list" role="list">${rows}</div><p class="muted small showcase-note">${removing ? 'Tap an object or creature to delete it.' : 'Items go into the pack. Tap the ground to place an armed object.'}</p>`;
@@ -178,6 +178,7 @@ export function clearShowcaseWorld(world){
   world.dismantleHolds?.clear?.();
   world.chestSessions?.clear?.();
   clearMagicLists(world);
+  for(const player of world.players||[]) delete player.magicCast;
 }
 
 export function showcaseSpawnName(kind, id){

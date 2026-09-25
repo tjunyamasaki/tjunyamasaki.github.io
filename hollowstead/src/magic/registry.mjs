@@ -1,15 +1,16 @@
 // Mutable registry for magic weapons. Modules register at startup.
 // The engine stays the authority for damage, knockback, burns, and roots.
+import {GRAVECRAFT, gravecraftSprite, skeletonSprite} from './art.mjs?v=harvest-14';
 
 export const magicItems = Object.create(null);
 export const magicModules = [];
 const allyTypes = new Set();
 const listNames = new Set([
   'bolts', 'projectiles', 'sweeps', 'darts', 'magic', 'summons', 'skeletons',
-  'magicBolts', 'magicPuffs', 'magicCasts', 'magicSweeps', 'magicDarts', 'magicPins', 'magicRoots', 'magicSummons',
+  'magicBolts', 'magicPuffs', 'magicCasts', 'magicSweeps', 'magicDarts', 'magicPins', 'magicRoots', 'magicSummons', 'magicWaves',
 ]);
 const SNAP_LISTS = [
-  'magicBolts', 'magicPuffs', 'magicCasts', 'magicSweeps', 'magicDarts', 'magicPins', 'magicRoots', 'magicSummons',
+  'magicBolts', 'magicPuffs', 'magicCasts', 'magicSweeps', 'magicDarts', 'magicPins', 'magicRoots', 'magicSummons', 'magicWaves',
 ];
 
 export function magicItemId(pack){
@@ -176,7 +177,7 @@ function considerList(world, list, name, visit, seen){
     const id = entry.id || `${name}:${entry.x}:${entry.z}`;
     if(seen.has(id)) continue;
     seen.add(id);
-    visit(shown, shown._key || entry.sprite || entry.key || entry.type || name);
+    visit(shown, entry.type==='skeleton' ? 'gravecraft-skeleton' : shown._key || entry.sprite || entry.key || entry.type || name);
   }
 }
 
@@ -229,8 +230,8 @@ export function clearMagicLists(world){
 
 export function magicClipName(entity, kind){
   if(kind === 'magic' || (kind === 'enemy' && isMagicAlly(entity))){
-    if(entity?.action === 'attack' || entity?.windup > 0) return 'attack';
-    if(entity?.action === 'walk') return 'walk';
+    if(entity?.action === 'attack' || entity?.anim === 'attack' || entity?.windup > 0) return 'attack';
+    if(entity?.action === 'walk' || entity?.anim === 'walk') return 'walk';
     return 'idle';
   }
   return null;
@@ -279,6 +280,11 @@ export function collectMagicSprites(){
     const base = mod.moduleUrl;
     const pack = mod.magicPack || {};
     const itemId = magicItemId(pack);
+    if(GRAVECRAFT[itemId]){
+      add(itemId, gravecraftSprite(itemId), base);
+      if(itemId==='barrow-rattle') add('gravecraft-skeleton', skeletonSprite, base);
+      continue;
+    }
     const groups = [pack.art, pack.sprites, mod.sprites, mod.art];
     for(const group of groups){
       if(!group || typeof group !== 'object') continue;

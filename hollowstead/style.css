@@ -148,6 +148,9 @@
 #showcase-panel .showcase-head button,#showcase-panel .showcase-list button,#showcase-panel .chip{min-height:44px}
 #showcase-panel .showcase-list{overflow:auto;display:flex;flex-direction:column;gap:4px;min-height:0;overscroll-behavior:contain;touch-action:pan-y}
 #showcase-panel .showcase-list button{text-align:left;padding:8px 10px}
+#showcase-panel .showcase-list button:has(.item-icon){display:flex;align-items:center;gap:7px;padding:5px 7px;min-height:49px}
+#showcase-panel .showcase-list .item-icon{width:36px;height:36px;object-fit:contain;flex:none;filter:drop-shadow(0 1px 2px #1119)}
+#showcase-panel .showcase-list button span{min-width:0;overflow-wrap:anywhere}
 #showcase-panel .showcase-note{margin:0}
 .front-secondary{flex-wrap:wrap}
 @media(max-width:600px){#showcase-panel{top:calc(108px + env(safe-area-inset-top));bottom:auto;left:112px;right:86px;width:auto;max-height:min(36dvh,300px)}}

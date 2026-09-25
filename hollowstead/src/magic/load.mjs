@@ -1,16 +1,18 @@
-import { registerMagicModule } from './registry.mjs?v=harvest-13';
+import { registerMagicModule } from './registry.mjs?v=harvest-14';
 
 const SPECS = [
   'barrow-rattle.mjs',
   'cinder-staff.mjs',
   'widows-needle.mjs',
   'spirit-fan.mjs',
+  'mourning-bell.mjs',
 ];
 
 export async function loadMagicModules(){
   const loaded = [];
   for(const name of SPECS){
     const url = new URL(`./${name}`, import.meta.url);
+    url.search = new URL(import.meta.url).search;
     try{
       const mod = await import(url.href);
       const record = {

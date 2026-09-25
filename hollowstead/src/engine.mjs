@@ -1,18 +1,18 @@
-import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-13';
+import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-14';
 import {
   CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createChest, createContainer,
   containerId, duplicateUids, emptyEquipment, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
   supplyLoad, wearStack,
-} from './inventory.mjs?v=harvest-13';
-import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-13';
-import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-13';
-import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-13';
-import {pruneChests, releaseChests} from './chests.mjs?v=harvest-13';
-import {inventoryIntent} from './transactions.mjs?v=harvest-13';
-import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-13';
-import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, readPendingKnock, restoreMagicFields} from './magic/registry.mjs?v=harvest-13';
+} from './inventory.mjs?v=harvest-14';
+import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-14';
+import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-14';
+import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-14';
+import {pruneChests, releaseChests} from './chests.mjs?v=harvest-14';
+import {inventoryIntent} from './transactions.mjs?v=harvest-14';
+import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-14';
+import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, readPendingKnock, restoreMagicFields} from './magic/registry.mjs?v=harvest-14';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.z||0)-(b.z||0));
@@ -945,6 +945,8 @@ export class World {
     if(worn&&worn.uid===weapon.uid&&worn.durability===durabilityBefore)this.wearEquipped(p,'weapon', profile?.durabilityCost??1);
     if(p.cooldown===cooldownBefore)p.cooldown=profile?.cooldown??0.55;
     if(p.action!=='attack'){p.action='attack';p.actionUntil=Math.max(p.actionUntil||0, this.time+.32);}
+    // Replicated casting pose. Renderers interpolate this stamp, never combat.
+    p.magicCast={itemId:weapon.itemId,at:this.time,x:p.x,z:p.z,dx:p.dx,dz:p.dz};
     this.event('swing',p.x,p.z);
     this.consumeMagicPayloads(before, RULES.tick);
   }

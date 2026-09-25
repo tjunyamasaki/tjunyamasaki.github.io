@@ -1,12 +1,12 @@
 // Stack, container, and equipment primitives. No DOM, network, rendering, or World.
 
-import {EQUIPMENT, ITEMS} from './content.mjs?v=harvest-13';
-import {magicItems} from './magic/registry.mjs?v=harvest-13';
+import {EQUIPMENT, ITEMS} from './content.mjs?v=harvest-14';
+import {magicItems} from './magic/registry.mjs?v=harvest-14';
 import {
   BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,
   EQUIPMENT_SLOTS, RESULT_CODES, SAVE_VERSION_V2, SUPPLY_CAPACITY, SUPPLY_ITEM_IDS,
   containerId, equipmentSlotFor, itemDefinition,
-} from './contracts.mjs?v=harvest-13';
+} from './contracts.mjs?v=harvest-14';
 
 export {
   BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,

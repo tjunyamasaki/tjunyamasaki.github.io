@@ -365,7 +365,7 @@ function attachBurn(world, targetId) {
 
 function spawnPuff(world, x, z, startFrame) {
   if (!Array.isArray(world.magicPuffs)) world.magicPuffs = [];
-  const life = FRAME_COUNT / FRAME_FPS;
+  const life = .55;
   world.magicPuffs.push({
     id: mint(world, 'puff'),
     packId: PACK,
@@ -405,5 +405,5 @@ function mint(world, prefix) {
 
 function emit(world, type, x, z, text, extra) {
   if (typeof world.event !== 'function' || !Array.isArray(world.events) || !Number.isFinite(world.eventId)) return;
-  world.event(type, x, z, text, extra);
+  world.event(type, x, z, text, {...extra, magicPack: PACK});
 }

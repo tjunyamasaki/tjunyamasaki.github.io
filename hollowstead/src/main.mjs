@@ -1,22 +1,22 @@
-import {World,clamp,distance,biome} from './engine.mjs?v=harvest-13';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-13';
-import {Renderer,loadTheme} from './renderer.mjs?v=harvest-13';
-import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-13';
-import {createNetwork} from './network.mjs?v=harvest-13';
-import {Sound} from './audio.mjs?v=harvest-13';
-import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-13';
-import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-13';
-import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-13';
-import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-13';
+import {World,clamp,distance,biome} from './engine.mjs?v=harvest-14';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-14';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-14';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-14';
+import {createNetwork} from './network.mjs?v=harvest-14';
+import {Sound} from './audio.mjs?v=harvest-14';
+import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-14';
+import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-14';
+import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-14';
+import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-14';
 import {
   allowsCombat,allowsMovement,clusterFor,effectLine,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
-} from './ui/actions.mjs?v=harvest-13';
-import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-13';
-import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-13';
-import {loadMagicModules} from './magic/load.mjs?v=harvest-13';
-import {installMagicSprites} from './magic/registry.mjs?v=harvest-13';
-import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-13';
+} from './ui/actions.mjs?v=harvest-14';
+import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-14';
+import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-14';
+import {loadMagicModules} from './magic/load.mjs?v=harvest-14';
+import {installMagicSprites} from './magic/registry.mjs?v=harvest-14';
+import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-14';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -174,7 +174,7 @@ function solo(resume=false){sound.unlock();storeProfile();try{prepareWorld(resum
 function showShowcase(open){const panel=$('showcase-panel');if(!panel)return;panel.hidden=!open;if(open)paintShowcase();}
 function paintShowcase(){
   const panel=$('showcase-panel');if(!panel||panel.hidden||!world?.showcase)return;
-  const html=showcaseMarkup({active:showcaseCategory,tool:showcaseTool});
+  const html=showcaseMarkup({active:showcaseCategory,tool:showcaseTool,icon});
   if(html===showcaseMarkupCache)return;
   showcaseMarkupCache=html;panel.innerHTML=html;
 }

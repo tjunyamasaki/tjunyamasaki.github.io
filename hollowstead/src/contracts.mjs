@@ -5,8 +5,8 @@
 // schedule, used only to migrate a saved campaign. Do not import World, the DOM,
 // the network, or a renderer from here.
 
-import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-13';
-import {magicItems} from './magic/registry.mjs?v=harvest-13';
+import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-14';
+import {magicItems} from './magic/registry.mjs?v=harvest-14';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 

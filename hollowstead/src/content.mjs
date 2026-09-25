@@ -14,14 +14,14 @@ export const EQUIPMENT = {
   armor:{name:'Bark armor',icon:'armor',durability:110},torch:{name:'Hand lantern',icon:'lantern',durability:180},
 };
 export const NODES = {
-  tree:{name:'Crooked pine',hits:4,tool:'axe',loot:{wood:5,fiber:1},regrow:420,radius:.55},
-  rock:{name:'Flint outcrop',hits:4,tool:'pick',loot:{stone:5},regrow:520,radius:.65},
-  grass:{name:'Dry grass',hits:1,loot:{fiber:4},regrow:140,radius:0},
-  bush:{name:'Nightberry bush',hits:2,loot:{berry:3,seed:1},regrow:210,radius:.25},
-  pumpkin:{name:'Wild pumpkin',hits:2,loot:{pumpkin:2,seed:2},regrow:300,radius:.3},
-  mushroom:{name:'Mooncap patch',hits:1,loot:{mushroom:3},regrow:200,radius:0},
-  ore:{name:'Moon iron seam',hits:6,tool:'pick',required:true,loot:{ore:3,stone:2},regrow:600,radius:.6},
-  grave:{name:'Restless grave',hits:4,tool:'pick',required:true,loot:{ember:3,stone:2},regrow:600,radius:.5},
+  tree:{name:'Crooked pine',hits:4,workSeconds:4,handRate:1,tool:'axe',toolRate:2,output:'floor',loot:{wood:5,fiber:1},regrow:420,radius:.55},
+  rock:{name:'Flint outcrop',hits:4,workSeconds:4.5,handRate:1,tool:'pick',toolRate:1.8,output:'floor',loot:{stone:5},regrow:520,radius:.65},
+  grass:{name:'Dry grass',hits:1,workSeconds:0.9,handRate:1,output:'backpack',loot:{fiber:4},regrow:140,radius:0},
+  bush:{name:'Nightberry bush',hits:2,workSeconds:1.6,handRate:1,output:'backpack',loot:{berry:3,seed:1},regrow:210,radius:.25},
+  pumpkin:{name:'Wild pumpkin',hits:2,workSeconds:1.8,handRate:1,output:'backpack',loot:{pumpkin:2,seed:2},regrow:300,radius:.3},
+  mushroom:{name:'Mooncap patch',hits:1,workSeconds:1,handRate:1,output:'backpack',loot:{mushroom:3},regrow:200,radius:0},
+  ore:{name:'Moon iron seam',hits:6,workSeconds:3.5,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{ore:3,stone:2},regrow:600,radius:.6},
+  grave:{name:'Restless grave',hits:4,workSeconds:3,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{ember:3,stone:2},regrow:600,radius:.5},
 };
 export const STRUCTURES = {
   hearth:{name:'Heartfire',hp:600,radius:1,light:8},fire:{name:'Campfire',hp:160,radius:.55,light:6},
@@ -32,11 +32,11 @@ export const STRUCTURES = {
   bed:{name:'Bedroll',hp:100,radius:0},ward:{name:'Warding totem',hp:200,radius:.55},
 };
 export const RECIPES = {
-  axe:{kind:'tool',cost:{wood:2,stone:2},desc:'Fell trees twice as quickly.'},
-  pick:{kind:'tool',cost:{wood:2,stone:3},desc:'Mine flint, moon iron and haunted graves.'},
-  spear:{kind:'tool',cost:{wood:3,stone:2,fiber:2},desc:'Reach and damage for defending the camp.'},
-  torch:{kind:'tool',cost:{wood:2,fiber:3},desc:'A portable light. Toggle it to save 3 minutes of fuel.'},
-  bandage:{kind:'item',cost:{fiber:4,berry:1},desc:'Restore 35 health. Use from your pack.'},
+  axe:{kind:'tool',cost:{wood:2,stone:2},station:'bench',desc:'Fell trees twice as quickly.'},
+  pick:{kind:'tool',cost:{wood:2,stone:3},station:'bench',desc:'Mine flint, moon iron and haunted graves.'},
+  spear:{kind:'tool',cost:{wood:3,stone:2,fiber:2},station:'bench',desc:'Reach and damage for defending the camp.'},
+  torch:{kind:'tool',cost:{wood:2,fiber:3},station:'bench',desc:'A portable light. Toggle it to save 3 minutes of fuel.'},
+  bandage:{kind:'item',cost:{fiber:4,berry:1},station:'bench',desc:'Restore 35 health. Use from your pack.'},
   armor:{kind:'tool',cost:{wood:5,fiber:5},station:'bench',desc:'Absorb 45% of damage until it breaks.'},
   sword:{kind:'tool',cost:{wood:3,ore:5,ember:2},station:'bench',desc:'A powerful weapon for the final nights.'},
   fire:{kind:'build',cost:{wood:4,stone:4},desc:'Light and courage. Feed it wood to keep it burning.'},

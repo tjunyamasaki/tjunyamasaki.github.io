@@ -20,7 +20,17 @@ const readFixture = name => readFileSync(new URL(name, fixtureDir), 'utf8');
 const loadFixture = name => JSON.parse(readFixture(name));
 
 function camp(){const w=new World(402);const p=w.addPlayer('host','Jun');w.start();return {w,p};}
-function act(w,p,cmd){p.cooldown=0;w.action(p.id,cmd);}
+function act(w,p,cmd){p.cooldown=0;return w.action(p.id,cmd);}
+function hold(w,p,target,seconds,extra={}){
+  let left=seconds;
+  while(left>1e-8){
+    const dt=Math.min(RULES.tick, left);
+    w.input(p.id,{x:extra.x||0,z:extra.z||0,act:extra.act!==false,attack:!!extra.attack,target});
+    w.tick(dt);
+    left-=dt;
+  }
+}
+function nearDurability(actual,expected){assert.ok(Math.abs(actual-expected)<1e-6,`${actual} vs ${expected}`);}
 function qty(container,itemId){return countItem(container,itemId);}
 function owned(world){return duplicateUids(collectLocations(world));}
 function stackOf(container,itemId){return container?.slots?.find(stack=>stack?.itemId===itemId);}
@@ -53,8 +63,11 @@ function v1Durability(player){
 test('T01 two axes keep independent identity through craft, move, equip, drop, pickup, and save',()=>{
   const {w,p}=camp();
   setPack(w,p,{wood:8,stone:8});
-  act(w,p,{type:'craft',recipe:'axe'});
-  act(w,p,{type:'craft',recipe:'axe'});
+  const bench=w.structure('bench',p.x+1,p.z);w.buildings.push(bench);
+  assert.equal(act(w,p,{type:'craft',recipe:'axe'}).ok,false);
+  assert.equal(p.inventory.slots.some(stack=>stack?.itemId==='axe'),false);
+  act(w,p,{type:'craft',recipe:'axe',stationId:bench.id});
+  act(w,p,{type:'craft',recipe:'axe',stationId:bench.id});
   const axes=p.inventory.slots.filter(stack=>stack?.itemId==='axe');
   assert.equal(axes.length,2);
   assert.equal(p.equipment.chop,null);
@@ -69,7 +82,11 @@ test('T01 two axes keep independent identity through craft, move, equip, drop, p
   const tree=w.nodes.find(node=>node.type==='tree');
   p.x=tree.x;p.z=tree.z+1;
   act(w,p,{type:'interact',target:tree.id});
-  assert.equal(p.equipment.chop.durability,EQUIPMENT.axe.durability-1);
+  assert.equal(tree.ready,0);
+  assert.equal(p.equipment.chop.durability,EQUIPMENT.axe.durability);
+  hold(w,p,tree.id,1);
+  assert.equal(tree.ready>w.time,false);
+  nearDurability(p.equipment.chop.durability,EQUIPMENT.axe.durability-1);
   assert.equal(stackOf(p.inventory,'axe').uid,spareUid);
   assert.equal(stackOf(p.inventory,'axe').durability,EQUIPMENT.axe.durability);
   const from=p.inventory.slots.findIndex(stack=>stack?.uid===spareUid);
@@ -81,13 +98,13 @@ test('T01 two axes keep independent identity through craft, move, equip, drop, p
   act(w,p,{type:'drop',uid:wornUid,quantity:1});
   assert.equal(p.equipment.chop,null);
   const drop=w.drops.find(entry=>entry.stack.uid===wornUid);
-  assert.equal(drop.stack.durability,EQUIPMENT.axe.durability-1);
+  nearDurability(drop.stack.durability,EQUIPMENT.axe.durability-1);
   act(w,p,{type:'interact',target:drop.id});
   assert.equal(w.drops.some(entry=>entry.stack?.uid===wornUid),false);
-  assert.equal(p.inventory.slots.find(stack=>stack?.uid===wornUid).durability,EQUIPMENT.axe.durability-1);
+  nearDurability(p.inventory.slots.find(stack=>stack?.uid===wornUid).durability,EQUIPMENT.axe.durability-1);
   const restored=World.restore(JSON.parse(JSON.stringify(w.snapshot())));
   const again=restored.player('host');
-  assert.equal(again.inventory.slots.find(stack=>stack?.uid===wornUid).durability,EQUIPMENT.axe.durability-1);
+  nearDurability(again.inventory.slots.find(stack=>stack?.uid===wornUid).durability,EQUIPMENT.axe.durability-1);
   assert.equal(again.inventory.slots.find(stack=>stack?.uid===spareUid).durability,EQUIPMENT.axe.durability);
   assert.equal(owned(restored).length,0);
 });
@@ -204,28 +221,33 @@ test('T05 equip swap uses the source slot and unequip fails when the backpack is
 });
 
 test('T06 only the equipped tool, weapon, and armor change the outcome',()=>{
-  const treeHit=(where)=>{
+  const chop=(where,seconds)=>{
     const {w,p}=camp();
     const tree=w.nodes.find(node=>node.type==='tree');
     p.x=tree.x;p.z=tree.z+1;
     if(where==='pack'){w.clearPack(p);p.inventory.slots[0]=w.mintStack('axe',1,70);}
     if(where==='worn')w.grantEquipped(p,'axe',70);
-    const before=tree.hits;
-    act(w,p,{type:'interact',target:tree.id});
-    return {delta:before-tree.hits, durability:where==='worn'?p.equipment.chop.durability:p.inventory.slots.find(stack=>stack?.itemId==='axe')?.durability};
+    hold(w,p,tree.id,seconds);
+    const wood=w.drops.filter(drop=>drop.stack.itemId==='wood').reduce((total,drop)=>total+drop.stack.quantity,0);
+    return {ready:tree.ready>w.time, hits:tree.hits, wood, durability:where==='worn'?p.equipment.chop?.durability:p.inventory.slots.find(stack=>stack?.itemId==='axe')?.durability};
   };
-  assert.equal(treeHit(null).delta,1);
-  assert.equal(treeHit('pack').delta,1);
-  assert.equal(treeHit('pack').durability,70);
-  assert.equal(treeHit('worn').delta,2);
-  assert.equal(treeHit('worn').durability,69);
+  assert.equal(chop(null,2).ready,false);
+  assert.equal(chop(null,2).hits,NODES.tree.hits);
+  assert.equal(chop('pack',2).ready,false);
+  assert.equal(chop('pack',2).durability,70);
+  assert.equal(chop('worn',1).ready,false);
+  nearDurability(chop('worn',1).durability,69);
+  assert.equal(chop('worn',2).ready,true);
+  assert.equal(chop('worn',2).wood,5);
+  assert.equal(chop('worn',2).hits,0);
 
   const {w,p}=camp();
   const ore=w.nodes.find(node=>node.type==='ore');
   p.x=ore.x;p.z=ore.z+1;
   p.inventory.slots[0]=w.mintStack('pick',1,70);
-  act(w,p,{type:'interact',target:ore.id});
+  hold(w,p,ore.id,1);
   assert.equal(ore.hits,NODES.ore.hits);
+  assert.equal(ore.ready,0);
   assert.equal(p.inventory.slots[0].durability,70);
 
   const strike=(where)=>{
@@ -282,7 +304,10 @@ test('T07 explicit food selection consumes that stack and bare eat chooses nothi
 test('T08 moving the lit lantern turns it off and keeps its fuel',()=>{
   const {w,p}=camp();
   setPack(w,p,{wood:2,fiber:3});
-  act(w,p,{type:'craft',recipe:'torch'});
+  const bench=w.structure('bench',p.x+1,p.z);w.buildings.push(bench);
+  assert.equal(act(w,p,{type:'craft',recipe:'torch'}).code,'stationRequired');
+  assert.equal(qty(p.inventory,'wood'),2);
+  act(w,p,{type:'craft',recipe:'torch',stationId:bench.id});
   assert.equal(p.lantern,false);
   assert.equal(p.equipment.light,null);
   const crafted=stackOf(p.inventory,'torch');
@@ -343,15 +368,17 @@ test('T18 craft is all or nothing, and success creates a new item',()=>{
   const uids=new Set();
   for(let i=0;i<24;i++){const stack=w.mintStack('axe',1,70);p.inventory.slots[i]=stack;uids.add(stack.uid);}
   const chest=w.structure('chest',p.x+1,p.z);
-  w.buildings.push(chest);
+  const bench=w.structure('bench',p.x+1.5,p.z+1.2);
+  w.buildings.push(chest,bench);
   assert.equal(w.stock(chest.store,'wood',4),4);
   assert.equal(w.stock(chest.store,'stone',4),4);
   const before=JSON.stringify(chest.store);
-  act(w,p,{type:'craft',recipe:'axe'});
+  const blocked=act(w,p,{type:'craft',recipe:'axe',stationId:bench.id});
+  assert.equal(blocked.code,'inventoryFull');
   assert.equal(JSON.stringify(chest.store),before);
   assert.equal(p.inventory.slots.filter(stack=>stack?.itemId==='axe').length,24);
   p.inventory.slots[0]=null;
-  act(w,p,{type:'craft',recipe:'axe'});
+  assert.equal(act(w,p,{type:'craft',recipe:'axe',stationId:bench.id}).ok,true);
   assert.equal(qty(chest.store,'wood'),2);
   assert.equal(qty(chest.store,'stone'),2);
   const created=p.inventory.slots.find(stack=>stack&&!uids.has(stack.uid));
@@ -368,10 +395,16 @@ test('T25 a full pack can still finish a chop, and pickup leaves the exact remai
   const tree=w.nodes.find(node=>node.type==='tree');
   p.x=tree.x;p.z=tree.z+1;
   const hits=tree.hits;
-  act(w,p,{type:'interact',target:tree.id});
-  assert.equal(tree.hits,hits-1);
-  while(tree.hits>0)act(w,p,{type:'interact',target:tree.id});
+  for(let i=0;i<12;i++)act(w,p,{type:'interact',target:tree.id});
+  assert.equal(tree.hits,hits);
+  assert.equal(tree.ready,0);
+  assert.equal(w.drops.length,0);
+  hold(w,p,tree.id,1);
+  assert.equal(tree.hits,hits);
+  assert.equal(w.drops.length,0);
+  hold(w,p,tree.id,3);
   assert.ok(tree.ready>w.time);
+  assert.equal(tree.hits,0);
   assert.equal(qty(p.inventory,'wood'),120);
   assert.equal(qty(p.inventory,'fiber'),0);
   assert.equal(w.drops.filter(drop=>drop.stack.itemId==='wood').reduce((total,drop)=>total+drop.stack.quantity,0),5);
@@ -402,8 +435,16 @@ test('callers that create or consume items keep a single owner',()=>{
 
   const risen=camp();
   setPack(risen.w,risen.p,{wood:10,stone:8,ember:4});
+  const heart=risen.w.buildings.find(b=>b.type==='hearth');
   act(risen.w,risen.p,{type:'upgrade'});
-  assert.equal(risen.w.buildings[0].level,2);
+  assert.equal(heart.level,1);
+  assert.equal(qty(risen.p.inventory,'wood'),10);
+  assert.equal(qty(risen.p.inventory,'ember'),4);
+  act(risen.w,risen.p,{type:'upgrade',target:'no-such-fire'});
+  assert.equal(heart.level,1);
+  assert.equal(qty(risen.p.inventory,'wood'),10);
+  act(risen.w,risen.p,{type:'upgrade',target:heart.id});
+  assert.equal(heart.level,2);
   assert.equal(qty(risen.p.inventory,'wood'),0);
   assert.equal(qty(risen.p.inventory,'ember'),0);
 
@@ -453,7 +494,12 @@ test('callers that create or consume items keep a single owner',()=>{
   const box=taken.w.structure('chest',taken.p.x+1,taken.p.z);
   taken.w.buildings.push(box);
   assert.equal(taken.w.stock(box.store,'ore',2),2);
-  act(taken.w,taken.p,{type:'dismantle',target:box.id});
+  assert.equal(act(taken.w,taken.p,{type:'dismantle',target:box.id,hold:true}).ok,true);
+  assert.equal(taken.w.buildings.some(building=>building.id===box.id),true);
+  assert.equal(qty(box.store,'ore'),2);
+  hold(taken.w,taken.p,null,0.7,{act:false});
+  assert.equal(taken.w.buildings.some(building=>building.id===box.id),true);
+  hold(taken.w,taken.p,null,0.15,{act:false});
   assert.equal(taken.w.buildings.some(building=>building.id===box.id),false);
   assert.equal(qty(taken.p.inventory,'wood'),3);
   assert.equal(qty(taken.p.inventory,'fiber'),1);

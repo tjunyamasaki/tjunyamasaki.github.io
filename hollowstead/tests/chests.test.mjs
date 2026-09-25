@@ -143,11 +143,13 @@ test('renewal is explicit, owner-only, and a stale close cannot release a new se
 test('T13–T14 locked chest excludes all other actors shared costs and transfer/craft cannot double spend',()=>{
   const {w,p,q,chest,open,command,transfer}=camp();w.clearPack(p);w.clearPack(q);w.stock(chest.store,'wood',3);w.stock(chest.store,'stone',2);
   const session=open(p).sessionId;
+  const bench=w.structure('bench',p.x+.4,p.z+.8);w.buildings.push(bench);
   assert.equal(w.available(q,'wood'),0);assert.equal(w.canPay(q,{wood:1}),false);
   assert.equal(w.pay(q,{wood:1}),false);assert.equal(w.available(p,'wood'),3);
-  assert.equal(command(q,{type:'craft',recipe:'axe'}).ok,false);
+  assert.equal(command(q,{type:'craft',recipe:'axe',stationId:bench.id}).ok,false);
+  assert.equal(countItem(chest.store,'wood'),3);
   const wood=chest.store.slots.find(s=>s?.itemId==='wood');
-  const revision=chest.store.revision;assert.equal(command(p,{type:'craft',recipe:'axe'}).ok,true);
+  const revision=chest.store.revision;assert.equal(command(p,{type:'craft',recipe:'axe',stationId:bench.id}).ok,true);
   assert.equal(transfer(p,session,chest.store,p.inventory,wood.uid,1,{sourceRevision:revision}).code,'staleRevision');
   assert.equal(countItem(p.inventory,'axe'),1);
   command(p,{type:'chestClose',chestId:chest.id,sessionId:session});
@@ -161,10 +163,11 @@ test('locked supplies cannot fuel, repair, upgrade, plant or rearm through old i
   open(p);const before=copy(chest.store);
   const fire=w.structure('fire',q.x+.2,q.z),wall=w.structure('wall',q.x+.3,q.z),farm=w.structure('farm',q.x+.4,q.z),trap=w.structure('trap',q.x+.5,q.z);
   fire.fuel=0;wall.hp=1;trap.charges=0;w.buildings.push(fire,wall,farm,trap);
-  for(const cmd of [{type:'interact',target:fire.id},{type:'repair',target:wall.id},{type:'upgrade'},{type:'interact',target:farm.id},{type:'interact',target:trap.id}]){
+  const heart=w.buildings.find(b=>b.type==='hearth');
+  for(const cmd of [{type:'interact',target:fire.id},{type:'repair',target:wall.id},{type:'upgrade',target:heart.id},{type:'interact',target:farm.id},{type:'interact',target:trap.id}]){
     q.cooldown=0;command(q,cmd);
   }
-  assert.equal(copy(chest.store),before);assert.equal(fire.fuel,0);assert.equal(wall.hp,1);assert.equal(farm.planted,false);assert.equal(trap.charges,0);
+  assert.equal(copy(chest.store),before);assert.equal(fire.fuel,0);assert.equal(wall.hp,1);assert.equal(farm.planted,false);assert.equal(trap.charges,0);assert.equal(heart.level,1);
 });
 
 test('T15 dismantle cannot bypass a lease; destruction spills exactly once with durability intact',()=>{

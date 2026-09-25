@@ -1,6 +1,6 @@
 // Authoritative chest leases and item moves. No browser, transport, or World import.
-import {CHEST_LEASE_SECONDS, CHEST_GROWTH_SLOTS, EQUIPMENT_SLOTS, inReach} from './contracts.mjs?v=harvest-5';
-import {cloneContainer, cloneStack, containerId, planInsert, planMove, SUPPLY_CAPACITY, validateEquipment} from './inventory.mjs?v=harvest-5';
+import {CHEST_LEASE_SECONDS, CHEST_GROWTH_SLOTS, EQUIPMENT_SLOTS, inReach} from './contracts.mjs?v=harvest-6';
+import {cloneContainer, cloneStack, containerId, planInsert, planMove, SUPPLY_CAPACITY, validateEquipment} from './inventory.mjs?v=harvest-6';
 
 const result=(code, extra={})=>({ok:code==='ok', code, ...extra});
 const near=(a,b)=>inReach(Math.hypot(a.x-b.x,a.z-b.z));

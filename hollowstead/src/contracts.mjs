@@ -4,7 +4,7 @@
 // The running clock stays on content.mjs 150/30/80 until P5 enables 180/30/100.
 // Do not import World, the DOM, the network, or a renderer from here.
 
-import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-5';
+import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-6';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 

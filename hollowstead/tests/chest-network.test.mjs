@@ -54,8 +54,11 @@ test('N07/N08 transport heartbeat, host pause and explicit old inventory-path re
     await host.host();await guest.join('ABCDE','Friend','moss');await flush();
     guest.ping();await flush();assert.ok(status.some(s=>/ms$/.test(s)));
     for(const type of ['eat','deposit','withdraw','equip','drop','recover'])assert.equal((await guest.action({type})).code,'unsupported',type);
-    host.pause(true);await flush();assert.equal((await guest.action({type:'craft',recipe:'axe'})).code,'paused');
-    host.pause(false);await flush();assert.equal((await guest.action({type:'craft',recipe:'axe'})).ok,true);
+    const before=w.events.length;assert.equal((await guest.action({type:'ping',text:'Here!'})).code,'unsupported');assert.equal(w.events.length,before);assert.equal(w.events.some(event=>event.type==='ping'),false);
+    const guestPlayer=w.players.find(p=>p.id!=='host');const bench=w.structure('bench',guestPlayer.x+1,guestPlayer.z);w.buildings.push(bench);
+    assert.equal((await guest.action({type:'craft',recipe:'axe'})).code,'stationRequired');assert.equal(w.player(guestPlayer.id).inventory.slots.some(stack=>stack?.itemId==='axe'),false);
+    host.pause(true);await flush();assert.equal((await guest.action({type:'craft',recipe:'axe',stationId:bench.id})).code,'paused');
+    host.pause(false);await flush();assert.equal((await guest.action({type:'craft',recipe:'axe',stationId:bench.id})).ok,true);
   }finally{await guest.stop();await host.stop();}
 });
 

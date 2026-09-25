@@ -932,7 +932,7 @@ These searches are review aids, not blanket delete commands: 180 is now a valid 
 
 ## 16. Implementation packages for other agents
 
-P0 and P1 are complete. P2–P6 are NOT STARTED. The planning commit does not satisfy any later package's acceptance criterion.
+P0, P1, P2, and P3 are complete. P4–P6 are not started. The planning commit does not satisfy any later package's acceptance criterion.
 
 Work on feat/hollowstead-coop or a narrowly scoped integration branch based on its current head. Only an integrator pushes the deployable branch after a coherent slice is working. Do not independently force-push shared history or merge to master.
 
@@ -975,14 +975,14 @@ Dependencies: P1 contract and functioning containers; can develop harness cases 
 
 Owns: chest session lifecycle in engine, network action results/dedupe, network tests.
 
-- [ ] Implement exclusive open/renew/close, range checks, lease expiry, lifecycle release.
-- [ ] Implement transfers including sockets and all items.
-- [ ] Make all shared-cost selectors lock-aware and atomic.
-- [ ] Remove deposit/withdraw bypasses and dismantle loopholes.
-- [ ] Add request IDs, revisions, result caching/high-water logic and snapshot/result reconciliation.
-- [ ] Add network protocol v2 mismatch handling and bounded serialization checks.
-- [ ] Keep transport heartbeat intact.
-- [ ] Add T09–T15 and N01–N09.
+- [x] Implement exclusive open/renew/close, range checks, lease expiry, lifecycle release.
+- [x] Implement transfers including sockets and all items.
+- [x] Make all shared-cost selectors lock-aware and atomic.
+- [x] Remove deposit/withdraw bypasses and dismantle loopholes.
+- [x] Add request IDs, revisions, result caching/high-water logic and snapshot/result reconciliation.
+- [x] Add network protocol v2 mismatch handling and bounded serialization checks.
+- [x] Keep transport heartbeat intact.
+- [x] Add T09–T15 and N01–N09.
 
 Done when: race tests conserve all items; disconnection and rejoin cannot strand ownership.
 
@@ -992,14 +992,14 @@ Dependencies: P1; lock-aware costs from P2 before integration.
 
 Owns: interactions.mjs, recipe eligibility, harvest/revive channels, build/maintenance intents.
 
-- [ ] Define direct context capabilities for every structure type and exact-target validation.
-- [ ] Apply station policies/lists and verify first-workbench progression.
-- [ ] Implement placement context validation and maintenance/dismantle rules.
-- [ ] Replace hit-based harvesting with dt-based shared work; interrupt/cancel correctly.
-- [ ] Route tree/mining yield to world drops and require fresh pickup activation.
-- [ ] Convert teammate revive to elapsed channel while preserving outcome.
-- [ ] Remove gameplay ping and automatic-eat authoritative cases.
-- [ ] Add T16–T27 and updated behavior assertions in existing tests.
+- [x] Define direct context capabilities for every structure type and exact-target validation.
+- [x] Apply station policies/lists and verify first-workbench progression.
+- [x] Implement placement context validation and maintenance/dismantle rules.
+- [x] Replace hit-based harvesting with dt-based shared work; interrupt/cancel correctly.
+- [x] Route tree/mining yield to world drops and require fresh pickup activation.
+- [x] Convert teammate revive to elapsed channel while preserving outcome.
+- [x] Remove gameplay ping and automatic-eat authoritative cases.
+- [x] Add T16–T27 and updated behavior assertions in existing tests.
 
 Done when: no shortcut/event frequency can bypass duration, station eligibility, or item ownership.
 
@@ -1110,8 +1110,8 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | Planning | Complete | Orchestrator | Plan only; baseline 395baac7a332f1ed94b5c73e0ec4b4882ee47afe | Gameplay implementation not started |
 | P0 | Complete | P0 agent | bc220e92a19eb4665e0346ce025a124e4e283035 | No gameplay change. P1–P6 not started |
 | P1 | Complete | P1 agent | f25990e8ee7f0c55c578df76ab54d2318bc3349d | Live clock still 150/30/80. Full inventory UI, chest locks, and 180/30/100 are later packages |
-| P2 | Complete | P2 review | Review fixes on 653eb983e14027e689421f19fe0f750e60a927e1. 62 Hollowstead + 17 ball-game tests passing | Gameplay ping, hit harvesting, and station ids remain P3. Live clock stays 150/30/80 |
-| P3 | Not started | Unassigned | — | — |
+| P2 | Complete | P2 review | e17d4a687f11b330defd7676489c31579b5005b7. 62 Hollowstead + 17 ball-game tests passing | Live clock stays 150/30/80. Review left stations, timed harvest, and gameplay ping for P3 |
+| P3 | Complete | P3 agent | P3_IMPLEMENTATION_SHA. 73 Hollowstead + 17 ball-game tests passing. Deploy note records the hash | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
 | P4 | Not started | Unassigned | — | — |
 | P5 | Not started | Unassigned | — | — |
 | P6 | Not started | Unassigned | — | — |
@@ -1243,7 +1243,7 @@ Exact next task after release checks: P3. Do not enable P4/P5 behavior as part o
 Date: 2026-09-25
 Package / agent: P2 review / review agent
 Starting commit: 653eb983e14027e689421f19fe0f750e60a927e1
-Ending commit: this P2 review-fix commit. The following P3 handoff records its hash.
+Ending commit: e17d4a687f11b330defd7676489c31579b5005b7
 Files changed:
 - hollowstead/src/engine.mjs
 - hollowstead/src/chests.mjs
@@ -1268,3 +1268,54 @@ Tests and device checks actually run:
 Compatibility notes:
 - Clock remains 150/30/80. No 180/30/100 change. Protocol remains hollowstead-2.
 Exact next task: P3 — Context rules, recipes, timed interactions. Do not start P4, P5, or P6.
+
+Date: 2026-09-25
+Package / agent: P3 / P3 agent
+Starting commit: e17d4a687f11b330defd7676489c31579b5005b7
+Ending commit: P3_IMPLEMENTATION_SHA. The following note records the Pages run for the tip that contains this implementation.
+Files changed:
+- hollowstead/src/interactions.mjs
+- hollowstead/src/engine.mjs
+- hollowstead/src/content.mjs
+- hollowstead/src/transactions.mjs
+- hollowstead/src/main.mjs
+- hollowstead/README.md
+- hollowstead/index.html
+- hollowstead/src/canvas-renderer.mjs
+- hollowstead/src/chests.mjs
+- hollowstead/src/contracts.mjs
+- hollowstead/src/inventory.mjs
+- hollowstead/src/network.mjs
+- hollowstead/src/renderer.mjs
+- hollowstead/src/serialization.mjs
+- hollowstead/src/transport.mjs
+- hollowstead/tests/interactions.test.mjs
+- hollowstead/tests/items.test.mjs
+- hollowstead/tests/survival.test.mjs
+- hollowstead/tests/network.test.mjs
+- hollowstead/tests/chest-network.test.mjs
+- hollowstead/tests/chests.test.mjs
+- hollowstead/IMPLEMENTATION_PLAN.md
+Implemented behavior:
+- interactions.mjs describes harvest rates, station lists, context actions, dismantle rules, and exact target selection. It does not mutate the world. The host engine remains the authority.
+- An explicit world target returns that in-range entity or nothing. An invalid id does not fall back to a nearby entity.
+- Field Build lists campfire, workbench, supply chest, palisade, camp gate, briar trap, pumpkin patch, and bedroll. Cauldron, soul lantern, and ward still require a live workbench id at placement. Bench tools, armor, the moon blade, fire cooking, and stew require the matching station id. There is no permanent recipe unlock. Choosing a recipe spends nothing.
+- Harvest uses host elapsed time. Duration is the node's work seconds divided by the sum of active contributor rates. Unfinished work resets when every contributor stops. Finishing consumes the held Gather press, so that same press does not pick up the new drop. Trees, flint, ore, and graves leave floor drops. Grass, berries, pumpkins, and mushrooms go into the backpack, and overflow is dropped. A teammate revive takes 3 seconds of elapsed time, at most one second per simulation second, and resets when the last helper stops.
+- Dismantle is a 0.8 second host channel. The Heartfire cannot be dismantled. A chest someone else has open cannot be dismantled. The chest and camp sheets say "Hold to dismantle".
+- Gameplay ping and automatic food selection are unsupported. The transport ping/pong heartbeat and network.ping() stay. Eating a selected pack item stays. Crafting stays.
+- The existing Eat and Ping hotbar buttons are disabled and labeled FOOD and OFF. Q asks the player to choose food in the pack. G says camp signals are off. The "effort left" line is gone. Gathering takes time on the existing Gather button. There is no new progress bar.
+- The live clock stays day 150, dusk 30, night 80, cycle 260. Continue does not call remapWorldClock. Renderer night boundaries and the wave schedule are unchanged.
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 73 pass, 0 fail. Includes T16–T27 and the updated hit-count, auto-eat, and gameplay-ping assertions.
+- node --test ball-game/tests/*.test.mjs: 17 pass, 0 fail.
+- git diff --check clean. node --check on the changed Hollowstead modules.
+- Headless Chrome loaded /hollowstead/index.html?dev, started a solo camp, and held Gather on the starting dry grass. Fiber went from 3 to 7, that grass node was spent (hits 0), and the target card then read "THE WOODS ARE WAITING" because nothing else was in reach. Field Build listed the eight field structures and did not list cauldron, soul lantern, or ward. Field Craft read "Craft at a workbench or cooking station." The objective read "Gather wood and flint by hand, then place a workbench." The page text contained no "effort". FOOD and OFF were disabled. Daylight began at 2:30, which is the 150-second day. No phone and no second device.
+Evidence / screenshots / deployment run:
+- P3_DEPLOY_NOTE
+Remaining failures or unverified cases:
+- No automated failure remains in the Hollowstead or ball-game suites. M01–M18, a real phone, and a two-device join were not run. The full HUD rewrite, including removal of the old hotbar buttons and any progress presentation, is P4. The 180/30/100 clock and wave offsets 0/40/80 are P5.
+Compatibility/migration notes:
+- Saves stay v2 with clock v1. Partial harvest work is host-only and is not written into saves. Node hits remain in the snapshot for round-trip and are cleared only when a harvest completes. Continue still refuses clock v2.
+- Protocol stays hollowstead-2. Cache query on player entry modules is harvest-6.
+- Old peers that send gameplay ping or a bare eat command receive unsupported. Transport ping still answers.
+Exact next task: P4 — Mobile inventory, catalog, actions, HUD. Do not start P5 or P6. Do not enable the 180/30/100 clock.

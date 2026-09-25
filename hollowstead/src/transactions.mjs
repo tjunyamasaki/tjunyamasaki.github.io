@@ -1,12 +1,12 @@
-import {ACTION_RESULT_CACHE_LIMIT, INTENTS} from './contracts.mjs?v=harvest-5';
-import {containerId} from './inventory.mjs?v=harvest-5';
-import {chestIntent, moveItems} from './chests.mjs?v=harvest-5';
+import {ACTION_RESULT_CACHE_LIMIT, INTENTS} from './contracts.mjs?v=harvest-6';
+import {containerId} from './inventory.mjs?v=harvest-6';
+import {chestIntent, moveItems} from './chests.mjs?v=harvest-6';
 
 export const TRANSACTION_PROTOCOL=1;
 const outcome=code=>({ok:code==='ok',code});
-// Existing world controls remain until P3/P4. Legacy inventory/chest mutation
-// packets are deliberately excluded: their replacements require revisions.
-const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','dash','lantern','repair','dismantle','upgrade','ping']);
+// Gameplay ping and automatic eat are not world actions. Legacy inventory
+// packets stay excluded: their replacements require revisions.
+const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','dash','lantern','repair','dismantle','upgrade']);
 function validWorldAction(cmd){
   if(typeof cmd.type!=='string')return false;
   if(['move','build'].includes(cmd.type)&&(!Number.isFinite(cmd.x)||!Number.isFinite(cmd.z)))return false;
@@ -29,6 +29,11 @@ export function inventoryIntent(world,p,cmd){
     if(!Number.isSafeInteger(cmd.inventoryRevision)||cmd.inventoryRevision!==p.inventory.revision)return outcome('staleRevision');
     return world.action(p.id,{type:'use',uid:cmd.uid,inventoryRevision:cmd.inventoryRevision})||outcome('rejected');
   }
+  if(cmd.type==='craftRecipe')return world.performCraft(p, cmd.recipeId, cmd.stationId);
+  if(cmd.type==='placeBuilding')return world.performBuild(p, cmd.recipeId, cmd.x, cmd.z, cmd.stationId, cmd.rotation);
+  if(cmd.type==='buildingAction')return world.performBuildingAction(p, cmd.targetId, cmd.actionId);
+  if(cmd.type==='setHarvestTarget')return world.setHarvestTarget(p, cmd);
+  if(cmd.type==='lanternToggle')return world.action(p.id,{type:'lantern',uid:cmd.uid})||outcome('rejected');
   if(cmd.type==='dropItem'){
     const loc=world.locate(p,cmd.uid);
     if(!loc||loc.kind==='recovery')return outcome('notOwner');

@@ -1,15 +1,16 @@
-import {RULES, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-5';
+import {RULES, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-6';
 import {
   CLOCK_V1, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2, SUPPLY_CAPACITY,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createContainer,
   containerId, duplicateUids, emptyEquipment, equippedLanternLit, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
   supplyLoad, wearStack,
-} from './inventory.mjs?v=harvest-5';
-import {repairIdCounter, validateV2World} from './serialization.mjs?v=harvest-5';
-import {INTENTS, inSupplyChestRange} from './contracts.mjs?v=harvest-5';
-import {pruneChests, releaseChests} from './chests.mjs?v=harvest-5';
-import {inventoryIntent} from './transactions.mjs?v=harvest-5';
+} from './inventory.mjs?v=harvest-6';
+import {repairIdCounter, validateV2World} from './serialization.mjs?v=harvest-6';
+import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange} from './contracts.mjs?v=harvest-6';
+import {pruneChests, releaseChests} from './chests.mjs?v=harvest-6';
+import {inventoryIntent} from './transactions.mjs?v=harvest-6';
+import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-6';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
@@ -35,6 +36,7 @@ export class World {
     this.buildings=[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
     this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=false;this.wipe=0;
     this.networkId=crypto.randomUUID();this.transactionRevision=0;this.chestSessions=new Map();
+    this.harvestWork=new Map();this.reviveWork=new Map();this.activations=new Map();this.dismantleHolds=new Map();this.toolNoticeAt=new Map();this.damagedAt=new Map();
     this.stats={gathered:0,built:0,revives:0};this.inputs=new Map();this.rng=random(seed^0x1234);this.discoverTimer=0;
   }
   nextId(prefix){return prefix+(this.idCounter++);}
@@ -220,10 +222,23 @@ export class World {
     const plan=planInsert(clones[0], made.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:false, grow:false, acceptsItems:true, mintUid:()=>'preview-split'});
     return plan.ok?'':'Pack full — store or drop some supplies';
   }
-  recipeReason(p,key){
+  stationBuilding(p, recipeId, stationId){
+    const spec=stationRule(recipeId);
+    if(!spec)return true;
+    if(typeof stationId!=='string'||!stationId)return null;
+    const building=this.buildings.find(b=>b.id===stationId&&b.hp>0);
+    if(!building||!spec.accepts(building.type)||!inCraftRange(distance(p,building)))return null;
+    if(spec.needsFuel&&!(building.fuel>0))return 'fuel';
+    return building;
+  }
+  recipeReason(p,key,stationId){
     const recipe=RECIPES[key];
     if(!recipe)return 'Unknown recipe';
-    if(recipe.station&&!this.nearby(p, recipe.station, 5))return recipe.station==='fire'?'Stand near a burning fire':`Stand near a ${label(recipe.station).toLowerCase()}`;
+    if(recipe.station){
+      const station=this.stationBuilding(p, key, stationId);
+      if(station==='fuel')return 'The fire needs wood';
+      if(!station)return stationLabel(key);
+    }
     if(!this.canPay(p, recipe.cost))return 'Gather the missing materials';
     if(recipe.kind!=='build'){
       const sources=[p.inventory, ...this.stores(p)];
@@ -254,7 +269,7 @@ export class World {
     sources.forEach((live, index)=>{live.slots=clones[index].slots;live.revision=clones[index].revision;});
     return true;
   }
-  canBuild(p,type,x,z){
+  canBuild(p,type,x,z,stationId){
     if(!RECIPES[type]||RECIPES[type].kind!=='build')return 'Unknown structure';
     if(!Number.isFinite(x)||!Number.isFinite(z)||Math.abs(x)>RULES.radius-2||Math.abs(z)>RULES.radius-2)return 'Outside the clearing';
     if(Math.hypot(x-p.x,z-p.z)>5.5)return 'Move closer to this spot';
@@ -263,7 +278,8 @@ export class World {
     if(this.players.some(q=>q.online&&!q.ghost&&Math.hypot(q.x-x,q.z-z)<radius+.4))return 'A wanderer is standing here';
     if(this.buildings.some(b=>Math.hypot(b.x-x,b.z-z)<Math.max(.65,STRUCTURES[b.type].radius)+radius+.1))return 'Too close to another structure';
     if(this.nodes.some(n=>!n.ready&&NODES[n.type].radius>.3&&Math.hypot(n.x-x,n.z-z)<NODES[n.type].radius+radius))return 'Clear these resources first';
-    return this.recipeReason(p,type);
+    if(RECIPES[type].station&&!this.stationBuilding(p, type, stationId))return 'Build this at a workbench';
+    return this.recipeReason(p,type,stationId);
   }
   transferAll(p,uid,dest,{grow=false,supplyCapacity=null,accepts=true}={}){
     const loc=this.locate(p, uid);
@@ -378,23 +394,15 @@ export class World {
     if(this.status!=='playing')return {ok:false,code:'unavailable'};
     if(p.down||p.ghost){if(cmd.type==='interact'&&p.charm>0){p.charm--;this.revivePlayer(p);this.event('heal',p.x,p.z,'Last charm');return {ok:true,code:'ok'};}return {ok:false,code:'unavailable'};}
     if(Object.hasOwn(INTENTS,cmd.type))return inventoryIntent(this,p,cmd);
-    if(p.cooldown>.05&&!['move','ping','lantern','dash'].includes(cmd.type))return {ok:false,code:'cooldown'};
+    if(p.cooldown>.05&&!['move','lantern','dash','dismantle'].includes(cmd.type))return {ok:false,code:'cooldown'};
     switch(cmd.type){
       case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){p.goal={x:clamp(cmd.x,-41,41),z:clamp(cmd.z,-41,41),target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
-      case 'craft':{
-        const recipe=RECIPES[cmd.recipe];if(!recipe||recipe.kind==='build')return;const reason=this.recipeReason(p, cmd.recipe);if(reason){this.tell(p, reason);return;}
-        if(!this.commitCraft(p, cmd.recipe)){this.tell(p, 'Pack full — store or drop some supplies');return;}
-        p.cooldown=.35;this.event('craft',p.x,p.z,label(recipe.result||cmd.recipe));break;
-      }
-      case 'build':{
-        const x=Math.round(cmd.x*2)/2,z=Math.round(cmd.z*2)/2;const reason=this.canBuild(p, cmd.recipe, x, z);if(reason){this.tell(p, reason);return;}
-        if(!this.pay(p, RECIPES[cmd.recipe].cost))return;const building=this.structure(cmd.recipe, x, z);building.rotation=cmd.rotation===1?1:0;this.buildings.push(building);this.stats.built++;p.cooldown=.4;this.event('build',x,z,STRUCTURES[building.type].name);break;
-      }
+      case 'craft':return this.performCraft(p, cmd.recipe, cmd.stationId);
+      case 'build':return this.performBuild(p, cmd.recipe, cmd.x, cmd.z, cmd.stationId, cmd.rotation);
       case 'use':{
         let stack=null;
-        if(typeof cmd.uid==='string'){stack=p.inventory.slots.find(slot=>slot?.uid===cmd.uid)||null;if(!stack)return;}
-        else if(typeof cmd.item==='string'&&itemDefinition(cmd.item))stack=p.inventory.slots.find(slot=>slot?.itemId===cmd.item)||null;
-        if(!stack)return;
+        if(typeof cmd.uid==='string'){stack=p.inventory.slots.find(slot=>slot?.uid===cmd.uid)||null;if(!stack)return {ok:false,code:'unknownItem'};}
+        if(!stack)return {ok:false,code:'unknownItem'};
         const item=ITEMS[stack.itemId];if(!item||(!item.food&&!item.heal))return;
         if(p.hunger>=100&&item.food&&p.hp>=100){this.tell(p,'You are already full');return;}
         const consumed=planConsume({inventory:p.inventory, inventoryRevision:cmd.inventoryRevision, uid:stack.uid, quantity:1});
@@ -403,7 +411,7 @@ export class World {
         p.hunger=clamp(p.hunger+(item.food||0),0,100);p.hp=clamp(p.hp+(item.heal||0),1,100);p.courage=clamp(p.courage+(item.courage||0),0,100);p.cooldown=.4;this.event('heal',p.x,p.z,item.food?'Delicious':'+35 health');break;
       }
       case 'eat':return {ok:false,code:'unsupported'};
-      case 'interact':this.interact(p, cmd.target);break;
+      case 'interact':return this.interact(p, cmd.target)||{ok:false,code:'rejected'};
       case 'attack':this.attack(p);break;
       case 'dash':if(p.stamina>=28&&p.dashCooldown<=0){p.stamina-=28;p.dash=.24;p.dashCooldown=1.1;p.rest=false;this.event('dash',p.x,p.z);}break;
       case 'lantern':{
@@ -433,26 +441,15 @@ export class World {
         this.collapseRecovery(p);break;
       }
       case 'drop':{
-        let dropped=false;
-        if(typeof cmd.uid==='string')dropped=this.dropOwned(p, cmd.uid, Number.isInteger(cmd.quantity)?cmd.quantity:undefined);
-        else if(typeof cmd.item==='string'){const stack=p.inventory.slots.find(slot=>slot?.itemId===cmd.item);if(stack)dropped=this.dropOwned(p, stack.uid, undefined);}
+        const dropped=typeof cmd.uid==='string'&&this.dropOwned(p, cmd.uid, Number.isInteger(cmd.quantity)?cmd.quantity:undefined);
         if(dropped)p.cooldown=.3;break;
       }
       case 'repair':{
         const building=this.buildings.find(b=>b.id===cmd.target&&distance(p,b)<4);if(!building||building.hp>=building.maxHp)return;if(!this.pay(p,{wood:1})){this.tell(p,'Need 1 wood');return;}building.hp=Math.min(building.maxHp, building.hp+90);p.cooldown=.4;this.event('heal',building.x,building.z,'Repaired');break;
       }
-      case 'dismantle':{
-        const building=this.buildings.find(b=>b.id===cmd.target&&b.type!=='hearth'&&distance(p,b)<4);if(!building)return;
-        if(this.chestSessions.has(building.id))return {ok:false,code:'chestInUse'};
-        for(const [itemId, count] of Object.entries(RECIPES[building.type].cost))this.give(p, itemId, Math.ceil(count*.5));
-        this.dropContainer(building.store, building.x, building.z);this.buildings=this.buildings.filter(entry=>entry!==building);p.cooldown=.5;break;
-      }
-      case 'upgrade':{
-        const building=this.nearby(p,'hearth');if(!building)return;if(building.level>=3){this.tell(p,'The Heartfire is fully awakened');return;}
-        const cost=this.upgradeCost();if(!this.pay(p, cost)){this.tell(p,'The Heartfire needs more offerings');return;}
-        building.level++;building.maxHp+=300;building.hp=building.maxHp;building.fuel=Math.min(360, building.fuel+120);this.event('build',building.x,building.z,`Heartfire • level ${building.level}`);p.cooldown=.5;break;
-      }
-      case 'ping':this.event('ping',p.x,p.z,`${p.name}: ${['Here!','Need help!','Back to camp!'].includes(cmd.text)?cmd.text:'Here!'}`,{player:p.id});p.cooldown=.2;break;
+      case 'dismantle':return this.beginDismantle(p, cmd.target, cmd.hold!==false);
+      case 'upgrade':return this.performUpgrade(p, cmd.target);
+      case 'ping':return {ok:false,code:'unsupported'};
       default:return {ok:false,code:'unsupported'};
     }
     this.assertItems();
@@ -460,38 +457,308 @@ export class World {
   }
   upgradeCost(){return this.buildings.find(b=>b.type==='hearth')?.level===1?{wood:10,stone:8,ember:4}:{wood:15,ore:6,ember:8};}
   target(p,id){
-    const revive=this.players.find(q=>q.id!==p.id&&q.online&&q.down&&distance(p,q)<RULES.reach);if(revive)return {kind:'revive',entity:revive,label:'Revive teammate'};
-    const candidates=[...this.drops.map(e=>({kind:'drop',entity:e,label:`Pick up ${label(e.stack.itemId)}`})),...this.nodes.filter(n=>!n.ready).map(e=>({kind:'node',entity:e,label:e.type==='tree'?'Chop':e.type==='rock'||e.type==='ore'||e.type==='grave'?'Mine':'Gather'})),...this.buildings.map(e=>({kind:'building',entity:e,label:this.buildingLabel(e)}))].filter(t=>distance(p,t.entity)<RULES.reach);
-    return candidates.find(t=>t.entity.id===id)||candidates.sort((a,b)=>distance(p,a.entity)-distance(p,b.entity))[0];
+    const inRange=entity=>distance(p,entity)<RULES.reach;
+    const revive=this.players.find(q=>q.id!==p.id&&q.online&&q.down&&inRange(q));
+    const candidates=[
+      ...this.drops.filter(inRange).map(e=>({kind:'drop',entity:e,label:`Pick up ${label(e.stack.itemId)}`})),
+      ...this.nodes.filter(n=>!(n.ready>this.time)&&inRange(n)).map(e=>({kind:'node',entity:e,label:e.type==='tree'?'Chop':e.type==='rock'||e.type==='ore'||e.type==='grave'?'Mine':'Gather'})),
+      ...this.buildings.filter(b=>b.hp>0&&inRange(b)).map(e=>({kind:'building',entity:e,label:this.buildingLabel(e)})),
+      ...(revive?[{kind:'revive',entity:revive,label:'Revive teammate'}]:[]),
+    ];
+    if(typeof id==='string')return candidates.find(t=>t.entity.id===id)||null;
+    if(revive)return {kind:'revive',entity:revive,label:'Revive teammate'};
+    return candidates.sort((a,b)=>distance(p,a.entity)-distance(p,b.entity)||(a.entity.id<b.entity.id?-1:1))[0]||null;
   }
   buildingLabel(b){return ({hearth:'Feed heartfire',fire:'Feed fire',bench:'Workbench',chest:'Open supplies',wall:'Repair wall',gate:b.open?'Close gate':'Open gate',trap:b.charges<3?'Rearm trap':'Briar trap',farm:b.planted?(b.growth>=100?'Harvest pumpkins':'Growing…'):'Plant seed',pot:'Cook a feast',lantern:'Soul lantern',bed:'Rest',ward:'Warding totem'})[b.type];}
   interact(p,target){
-    const t=this.target(p,target);if(!t)return;
+    const explicit=typeof target==='string'?target:null;
+    const t=this.target(p, explicit);if(!t)return {ok:false,code:'rejected'};
     const e=t.entity;
-    if(t.kind==='revive'){e.revive+=.55;p.cooldown=.45;this.event('heal',e.x,e.z,'Helping…');if(e.revive>=3){this.revivePlayer(e);this.stats.revives++;}return;}
-    if(t.kind==='drop'){this.pickupDrop(p, e);p.cooldown=.2;return;}
+    if(t.kind==='revive')return {ok:true,code:'ok'};
+    if(t.kind==='drop'){
+      const state=this.syncActivation(p, true);
+      this.pickupDrop(p, e);
+      state.consumed=true;
+      p.cooldown=.2;
+      return {ok:true,code:'ok'};
+    }
     if(t.kind==='node'){
-      const def=NODES[e.type],has=this.hasTool(p, def.tool);
-      if(def.required&&!has){this.tell(p,`Craft a ${label(def.tool).toLowerCase()} first`);p.goal=null;return;}
-      e.hits-=has?2:1;if(has)this.wearEquipped(p, equipmentSlotFor(def.tool), 1);
-      p.cooldown=has?.5:.8;p.stamina=Math.max(0,p.stamina-2);p.action='gather';p.actionUntil=this.time+.4;p.dx=(e.x-p.x)/Math.max(.1,distance(e,p));p.dz=(e.z-p.z)/Math.max(.1,distance(e,p));this.event('hit',e.x,e.z,'',{key:e.type});
-      if(e.hits<=0){for(const[itemId, count]of Object.entries(def.loot)){this.give(p, itemId, count);this.stats.gathered+=count;}e.ready=this.time+def.regrow;this.event('loot',e.x,e.z,Object.entries(def.loot).map(([itemId, count])=>`+${count} ${label(itemId)}`).join(' · '));p.goal=null;if(e.type==='grave'&&this.rng()<.45)this.spawnEnemy('wraith',e.x+1,e.z+1);}
-      return;
+      const started=this.setHarvestTarget(p, {mode:'auto', nodeId:e.id});
+      return started.ok?started:{ok:false,code:'rejected'};
     }
     if(t.kind==='building'){
-      if(['fire','hearth'].includes(e.type)){if(e.fuel>320){this.tell(p,'The fire has plenty of fuel');return;}if(this.pay(p,{wood:1})){e.fuel=Math.min(360,e.fuel+55);this.event('craft',e.x,e.z,'+55 fuel');}else this.tell(p,'Feed the fire with wood');}
+      if(['fire','hearth'].includes(e.type)){if(e.fuel>320){this.tell(p,'The fire has plenty of fuel');return {ok:false,code:'rejected'};}if(this.pay(p,{wood:1})){e.fuel=Math.min(360,e.fuel+55);this.event('craft',e.x,e.z,'+55 fuel');}else this.tell(p,'Feed the fire with wood');}
       if(e.type==='gate')e.open=!e.open;
       if(e.type==='wall')this.action(p.id,{type:'repair',target:e.id});
       if(e.type==='farm'){if(!e.planted){if(this.pay(p,{seed:1})){e.planted=true;e.growth=0;}else this.tell(p,'Need 1 pumpkin seed');}else if(e.growth>=100){this.give(p,'pumpkin',3);this.give(p,'seed',2);e.planted=false;e.growth=0;this.event('loot',e.x,e.z,'+3 pumpkins · +2 seeds');}}
       if(e.type==='trap'&&e.charges<3){if(this.pay(p,{stone:1})){e.charges=3;e.hp=e.maxHp;}else this.tell(p,'Need 1 flint to rearm');}
       if(e.type==='bed'){if(phaseAt(this.time)==='night')this.tell(p,'Too dangerous to sleep at night');else if(p.hunger<20)this.tell(p,'Eat before resting');else {p.rest=!p.rest;p.goal=null;}}
       p.cooldown=.45;
+      return {ok:true,code:'ok'};
+    }
+    return {ok:false,code:'rejected'};
+  }
+  performCraft(p, recipeId, stationId){
+    const recipe=RECIPES[recipeId];
+    if(!recipe||recipe.kind==='build')return {ok:false,code:'rejected'};
+    if(p.cooldown>.05)return {ok:false,code:'cooldown'};
+    const station=recipe.station?this.stationBuilding(p, recipeId, stationId):true;
+    if(station==='fuel'){this.tell(p,'The fire needs wood');return {ok:false,code:'missingFuel'};}
+    if(!station){this.tell(p, stationLabel(recipeId));return {ok:false,code:'stationRequired'};}
+    const reason=this.recipeReason(p, recipeId, stationId);
+    if(reason){this.tell(p, reason);return {ok:false,code:reason.startsWith('Pack')?'inventoryFull':'rejected'};}
+    if(!this.commitCraft(p, recipeId)){this.tell(p,'Pack full — store or drop some supplies');return {ok:false,code:'inventoryFull'};}
+    p.cooldown=.35;this.event('craft',p.x,p.z,label(recipe.result||recipeId));this.assertItems();
+    return {ok:true,code:'ok'};
+  }
+  performBuild(p, recipeId, x, z, stationId, rotation){
+    if(p.cooldown>.05)return {ok:false,code:'cooldown'};
+    const sx=Math.round(x*2)/2, sz=Math.round(z*2)/2;
+    const reason=this.canBuild(p, recipeId, sx, sz, stationId);
+    if(reason){this.tell(p, reason);return {ok:false,code:reason==='Build this at a workbench'?'stationRequired':'rejected'};}
+    if(!this.pay(p, RECIPES[recipeId].cost))return {ok:false,code:'rejected'};
+    const building=this.structure(recipeId, sx, sz);building.rotation=rotation===1?1:0;this.buildings.push(building);this.stats.built++;p.cooldown=.4;this.event('build',sx,sz,STRUCTURES[building.type].name);this.assertItems();
+    return {ok:true,code:'ok'};
+  }
+  performUpgrade(p, targetId){
+    const building=this.buildings.find(b=>b.id===targetId&&b.type==='hearth'&&b.hp>0&&distance(p,b)<4);
+    if(!building){this.tell(p,'Stand at the Heartfire');return {ok:false,code:'rejected'};}
+    if(building.level>=3){this.tell(p,'The Heartfire is fully awakened');return {ok:false,code:'rejected'};}
+    const cost=this.upgradeCost();if(!this.pay(p, cost)){this.tell(p,'The Heartfire needs more offerings');return {ok:false,code:'rejected'};}
+    building.level++;building.maxHp+=300;building.hp=building.maxHp;building.fuel=Math.min(360, building.fuel+120);this.event('build',building.x,building.z,`Heartfire • level ${building.level}`);p.cooldown=.5;this.assertItems();
+    return {ok:true,code:'ok'};
+  }
+  performBuildingAction(p, targetId, actionId){
+    if(actionId==='cancel'){this.dismantleHolds.delete(p.id);p.goal=null;return {ok:true,code:'ok'};}
+    const building=this.buildings.find(b=>b.id===targetId&&b.hp>0);
+    if(!building||distance(p,building)>=RULES.reach)return {ok:false,code:'outOfRange'};
+    if(!contextActionIds(building.type).includes(actionId))return {ok:false,code:'rejected'};
+    if(actionId==='dismantle')return this.beginDismantle(p, targetId, true);
+    if(actionId==='repair')return this.action(p.id,{type:'repair',target:targetId});
+    if(actionId==='awaken')return this.performUpgrade(p, targetId);
+    if(actionId==='cook'||actionId==='craft'||actionId==='build'||actionId==='open')return {ok:true,code:'ok'};
+    return this.interact(p, targetId);
+  }
+  beginDismantle(p, targetId, holding){
+    if(!holding){this.dismantleHolds.delete(p.id);return {ok:true,code:'ok'};}
+    const building=this.buildings.find(b=>b.id===targetId&&b.hp>0&&distance(p,b)<4);
+    if(!building||building.type==='hearth')return {ok:false,code:'rejected'};
+    if(this.chestSessions.has(building.id))return {ok:false,code:'chestInUse'};
+    const current=this.dismantleHolds.get(p.id);
+    if(!current||current.buildingId!==building.id)this.dismantleHolds.set(p.id,{buildingId:building.id,elapsed:0});
+    return {ok:true,code:'ok'};
+  }
+  finishDismantle(p, building){
+    if(!building||building.type==='hearth'||this.chestSessions.has(building.id))return;
+    for(const [itemId, count] of Object.entries(RECIPES[building.type].cost))this.give(p, itemId, Math.ceil(count*.5));
+    this.dropContainer(building.store, building.x, building.z);
+    this.buildings=this.buildings.filter(entry=>entry!==building);
+    p.cooldown=.5;
+  }
+  setHarvestTarget(p, cmd){
+    if(cmd?.mode==='cancel'){p.goal=null;return {ok:true,code:'ok'};}
+    if(cmd?.mode==='hold')return {ok:true,code:'ok'};
+    if(cmd?.mode!=='auto'||typeof cmd.nodeId!=='string')return {ok:false,code:'rejected'};
+    const node=this.nodes.find(n=>n.id===cmd.nodeId&&!(n.ready>this.time));
+    if(!node)return {ok:false,code:'rejected'};
+    const profile=harvestProfile(node.type);
+    if(profile?.required&&!this.hasTool(p, profile.tool)){this.noteTool(p, node);p.goal=null;return {ok:false,code:'rejected'};}
+    p.goal={x:node.x,z:node.z,target:node.id};p.rest=false;
+    return {ok:true,code:'ok'};
+  }
+  noteTool(p, node){
+    const last=this.toolNoticeAt.get(p.id)||-10;
+    if(this.time-last<2)return;
+    this.toolNoticeAt.set(p.id, this.time);
+    this.tell(p, `Craft a ${label(NODES[node.type].tool).toLowerCase()} first`);
+  }
+  syncActivation(p, pressed){
+    let state=this.activations.get(p.id);
+    if(!state){state={held:false,consumed:false,seq:0};this.activations.set(p.id,state);}
+    if(pressed&&!state.held){state.seq++;state.consumed=false;}
+    if(!pressed)state.consumed=false;
+    state.held=!!pressed;
+    return state;
+  }
+  freshInput(p){
+    const raw=this.inputs.get(p.id);
+    if(!raw||!(this.time-raw.at<=.6))return {x:0,z:0,act:false,attack:false,target:null,at:0};
+    return raw;
+  }
+  liveNode(id, p){
+    const node=this.nodes.find(n=>n.id===id&&!(n.ready>this.time));
+    if(!node||distance(p,node)>=RULES.reach)return null;
+    return node;
+  }
+  harvestChoice(p, dt=RULES.tick){
+    if(!p.online||p.down||p.ghost||p.hp<=0||p.rest||p.dash>0)return null;
+    // Damage inside this step, including a hurt recorded just before the tick advanced time.
+    const hurtAt=this.damagedAt.get(p.id);
+    if(hurtAt!=null&&this.time-hurtAt<=dt+1e-9)return null;
+    if(p.action==='attack'&&p.actionUntil>this.time)return null;
+    const raw=this.freshInput(p);
+    if(Math.hypot(raw.x||0, raw.z||0)>.08||raw.attack)return null;
+    const pressed=raw.act===true;
+    let node=null, mode=null;
+    if(p.goal?.target){const aimed=this.liveNode(p.goal.target, p);if(aimed){node=aimed;mode='auto';}}
+    if(pressed){
+      const id=typeof raw.target==='string'?raw.target:null;
+      if(id){
+        const held=this.liveNode(id, p);
+        if(!held){if(node&&node.id!==id){node=null;mode=null;}}
+        else{node=held;mode=mode&&mode!=='hold'?'both':'hold';}
+      }else{
+        const near=this.nodes.filter(n=>!(n.ready>this.time)&&distance(p,n)<RULES.reach).sort((a,b)=>distance(p,a)-distance(p,b)||(a.id<b.id?-1:1))[0];
+        if(near){node=near;mode=mode?'both':'hold';}
+      }
+    }
+    if(!node)return null;
+    const toolId=NODES[node.type].tool&&this.hasTool(p, NODES[node.type].tool)?NODES[node.type].tool:null;
+    if(gatherRate(node.type, toolId)<=0){
+      if(NODES[node.type].required)this.noteTool(p, node);
+      if(p.goal?.target===node.id)p.goal=null;
+      return null;
+    }
+    return {node, mode:mode||'auto'};
+  }
+  advanceChannels(dt){
+    for(const p of this.players)this.syncActivation(p, this.freshInput(p).act===true);
+    this.advanceHarvest(dt);this.advanceRevive(dt);this.advanceDismantle(dt);this.advancePickup();
+  }
+  advanceHarvest(dt){
+    const wanted=new Map();
+    for(const p of this.players.slice().sort((a,b)=>a.id<b.id?-1:1)){
+      const choice=this.harvestChoice(p, dt);if(!choice)continue;
+      let bucket=wanted.get(choice.node.id);
+      if(!bucket){bucket=new Map();wanted.set(choice.node.id, bucket);}
+      bucket.set(p.id,{mode:choice.mode,startedAt:this.time});
+    }
+    for(const nodeId of [...new Set([...wanted.keys(), ...this.harvestWork.keys()])].sort()){
+      const node=this.nodes.find(n=>n.id===nodeId), next=wanted.get(nodeId);
+      if(!node||node.ready>this.time||!next||next.size===0){this.harvestWork.delete(nodeId);continue;}
+      let work=this.harvestWork.get(nodeId);
+      if(!work){work={elapsed:0,swing:0,contributors:new Map()};this.harvestWork.set(nodeId, work);}
+      const previous=[...work.contributors.keys()];
+      if(previous.length&&previous.every(id=>!next.has(id))){work.elapsed=0;work.swing=0;work.contributors.clear();}
+      for(const id of [...work.contributors.keys()])if(!next.has(id))work.contributors.delete(id);
+      for(const [id, meta] of next)if(!work.contributors.has(id))work.contributors.set(id,{...meta});
+      if(work.contributors.size===0){this.harvestWork.delete(nodeId);continue;}
+      this.stepHarvest(node, work, dt);
+    }
+  }
+  stepHarvest(node, work, dt){
+    const profile=harvestProfile(node.type);
+    let left=dt;
+    while(left>1e-8&&work.elapsed<profile.workSeconds-1e-9){
+      const parts=[];
+      for(const id of [...work.contributors.keys()].sort()){
+        const p=this.player(id);
+        const toolId=p&&NODES[node.type].tool&&this.hasTool(p, NODES[node.type].tool)?NODES[node.type].tool:null;
+        const rate=p?gatherRate(node.type, toolId):0;
+        if(!(rate>0)){work.contributors.delete(id);continue;}
+        const slot=toolId?equipmentSlotFor(toolId):null;
+        parts.push({p, rate, slot, durability:slot?p.equipment[slot].durability:Infinity});
+      }
+      if(!parts.length){this.harvestWork.delete(node.id);return;}
+      const sum=parts.reduce((total,part)=>total+part.rate,0);
+      let slice=Math.min(left, (profile.workSeconds-work.elapsed)/sum);
+      for(const part of parts)if(part.slot)slice=Math.min(slice, part.durability);
+      if(!(slice>0)){this.harvestWork.delete(node.id);return;}
+      work.elapsed+=sum*slice;
+      for(const part of parts){
+        if(part.slot)this.wearEquipped(part.p, part.slot, part.durability-slice<=1e-8?part.durability:slice);
+        part.p.stamina=Math.max(0, part.p.stamina-2*slice);
+        part.p.action='gather';part.p.actionUntil=this.time+.3;
+        const span=Math.max(.1, distance(part.p, node));
+        part.p.dx=(node.x-part.p.x)/span;part.p.dz=(node.z-part.p.z)/span;
+      }
+      work.swing+=slice;
+      if(work.swing>=.45){work.swing=0;this.event('hit', node.x, node.z, '', {key:node.type});}
+      left-=slice;
+      if(work.elapsed>=profile.workSeconds-1e-9){this.finishHarvest(node, work);return;}
+    }
+  }
+  finishHarvest(node, work){
+    const profile=harvestProfile(node.type);
+    node.ready=this.time+profile.regrow;node.hits=0;
+    const ids=[...work.contributors.keys()].sort((a,b)=>{
+      const delta=work.contributors.get(a).startedAt-work.contributors.get(b).startedAt;
+      return delta||(a<b?-1:a>b?1:0);
+    });
+    for(const id of work.contributors.keys()){
+      const p=this.player(id);
+      if(p?.goal?.target===node.id)p.goal=null;
+      const state=this.activations.get(id);
+      if(state?.held)state.consumed=true;
+    }
+    this.harvestWork.delete(node.id);
+    if(profile.output==='floor'){
+      const entries=Object.entries(profile.loot);
+      entries.forEach(([itemId, count], index)=>{
+        const angle=(index+0.5)/entries.length*Math.PI*2;
+        this.dropNew(itemId, count, node.x+Math.cos(angle)*0.55, node.z+Math.sin(angle)*0.55);
+        this.stats.gathered+=count;
+      });
+      this.event('impact', node.x, node.z, NODES[node.type].name);
+    }else{
+      const recipient=this.player(ids[0]);
+      for(const [itemId, count] of Object.entries(profile.loot)){
+        const accepted=recipient?this.give(recipient, itemId, count):0;
+        this.stats.gathered+=count;
+        if(accepted>0)this.event('loot', recipient.x, recipient.z, `+${accepted} ${label(itemId)}`);
+      }
+    }
+    if(node.type==='grave'&&this.rng()<.45)this.spawnEnemy('wraith', node.x+1, node.z+1);
+  }
+  advanceRevive(dt){
+    const helpers=new Set();
+    for(const p of this.players){
+      if(!p.online||p.down||p.ghost||p.hp<=0||p.rest||p.dash>0)continue;
+      const raw=this.freshInput(p);
+      if(raw.act!==true||raw.attack||Math.hypot(raw.x||0, raw.z||0)>.08)continue;
+      const id=typeof raw.target==='string'?raw.target:null;
+      const target=id
+        ?this.players.find(q=>q.id===id&&q.down&&q.id!==p.id&&distance(p,q)<RULES.reach)
+        :this.players.filter(q=>q.id!==p.id&&q.online&&q.down&&distance(p,q)<RULES.reach).sort((a,b)=>distance(p,a)-distance(p,b)||(a.id<b.id?-1:1))[0];
+      if(target)helpers.add(target.id);
+    }
+    for(const q of this.players){
+      if(!q.down){this.reviveWork.delete(q.id);continue;}
+      if(!helpers.has(q.id)){this.reviveWork.delete(q.id);q.revive=0;continue;}
+      const channel=this.reviveWork.get(q.id)||{elapsed:0};
+      channel.elapsed+=dt;q.revive=channel.elapsed;this.reviveWork.set(q.id, channel);
+      if(channel.elapsed>=3-1e-9){this.revivePlayer(q);this.stats.revives++;this.reviveWork.delete(q.id);}
+    }
+  }
+  advanceDismantle(dt){
+    for(const [id, hold] of [...this.dismantleHolds]){
+      const p=this.player(id);
+      const building=this.buildings.find(b=>b.id===hold.buildingId&&b.hp>0);
+      if(!p||!p.online||p.down||p.ghost||p.hp<=0||!building||building.type==='hearth'||distance(p,building)>=4||this.chestSessions.has(building.id)){
+        this.dismantleHolds.delete(id);continue;
+      }
+      hold.elapsed+=dt;
+      if(hold.elapsed+1e-9>=DISMANTLE_HOLD_SECONDS){this.finishDismantle(p, building);this.dismantleHolds.delete(id);}
+    }
+  }
+  advancePickup(){
+    for(const p of this.players){
+      if(!p.online||p.down||p.ghost||p.hp<=0)continue;
+      const raw=this.freshInput(p), state=this.activations.get(p.id);
+      if(!state?.held||state.consumed||raw.attack||Math.hypot(raw.x||0, raw.z||0)>.08)continue;
+      const id=typeof raw.target==='string'?raw.target:null;
+      const drop=id
+        ?this.drops.find(d=>d.id===id&&distance(p,d)<RULES.reach)||null
+        :this.drops.filter(d=>distance(p,d)<RULES.reach).sort((a,b)=>distance(p,a)-distance(p,b)||(a.id<b.id?-1:1))[0]||null;
+      if(!drop||(!id&&this.harvestChoice(p)))continue;
+      this.pickupDrop(p, drop);state.consumed=true;
     }
   }
   pickupDrop(p,drop){
     const plan=planInsert(p.inventory, drop.stack, {supplyCapacity:SUPPLY_CAPACITY, allowPartial:true, grow:false, acceptsItems:true, mintUid:()=>this.nextItemUid()});
     if(!plan.ok||plan.accepted<=0){this.tell(p,'Pack full — store or drop some supplies');return false;}
     p.inventory.slots=plan.slots;p.inventory.revision=plan.revision;
+    this.event('loot', p.x, p.z, `+${plan.accepted} ${label(drop.stack.itemId)}`);
     if(plan.remainder)drop.stack=plan.remainder;
     else this.drops=this.drops.filter(entry=>entry!==drop);
     this.assertItems();return true;
@@ -511,7 +778,7 @@ export class World {
     if(can(x,z)){p.x=x;p.z=z;return true;}
     let moved=false;if(can(x,p.z)){p.x=x;moved=true;}if(can(p.x,z)){p.z=z;moved=true;}return moved;
   }
-  hurt(p,amount){if(p.dash>0||p.down||p.ghost)return;if(p.equipment.body?.itemId==='armor'&&p.equipment.body.durability>0){this.wearEquipped(p,'body',amount);amount*=.55;}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
+  hurt(p,amount){if(p.dash>0||p.down||p.ghost)return;this.damagedAt.set(p.id,this.time);if(p.equipment.body?.itemId==='armor'&&p.equipment.body.durability>0){this.wearEquipped(p,'body',amount);amount*=.55;}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
   revivePlayer(p){p.down=0;p.ghost=false;p.hp=50;p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}this.event('heal',p.x,p.z,'Back on your feet');}
   spawnEnemy(type,x,z){const def=ENEMIES[type],scale=1+(this.players.filter(p=>p.online).length-1)*.35;this.enemies.push({id:this.nextId('e'),type,x,z,hp:def.hp*scale,maxHp:def.hp*scale,cooldown:1,windup:0,slam:0,tx:x,tz:z,slowed:0});}
   spawnWave(){
@@ -531,7 +798,7 @@ export class World {
     for(const p of this.players){
       if(!p.online)continue;p.cooldown=Math.max(0,p.cooldown-dt);p.dash=Math.max(0,p.dash-dt);p.dashCooldown=Math.max(0,p.dashCooldown-dt);
       if(p.ghost)continue;
-      if(p.down){p.down-=dt;p.revive=Math.max(0,p.revive-dt*.12);if(p.down<=0){p.down=0;p.ghost=true;this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}continue;}
+      if(p.down){p.down-=dt;if(p.down<=0){p.down=0;p.ghost=true;p.revive=0;this.reviveWork.delete(p.id);this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}continue;}
       p.hunger=Math.max(0,p.hunger-dt*(p.rest?.45:.075));p.stamina=Math.min(100,p.stamina+dt*(p.rest?25:15));
       const light=phase!=='night'||this.lit(p);p.courage=clamp(p.courage+dt*(light?.6:-3),0,100);
       if(p.hunger<=0)this.hurtQuiet(p,dt*1.2);if(!light&&p.courage<20)this.hurtQuiet(p,dt*(p.courage<=0?6:2));
@@ -539,10 +806,10 @@ export class World {
       else if(p.lantern)p.lantern=false;
       if(p.rest){if(phase==='night'||p.hunger<15)p.rest=false;else{p.hp=Math.min(100,p.hp+dt*3);p.courage=Math.min(100,p.courage+dt*4);}continue;}
       let input=this.inputs.get(p.id)||{x:0,z:0};if(this.time-input.at>.6)input={x:0,z:0};let x=input.x||0,z=input.z||0;
-      if(p.goal){const goal=p.goal;const goalTarget=this.nodes.find(n=>n.id===goal.target)||this.buildings.find(b=>b.id===goal.target)||this.drops.find(d=>d.id===goal.target);const d=distance(p,goal),stop=goalTarget?2.05:.25;if(d>stop){x=(goal.x-p.x)/d;z=(goal.z-p.z)/d;}else{if(goalTarget&&p.cooldown<=0){this.interact(p,goal.target);if(!this.nodes.includes(goalTarget))p.goal=null;}else if(!goalTarget)p.goal=null;}}
+      if(p.goal){const goal=p.goal;const goalTarget=this.nodes.find(n=>n.id===goal.target)||this.buildings.find(b=>b.id===goal.target)||this.drops.find(d=>d.id===goal.target);const d=distance(p,goal),stop=goalTarget?2.05:.25;if(d>stop){x=(goal.x-p.x)/d;z=(goal.z-p.z)/d;}else if(!goalTarget||(this.nodes.includes(goalTarget)&&goalTarget.ready>this.time))p.goal=null;else if(!this.nodes.includes(goalTarget)&&p.cooldown<=0){this.interact(p,goal.target);p.goal=null;}}
       const moving=Math.hypot(x,z)>.08;if(moving){p.dx=x;p.dz=z;const speed=RULES.speed*(p.dash>0?3:1)*(p.hunger<=0?.65:1);const moved=this.move(p,x*speed,z*speed,dt,obstacles);if(!moved&&p.goal){this.move(p,-z*speed,x*speed,dt,obstacles);}p.action=p.dash>0?'dash':'walk';}
       else if(this.time>p.actionUntil)p.action='idle';
-      if(p.cooldown<=0){if(input.attack)this.attack(p);else if(input.act)this.interact(p,input.target);}
+      if(p.cooldown<=0){if(input.attack)this.attack(p);else if(input.act){const aimed=this.target(p, typeof input.target==='string'?input.target:null);if(aimed?.kind==='building')this.interact(p, aimed.entity.id);}}
     }
     for(const b of this.buildings){
       b.cooldown=Math.max(0,b.cooldown-dt);if(['hearth','fire'].includes(b.type))b.fuel=Math.max(0,b.fuel-dt*(phase==='day'?.18:1));
@@ -566,11 +833,13 @@ export class World {
     this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.until>this.time&&d.stack?.quantity>0);
     const active=this.players.filter(p=>p.online);if(active.length&&active.every(p=>(p.down||p.ghost)&&!p.charm)){this.wipe+=dt;if(this.wipe>6)this.status='defeat';}else this.wipe=0;
     this.discoverTimer-=dt;if(this.discoverTimer<=0){this.discoverTimer=.5;const seen=new Set(this.explored);for(const p of active){const gx=Math.floor((p.x+42)/4),gz=Math.floor((p.z+42)/4);for(let x=gx-2;x<=gx+2;x++)for(let z=gz-2;z<=gz+2;z++)if(x>=0&&z>=0&&x<21&&z<21)seen.add(z*21+x);}this.explored=[...seen];}
+    if(this.status==='playing')this.advanceChannels(dt);
     pruneChests(this);this.assertItems();
   }
-  hurtQuiet(p,amount){if(p.down||p.ghost)return;p.hp-=amount;if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;this.event('announce',p.x,p.z,`${p.name} has fallen`);}}
+  hurtQuiet(p,amount){if(p.down||p.ghost)return;p.hp-=amount;if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} has fallen`);}}
   resumeExpedition(){
     releaseChests(this);this.networkId=crypto.randomUUID();this.transactionRevision=0;
+    this.harvestWork.clear();this.reviveWork.clear();this.activations.clear();this.dismantleHolds.clear();this.damagedAt.clear();
     for(const p of this.players){p.online=p.id==='host';p.goal=null;p.rest=false;p.action='idle';p.actionUntil=0;}
     this.inputs.clear();
   }

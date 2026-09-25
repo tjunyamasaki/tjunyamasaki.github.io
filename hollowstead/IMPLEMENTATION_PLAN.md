@@ -1111,7 +1111,7 @@ Maintain this section as implementation proceeds. Do not mark a package complete
 | P2 | Complete | P2 review | e17d4a687f11b330defd7676489c31579b5005b7. 62 Hollowstead + 17 ball-game tests passing | Live clock stays 150/30/80. Review left stations, timed harvest, and gameplay ping for P3 |
 | P3 | Complete | P3 agent | 36614c80a0fb1520532df7368983188b08c0099a. 73 Hollowstead + 17 ball-game tests passing. Pages run 36088851645 succeeded for 0798d6c4213d2aad3d9c6be979531222a2b3ccf0 | Full HUD rewrite is P4. Live clock stays 150/30/80. 180/30/100 and wave offsets stay P5 |
 | P4 | Complete | P4 agent | a61545910636fc65f2fe487071ab2e8aa8ea892f (HUD rewrite f504b8031352223b161c20d377b7abadda5056b4). 81 Hollowstead + 17 ball-game tests passing. Pages run 36094379157 succeeded for 108481d958d253a47f92445abe3f15c6a2435121 | Real phone, rotation-during-drag, two-device chest, full first night, cauldron station, M10, and M11 were not run. Live clock stays 150/30/80. Night visuals stay P5 |
-| Floor pickup | Complete | proximity pickup | This commit. Supersedes the P3 rule that a fresh Gather press collected a floor pile | Live clock stays 150/30/80. P5 and P6 not started |
+| Floor pickup | Complete | proximity pickup | 5b79932cb6544780c23f05eb6097623ed8b20651. 94 Hollowstead + 17 ball-game tests passing. Pages run 36145733731 succeeded. Supersedes the P3 fresh-Gather pickup rule | Live clock stays 150/30/80. P5 and P6 not started |
 | P5 | Not started | Unassigned | — | — |
 | P6 | Not started | Unassigned | — | — |
 
@@ -1465,4 +1465,12 @@ Remaining failures or unverified cases:
 Compatibility/migration notes:
 - Saves stay v2 with clock v1. Continue does not call remapWorldClock. RULES stay day 150, dusk 30, night 80, cycle 260. Renderer night boundaries stay t>150 and t>=180. Do not enable 180/30/100 or night darkness in this change. P5 still owns that clock and the night visuals.
 - Protocol stays hollowstead-2. Guests are not trusted for "I collected this." Pickup is host-simulated. Dwell state is not part of the save. Flight, attract, and the drop block travel in the world snapshot.
+Exact next task: P5 — Night visuals and pacing. Do not start P6. Do not restore "press Gather on the pile." Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.
+
+Date: 2026-09-25
+Package / agent: Floor pickup deploy note
+Starting commit: 5b79932cb6544780c23f05eb6097623ed8b20651
+Ending commit: This note. It changes only this log.
+Evidence / screenshots / deployment run:
+- GitHub Pages run https://github.com/tjunyamasaki/tjunyamasaki.github.io/actions/runs/36145733731 succeeded (conclusion success) for 5b79932cb6544780c23f05eb6097623ed8b20651. Hollowstead and ball-game tests passed in the workflow. The live page serves main.mjs?v=harvest-9.
 Exact next task: P5 — Night visuals and pacing. Do not start P6. Do not restore "press Gather on the pile." Enable 180/30/100 only with the phase-preserving migration, and do not call remapWorldClock twice.

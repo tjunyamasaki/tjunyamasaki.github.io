@@ -1,4 +1,4 @@
-import {magicItems} from './magic/registry.mjs?v=harvest-16';
+import {magicItems} from './magic/registry.mjs?v=harvest-17';
 // Simulation identifiers are deliberately independent of art, names and animations.
 const DAY=180, DUSK=30, NIGHT=100;
 export const RULES = Object.freeze({version:1, tick:1/20, radius:96, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2, finalNight:5});
@@ -30,10 +30,10 @@ export const ITEMS = {
 };
 export const EQUIPMENT = {
   axe:{name:'Woodcutter’s axe',icon:'axe',durability:70},pick:{name:'Flint pick',icon:'pick',durability:70},
-  spear:{name:'Briar spear',icon:'spear',durability:100,damage:16},sword:{name:'Moon blade',icon:'sword',durability:160,damage:20},
+  spear:{name:'Briar spear',icon:'spear',durability:100,damage:15},sword:{name:'Moon blade',icon:'sword',durability:160,damage:19},
   armor:{name:'Bark armor',icon:'armor',durability:110},torch:{name:'Hand lantern',icon:'lantern',durability:180},
   recurve:{name:'Hunter’s recurve',icon:'recurve',durability:150,damage:15},
-  bonebow:{name:'Barrow longbow',icon:'bonebow',durability:220,damage:16},
+  bonebow:{name:'Barrow longbow',icon:'bonebow',durability:220,damage:15},
   broadsword:{name:'Knight’s broadsword',icon:'broadsword',durability:230,damage:16},
   flamberge:{name:'Ember flamberge',icon:'flamberge',durability:280,damage:25},
   crookstaff:{name:'Moonshard crook',icon:'crookstaff',durability:170,damage:19},
@@ -109,14 +109,19 @@ export const RECIPES = {
   roastCaps:{kind:'cook',result:'roast',cost:{mushroom:2},station:'fire',desc:'Cook away the mushrooms’ unsettling effects.'},
   stew:{kind:'cook',cost:{pumpkin:1,berry:2,meat:1},station:'pot',desc:'A feast: +65 hunger, +35 health and +25 courage.'},
 };
+/**
+ * Hostiles. Small melee creatures are weak and come in numbers; big slow ones wind up long and hit
+ * hard. `range` is how far the main attack reaches, `period` the rest between attacks (jittered in
+ * play). Movement and attack patterns live in mobs.mjs.
+ */
 export const ENEMIES = {
-  crawler:{name:'Briarling',hp:48,speed:2,damage:9,range:1.1,period:1.3,loot:{fiber:2,meat:1}},
-  wraith:{name:'Lantern wraith',hp:60,speed:2.6,damage:12,range:1.4,period:1.6,loot:{ember:2}},
-  brute:{name:'Gravekeeper',hp:160,speed:1.4,damage:23,range:1.5,period:2,loot:{ore:2,ember:2,meat:2}},
-  king:{name:'The Hollow King',hp:950,speed:1.3,damage:30,range:2,period:2.2,loot:{ember:15}},
-  bonewalker:{name:'Bonewalker',hp:90,speed:2.5,damage:14,range:1.2,period:1.2,loot:{bone:2}},
-  bogling:{name:'Bogling',hp:75,speed:1.8,damage:12,range:1.2,period:1.4,loot:{spore:1,fiber:1}},
-  golem:{name:'Moonshard golem',hp:280,speed:1.2,damage:30,range:1.6,period:2.2,loot:{shard:2,stone:2}},
+  crawler:{name:'Briarling',hp:24,speed:3,damage:6,range:1.35,period:1.3,loot:{}},
+  wraith:{name:'Lantern wraith',hp:34,speed:2.7,damage:7,range:8.5,period:2.8,loot:{ember:1}},
+  brute:{name:'Gravekeeper',hp:190,speed:1.35,damage:28,range:2.6,period:2.6,loot:{ore:2,ember:2,meat:2}},
+  king:{name:'The Hollow King',hp:950,speed:1.35,damage:30,range:3.6,period:2.2,loot:{ember:15}},
+  bonewalker:{name:'Bonewalker',hp:48,speed:2.5,damage:12,range:5.6,period:2.1,loot:{bone:1}},
+  bogling:{name:'Bogling',hp:52,speed:1.8,damage:10,range:7.5,period:3,loot:{spore:1}},
+  golem:{name:'Moonshard golem',hp:320,speed:1.05,damage:36,range:2.7,period:3,loot:{shard:2,stone:2}},
 };
 export const CHARACTERS = [
   {id:'ember',name:'Ember',detail:'The lost lantern keeper',color:'#f6a35d'},

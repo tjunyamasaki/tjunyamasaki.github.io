@@ -3,15 +3,16 @@
 import {World} from '../../src/engine.mjs';
 import {RULES, EQUIPMENT, RECIPES} from '../../src/content.mjs';
 import {equipmentSlotFor} from '../../src/inventory.mjs';
-import {loadMagicModules} from '../../src/magic/load.mjs?v=harvest-16';
-import {magicItems} from '../../src/magic/registry.mjs?v=harvest-16';
+import {loadMagicModules} from '../../src/magic/load.mjs?v=harvest-17';
+import {magicItems} from '../../src/magic/registry.mjs?v=harvest-17';
 import {maxHealth, rarityOf, WEAPON_STYLES} from '../../src/progression.mjs';
 
 await loadMagicModules();
 const DAY = +(process.env.DAY||5), LEVEL = +(process.env.LEVEL||5), CAP = 45;
 const SCENES = {
   duel:  [['bonewalker', 6, 0]],
-  pack:  [0, 1, 2, 3, 4].map(i => ['crawler', 7*Math.cos(-.8+i*.4), 7*Math.sin(-.8+i*.4)]),
+  // Ten briarlings: the same total health as the old pack of five, arriving as a swarm.
+  pack:  [...Array(10)].map((_, i) => ['crawler', (7+(i%2)*1.5)*Math.cos(-.9+i*.2), (7+(i%2)*1.5)*Math.sin(-.9+i*.2)]),
   brute: [['brute', 5, 0]],
 };
 function equip(w, p, id){

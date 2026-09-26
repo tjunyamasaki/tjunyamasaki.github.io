@@ -1,24 +1,26 @@
-import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-16';
+import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-17';
 import {
   CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createChest, createContainer,
   containerId, duplicateUids, emptyEquipment, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
   supplyLoad, wearStack,
-} from './inventory.mjs?v=harvest-16';
-import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-16';
-import {DISMANTLE_HOLD_SECONDS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-16';
-import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-16';
-import {pruneChests, releaseChests} from './chests.mjs?v=harvest-16';
-import {inventoryIntent} from './transactions.mjs?v=harvest-16';
-import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-16';
+} from './inventory.mjs?v=harvest-17';
+import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-17';
+import {DISMANTLE_HOLD_SECONDS, HOTBAR_SLOTS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-17';
+import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-17';
+import {pruneChests, releaseChests} from './chests.mjs?v=harvest-17';
+import {inventoryIntent} from './transactions.mjs?v=harvest-17';
+import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-17';
 import {
-  CACHE_GUARDS, CACHE_LAYOUT, DISCOVER_XP, ELITE, GATHER_XP, HEARTSTONE_HP, LIGHT_ITEMS, MAX_LEVEL, NODE_POOLS, REGIONS, RESIDENTS, ROAM, SHARE_RADIUS,
-  ARMOR_REDUCTION, LOOT_TABLES, eliteChance, enemyScale, enemyXp, isBossNight, isCache, maxHealth, nightRoster, pickWeighted, powerOf, rarityRank, regionAt, rollLoot,
+  CACHE_GUARDS, CACHE_LAYOUT, DASH, DISCOVER_XP, ELITE, GATHER_XP, HEARTSTONE_HP, LIGHT_ITEMS, MAX_LEVEL, NODE_POOLS, REGIONS, RESIDENTS, ROAM, SHARE_RADIUS,
+  ARMOR_REDUCTION, LOOT_TABLES, NIGHT_CAP, eliteChance, enemyScale, enemyXp, isBossNight, isCache, maxHealth, nightRoster, pickWeighted, powerOf, rarityRank, regionAt, rollLoot,
   tierAt, waveSize, weaponStyle, xpToNext,
-} from './progression.mjs?v=harvest-16';
-import {ARSENAL, landBlow, preyFor, stepArsenal} from './arsenal.mjs?v=harvest-16';
-import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, readPendingKnock, restoreMagicFields} from './magic/registry.mjs?v=harvest-16';
+} from './progression.mjs?v=harvest-17';
+import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-17';
+import {stepMobs} from './mobs.mjs?v=harvest-17';
+import {ARENA, arenaEliteChance, arenaKill, arenaPick, arenaScale, setupArena, stepArena} from './arena.mjs?v=harvest-17';
+import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, readPendingKnock, restoreMagicFields} from './magic/registry.mjs?v=harvest-17';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.z||0)-(b.z||0));
@@ -118,12 +120,36 @@ export function createDropMotion(){
 }
 export function random(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
 export function biome(x,z){return regionAt(x,z);}
-/** Creatures chew through camp structures at half their bite, so a lone explorer's fire survives an early night. */
-const STRUCTURE_HIT=.5, HEARTH_HIT=.35;
-const structureHit=b=>b.type==='hearth'?HEARTH_HIT:STRUCTURE_HIT;
 /** A fed Heartfire spits embers at anything clawing at it: enough for early nights, not for later ones. */
 const HEARTH_FLARE={range:3,damage:14,period:1.5};
 const rollXp=type=>LOOT_TABLES[NODES[type]?.table]?.xp||10;
+/** Spatial hash for trees and rocks: larger than any obstacle radius plus walker clearance. */
+const OBSTACLE_CELL=4;
+/** Auto-aim for the Gravecraft packs, which aim along the wanderer's facing. */
+const MAGIC_AIM=Object.freeze({
+  'cinder-staff':{reach:11,speed:12,range:11},'widows-needle':{reach:9,speed:20,range:9},
+  'spirit-fan':{reach:5.5,range:5.5},'barrow-rattle':{reach:10,range:10},'mourning-bell':{reach:5.2,range:5.2},
+});
+/**
+ * Guests only draw creatures and shots, so the network copy rounds every number to centimetres and
+ * drops per-charge bookkeeping. Fifty creatures fit in a fraction of the bytes.
+ */
+const HOST_ONLY=new Set(['hitIds','cooldown','slam','slowed','power','flank','stuck','back','detour','leash','roamer','aggro','home','vx','vz','level','pat']);
+const WINDUP_ONLY=new Set(['atk','wt','ang','tx','tz']);
+function compactForNetwork(entity){
+  const out={},busy=entity.windup>0||entity.act>0;
+  for(const key in entity){
+    const value=entity[key];
+    if(HOST_ONLY.has(key)||(!busy&&WINDUP_ONLY.has(key)))continue;
+    out[key]=typeof value==='number'&&!Number.isInteger(value)?Math.round(value*100)/100:value;
+  }
+  return out;
+}
+/** Hostile shots keep their motion (guests extrapolate), rounded. */
+function compactShot(shot){const out={};for(const key in shot){if(key==='owner'||key==='done')continue;const value=shot[key];out[key]=typeof value==='number'&&!Number.isInteger(value)?Math.round(value*100)/100:value;}return out;}
+/** Swarms hit many foes in one tick; the renderer reads every event since its last frame. */
+const EVENT_BUFFER=72;
+const gridKey=(gx,gz)=>(gx+2048)*4096+(gz+2048);
 /** Explored-map grid: 4-unit cells covering the whole disc. */
 export const EXPLORE_CELL=4, EXPLORE_SIZE=Math.ceil(RULES.radius*2/4);
 const MAP_CACHE=new Map();
@@ -164,13 +190,16 @@ function generateMap(seed){
 export class World {
   constructor(seed=(Math.random()*0xffffffff)>>>0, options={}){
     this.version=SAVE_VERSION_V2;this.clock=CLOCK_V2;this.seed=seed;this.time=0;this.status='lobby';this.players=[];
-    this.showcase=options?.showcase===true;
-    this.nodes=this.showcase?[]:makeMap(seed);
-    this.buildings=this.showcase?[]:[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
+    this.showcase=options?.showcase===true;this.radius=RULES.radius;this.arena=null;this.hostile=[];
+    for(const key of ['frameObstacles','fieldBudget','obstacleCache','flowFields'])Object.defineProperty(this,key,{value:key==='flowFields'?new Map():null,writable:true,configurable:true,enumerable:false});
+    const bare=this.showcase||options?.arena===true;
+    this.nodes=bare?[]:makeMap(seed);
+    this.buildings=bare?[]:[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
     this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=true;this.wipe=0;this.bossNight=0;this.roamTimer=ROAM.interval;this.guardsDay=0;this.projectiles=[];this.allies=[];this.zones=[];this.best={day:1,level:1,loot:null,lootRank:-1};this.ambient=options?.ambient!==false;
     this.networkId=crypto.randomUUID();this.transactionRevision=0;this.chestSessions=new Map();
     this.harvestWork=new Map();this.reviveWork=new Map();this.activations=new Map();this.dismantleHolds=new Map();this.toolNoticeAt=new Map();this.damagedAt=new Map();this.pickupDwell=new Map();this.packNoticeAt=new Map();this.previewUid=1;
-    this.stats={gathered:0,built:0,revives:0};this.inputs=new Map();this.rng=random(seed^0x1234);this.spawnRng=random(seed^0x5eed);this.lootRng=random(seed^0x100f);this.discoverTimer=0;
+    this.stats={gathered:0,built:0,revives:0};this.inputs=new Map();this.rng=random(seed^0x1234);this.mobRng=random(seed^0xa11ce);this.spawnRng=random(seed^0x5eed);this.lootRng=random(seed^0x100f);this.discoverTimer=0;
+    if(options?.arena===true)setupArena(this);
   }
   nextId(prefix){return prefix+(this.idCounter++);}
   nextItemUid(){return `i${this.idCounter++}`;}
@@ -194,19 +223,20 @@ export class World {
     let p=this.players.find(p=>p.id===id);if(p){p.online=true;return p;}
     if(this.players.filter(p=>p.online).length>=RULES.maxPlayers)return null;
     if(this.players.length>=RULES.maxPlayers){const old=this.players.find(p=>!p.online);if(old){this.spillPlayer(old);this.players=this.players.filter(p=>p!==old);}}
-    p={id,name:String(name).replace(/[<>\x00-\x1f]/g,'').trim().slice(0,18)||'Wanderer',character:CHARACTERS.some(c=>c.id===character)?character:'ember',x:2+this.players.length*.8,z:1.8,dx:0,dz:1,hp:100,hunger:90,courage:100,stamina:100,inventory:createBackpack(id),equipment:emptyEquipment(),equipmentRevision:0,recovery:null,cooldown:0,dash:0,dashCooldown:0,down:0,ghost:false,revive:0,charm:1,online:true,lantern:false,rest:false,action:'idle',actionUntil:0,notice:'',noticeAt:0,goal:null,level:1,xp:0,bonusHp:0,maxHp:100,regions:['meadow']};
+    p={id,name:String(name).replace(/[<>\x00-\x1f]/g,'').trim().slice(0,18)||'Wanderer',character:CHARACTERS.some(c=>c.id===character)?character:'ember',x:2+this.players.length*.8,z:1.8,dx:0,dz:1,hp:100,hunger:90,courage:100,stamina:100,inventory:createBackpack(id),equipment:emptyEquipment(),equipmentRevision:0,recovery:null,cooldown:0,dash:0,dashCooldown:0,down:0,ghost:false,revive:0,charm:1,online:true,lantern:false,rest:false,action:'idle',actionUntil:0,notice:'',noticeAt:0,goal:null,level:1,xp:0,bonusHp:0,maxHp:100,regions:['meadow'],hotbar:Array(HOTBAR_SLOTS).fill(null),hotbarIndex:0};
     this.players.push(p);
     this.give(p,'wood',3);this.give(p,'stone',2);this.give(p,'fiber',3);this.give(p,'berry',3);
-    if(this.showcase){
+    if(this.showcase||this.arena){
       p.hp=100;p.hunger=100;p.courage=100;
       p.inventory.slots=p.inventory.slots.map(()=>null);p.inventory.revision++;
     }
+    if(this.arena){p.growth='arena';p.ranks={};p.charm=0;const a=this.players.length*1.7;p.x=Math.cos(a)*1.2;p.z=Math.sin(a)*1.2;}
     return p;
   }
   leave(id){releaseChests(this,id);const p=this.player(id);if(p){p.online=false;p.goal=null;this.inputs.delete(id);}}
   player(id){return this.players.find(p=>p.id===id);}
   start(){if(this.status==='lobby')this.status='playing';}
-  event(type,x,z,text='',extra={}){this.events.push({id:++this.eventId,type,x,z,text,at:this.time,...extra});if(this.events.length>25)this.events.shift();}
+  event(type,x,z,text='',extra={}){this.events.push({id:++this.eventId,type,x,z,text,at:this.time,...extra});if(this.events.length>EVENT_BUFFER)this.events.splice(0,this.events.length-EVENT_BUFFER);}
   tell(p,text){p.notice=text;p.noticeAt=++this.eventId;}
   input(id,value){
     const p=this.player(id);if(!p||!p.online||!value||typeof value!=='object')return;
@@ -315,12 +345,64 @@ export class World {
   wearEquipped(p,slot,amount){
     const current=p.equipment[slot];
     if(!current||!(amount>0))return;
+    if(this.arena)return; // Arena weapons never wear out.
     const worn=wearStack(current, amount);
     p.equipment[slot]=worn.stack;
     // Ownership revisions track socket changes, not continuously burning fuel.
     // Transfers always read current host durability rather than a client copy.
     if(worn.removed)p.equipmentRevision++;
     if(slot==='light'&&!(p.equipment.light?.durability>0))p.lantern=false;
+    if(worn.removed&&slot==='weapon')this.autoSwap(p, current.itemId);
+  }
+  /**
+   * Weapon hotbar. Slots hold uids of weapons the wanderer carries or wears; the worn one is the
+   * active slot. Kept honest every tick: gone weapons leave, a newly worn weapon takes the active
+   * slot (or a free one), and spare weapons in the pack fill empty slots.
+   */
+  syncHotbar(p){
+    if(!Array.isArray(p.hotbar)||p.hotbar.length!==HOTBAR_SLOTS)p.hotbar=Array(HOTBAR_SLOTS).fill(null);
+    if(!(Number.isInteger(p.hotbarIndex)&&p.hotbarIndex>=0&&p.hotbarIndex<HOTBAR_SLOTS))p.hotbarIndex=0;
+    const owned=new Set();
+    for(const stack of p.inventory?.slots||[])if(stack&&equipmentSlotFor(stack.itemId)==='weapon')owned.add(stack.uid);
+    const worn=p.equipment?.weapon;if(worn)owned.add(worn.uid);
+    const seen=new Set();
+    for(let i=0;i<HOTBAR_SLOTS;i++){const uid=p.hotbar[i];if(!uid||!owned.has(uid)||seen.has(uid))p.hotbar[i]=null;else seen.add(uid);}
+    if(worn){
+      let at=p.hotbar.indexOf(worn.uid);
+      if(at<0){at=p.hotbar[p.hotbarIndex]==null?p.hotbarIndex:p.hotbar.indexOf(null);if(at<0)at=p.hotbarIndex;p.hotbar[at]=worn.uid;seen.add(worn.uid);}
+      p.hotbarIndex=at;
+    }
+    for(const stack of p.inventory?.slots||[]){
+      if(!stack||equipmentSlotFor(stack.itemId)!=='weapon'||seen.has(stack.uid))continue;
+      const free=p.hotbar.indexOf(null);if(free<0)break;
+      p.hotbar[free]=stack.uid;seen.add(stack.uid);
+    }
+  }
+  /** Tap a hotbar slot: wear that weapon now. The one it replaces goes back to its pack slot. */
+  selectHotbar(p, slot){
+    if(!Number.isInteger(slot)||slot<0||slot>=HOTBAR_SLOTS)return {ok:false,code:'rejected'};
+    this.syncHotbar(p);
+    const uid=p.hotbar[slot];
+    if(!uid){this.tell(p,'Empty slot · carry another weapon to fill it');return {ok:false,code:'rejected'};}
+    if(p.equipment.weapon?.uid===uid){p.hotbarIndex=slot;return {ok:true,code:'ok'};}
+    const plan=planEquip({inventory:p.inventory, equipment:p.equipment, currentEquipmentRevision:p.equipmentRevision, uid, socket:'weapon'});
+    if(!plan.ok)return {ok:false,code:plan.code};
+    p.inventory.slots=plan.slots;p.inventory.revision=plan.inventoryRevision;
+    p.equipment=plan.equipment;p.equipmentRevision=plan.equipmentRevision;
+    p.hotbarIndex=slot;p.cooldown=Math.max(p.cooldown,.12);p.combo=0;
+    this.event('swap',p.x,p.z,label(p.equipment.weapon.itemId),{player:p.id,itemId:p.equipment.weapon.itemId});
+    this.syncHotbar(p);this.assertItems();
+    return {ok:true,code:'ok'};
+  }
+  /** A weapon broke: reach for the next one on the hotbar. */
+  autoSwap(p, brokenId){
+    this.syncHotbar(p);
+    for(let k=1;k<=HOTBAR_SLOTS;k++){
+      const i=(p.hotbarIndex+k)%HOTBAR_SLOTS;
+      if(!p.hotbar[i]||p.hotbar[i]===p.equipment.weapon?.uid)continue;
+      if(this.selectHotbar(p,i).ok){this.tell(p,`${label(brokenId)} broke · switched to ${label(p.equipment.weapon.itemId)}`);return true;}
+    }
+    return false;
   }
   collapseRecovery(p){if(p.recovery&&!p.recovery.slots.some(Boolean))p.recovery=null;}
   nearby(p,type,range=4){return this.buildings.find(b=>(b.type===type||(type==='fire'&&['hearth','fire'].includes(b.type)))&&b.hp>0&&distance(p,b)<range&&(type!=='fire'||b.fuel>0));}
@@ -534,9 +616,9 @@ export class World {
     if(this.status!=='playing')return {ok:false,code:'unavailable'};
     if(p.down||p.ghost){if(cmd.type==='interact'&&p.charm>0){p.charm--;this.revivePlayer(p);this.event('heal',p.x,p.z,'Last charm');return {ok:true,code:'ok'};}return {ok:false,code:'unavailable'};}
     if(Object.hasOwn(INTENTS,cmd.type))return inventoryIntent(this,p,cmd);
-    if(p.cooldown>.05&&!['move','lantern','dash','dismantle'].includes(cmd.type))return {ok:false,code:'cooldown'};
+    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick'].includes(cmd.type))return {ok:false,code:'cooldown'};
     switch(cmd.type){
-      case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){p.goal={x:clamp(cmd.x,-RULES.radius+1,RULES.radius-1),z:clamp(cmd.z,-RULES.radius+1,RULES.radius-1),target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
+      case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){p.goal={x:clamp(cmd.x,-this.radius+1,this.radius-1),z:clamp(cmd.z,-this.radius+1,this.radius-1),target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
       case 'craft':return this.performCraft(p, cmd.recipe, cmd.stationId);
       case 'build':return this.performBuild(p, cmd.recipe, cmd.x, cmd.z, cmd.stationId, cmd.rotation);
       case 'use':{
@@ -555,7 +637,9 @@ export class World {
       case 'eat':return {ok:false,code:'unsupported'};
       case 'interact':return this.interact(p, cmd.target)||{ok:false,code:'rejected'};
       case 'attack':this.attack(p);break;
-      case 'dash':if(p.stamina>=28&&p.dashCooldown<=0){p.stamina-=28;p.dash=.24;p.dashCooldown=1.1;p.rest=false;this.event('dash',p.x,p.z);}break;
+      case 'dash':return this.dodge(p);
+      case 'hotbar':return this.selectHotbar(p, cmd.slot);
+      case 'arenaPick':return this.arena?arenaPick(this, p, cmd.choice, cmd.replace):{ok:false,code:'unavailable'};
       case 'lantern':{
         const light=p.equipment.light;
         if(LIGHT_ITEMS.includes(light?.itemId)&&light.durability>0){p.lantern=!p.lantern;break;}
@@ -964,20 +1048,69 @@ export class World {
     }
     for(const id of [...this.pickupDwell.keys()])if(!live.has(id))this.pickupDwell.delete(id);
   }
+  /**
+   * How the equipped weapon finds a foe: `reach` is how far auto-aim looks, `speed` leads a moving
+   * target for shots, `assist` is the short step a melee swing takes to close the last gap.
+   */
+  aimProfile(p){
+    const weapon=p?.equipment?.weapon;
+    const itemId=weapon&&weapon.durability>0?weapon.itemId:'fist';
+    if(Object.hasOwn(MAGIC_AIM,itemId))return MAGIC_AIM[itemId];
+    const style=weaponStyle(itemId)||weaponStyle('fist');
+    const range=style.range??style.sight??2;
+    switch(style.style){
+      case 'melee':case 'combo':return {reach:range+1.3,assist:1.1,range};
+      case 'reap':return {reach:range+.9,assist:.8,range};
+      case 'arrow':case 'bolt':return {reach:range,speed:style.speed,range};
+      case 'wisps':return {reach:style.seek,range:style.seek};
+      case 'crows':case 'sentry':case 'wight':return {reach:style.sight,range:style.sight};
+      default:return {reach:range,range};
+    }
+  }
+  /** How far a hostile can be for the wanderer's current weapon to be worth swinging (auto-attack). */
+  weaponReach(p){return this.aimProfile(p).reach;}
+  /**
+   * Auto-aim: the best foe in reach (near, in front, already locked, or winding up), leading it for
+   * shots. Turns the wanderer to face it and keeps that facing briefly while they run.
+   */
+  autoAim(p, aim=this.aimProfile(p)){
+    const fx=p.dx||0,fz=p.dz||0,fl=Math.hypot(fx,fz)||1;
+    let best=null,score=Infinity;
+    for(const e of this.enemies){
+      if(!(e.hp>0)||isMagicAlly(e))continue;
+      const d=distance(e,p);if(d>aim.reach)continue;
+      const dot=d>.01?((e.x-p.x)*fx+(e.z-p.z)*fz)/(d*fl):1;
+      let value=d*(1.25-.25*dot);
+      if(e.id===p.lockId)value*=.7;
+      if(e.windup>0||e.act>0)value*=.88;
+      if(value<score){score=value;best=e;}
+    }
+    p.lockId=best?.id||null;
+    if(!best)return null;
+    let ax=best.x,az=best.z;
+    if(aim.speed>0){const t=Math.min(1.2,distance(best,p)/aim.speed);ax+=(best.vx||0)*t*.85;az+=(best.vz||0)*t*.85;}
+    const d=Math.max(.05,Math.hypot(ax-p.x,az-p.z));
+    p.dx=(ax-p.x)/d;p.dz=(az-p.z)/d;p.aimUntil=this.time+.5;
+    return best;
+  }
   attack(p){
     const weapon=p.equipment.weapon;
     const magic=weapon&&weapon.durability>0?magicModuleFor(weapon.itemId):null;
+    const aim=this.aimProfile(p);
+    const locked=this.autoAim(p, aim);
     if(magic)return this.attackMagic(p, weapon, magic);
     const armed=!!(weapon&&weapon.durability>0&&equipmentSlotFor(weapon.itemId)==='weapon');
     const style=(armed&&weaponStyle(weapon.itemId))||weaponStyle('fist');
-    const stamina=style.stamina??7;
+    const stamina=this.arena?0:(style.stamina??7);
     if(p.stamina<stamina){this.tell(p,'Catch your breath');return;}
     const hostile=this.enemies.filter(entry=>!isMagicAlly(entry)&&entry.hp>0);
     const range=style.range??style.sight??2;
-    const target=hostile.filter(entry=>distance(entry,p)<range).sort((a,b)=>distance(a,p)-distance(b,p))[0];
+    // Melee assist: a short step closes the last gap to the locked foe, so swings connect on the run.
+    if(locked&&aim.assist){const d=distance(locked,p);if(d>range*.8&&d<range+aim.assist){const step=Math.min(aim.assist,d-range*.7);this.move(p,(locked.x-p.x)/d*step/.05,(locked.z-p.z)/d*step/.05,.05,this.frameObstacles||this.obstacles());}}
+    const target=locked&&distance(locked,p)<range?locked:hostile.filter(entry=>distance(entry,p)<range).sort((a,b)=>distance(a,p)-distance(b,p))[0];
     const damage=(armed?EQUIPMENT[weapon.itemId].damage:style.damage)*powerOf(p);
     p.stamina-=stamina;p.cooldown=style.cooldown;p.rest=false;p.action='attack';p.actionUntil=this.time+.32;this.event('swing',p.x,p.z);
-    if(target){const span=Math.max(.1,distance(target,p));p.dx=(target.x-p.x)/span;p.dz=(target.z-p.z)/span;}
+    if(target&&!aim.speed){const span=Math.max(.1,distance(target,p));p.dx=(target.x-p.x)/span;p.dz=(target.z-p.z)/span;p.aimUntil=this.time+.5;}
     if(armed)p.magicCast={itemId:weapon.itemId,at:this.time,x:p.x,z:p.z,dx:p.dx,dz:p.dz};
     const special=ARSENAL[style.style];
     if(special){special(this,p,{style,damage,weapon,hostile});return;}
@@ -1030,13 +1163,13 @@ export class World {
         if(shot.splash){for(const other of hostile)if(other!==enemy&&other.hp>0&&Math.hypot(other.x-shot.x,other.z-shot.z)<shot.splash)this.strike(owner, other, shot.damage*.55, .2);this.event('burst',shot.x,shot.z,'',{radius:shot.splash});shot.done=true;}
         else if(shot.hit.length>shot.pierce)shot.done=true;
       }
-      if(!shot.done&&(shot.traveled>=shot.range||Math.hypot(shot.x,shot.z)>RULES.radius))shot.done=true;
+      if(!shot.done&&(shot.traveled>=shot.range||Math.hypot(shot.x,shot.z)>this.radius))shot.done=true;
     }
     this.projectiles=this.projectiles.filter(shot=>!shot.done);
   }
   attackMagic(p, weapon, magic){
     const profile=magicAttackProfile(weapon.itemId);
-    const stamina=profile?.stamina??0;
+    const stamina=this.arena?0:(profile?.stamina??0);
     if(stamina>0&&p.stamina<stamina){this.tell(p,'Catch your breath');return;}
     if(p.cooldown>0.05)return;
     const before=this.magicSnapshot();
@@ -1045,6 +1178,8 @@ export class World {
     const cooldownBefore=p.cooldown;
     p.rest=false;
     const result=magic.use(this, p);
+    if(this.arena&&p.equipment.weapon?.uid===weapon.uid)p.equipment.weapon.durability=Math.max(p.equipment.weapon.durability,durabilityBefore);
+    else if(this.arena&&!p.equipment.weapon){weapon.durability=durabilityBefore;p.equipment.weapon=weapon;}
     const worn=p.equipment.weapon;
     const acted=result!=null||p.cooldown!==cooldownBefore||p.action==='attack'||worn!==weapon||(worn&&worn.durability!==durabilityBefore);
     if(!acted)return;
@@ -1190,23 +1325,94 @@ export class World {
     const offset=remainingNightWaveOffsets(progress.elapsed, RULES.night)[0];
     this.nextSpawn=offset===undefined?progress.cycleIndex*schedule.cycle+schedule.cycle:progress.cycleIndex*schedule.cycle+progress.phaseStart+offset;
   }
-  obstacles(){return [...this.nodes.filter(n=>!n.ready&&NODES[n.type].radius>.3).map(n=>({...n,radius:NODES[n.type].radius})),...this.buildings.filter(b=>STRUCTURES[b.type].radius>0&&!(b.type==='gate'&&b.open)).map(b=>({...b,radius:STRUCTURES[b.type].radius}))];}
+  /**
+   * Solid things a walker cannot enter. Returns the few camp structures as a plain array and hangs
+   * the many standing trees and rocks on `.grid`, a 4-unit spatial hash cached until a node is felled,
+   * regrows or moves. Swarms call move() thousands of times a second; a linear scan of every tree
+   * per call does not scale.
+   */
+  obstacles(){
+    const nodes=this.nodes;let sig=nodes.length|0;
+    for(let i=0;i<nodes.length;i++){const n=nodes[i];sig=(Math.imul(sig,31)+(n.ready?7:1)+((n.x*64)|0)*3+((n.z*64)|0)*5+n.type.length)|0;}
+    let cache=this.obstacleCache;
+    if(!cache||cache.sig!==sig||cache.nodes!==nodes){
+      const grid=new Map(),list=[];
+      for(const n of nodes){
+        const radius=NODES[n.type]?.radius||0;if(n.ready||!(radius>.3))continue;
+        const o={id:n.id,type:n.type,x:n.x,z:n.z,radius};list.push(o);
+        const key=gridKey(Math.floor(n.x/OBSTACLE_CELL),Math.floor(n.z/OBSTACLE_CELL));
+        let bucket=grid.get(key);if(!bucket){bucket=[];grid.set(key,bucket);}bucket.push(o);
+      }
+      cache={sig,nodes,grid,list};
+      Object.defineProperty(this,'obstacleCache',{value:cache,writable:true,configurable:true,enumerable:false});
+    }
+    const out=[];
+    for(const b of this.buildings){const radius=STRUCTURES[b.type]?.radius||0;if(radius>0&&b.hp>0&&!(b.type==='gate'&&b.open))out.push({id:b.id,type:b.type,x:b.x,z:b.z,radius});}
+    out.grid=cache.grid;out.nodes=cache.list;
+    return out;
+  }
+  /** True when a walker of clearance .33 cannot stand at x,z. */
+  blockedAt(x,z,obstacles,selfId=null){
+    if(Math.hypot(x,z)>=this.radius-1)return true;
+    const grid=obstacles?.grid;
+    if(grid){
+      const gx=Math.floor(x/OBSTACLE_CELL),gz=Math.floor(z/OBSTACLE_CELL);
+      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const bucket=grid.get(gridKey(gx+i,gz+j));if(!bucket)continue;for(const o of bucket)if(o.id!==selfId&&Math.hypot(o.x-x,o.z-z)<o.radius+.33)return true;}
+    }
+    if(obstacles)for(const o of obstacles)if(o.id!==selfId&&Math.hypot(o.x-x,o.z-z)<o.radius+.33)return true;
+    return false;
+  }
   move(p,dx,dz,dt,obstacles){
-    const R=RULES.radius-1;const can=(x,z)=>Math.hypot(x,z)<R&&!obstacles.some(o=>o.id!==p.id&&Math.hypot(o.x-x,o.z-z)<o.radius+.33);
+    const R=this.radius-1;const can=(x,z)=>!this.blockedAt(x,z,obstacles,p.id);
     const x=p.x+dx*dt,z=p.z+dz*dt;
     // Something knocked or summoned inside a trunk may always walk back out.
     if(can(x,z)||(Math.hypot(x,z)<R&&!can(p.x,p.z))){p.x=x;p.z=z;return true;}
     let moved=false;if(can(x,p.z)){p.x=x;moved=true;}if(can(p.x,z)){p.z=z;moved=true;}return moved;
   }
-  hurt(p,amount){if(this.showcase||p.dash>0||p.down||p.ghost)return;this.damagedAt.set(p.id,this.time);const armor=p.equipment.body;if(armor&&ARMOR_REDUCTION[armor.itemId]&&armor.durability>0){this.wearEquipped(p,'body',amount);amount*=1-ARMOR_REDUCTION[armor.itemId];}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
+  /** A timed dodge: fixed-distance burst in the stick direction (or away from the closest threat), with i-frames. */
+  dodge(p){
+    if(p.down||p.ghost||p.dashCooldown>0)return {ok:false,code:'cooldown'};
+    const cost=this.arena?0:DASH.stamina;
+    if(p.stamina<cost){this.tell(p,'Catch your breath');return {ok:false,code:'rejected'};}
+    const raw=this.freshInput(p);let dx=raw.x||0,dz=raw.z||0;
+    if(Math.hypot(dx,dz)<.2){
+      const threat=this.enemies.filter(e=>e.hp>0&&!isMagicAlly(e)&&distance(e,p)<7).sort((a,b)=>distance(a,p)-distance(b,p))[0];
+      if(threat){const d=Math.max(.01,distance(threat,p));dx=(p.x-threat.x)/d;dz=(p.z-threat.z)/d;}
+      else{dx=p.dx||0;dz=p.dz||1;}
+    }
+    const l=Math.hypot(dx,dz)||1;
+    p.ddx=dx/l;p.ddz=dz/l;p.stamina-=cost;p.dash=DASH.time;p.iframes=DASH.iframes;p.dashCooldown=DASH.cooldown;p.rest=false;p.goal=null;
+    this.event('dash',p.x,p.z,'',{dx:p.ddx,dz:p.ddz,player:p.id});
+    return {ok:true,code:'ok'};
+  }
+  /** Shove a wanderer (heavy blows knock you back); walls and trunks still stop you. */
+  shove(p,dx,dz,amount){
+    const l=Math.hypot(dx,dz);if(!(l>1e-4)||!(amount>0))return;
+    const obstacles=this.frameObstacles||this.obstacles();
+    for(let i=0;i<4;i++)this.move(p,dx/l*amount/.2,dz/l*amount/.2,.05,obstacles);
+  }
+  hurt(p,amount,source=null){if(this.showcase||p.down||p.ghost)return;
+    if(p.iframes>0||p.dash>0){
+      // Inside the telegraph, but mid-dodge: the blow passes through. Timed well, it pays back.
+      if(!(this.time-(p.lastDodge??-9)<.35)){p.lastDodge=this.time;p.dashCooldown=Math.min(p.dashCooldown,DASH.perfectCooldown);if(!this.arena)p.stamina=Math.min(100,p.stamina+DASH.perfectStamina);this.event('dodge',p.x,p.z,'Dodged!',{player:p.id});}
+      return;
+    }this.damagedAt.set(p.id,this.time);const armor=p.equipment.body;if(armor&&ARMOR_REDUCTION[armor.itemId]&&armor.durability>0){this.wearEquipped(p,'body',amount);amount*=1-ARMOR_REDUCTION[armor.itemId];}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
   revivePlayer(p){p.down=0;p.ghost=false;p.hp=Math.round(maxHealth(p)/2);p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}this.event('heal',p.x,p.z,'Back on your feet');}
+  /** Strength of a new creature: by day survived (and region tier) on an expedition, by wave in the arena. */
+  mobScale(tier=0){
+    if(this.arena){const wave=Math.max(1,this.arena.wave||1);return {scale:arenaScale(wave),level:wave,elite:arenaEliteChance(wave),boss:1+.3*Math.max(0,Math.floor(wave/10)-1)};}
+    const day=dayAt(this.time);
+    return {scale:enemyScale(day+tier*2),level:day+tier*2,elite:eliteChance(day,tier),boss:1+.25*Math.max(0,Math.floor(day/5)-1)};
+  }
   spawnEnemy(type,x,z,options={}){
     const def=ENEMIES[type];if(!def)return null;
-    const day=dayAt(this.time),humans=Math.max(1,this.players.filter(p=>p.online).length);
-    const scale=enemyScale(day+(options.tier||0)*2);
-    const elite=options.elite??(!this.showcase&&type!=='king'&&this.spawnRng()<eliteChance(day, options.tier||0));
-    const hp=Math.round(def.hp*scale.hp*(1+(humans-1)*.35)*(elite?ELITE.hp:1)*(type==='king'?1+.25*Math.max(0,Math.floor(day/5)-1):1));
-    const enemy={id:this.nextId('e'),type,x,z,hp,maxHp:hp,cooldown:1,windup:0,slam:0,tx:x,tz:z,slowed:0,power:+(scale.damage*(elite?ELITE.damage:1)).toFixed(3),level:day+(options.tier||0)*2,elite:!!elite};
+    const humans=Math.max(1,this.players.filter(p=>p.online).length);
+    const {scale,level,elite:chance,boss}=this.mobScale(options.tier||0);
+    const elite=options.elite??(!this.showcase&&type!=='king'&&!options.minion&&this.spawnRng()<chance);
+    const hp=Math.round(def.hp*scale.hp*(1+(humans-1)*.35)*(elite?ELITE.hp:1)*(type==='king'?boss:1));
+    const enemy={id:this.nextId('e'),type,x,z,hp,maxHp:hp,cooldown:.6+this.mobRng()*.9,windup:0,slam:0,tx:x,tz:z,slowed:0,power:+(scale.damage*(elite?ELITE.damage:1)).toFixed(3),level,elite:!!elite,
+      vx:0,vz:0,atk:'',wt:0,ang:0,act:0,face:1,flank:+((this.mobRng()<.5?-1:1)*(.35+this.mobRng()*.65)).toFixed(3)};
+    if(options.minion)enemy.minion=true;
     if(options.home){enemy.home={x,z};enemy.leash=options.leash||ROAM.leash;enemy.guardOf=options.guardOf||null;enemy.roamer=!!options.roamer;}
     this.enemies.push(enemy);return enemy;
   }
@@ -1215,7 +1421,9 @@ export class World {
     const day=dayAt(this.time),humans=this.players.filter(p=>p.online).length;this.wave++;
     const count=waveSize(day, humans);const hearth=this.buildings.find(b=>b.type==='hearth')||{x:0,z:0};
     const roster=nightRoster(day);
-    for(let i=0;i<count;i++){const a=this.rng()*Math.PI*2,r=16+this.rng()*6;const type=i===0&&day>=3&&day%2===1?'brute':pickWeighted(this.rng, roster);const lim=RULES.radius-4;this.spawnEnemy(type,clamp(hearth.x+Math.cos(a)*r,-lim,lim),clamp(hearth.z+Math.sin(a)*r,-lim,lim));}
+    // The night comes from one to three directions at once, each a loose pack, so the camp is swarmed rather than trickled.
+    const groups=Math.min(3,1+Math.floor(count/8)),heading=[...Array(groups)].map(()=>this.rng()*Math.PI*2);
+    for(let i=0;i<count;i++){const a=heading[i%groups]+(this.rng()-.5)*.7,r=16+this.rng()*6;const type=i===0&&day>=3&&day%2===1?'brute':pickWeighted(this.rng, roster);const lim=RULES.radius-4;this.spawnEnemy(type,clamp(hearth.x+Math.cos(a)*r,-lim,lim),clamp(hearth.z+Math.sin(a)*r,-lim,lim));}
     if(isBossNight(day)&&this.bossNight!==day&&!this.enemies.some(e=>e.type==='king')){this.bossNight=day;this.bossSpawned=true;this.bossSlain=false;this.spawnEnemy('king',hearth.x,hearth.z-19);this.event('announce',0,0,day===5?'The Hollow King has found your fire.':`The Hollow King returns, stronger. Night ${day}.`);}
     else this.event('announce',0,0,`Night ${day} • the woods are waking`);
   }
@@ -1246,7 +1454,9 @@ export class World {
         const a=this.spawnRng()*Math.PI*2,r=ROAM.spawnMin+this.spawnRng()*(ROAM.spawnMax-ROAM.spawnMin),x=p.x+Math.cos(a)*r,z=p.z+Math.sin(a)*r;
         if(Math.hypot(x,z)>RULES.radius-3||tierAt(x,z)<1)continue;
         if(this.players.some(q=>q.online&&distance(q,{x,z})<ROAM.spawnMin-2))continue;
-        this.spawnEnemy(pool[Math.floor(this.spawnRng()*pool.length)],x,z,{home:true,roamer:true,tier:tier-1,leash:ROAM.leash});break;
+        const type=pool[Math.floor(this.spawnRng()*pool.length)],[lo,hi]=ROAM.pack[type]||[1,1],n=lo+Math.floor(this.spawnRng()*(hi-lo+1));
+        for(let k=0;k<n;k++){const b=this.spawnRng()*Math.PI*2,s=k?.8+this.spawnRng()*1.2:0;this.spawnEnemy(type,x+Math.cos(b)*s,z+Math.sin(b)*s,{home:true,roamer:true,tier:tier-1,leash:ROAM.leash});}
+        break;
       }
     }
     this.enemies=this.enemies.filter(e=>!e.roamer||this.players.some(p=>p.online&&distance(p,e)<ROAM.despawn));
@@ -1272,18 +1482,23 @@ export class World {
     });
   }
   tick(dt=RULES.tick){
-    pruneChests(this);if(this.status!=='playing')return;dt=clamp(dt,0,.1);const before=phaseAt(this.time),oldDay=dayAt(this.time);this.time+=dt;const phase=phaseAt(this.time);
-    if(before!==phase){const survived=dayAt(this.time)-1;this.event('phase',0,0,phase==='day'?(survived>0?`Dawn. ${survived} ${survived===1?'night':'nights'} survived.`:'Dawn. You made it.'):phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='day')this.best.day=Math.max(this.best.day||1,dayAt(this.time));if(phase==='night'&&!this.showcase){this.spawnWave();this.armNextWave();}else if(phase==='night')this.armNextWave();if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);this.enemies=this.enemies.filter(e=>e.type==='king'||e.home||isMagicAlly(e));}}
+    pruneChests(this);if(this.status!=='playing')return;dt=clamp(dt,0,.1);
+    let phase='day';
+    if(this.arena){this.time+=dt;stepArena(this,dt);if(this.status!=='playing')return;}
+    else{
+    const before=phaseAt(this.time),oldDay=dayAt(this.time);this.time+=dt;phase=phaseAt(this.time);
+    if(before!==phase){const survived=dayAt(this.time)-1;this.event('phase',0,0,phase==='day'?(survived>0?`Dawn. ${survived} ${survived===1?'night':'nights'} survived.`:'Dawn. You made it.'):phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='day')this.best.day=Math.max(this.best.day||1,dayAt(this.time));if(phase==='night'&&!this.showcase){this.spawnWave();this.armNextWave();}else if(phase==='night')this.armNextWave();if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);this.enemies=this.enemies.filter(e=>e.type==='king'||e.home||isMagicAlly(e));this.hostile=[];}}
     if(!this.showcase&&dayAt(this.time)!==oldDay&&this.bossSlain&&!this.endless){this.status='victory';this.event('announce',0,0,'The curse is broken. Your fire still burns.');return;}
-    if(phase==='night'&&this.time>=this.nextSpawn){if(!this.showcase&&this.invaders().length<22)this.spawnWave();this.armNextWave();}
+    if(phase==='night'&&this.time>=this.nextSpawn){if(!this.showcase&&this.invaders().length<NIGHT_CAP)this.spawnWave();this.armNextWave();}
     this.maintainGuards();this.roam(dt);
     for(const n of this.nodes)if(n.ready&&n.ready<this.time){n.ready=0;n.hits=NODES[n.type].hits;}
+    }
     const obstacles=this.obstacles();
     for(const p of this.players){
-      if(!p.online)continue;p.cooldown=Math.max(0,p.cooldown-dt);p.dash=Math.max(0,p.dash-dt);p.dashCooldown=Math.max(0,p.dashCooldown-dt);
-      if(p.ghost)continue;
-      if(p.down){p.down-=dt;if(p.down<=0){p.down=0;p.ghost=true;p.revive=0;this.reviveWork.delete(p.id);this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}continue;}
-      if(!this.showcase){
+      if(!p.online)continue;p.cooldown=Math.max(0,p.cooldown-dt);p.dashCooldown=Math.max(0,p.dashCooldown-dt);p.iframes=Math.max(0,(p.iframes||0)-dt);
+      if(p.ghost){p.dash=0;continue;}
+      if(p.down){p.dash=0;p.down-=dt;if(p.down<=0){p.down=0;p.ghost=true;p.revive=0;this.reviveWork.delete(p.id);this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}continue;}
+      if(!this.showcase&&!this.arena){
         p.hunger=Math.max(0,p.hunger-dt*(p.rest?.45:.075));
         const light=phase!=='night'||this.lit(p);p.courage=clamp(p.courage+dt*(light?.6:-3),0,100);
         if(p.hunger<=0)this.hurtQuiet(p,dt*1.2);if(!light&&p.courage<20)this.hurtQuiet(p,dt*(p.courage<=0?6:2));
@@ -1306,8 +1521,22 @@ export class World {
         else if(drop)p.goal=null;
         else if(!node&&p.cooldown<=0){this.interact(p,goal.target);p.goal=null;}
       }
-      const moving=Math.hypot(x,z)>.08;if(moving){p.dx=x;p.dz=z;const speed=RULES.speed*(p.dash>0?3:1)*(p.hunger<=0?.65:1);const moved=this.move(p,x*speed,z*speed,dt,obstacles);if(!moved&&p.goal){this.move(p,-z*speed,x*speed,dt,obstacles);}p.action=p.dash>0?'dash':'walk';}
-      else if(this.time>p.actionUntil)p.action='idle';
+      const x0=p.x,z0=p.z;
+      if(p.dash>0){
+        // A dodge is a short burst over a fixed distance; input is ignored until it lands.
+        const step=Math.min(p.dash,dt),speed=DASH.distance/DASH.time;
+        for(let i=0;i<3;i++)this.move(p,(p.ddx||0)*speed,(p.ddz||0)*speed,step/3,obstacles);
+        p.dash=Math.max(0,p.dash-dt);p.action='dash';p.actionUntil=this.time+.05;
+      }else{
+        const moving=Math.hypot(x,z)>.08;
+        if(moving){
+          // While a blow is recent the wanderer keeps facing the foe it struck: run one way, fight the other.
+          if(!(p.aimUntil>this.time)){p.dx=x;p.dz=z;}
+          const speed=RULES.speed*(p.hunger<=0&&!this.arena?.65:1);const moved=this.move(p,x*speed,z*speed,dt,obstacles);if(!moved&&p.goal){this.move(p,-z*speed,x*speed,dt,obstacles);}p.action='walk';
+        }
+        else if(this.time>p.actionUntil)p.action='idle';
+      }
+      p.vx=(p.x-x0)/Math.max(dt,1e-3);p.vz=(p.z-z0)/Math.max(dt,1e-3);
       if(p.cooldown<=0){if(input.attack)this.attack(p);else if(input.act){const aimed=this.target(p, typeof input.target==='string'?input.target:null);if(aimed?.kind==='building')this.interact(p, aimed.entity.id);}}
       if(this.showcase){p.hp=maxHealth(p);p.hunger=100;p.courage=100;p.down=0;p.ghost=false;}
     }
@@ -1319,47 +1548,17 @@ export class World {
       if(b.type==='hearth'&&b.fuel>0&&b.cooldown<=0&&!this.showcase){const enemy=this.enemies.find(enemy=>!isMagicAlly(enemy)&&distance(enemy,b)<HEARTH_FLARE.range);if(enemy){enemy.hp-=HEARTH_FLARE.damage;b.cooldown=HEARTH_FLARE.period;this.event('bolt',enemy.x,enemy.z,String(HEARTH_FLARE.damage),{sx:b.x,sz:b.z});}}
       if(b.type==='ward'&&b.cooldown<=0){const enemy=this.enemies.find(enemy=>!isMagicAlly(enemy)&&distance(enemy,b)<6);if(enemy){enemy.hp-=18;b.cooldown=2;this.event('bolt',enemy.x,enemy.z,'18',{sx:b.x,sz:b.z});}}
     }
-    for(const e of this.enemies){
-      if(e.hp<=0)continue;
-      if(isMagicAlly(e))continue;
-      if(this.tickRoot(e, dt)){
-        e.cooldown=Math.max(0, e.cooldown-dt);
-        if(e.windup>0){
-          const def=ENEMIES[e.type];
-          e.windup-=dt;
-          if(e.windup<=0&&def){
-            const people=this.players.filter(p=>p.online&&!p.down&&!p.ghost);
-            for(const person of people)if(Math.hypot(person.x-e.tx,person.z-e.tz)<(e.type==='king'?4:1.9))this.hurt(person,def.damage*(e.power||1));landBlow(this,e,def.damage*(e.power||1),e.type==='king'?4:1.9);
-            for(const building of this.buildings)if(Math.hypot(building.x-e.tx,building.z-e.tz)<(e.type==='king'?4:1.4))building.hp-=def.damage*(e.power||1)*structureHit(building);
-            this.event('impact',e.tx,e.tz,'');e.cooldown=def.period;
-          }
-        }
-        continue;
-      }
-      const def=ENEMIES[e.type];if(!def)continue;e.cooldown-=dt;e.slowed=Math.max(0,e.slowed-dt);
-      const people=this.players.filter(p=>p.online&&!p.down&&!p.ghost).sort((a,b)=>distance(a,e)-distance(b,e));
-      const hearth=this.buildings.find(b=>b.type==='hearth');let target;
-      if(e.home){
-        const prey=[preyFor(this,e,people,e.aggro?ROAM.aggro+6:ROAM.aggro)].find(q=>q&&Math.hypot(q.x-e.home.x,q.z-e.home.z)<e.leash+8)||null;
-        if(prey){e.aggro=true;target=prey;}
-        else{e.aggro=false;if(Math.hypot(e.x-e.home.x,e.z-e.home.z)<1.2){if(e.hp<e.maxHp)e.hp=Math.min(e.maxHp,e.hp+dt*e.maxHp*.05);continue;}target={x:e.home.x,z:e.home.z,homing:true};}
-      }else{const near=preyFor(this,e,people,12);target=near||hearth||(this.showcase?people[0]:null);}
-      if(!target)continue;
-      if(e.windup>0){e.windup-=dt;if(e.windup<=0){for(const person of people)if(Math.hypot(person.x-e.tx,person.z-e.tz)<(e.type==='king'?4:1.9))this.hurt(person,def.damage*(e.power||1));landBlow(this,e,def.damage*(e.power||1),e.type==='king'?4:1.9);for(const building of this.buildings)if(Math.hypot(building.x-e.tx,building.z-e.tz)<(e.type==='king'?4:1.4))building.hp-=def.damage*(e.power||1)*structureHit(building);this.event('impact',e.tx,e.tz,'');e.cooldown=def.period;}continue;}
-      const d=distance(e,target);const barricade=!target.homing&&this.buildings.find(b=>['wall','gate'].includes(b.type)&&!b.open&&distance(b,e)<1.65);
-      if(barricade&&e.cooldown<=0){barricade.hp-=def.damage*(e.power||1)*STRUCTURE_HIT;e.cooldown=def.period;this.event('hit',barricade.x,barricade.z);continue;}
-      if(!target.homing&&d<def.range+.5&&e.cooldown<=0){e.tx=target.x;e.tz=target.z;e.windup=e.type==='king'?1.35:.6;continue;}
-      if(d>def.range*.8){const speed=def.speed*(e.slowed>0?.3:1);const moved=this.move(e,(target.x-e.x)/d*speed,(target.z-e.z)/d*speed,dt,obstacles);if(!moved){const wall=this.buildings.filter(b=>b.type!=='trap'&&distance(b,e)<2).sort((a,b)=>distance(a,e)-distance(b,e))[0];if(wall&&!target.homing&&e.cooldown<=0){wall.hp-=def.damage*(e.power||1)*STRUCTURE_HIT;e.cooldown=def.period;}else this.move(e,-(target.z-e.z)/d*speed,(target.x-e.x)/d*speed,dt,obstacles);}}
-    }
-    for(const e of this.enemies.filter(e=>e.hp<=0)){const loot=ENEMIES[e.type]?.loot;if(loot)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));if(!isMagicAlly(e)){this.kills++;if(!this.showcase){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}}this.event('kill',e.x,e.z);if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,'The Hollow King falls. His treasure spills across the grass.');}}
+    stepMobs(this, dt, obstacles);
+    for(const e of this.enemies.filter(e=>e.hp<=0)){if(this.arena){if(!isMagicAlly(e)){this.kills++;arenaKill(this,e);}this.event('kill',e.x,e.z);continue;}const loot=ENEMIES[e.type]?.loot;if(loot)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));if(!isMagicAlly(e)){this.kills++;if(!this.showcase){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}}this.event('kill',e.x,e.z);if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,'The Hollow King falls. His treasure spills across the grass.');}}
     this.enemies=this.enemies.filter(e=>e.hp>0);
     for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth'&&!this.showcase)this.status='defeat';}
     this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.stack?.quantity>0&&(d.flight||d.until>this.time));
-    const active=this.players.filter(p=>p.online);if(active.length&&active.every(p=>(p.down||p.ghost)&&!p.charm)){this.wipe+=dt;if(this.wipe>6)this.status='defeat';}else this.wipe=0;
-    this.discoverTimer-=dt;if(this.discoverTimer<=0){this.discoverTimer=.5;const seen=new Set(this.explored),N=EXPLORE_SIZE,R=RULES.radius;for(const p of active){const gx=Math.floor((p.x+R)/EXPLORE_CELL),gz=Math.floor((p.z+R)/EXPLORE_CELL);for(let x=gx-2;x<=gx+2;x++)for(let z=gz-2;z<=gz+2;z++)if(x>=0&&z>=0&&x<N&&z<N)seen.add(z*N+x);
+    const active=this.players.filter(p=>p.online);if(active.length&&active.every(p=>(p.down||p.ghost)&&!p.charm)){this.wipe+=dt;if(this.wipe>(this.arena?1.6:6))this.status='defeat';}else this.wipe=0;
+    if(!this.arena)this.discoverTimer-=dt;if(this.discoverTimer<=0){this.discoverTimer=.5;const seen=new Set(this.explored),N=EXPLORE_SIZE,R=RULES.radius;for(const p of active){const gx=Math.floor((p.x+R)/EXPLORE_CELL),gz=Math.floor((p.z+R)/EXPLORE_CELL);for(let x=gx-2;x<=gx+2;x++)for(let z=gz-2;z<=gz+2;z++)if(x>=0&&z>=0&&x<N&&z<N)seen.add(z*N+x);
       if(!p.ghost&&!this.showcase){const region=regionAt(p.x,p.z);p.regions=Array.isArray(p.regions)?p.regions:['meadow'];if(!p.regions.includes(region)){p.regions.push(region);this.awardXp(p,DISCOVER_XP*(1+REGIONS[region].tier));this.event('discover',p.x,p.z,REGIONS[region].name,{player:p.id});this.tell(p,`Discovered ${REGIONS[region].name}`);}}}
       this.explored=[...seen];}
     if(this.status==='playing')this.advanceChannels(dt);
+    for(const p of this.players)if(p.online)this.syncHotbar(p);
     pruneChests(this);this.assertItems();
   }
   hurtQuiet(p,amount){if(this.showcase||p.down||p.ghost)return;p.hp-=amount;if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} has fallen`);}}
@@ -1377,11 +1576,12 @@ export class World {
     })):this.players;
     const data={
       version:this.version, clock:this.clock, seed:this.seed, time:this.time, status:this.status, players, buildings:this.buildings,
-      enemies:this.enemies, drops:this.drops, events:this.events, explored:this.explored,
+      enemies:purpose==='network'?this.enemies.map(compactForNetwork):this.enemies, drops:this.drops, events:purpose==='network'?this.events.filter(ev=>this.time-ev.at<.8):this.events, explored:this.explored,
       nodeChanges:this.nodes.filter(n=>n.ready||n.hits!==NODES[n.type].hits).map(n=>({id:n.id, hits:n.hits, ready:n.ready})),
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
       projectiles:this.projectiles, allies:this.allies, zones:this.zones, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
+      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, radius:this.radius,
       ...magicSnapshotFields(this),
     };
     if(purpose==='network'){pruneChests(this);data.chestBusy=[...this.chestSessions.values()].map(s=>({...s}));data.worldId=this.networkId;data.transactionRevision=this.transactionRevision;}
@@ -1391,9 +1591,10 @@ export class World {
     if(data&&typeof data==='object')settleStorage(data);
     if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
     const world=new World(data.seed);
-    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','bossNight','guardsDay','best','roamTimer'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','bossNight','guardsDay','best','roamTimer','hostile','arena','radius'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    if(world.arena){world.nodes=[];}if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0))world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
-    for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];}
+    for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.syncHotbar(p);}
     world.version=SAVE_VERSION_V2;world.clock=CLOCK_V2;
     for(const change of data.nodeChanges||[]){const node=world.nodes.find(entry=>entry.id===change.id);if(node){node.hits=change.hits;node.ready=change.ready;}}
     if(typeof data.worldId==='string')world.networkId=data.worldId;

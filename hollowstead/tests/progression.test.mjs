@@ -4,7 +4,7 @@ import {World, makeMap, biome} from '../src/engine.mjs';
 import {RULES, NODES, ENEMIES, EQUIPMENT} from '../src/content.mjs';
 import {
   CACHE_LAYOUT, CACHE_TYPES, REGIONS, RESIDENTS, LOOT_TABLES, rollLoot, regionAt, tierAt, xpToNext, maxHealth,
-  enemyScale, waveSize, nightRoster, isBossNight, rarityOf, WEAPON_STYLES,
+  ELITE, enemyScale, waveSize, nightRoster, isBossNight, rarityOf, WEAPON_STYLES,
 } from '../src/progression.mjs';
 import {countItem, itemDefinition, equipmentSlotFor} from '../src/inventory.mjs';
 
@@ -130,8 +130,9 @@ test('armour tiers absorb more damage',()=>{
 });
 
 test('the curve starts gentle and hardens every day; the king returns every fifth night',()=>{
-  assert.equal(waveSize(1,1),2);
-  assert.ok(waveSize(5,1)>waveSize(2,1));
+  assert.equal(waveSize(1,1),3);
+  assert.ok(waveSize(5,1)>waveSize(2,1)+5);
+  assert.ok(waveSize(3,4)>waveSize(3,1));
   assert.ok(enemyScale(6).hp>enemyScale(2).hp);
   assert.deepEqual(nightRoster(1).map(([id])=>id),['crawler']);
   assert.ok(nightRoster(8).some(([id])=>id==='golem'));
@@ -139,9 +140,11 @@ test('the curve starts gentle and hardens every day; the king returns every fift
   const {w}=camp();
   w.time=RULES.cycle*6+10;
   const tough=w.spawnEnemy('crawler',10,10,{elite:false});
-  assert.ok(tough.hp>ENEMIES.crawler.hp*1.9);
+  assert.ok(tough.hp>=Math.round(ENEMIES.crawler.hp*enemyScale(7).hp)&&tough.hp>ENEMIES.crawler.hp*1.5);
   const elite=w.spawnEnemy('crawler',10,12,{elite:true});
-  assert.ok(elite.hp>tough.hp*2);assert.equal(elite.elite,true);
+  assert.ok(elite.hp>=Math.floor(tough.hp*ELITE.hp));assert.equal(elite.elite,true);
+  // Swarms over tanks: numbers grow faster than any one creature's health.
+  assert.ok(waveSize(10,1)/waveSize(2,1)>enemyScale(10).hp/enemyScale(2).hp);
 });
 
 test('guards wait beside unopened caches, stay near home, and drop better loot',()=>{

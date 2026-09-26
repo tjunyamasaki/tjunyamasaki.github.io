@@ -5,8 +5,8 @@
 // schedule, used only to migrate a saved campaign. Do not import World, the DOM,
 // the network, or a renderer from here.
 
-import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-16';
-import {magicItems} from './magic/registry.mjs?v=harvest-16';
+import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-17';
+import {magicItems} from './magic/registry.mjs?v=harvest-17';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 
@@ -60,6 +60,8 @@ export const CHEST_RENEW_SECONDS = 3;
 export const DISMANTLE_HOLD_SECONDS = 0.8;
 
 export const EQUIPMENT_SLOTS = Object.freeze(['chop', 'mine', 'weapon', 'body', 'light']);
+/** Quick-swap weapon slots. Each holds the uid of a weapon the wanderer carries or wears. */
+export const HOTBAR_SLOTS = 3;
 export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
   chop: Object.freeze(['axe']),
   mine: Object.freeze(['pick']),

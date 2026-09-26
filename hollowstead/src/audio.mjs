@@ -1,5 +1,5 @@
 // Optional theme files replace these small synthesized cues without simulation changes.
-import {cachedSrc} from './assets.mjs?v=harvest-16';
+import {cachedSrc} from './assets.mjs?v=harvest-17';
 export class Sound {
   constructor(theme){this.theme=theme;this.enabled=true;this.context=null;this.last=0;this.clips=new Map();}
   unlock(){if(!this.enabled)return;try{this.context??=new (window.AudioContext||window.webkitAudioContext)();void this.context.resume();}catch{}}
@@ -14,7 +14,7 @@ export class Sound {
       }
       return;
     }
-    const tones={hit:[130,70,.1,'triangle'],swing:[180,60,.12,'sawtooth'],hurt:[100,40,.22,'sawtooth'],loot:[500,850,.16,'sine'],craft:[420,650,.22,'triangle'],build:[180,550,.35,'triangle'],heal:[600,950,.2,'sine'],phase:[330,110,.7,'sine'],kill:[160,55,.25,'triangle'],dash:[250,90,.12,'sine'],bolt:[720,180,.16,'sine'],impact:[70,30,.35,'triangle']};
+    const tones={hit:[130,70,.1,'triangle'],swing:[180,60,.12,'sawtooth'],hurt:[100,40,.22,'sawtooth'],loot:[500,850,.16,'sine'],craft:[420,650,.22,'triangle'],build:[180,550,.35,'triangle'],heal:[600,950,.2,'sine'],phase:[330,110,.7,'sine'],kill:[160,55,.25,'triangle'],dash:[250,90,.12,'sine'],bolt:[720,180,.16,'sine'],impact:[70,30,.35,'triangle'],dodge:[900,1500,.14,'sine'],swap:[520,380,.07,'square'],rankup:[520,1040,.32,'triangle'],portal:[140,260,.3,'sine'],quake:[55,28,.42,'triangle'],splat:[210,90,.18,'sine'],charge:[160,320,.2,'sawtooth']};
     const [from,to,duration,wave]=tones[type]||[300,400,.15,'sine'];const osc=this.context.createOscillator(),gain=this.context.createGain();osc.type=wave;osc.frequency.setValueAtTime(from,t);osc.frequency.exponentialRampToValueAtTime(to,t+duration);gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.065,t+.012);gain.gain.exponentialRampToValueAtTime(.0001,t+duration);osc.connect(gain);gain.connect(this.context.destination);osc.start(t);osc.stop(t+duration+.01);
   }
 }

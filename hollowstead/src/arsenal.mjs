@@ -3,15 +3,15 @@
 // World.strike for hits (kill credit, knockback, aggro, floating numbers), World.event for
 // presentation, and plain arrays on the world (allies, zones, projectiles) for anything that
 // lives longer than one swing. Numbers come from WEAPON_STYLES in progression.mjs.
-import {RULES} from './content.mjs?v=harvest-16';
-import {ALLIES, maxHealth, powerOf} from './progression.mjs?v=harvest-16';
-import {isMagicAlly} from './magic/registry.mjs?v=harvest-16';
+import {RULES} from './content.mjs?v=harvest-17';
+import {ALLIES, maxHealth, powerOf} from './progression.mjs?v=harvest-17';
+import {isMagicAlly} from './magic/registry.mjs?v=harvest-17';
 
 const dist = (a, b) => Math.hypot((a.x||0)-(b.x||0), (a.z||0)-(b.z||0));
 const hostiles = w => w.enemies.filter(e => !isMagicAlly(e) && e.hp > 0);
 const bossy = e => e.type === 'king' || e.type === 'golem';
 const facing = p => {const l = Math.hypot(p.dx||0, p.dz||0)||1; return {x: (p.dx||0)/l, z: (p.dz||0)/l};};
-function clampToMap(o){const r = Math.hypot(o.x, o.z), R = RULES.radius-1.2; if(r > R){o.x *= R/r; o.z *= R/r;}}
+function clampToMap(o, w){const r = Math.hypot(o.x, o.z), R = (w?.radius || RULES.radius)-1.2; if(r > R){o.x *= R/r; o.z *= R/r;}}
 
 /** Nearest hostile in range, preferring ones in front of the wanderer. */
 export function aimTarget(w, p, range, from = p){
@@ -129,7 +129,7 @@ function summon(w, p, type, x, z, damage){
   const hp = Math.round(def.hp*(def.scales ? power : 1));
   const ally = {id: w.nextId('al'), type, owner: p.id, x, z, hp, maxHp: hp, damage, age: 0, life: def.life,
     cooldown: .3, facing: (p.dx||1) < 0 ? -1 : 1, anim: 'idle', swing: 0, spawn: 0};
-  clampToMap(ally);
+  clampToMap(ally, w);
   (w.allies ||= []).push(ally);
   w.event('summon', ally.x, ally.z, '', {kind: type});
   return ally;
@@ -246,7 +246,7 @@ function stepAllies(w, dt, obstacles, foes){
     if(dist(a, owner) > def.leash){a.x = owner.x+(a.x-owner.x)*.5; a.z = owner.z+(a.z-owner.z)*.5;}
     if(goal){
       const d = Math.max(.01, dist(goal, a)), vx = (goal.x-a.x)/d*speed, vz = (goal.z-a.z)/d*speed;
-      if(def.fly){a.x += vx*dt; a.z += vz*dt; clampToMap(a);} else if(!w.move(a, vx, vz, dt, obstacles)) w.move(a, -vz, vx, dt, obstacles);
+      if(def.fly){a.x += vx*dt; a.z += vz*dt; clampToMap(a, w);} else if(!w.move(a, vx, vz, dt, obstacles)) w.move(a, -vz, vx, dt, obstacles);
       if(Math.abs(vx) > .05) a.facing = vx < 0 ? -1 : 1;
       if(a.swing <= 0) a.anim = 'walk';
     }

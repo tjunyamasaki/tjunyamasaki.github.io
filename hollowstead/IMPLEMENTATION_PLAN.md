@@ -1734,3 +1734,25 @@ Compatibility/migration notes:
 - Pack stays 12 slots. Chests stay 24. Weapon rules, night length, and pickup are unchanged. Clock stays day 180, dusk 30, night 100.
 - Hard refresh with style.css?v=harvest-15 and src/main.mjs?v=harvest-15.
 Exact next task: P6 — Integration and release. Do not start P6.
+
+Date: 2026-09-26
+Package / agent: Battle update (combat feel, swarm balance, weapon hotbar, battle arena). P6 was not started.
+Starting commit: 2e5c005 (main)
+Ending commit: uncommitted working tree in the user's folder
+Files changed: new src/mobs.mjs (creature movement, flow-field pathing, attack patterns, hostile shots), src/arena.mjs (arena waves and picks), src/ui/arena.mjs (hotbar and pick views), tests/battle.test.mjs; engine, content, progression, contracts, transactions, lighting, both renderers, main, ui/actions, audio, showcase, index.html, style.css, tools/balance/duel.mjs, README, docs/WEAPONS.md, docs/GAMEPLAY_PLAN.md. Cache query harvest-17.
+Implemented behavior:
+- Creatures: each type has a role and a telegraphed attack. Briarling bite (circle, .42s), Bonewalker line charge or swipe with hit-and-run, Lantern wraith orbs (a fan of three from level 6), Bogling lobbed spore that leads you, Gravekeeper 110° slam cone (1s, knockback), Moonshard golem quake ring (1.2s) plus eight shards, Hollow King cycling quake, two orb rings and summoned briarlings. Velocity steering with per-type acceleration, crowd spacing, flanking, jittered cadence. Flow fields (Dijkstra, 0.5-unit cells, 32-unit window) around each wanderer and the Heartfire, rebuilt at most three per tick; creatures walk straight when the straight line is the shortest path. Walls are clawed only when there is no way round.
+- Balance: quantity over toughness. Briarling 24 hp, 6 damage; big slow creatures hit hardest. Night waves 3 on night 1, about two more a day, cap 40 per wave and 48 alive. Health +10%/day, damage +7%/day, elites 1.8×/1.25× up to 18%. Guards 2/3/4 per cache tier; residents roam in packs.
+- Combat: auto-aim for every weapon style and Gravecraft pack (reach per weapon, sticky lock, threat priority, lead for shots, melee step-in assist), facing kept on the foe for .5s while running, optional auto-attack (menu, on by default; keeps dodge stamina on expeditions). Dodge is a 3.4-unit dash over .18s with .32s i-frames; a blow inside the i-frames is a perfect dodge (Dodged!, dodge back after .15s, +12 stamina). Hostile shots respect i-frames.
+- Hotbar: three weapon slots (uids) per player, auto-filled from the pack, the worn weapon is the active slot, `hotbar` action (allowed mid-cooldown, whitelisted for guests), auto-swap when a weapon breaks, R/Tab cycles.
+- Battle arena: title button or ?arena. Radius-22 bare disc, no night. Pick 1 of 3 weapons before each wave (starters: one close, one far, one bursting), duplicates rank up (+22% damage per rank, max 5), a full hotbar asks which weapon to give up. Waves 12+5w+.3w² creatures from the wall in packs, champions every 5th wave, the Hollow King every 10th. Heal 35% between waves; arena levels +12 hp and +6% damage; XP ×1.6. No hunger, courage, stamina, durability, loot or save.
+- Performance: trees and rocks in a cached 4-unit spatial hash (move() no longer scans every node), pooled telegraph meshes and shot sprites, damage labels capped at 36, network snapshots drop host-only creature fields and round numbers (123 creatures: 54 KB → 19 KB).
+Tests and device checks actually run:
+- node --test hollowstead/tests/*.test.mjs: 163 pass, 0 fail (19 new in battle.test.mjs).
+- node tools/balance/duel.mjs at level 5: every weapon within ±15% of target except the scythe (+20%). Spear, blade, longbow, cinder staff and spirit fan retuned.
+- Headless Chromium (WebGL via SwiftShader and the Canvas fallback) at 844×390 landscape and 390×844 portrait: arena pick, full hotbar replace, fight with telegraphs and orbs, dash afterimages, end screen, Fight again, menu, return to title. No console errors. A physical phone was not used.
+- Simulation: 64 creatures ≈ 0.3 ms per tick on the dev container; an automated arena player reaches waves 5–10.
+Compatibility/migration notes:
+- Old saves load: players get an empty hotbar filled from their pack; old creatures without the new fields keep working.
+- Hard refresh with style.css?v=harvest-17 and src/main.mjs?v=harvest-17.
+Exact next task: playtest nights 5+ on a phone; a lone wanderer without walls takes about twice the damage it used to on the King's night.

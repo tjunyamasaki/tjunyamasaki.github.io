@@ -194,3 +194,61 @@
   #joystick{margin:0 0 24px 24px}
   #action-cluster{margin:0 24px 24px 0}
 }
+/* Battle update: weapon hotbar, dodge cooldown, arena HUD and weapon picks. */
+.weapon-bar{display:flex;gap:4px;align-items:center;padding-right:6px;margin-right:2px;border-right:1px solid #dac29a33}
+.hotbar .weapon-slot{position:relative;width:50px;min-width:50px;height:48px;min-height:48px;padding:3px;display:grid;place-items:center;border:1px solid #dac29a40;border-radius:9px;background:#211c2855;touch-action:none;user-select:none}
+.hotbar .weapon-slot .item-icon{width:36px;height:36px;object-fit:contain;pointer-events:none}
+.hotbar .weapon-slot.active{border-color:var(--orange);background:#8d6c4355;box-shadow:0 0 0 1px var(--orange) inset,0 0 10px #edb47a55}
+.hotbar .weapon-slot.empty{opacity:.55;border-style:dashed}
+.hotbar .weapon-slot.empty>span{font-size:16px;color:var(--muted)}
+.hotbar .weapon-slot .rank{position:absolute;left:0;right:0;bottom:1px;margin:0;font-size:7px;letter-spacing:-.5px;color:#f2c14e;text-shadow:0 1px 2px #120f16;text-align:center;pointer-events:none}
+#action-cluster #attack.armed .item-icon{width:32px;height:32px;object-fit:contain;pointer-events:none;margin-top:-2px}
+#action-cluster #attack.armed small{margin-top:0}
+#action-cluster #dodge{position:relative}
+#action-cluster #dodge::after{content:"";position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(#bfe0ffcc calc(var(--cd,0) * 1turn),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));pointer-events:none}
+.world-label.dodge-label{font-size:17px;letter-spacing:.6px;color:#bfe8ff}
+body.arena .vital.hunger,body.arena .vital.courage,body.arena #hotbar-inventory,body.arena #hotbar-build,body.arena #action-cluster .stamina-track,body.arena #lantern-button{display:none}
+body.arena .weapon-bar{border-right:0;padding-right:0;margin-right:0}
+body.arena .hotbar .weapon-slot{width:56px;min-width:56px;height:54px;min-height:54px}
+body.arena .hotbar .weapon-slot .item-icon{width:40px;height:40px}
+#arena-pick{position:fixed;inset:0;z-index:58;display:grid;place-items:center;background:#1e1929c4;backdrop-filter:blur(5px);padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));pointer-events:auto;overflow:auto}
+#arena-pick[hidden]{display:none}
+.pick-card-wrap{width:min(760px,100%);text-align:center}
+.pick-card-wrap h2{margin:4px 0 12px;font-size:26px}
+.arena-offers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;transition:opacity .15s}
+.arena-offers.dim{opacity:.35;pointer-events:none}
+.pick-card{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:0;padding:14px 10px 12px;border:1px solid #dac29a55;border-radius:12px;background:#2e2835f2;color:var(--cream);text-align:center;box-shadow:0 10px 26px #17111f66}
+.pick-card:hover,.pick-card:focus-visible{border-color:var(--orange);transform:translateY(-2px)}
+.pick-card b{font-size:15px}
+.pick-card .pick-icon .item-icon{width:64px;height:64px;object-fit:contain}
+.pick-rarity{font:9px ui-monospace,monospace;letter-spacing:1.4px;color:var(--muted)}
+.pick-blurb{font-size:12px;line-height:1.35;color:var(--muted)}
+.pick-badge{position:absolute;top:8px;left:8px;font:9px ui-monospace,monospace;letter-spacing:1px;padding:2px 6px;border-radius:6px;background:#8fd3a033;color:#b8f0c6}
+.pick-badge.rank{background:#f2c14e33;color:#f6d27a}
+.pick-card.rarity-uncommon{border-color:#8fd3a088}.pick-card.rarity-rare{border-color:#79b8ffaa}.pick-card.rarity-epic{border-color:#c49bffaa;box-shadow:0 10px 26px #17111f66,0 0 16px #c49bff33}.pick-card.rarity-legendary{border-color:#f2c14ecc;box-shadow:0 10px 26px #17111f66,0 0 20px #f2c14e44}
+.pick-card.rarity-uncommon .pick-rarity{color:#8fd3a0}.pick-card.rarity-rare .pick-rarity{color:#79b8ff}.pick-card.rarity-epic .pick-rarity{color:#c49bff}.pick-card.rarity-legendary .pick-rarity{color:#f2c14e}
+.arena-replace{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:#29232ff2}
+.arena-replace p{margin:0 0 8px;font-size:13px}
+.replace-row{display:flex;justify-content:center;gap:8px}
+.replace-slot{display:flex;flex-direction:column;align-items:center;gap:2px;width:96px;min-height:74px;padding:6px}
+.replace-slot .item-icon{width:40px;height:40px;object-fit:contain}
+.replace-slot small{font-size:10px;line-height:1.2}
+.replace-tools{display:flex;justify-content:center;gap:8px;margin-top:8px}
+.replace-tools button{min-height:44px}
+@media(max-height:520px){
+  .pick-card-wrap h2{font-size:20px;margin:2px 0 8px}
+  .pick-card{padding:10px 8px 8px;gap:2px}
+  .pick-card .pick-icon .item-icon{width:48px;height:48px}
+  .pick-blurb{font-size:11px}
+  .arena-replace{margin-top:8px;padding:8px}
+  .replace-slot{min-height:60px}
+}
+@media(max-width:600px){
+  .arena-offers{grid-template-columns:1fr}
+  .pick-card{flex-direction:row;text-align:left;align-items:center;gap:10px;padding:10px}
+  .pick-card .pick-icon .item-icon{width:48px;height:48px}
+  .pick-badge{top:6px;left:auto;right:8px}
+  .hotbar .weapon-slot{width:44px;min-width:44px}
+}
+.world-label.swap-label{font-size:11px;font-weight:400;letter-spacing:.8px;color:var(--cream);opacity:.9}
+#arena-pick .arena-menu{position:absolute;top:max(10px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));min-height:44px;padding:8px 12px;z-index:1}

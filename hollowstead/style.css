@@ -188,3 +188,8 @@
 .item-icon.rarity-legendary{filter:drop-shadow(0 2px 0 #2b2233b0) drop-shadow(0 0 6px #f2c14e)}
 .map-legend .swatch{display:inline-block;width:9px;height:7px;border:1px solid #1e1624;margin:0 3px 0 6px;vertical-align:middle}
 @media(max-width:600px){.level-ring{width:30px;height:30px}.level-chip b{font-size:12px}}
+/* Landscape phone: lift the movement pad and action cluster off the corners. */
+@media(max-height:520px) and (min-width:601px){
+  #joystick{margin:0 0 24px 24px}
+  #action-cluster{margin:0 24px 24px 0}
+}

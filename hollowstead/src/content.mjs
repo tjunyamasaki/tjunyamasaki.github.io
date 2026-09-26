@@ -1,4 +1,4 @@
-import {magicItems} from './magic/registry.mjs?v=harvest-15';
+import {magicItems} from './magic/registry.mjs?v=harvest-16';
 // Simulation identifiers are deliberately independent of art, names and animations.
 const DAY=180, DUSK=30, NIGHT=100;
 export const RULES = Object.freeze({version:1, tick:1/20, radius:42, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2, finalNight:5});

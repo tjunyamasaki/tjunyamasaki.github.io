@@ -1,15 +1,15 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
-import {STRUCTURES, RULES} from './content.mjs?v=harvest-15';
-import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-15';
-import {equippedLanternLit, itemSpriteKey} from './inventory.mjs?v=harvest-15';
-import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-15';
-import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-15';
-import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-15';
-import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-15';
+import {STRUCTURES, RULES} from './content.mjs?v=harvest-16';
+import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-16';
+import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-16';
+import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-16';
+import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-16';
+import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-16';
+import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-16';
 import {
   brightnessAt, canInspect, entityBrightness, frameLighting, labelOpacity, shadeHex, warningVisible,
-} from './lighting.mjs?v=harvest-15';
+} from './lighting.mjs?v=harvest-16';
 export class CanvasRenderer {
   constructor(canvas,theme){
     this.canvas=canvas;this.theme=theme;this.magicClock=new MagicClock();this.magicActors=new Map();this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');
@@ -45,7 +45,7 @@ export class CanvasRenderer {
     if(kind==='building'&&['hearth','fire'].includes(key)&&e.fuel<=0)display*=0.45;
     if(kind==='held')display=display*.75+.25;
     const fade=labelOpacity(display, frame.darkness, frame.lighting);
-    c.save();c.globalAlpha=e.ghost?.4:key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):key==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
+    c.save();c.globalAlpha=e.ghost?.4:key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
     if(kind!=='held'){c.fillStyle='#211b2b30';c.beginPath();c.ellipse(ground.x,ground.y,w*.26,w*.10,0,0,Math.PI*2);c.fill();}
     c.translate(s.x,s.y-bob);
     if(e.pose){c.rotate(-e.pose.rotation);c.scale(e.pose.side,1);}
@@ -100,7 +100,7 @@ export class CanvasRenderer {
     if(target&&!placement){const fade=this.reveal(target.x, target.z);if(fade>0.05){c.save();c.globalAlpha=fade;c.setLineDash([5,4]);c.lineDashOffset=-this.clock*6;this.ellipse(target.x,target.z,1,'#edc48c',false);c.setLineDash([]);c.restore();}}
     if(p.goal){const fade=Math.max(this.reveal(p.goal.x, p.goal.z), distance(p, p.goal)<8?.28:0);if(fade>0.04){c.save();c.globalAlpha=fade;this.ellipse(p.goal.x,p.goal.z,.2,'#eadaba',false);c.restore();}}
     for(const e of world.enemies)if(e.windup>0){const radius=e.type==='king'?4:1.9;if(!warningVisible(frame, e.tx, e.tz, radius, p))continue;const alpha=frame.darkness>0.5?.16:.28;this.ellipse(e.tx,e.tz,radius,`rgba(240,118,100,${alpha+Math.sin(this.clock*12)*.04})`);this.ellipse(e.tx,e.tz,radius,`rgba(241,149,123,${frame.darkness>0.5?.45:.8})`,false);}
-    const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:e.type,kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
+    const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
     const drawn=entities.map(entry=>{
       if(entry.key==='gravecraft-skeleton'){
         const last=this.magicActors.get(entry.e.id)||{x:entry.e.x,z:entry.e.z};

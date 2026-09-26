@@ -1,4 +1,4 @@
-import {isMagicAlly} from './registry.mjs?v=harvest-15';
+import {isMagicAlly} from './registry.mjs?v=harvest-16';
 
 export const BELL = Object.freeze({delay: .28, travel: .65, linger: .32, radius: 5, damage: 9, push: 1.2, cooldown: 2.4});
 export const magicPack = {

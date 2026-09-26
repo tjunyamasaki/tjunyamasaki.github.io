@@ -9,8 +9,8 @@ export const GRAVECRAFT = Object.freeze({
 });
 
 export const MAGIC_PALETTE = Object.freeze({
-  ink: '#292332', spirit: '#9ce7c3', core: '#fff3cf', shade: '#3d897a',
-  ember: '#edaf69', bronze: '#b98d54', silk: '#d2bbdf', cloth: '#793e53',
+  ink: '#2b2233', spirit: '#7fd6c4', core: '#d4fff5', shade: '#45a394',
+  ember: '#e8b04a', bronze: '#b98d54', silk: '#d2bbdf', cloth: '#8f3a3f',
 });
 
 export function gravecraftSprite(id){

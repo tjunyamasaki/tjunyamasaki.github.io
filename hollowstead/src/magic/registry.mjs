@@ -1,6 +1,6 @@
 // Mutable registry for magic weapons. Modules register at startup.
 // The engine stays the authority for damage, knockback, burns, and roots.
-import {GRAVECRAFT, gravecraftSprite, skeletonSprite} from './art.mjs?v=harvest-15';
+import {GRAVECRAFT, gravecraftSprite, skeletonSprite} from './art.mjs?v=harvest-16';
 
 export const magicItems = Object.create(null);
 export const magicModules = [];

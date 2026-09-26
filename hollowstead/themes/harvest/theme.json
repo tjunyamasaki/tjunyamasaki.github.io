@@ -30,7 +30,7 @@
   "audio": {},
   "sprites": {
     "tree": {
-      "src": "./sprites/tree.svg",
+      "src": "./sprites/tree.svg?v=art2",
       "size": [
         4.1,
         6.15
@@ -48,10 +48,14 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "variants": [
+        "tree",
+        "tree-dead"
+      ]
     },
     "rock": {
-      "src": "./sprites/rock.svg",
+      "src": "./sprites/rock.svg?v=art2",
       "size": [
         2.8,
         4.2
@@ -69,10 +73,15 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "variants": [
+        "rock",
+        "rock",
+        "rock-rune"
+      ]
     },
     "ore": {
-      "src": "./sprites/ore.svg",
+      "src": "./sprites/ore.svg?v=art2",
       "size": [
         2.8,
         4.2
@@ -93,7 +102,7 @@
       }
     },
     "grass": {
-      "src": "./sprites/grass.svg",
+      "src": "./sprites/grass.svg?v=art2",
       "size": [
         1.5,
         2.25
@@ -111,10 +120,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/grass-icon.svg?v=art2"
     },
     "bush": {
-      "src": "./sprites/bush.svg",
+      "src": "./sprites/bush.svg?v=art2",
       "size": [
         2.4,
         3.6
@@ -135,7 +145,7 @@
       }
     },
     "pumpkin": {
-      "src": "./sprites/pumpkin.svg",
+      "src": "./sprites/pumpkin.svg?v=art2",
       "size": [
         2.1,
         3.15
@@ -153,10 +163,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/pumpkin-icon.svg?v=art2"
     },
     "mushroom": {
-      "src": "./sprites/mushroom.svg",
+      "src": "./sprites/mushroom.svg?v=art2",
       "size": [
         1.5,
         2.25
@@ -174,10 +185,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/mushroom-icon.svg?v=art2"
     },
     "grave": {
-      "src": "./sprites/grave.svg",
+      "src": "./sprites/grave.svg?v=art2",
       "size": [
         2.3,
         3.45
@@ -198,7 +210,7 @@
       }
     },
     "fire": {
-      "src": "./sprites/fire.svg",
+      "src": "./sprites/fire.svg?v=art2",
       "size": [
         2.6,
         3.9
@@ -207,19 +219,23 @@
         0.5,
         0.04
       ],
-      "columns": 1,
+      "columns": 4,
       "rows": 1,
       "clips": {
         "idle": {
           "frames": [
-            0
+            0,
+            1,
+            2,
+            3
           ],
-          "fps": 1
+          "fps": 7
         }
-      }
+      },
+      "icon": "./sprites/fire-icon.svg?v=art2"
     },
     "hearth": {
-      "src": "./sprites/hearth.svg",
+      "src": "./sprites/hearth.svg?v=art2",
       "size": [
         3.5,
         5.25
@@ -228,19 +244,23 @@
         0.5,
         0.04
       ],
-      "columns": 1,
+      "columns": 4,
       "rows": 1,
       "clips": {
         "idle": {
           "frames": [
-            0
+            0,
+            1,
+            2,
+            3
           ],
-          "fps": 1
+          "fps": 7
         }
-      }
+      },
+      "icon": "./sprites/hearth-icon.svg?v=art2"
     },
     "bench": {
-      "src": "./sprites/bench.svg",
+      "src": "./sprites/bench.svg?v=art2",
       "size": [
         2.6,
         3.9
@@ -261,7 +281,7 @@
       }
     },
     "chest": {
-      "src": "./sprites/chest.svg",
+      "src": "./sprites/chest.svg?v=art2",
       "size": [
         2.3,
         3.45
@@ -282,7 +302,7 @@
       }
     },
     "wall": {
-      "src": "./sprites/wall.svg",
+      "src": "./sprites/wall.svg?v=art2",
       "size": [
         2.4,
         3.6
@@ -303,7 +323,7 @@
       }
     },
     "gate": {
-      "src": "./sprites/gate.svg",
+      "src": "./sprites/gate.svg?v=art2",
       "size": [
         2.4,
         3.6
@@ -324,7 +344,7 @@
       }
     },
     "trap": {
-      "src": "./sprites/trap.svg",
+      "src": "./sprites/trap.svg?v=art2",
       "size": [
         2,
         3
@@ -345,7 +365,7 @@
       }
     },
     "farm": {
-      "src": "./sprites/farm.svg",
+      "src": "./sprites/farm.svg?v=art2",
       "size": [
         2.8,
         4.2
@@ -366,7 +386,7 @@
       }
     },
     "pot": {
-      "src": "./sprites/pot.svg",
+      "src": "./sprites/pot.svg?v=art2",
       "size": [
         2.5,
         3.75
@@ -375,19 +395,23 @@
         0.5,
         0.04
       ],
-      "columns": 1,
+      "columns": 4,
       "rows": 1,
       "clips": {
         "idle": {
           "frames": [
-            0
+            0,
+            1,
+            2,
+            3
           ],
-          "fps": 1
+          "fps": 4
         }
-      }
+      },
+      "icon": "./sprites/pot-icon.svg?v=art2"
     },
     "lantern": {
-      "src": "./sprites/lantern.svg",
+      "src": "./sprites/lantern.svg?v=art2",
       "size": [
         1.9,
         2.85
@@ -396,19 +420,23 @@
         0.5,
         0.04
       ],
-      "columns": 1,
+      "columns": 4,
       "rows": 1,
       "clips": {
         "idle": {
           "frames": [
-            0
+            0,
+            1,
+            2,
+            3
           ],
-          "fps": 1
+          "fps": 5
         }
-      }
+      },
+      "icon": "./sprites/lantern-icon.svg?v=art2"
     },
     "bed": {
-      "src": "./sprites/bed.svg",
+      "src": "./sprites/bed.svg?v=art2",
       "size": [
         2.5,
         3.75
@@ -429,7 +457,7 @@
       }
     },
     "ward": {
-      "src": "./sprites/ward.svg",
+      "src": "./sprites/ward.svg?v=art2",
       "size": [
         2.6,
         3.9
@@ -438,19 +466,23 @@
         0.5,
         0.04
       ],
-      "columns": 1,
+      "columns": 4,
       "rows": 1,
       "clips": {
         "idle": {
           "frames": [
-            0
+            0,
+            1,
+            2,
+            3
           ],
-          "fps": 1
+          "fps": 4
         }
-      }
+      },
+      "icon": "./sprites/ward-icon.svg?v=art2"
     },
     "crawler": {
-      "src": "./sprites/crawler.svg",
+      "src": "./sprites/crawler.svg?v=art2",
       "size": [
         1.9,
         2.85
@@ -459,19 +491,37 @@
         0.5,
         0.04
       ],
-      "columns": 1,
-      "rows": 1,
+      "columns": 4,
+      "rows": 2,
       "clips": {
         "idle": {
           "frames": [
-            0
+            7
           ],
           "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 6
         }
       }
     },
     "wraith": {
-      "src": "./sprites/wraith.svg",
+      "src": "./sprites/wraith.svg?v=art2",
       "size": [
         2,
         3
@@ -480,19 +530,37 @@
         0.5,
         0.04
       ],
-      "columns": 1,
-      "rows": 1,
+      "columns": 4,
+      "rows": 2,
       "clips": {
         "idle": {
           "frames": [
-            0
+            7
           ],
           "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 6
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 6
         }
       }
     },
     "brute": {
-      "src": "./sprites/brute.svg",
+      "src": "./sprites/brute.svg?v=art2",
       "size": [
         2.6,
         3.9
@@ -501,19 +569,37 @@
         0.5,
         0.04
       ],
-      "columns": 1,
-      "rows": 1,
+      "columns": 4,
+      "rows": 2,
       "clips": {
         "idle": {
           "frames": [
-            0
+            7
           ],
           "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 5
         }
       }
     },
     "king": {
-      "src": "./sprites/king.svg",
+      "src": "./sprites/king.svg?v=art2",
       "size": [
         4.4,
         6.6
@@ -522,19 +608,37 @@
         0.5,
         0.04
       ],
-      "columns": 1,
-      "rows": 1,
+      "columns": 4,
+      "rows": 2,
       "clips": {
         "idle": {
           "frames": [
-            0
+            7
           ],
           "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 5
         }
       }
     },
     "wood": {
-      "src": "./sprites/wood.svg",
+      "src": "./sprites/wood.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -552,10 +656,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/wood-icon.svg?v=art2"
     },
     "stone": {
-      "src": "./sprites/stone.svg",
+      "src": "./sprites/stone.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -573,10 +678,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/stone-icon.svg?v=art2"
     },
     "ember": {
-      "src": "./sprites/ember.svg",
+      "src": "./sprites/ember.svg?v=art2",
       "size": [
         1.65,
         2.48
@@ -585,52 +691,62 @@
         0.5,
         0.04
       ],
-      "columns": 4,
-      "rows": 1,
+      "columns": 8,
+      "rows": 2,
       "clips": {
         "idle": {
           "frames": [
+            0,
+            0,
+            0,
+            1,
+            0,
             0
           ],
-          "fps": 1
+          "fps": 2
         },
         "walk": {
           "frames": [
-            1,
-            0,
             2,
-            0
+            3,
+            4,
+            5
           ],
           "fps": 9
         },
         "attack": {
           "frames": [
-            3
+            6,
+            7,
+            8
           ],
-          "fps": 1
+          "fps": 10
         },
         "gather": {
           "frames": [
-            3
+            9,
+            10,
+            11,
+            10
           ],
-          "fps": 1
+          "fps": 7
         },
         "dash": {
           "frames": [
-            1
+            12
           ],
           "fps": 1
         },
         "down": {
           "frames": [
-            2
+            13
           ],
           "fps": 1
         }
       }
     },
     "seed": {
-      "src": "./sprites/seed.svg",
+      "src": "./sprites/seed.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -648,10 +764,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/seed-icon.svg?v=art2"
     },
     "berry": {
-      "src": "./sprites/berry.svg",
+      "src": "./sprites/berry.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -669,10 +786,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/berry-icon.svg?v=art2"
     },
     "meat": {
-      "src": "./sprites/meat.svg",
+      "src": "./sprites/meat.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -690,10 +808,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/meat-icon.svg?v=art2"
     },
     "roast": {
-      "src": "./sprites/roast.svg",
+      "src": "./sprites/roast.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -711,10 +830,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/roast-icon.svg?v=art2"
     },
     "stew": {
-      "src": "./sprites/stew.svg",
+      "src": "./sprites/stew.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -732,10 +852,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/stew-icon.svg?v=art2"
     },
     "bandage": {
-      "src": "./sprites/bandage.svg",
+      "src": "./sprites/bandage.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -753,10 +874,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/bandage-icon.svg?v=art2"
     },
     "axe": {
-      "src": "./sprites/axe.svg",
+      "src": "./sprites/axe.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -774,10 +896,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/axe-icon.svg?v=art2"
     },
     "pick": {
-      "src": "./sprites/pick.svg",
+      "src": "./sprites/pick.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -795,10 +918,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/pick-icon.svg?v=art2"
     },
     "spear": {
-      "src": "./sprites/spear.svg",
+      "src": "./sprites/spear.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -816,10 +940,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/spear-icon.svg?v=art2"
     },
     "sword": {
-      "src": "./sprites/sword.svg",
+      "src": "./sprites/sword.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -837,10 +962,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/sword-icon.svg?v=art2"
     },
     "armor": {
-      "src": "./sprites/armor.svg",
+      "src": "./sprites/armor.svg?v=art2",
       "size": [
         1.1,
         1.65
@@ -858,10 +984,11 @@
           ],
           "fps": 1
         }
-      }
+      },
+      "icon": "./sprites/armor-icon.svg?v=art2"
     },
     "moss": {
-      "src": "./sprites/moss.svg",
+      "src": "./sprites/moss.svg?v=art2",
       "size": [
         1.65,
         2.48
@@ -870,52 +997,62 @@
         0.5,
         0.04
       ],
-      "columns": 4,
-      "rows": 1,
+      "columns": 8,
+      "rows": 2,
       "clips": {
         "idle": {
           "frames": [
+            0,
+            0,
+            0,
+            1,
+            0,
             0
           ],
-          "fps": 1
+          "fps": 2
         },
         "walk": {
           "frames": [
-            1,
-            0,
             2,
-            0
+            3,
+            4,
+            5
           ],
           "fps": 9
         },
         "attack": {
           "frames": [
-            3
+            6,
+            7,
+            8
           ],
-          "fps": 1
+          "fps": 10
         },
         "gather": {
           "frames": [
-            3
+            9,
+            10,
+            11,
+            10
           ],
-          "fps": 1
+          "fps": 7
         },
         "dash": {
           "frames": [
-            1
+            12
           ],
           "fps": 1
         },
         "down": {
           "frames": [
-            2
+            13
           ],
           "fps": 1
         }
       }
     },
     "vesper": {
-      "src": "./sprites/vesper.svg",
+      "src": "./sprites/vesper.svg?v=art2",
       "size": [
         1.65,
         2.48
@@ -924,52 +1061,62 @@
         0.5,
         0.04
       ],
-      "columns": 4,
-      "rows": 1,
+      "columns": 8,
+      "rows": 2,
       "clips": {
         "idle": {
           "frames": [
+            0,
+            0,
+            0,
+            1,
+            0,
             0
           ],
-          "fps": 1
+          "fps": 2
         },
         "walk": {
           "frames": [
-            1,
-            0,
             2,
-            0
+            3,
+            4,
+            5
           ],
           "fps": 9
         },
         "attack": {
           "frames": [
-            3
+            6,
+            7,
+            8
           ],
-          "fps": 1
+          "fps": 10
         },
         "gather": {
           "frames": [
-            3
+            9,
+            10,
+            11,
+            10
           ],
-          "fps": 1
+          "fps": 7
         },
         "dash": {
           "frames": [
-            1
+            12
           ],
           "fps": 1
         },
         "down": {
           "frames": [
-            2
+            13
           ],
           "fps": 1
         }
       }
     },
     "cinder": {
-      "src": "./sprites/cinder.svg",
+      "src": "./sprites/cinder.svg?v=art2",
       "size": [
         1.65,
         2.48
@@ -978,7 +1125,71 @@
         0.5,
         0.04
       ],
-      "columns": 4,
+      "columns": 8,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          "fps": 2
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 10
+        },
+        "gather": {
+          "frames": [
+            9,
+            10,
+            11,
+            10
+          ],
+          "fps": 7
+        },
+        "dash": {
+          "frames": [
+            12
+          ],
+          "fps": 1
+        },
+        "down": {
+          "frames": [
+            13
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "soul": {
+      "src": "./sprites/soul.svg?v=art2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
       "rows": 1,
       "clips": {
         "idle": {
@@ -986,47 +1197,36 @@
             0
           ],
           "fps": 1
-        },
-        "walk": {
+        }
+      },
+      "icon": "./sprites/soul-icon.svg?v=art2"
+    },
+    "tree-dead": {
+      "src": "./sprites/tree-dead.svg?v=art2",
+      "size": [
+        4.1,
+        6.15
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
           "frames": [
-            1,
-            0,
-            2,
             0
-          ],
-          "fps": 9
-        },
-        "attack": {
-          "frames": [
-            3
-          ],
-          "fps": 1
-        },
-        "gather": {
-          "frames": [
-            3
-          ],
-          "fps": 1
-        },
-        "dash": {
-          "frames": [
-            1
-          ],
-          "fps": 1
-        },
-        "down": {
-          "frames": [
-            2
           ],
           "fps": 1
         }
       }
     },
-    "soul": {
-      "src": "./sprites/soul.svg",
+    "rock-rune": {
+      "src": "./sprites/rock-rune.svg?v=art2",
       "size": [
-        1.1,
-        1.65
+        2.8,
+        4.2
       ],
       "anchor": [
         0.5,
@@ -1045,10 +1245,15 @@
     }
   },
   "motion": {
-    "walkBob": 0.08,
-    "walkTilt": 0.045,
-    "idleSway": 0.018,
+    "walkBob": 0.04,
+    "walkTilt": 0.02,
+    "idleSway": 0.01,
     "hitSquash": 0.16,
-    "attackTilt": 0.26
+    "attackTilt": 0.1
+  },
+  "art": {
+    "style": "Hollow Harvest ink",
+    "generator": "tools/art/build.py",
+    "legacy": "legacy/"
   }
 }

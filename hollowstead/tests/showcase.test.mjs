@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
 import {ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES} from '../src/content.mjs';
 import {makeStack} from '../src/inventory.mjs';
-import {collectMagicSprites, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-15';
+import {collectMagicSprites, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-16';
 import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseCategories, showcaseMarkup} from '../src/showcase.mjs';
 
 test('showcase catalog stays closed until Spawn and can be dismissed', () => {

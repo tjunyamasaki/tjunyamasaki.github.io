@@ -1,35 +1,37 @@
 # Gravecraft weapon collection
 
-The active Halloween magic set uses ivory bone, crooked blackthorn, tarnished bronze,
-burgundy cloth and pale mint ghostfire. Amber marks embers; pale lavender marks silk.
-Strong ink outlines and five different silhouettes keep items readable in small slots.
+The magic set now shares the Hollow Harvest ink style used by every theme sprite:
+plum ink outlines (`#2b2233`), flat fills with one crescent shadow, and tapered
+brush highlights. Blackthorn wood, ivory bone, burgundy cloth, bronze and pale
+mint ghostfire carry over from the first collection.
 
-These six transparent PNGs were generated with the built-in image-generation tool.
-`PROMPTS.json` records the exact prompts. Cinder Staff established the style reference.
-Original generated alpha and resolution are preserved. No external service, key,
-runtime image generator or animation dependency is required.
+The PNGs are drawn by `tools/art/magic.py` and written by `python3 tools/art/build.py`.
+They are RGBA, 512 x 512 for the five weapons. The allied skeleton is the approved
+chibi skeleton, animated in `skeleton.png`. The previous generated images and their
+prompts are kept in `legacy/assets/magic/`.
 
 | Asset | Use |
 | --- | --- |
-| cinder-staff.png | Inventory, showcase, dropped item, held crooked staff |
+| cinder-staff.png | Inventory, showcase, dropped item, held crooked staff with ghostfire |
 | barrow-rattle.png | Inventory, showcase, dropped item, held skull rattle |
-| widows-needle.png | Inventory, showcase, dropped item, held bone needle |
+| widows-needle.png | Inventory, showcase, dropped item, held bone needle with silk |
 | spirit-fan.png | Inventory, showcase, dropped item, held open fan |
 | mourning-bell.png | Inventory, showcase, dropped item, held bronze bell |
-| skeleton.png | One 4-column × 3-row atlas: idle, walk, attack; 4 cells per row |
+| skeleton.png | One 4-column x 3-row atlas: idle, walk, attack; 4 cells per row |
 
 ## Replacement contract
 
 `src/magic/art.mjs` is the default manifest: world size, grip anchor, atlas clips and
 held poses. Theme `sprites` entries with the same item IDs or `gravecraft-skeleton`
-take precedence. Assets are square including transparent padding; preserve that
-canvas or update size/anchor together. The skeleton atlas has 362 × 362 pixel cells.
+take precedence. Weapon assets are square including transparent padding; preserve that
+canvas or update size/anchor together. The skeleton atlas has 360 × 430 pixel cells, the
+same proportion as its 1.8 × 2.15 world size.
 
 `src/magic/effects.mjs` builds world-coordinate strokes, motes, silk bindings and
 arcs. `effects-three.mjs` consumes them in one reusable geometry buffer; the Canvas
 renderer consumes the same commands. No sprite panel contains a second weapon or
-player. The old four pack directories remain source history; their effects and
-per-frame skeleton PNGs are no longer preloaded by the active collection.
+player. The four pack directories remain source history (redrawn in the new style);
+their effects and per-frame skeleton PNGs are not preloaded by the active collection.
 
 Override `theme.magic.palette` keys `ink`, `spirit`, `core`, `shade`, `ember`, `bronze`,
 `silk`, `cloth`. Defaults live in `art.mjs`; `maxEffects` defaults to 48 active

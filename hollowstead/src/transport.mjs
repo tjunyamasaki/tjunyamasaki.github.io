@@ -1,4 +1,4 @@
-import {SNAPSHOT_CHUNK_CHARS, SNAPSHOT_MAX_CHUNKS, SEND_BUFFER_GUARD} from './contracts.mjs?v=harvest-15';
+import {SNAPSHOT_CHUNK_CHARS, SNAPSHOT_MAX_CHUNKS, SEND_BUFFER_GUARD} from './contracts.mjs?v=harvest-16';
 
 // A partially queued snapshot is always finished before starting a newer one.
 // bufferedamountlow resumes at exactly the unsent chunk; actions have priority.

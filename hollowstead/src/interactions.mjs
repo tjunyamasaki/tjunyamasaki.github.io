@@ -1,10 +1,10 @@
 // Pure action and recipe capabilities. Describes what a context allows.
 // Does not mutate a world, read the DOM, or decide that a UI click succeeded.
-import {NODES, RECIPES, label} from './content.mjs?v=harvest-15';
+import {NODES, RECIPES, label} from './content.mjs?v=harvest-16';
 import {
   CAULDRON_COOK_RECIPES, CONTEXT_ACTIONS, DISMANTLE_HOLD_SECONDS, FIELD_BUILD_RECIPES,
   FIRE_COOK_RECIPES, FIRE_STATION_TYPES, WORKBENCH_BUILD_RECIPES, WORKBENCH_CRAFT_RECIPES,
-} from './contracts.mjs?v=harvest-15';
+} from './contracts.mjs?v=harvest-16';
 
 export function harvestProfile(nodeType){
   const node=NODES[nodeType];

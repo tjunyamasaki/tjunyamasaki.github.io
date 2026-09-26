@@ -1,6 +1,6 @@
 import {World,clamp,distance,biome,EXPLORE_CELL,EXPLORE_SIZE} from './engine.mjs?v=harvest-16';
 import {RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-16';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-16';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt} from './content.mjs?v=harvest-16';
 import {Renderer,loadTheme} from './renderer.mjs?v=harvest-16';
 import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-16';
 import {createNetwork} from './network.mjs?v=harvest-16';
@@ -10,11 +10,11 @@ import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inve
 import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-16';
 import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-16';
 import {
-  allowsCombat,allowsMovement,clusterFor,effectLine,escapeStep,isHarvestAction,keyboardAction,
+  allowsCombat,allowsMovement,clusterFor,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
 } from './ui/actions.mjs?v=harvest-16';
 import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-16';
-import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-16';
+import {actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-16';
 import {loadMagicModules} from './magic/load.mjs?v=harvest-16';
 import {installMagicSprites} from './magic/registry.mjs?v=harvest-16';
 import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-16';
@@ -39,7 +39,7 @@ let localActions=null,localActionWorld=null,localClient=null;
 let chestSession=null,chestOpening=false,chestToken=0,chestRenewAt=0,chestRenewing=false;
 let catalog={source:'field',stationId:null,stationType:null,tab:'build'};
 let catalogPending='';
-let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,dropDraft=null,actionPending=false;
+let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,pendingOp=null,actionPending=false;
 let liveActions=[],holdKind=null,holdTarget=null,holdSource=null,dismantleStarted=0,ringFrame=0,captured=null;
 
 function profile(){try{return JSON.parse(localStorage.getItem(PROFILE)||'{}');}catch{return {};}}
@@ -141,7 +141,7 @@ function currentMode(){
 }
 function cancelPlacement(){placement=null;}
 function cancelMaintenance(){maintenance=false;maintenanceTarget=null;endContextHold();}
-function clearSelection(){selection=null;dropDraft=null;qtyMode='all';chosenQty=1;}
+function clearSelection(){selection=null;pendingOp=null;qtyMode='all';chosenQty=1;}
 function refresh(){dirty=true;ui();}
 function discardPanel(){inventoryPanel?.destroy();inventoryPanel=null;}
 function prepareWorld(resume=false){
@@ -324,7 +324,7 @@ function locateUid(p,uid){
   return null;
 }
 function chosenQuantity(stack){if(!stack)return 1;if(qtyMode==='all')return stack.quantity;return Math.min(stack.quantity,Math.max(1,chosenQty));}
-function selectKey(key){dropDraft=null;const loc=stackByKey(me(),key);if(!loc?.stack)return;const same=selection?.uid===loc.stack.uid;selection={uid:loc.stack.uid,key:loc.key,where:loc.where};if(!same){qtyMode='all';chosenQty=loc.stack.quantity;}refresh();}
+function selectKey(key){const loc=stackByKey(me(),key);if(!loc?.stack)return;const same=selection?.uid===loc.stack.uid;if(!same){pendingOp=null;qtyMode='all';chosenQty=loc.stack.quantity;}selection={uid:loc.stack.uid,key:loc.key,where:loc.where};refresh();}
 function containerInfo(p,loc){if(loc.where==='pack')return p.inventory;if(loc.where==='equipment')return {id:containerId('equipment',p.id),revision:p.equipmentRevision};if(loc.where==='recovery')return p.recovery;if(loc.where==='chest')return chestBuilding()?.store||null;if(loc.where==='overflow')return chestBuilding()?.overflow||null;return null;}
 async function withPending(cmd){actionPending=true;refresh();const result=await send(cmd);actionPending=false;if(selection&&!locateUid(me(),selection.uid))clearSelection();refresh();return result;}
 async function commitMove(from,to,quantity,{insert=false}={}){
@@ -333,7 +333,7 @@ async function commitMove(from,to,quantity,{insert=false}={}){
   const chestSide=from.where==='chest'||to.where==='chest'||from.where==='overflow';
   const cmd={type:chestSide?'chestTransfer':'inventoryMove',sourceContainerId:source.id,sourceSlot:from.slot,destinationContainerId:dest.id,destinationSlot:insert?null:to.slot,uid:from.stack.uid,quantity,sourceRevision:source.revision,destinationRevision:dest.revision};
   if(chestSide){if(!chestSession)return;Object.assign(cmd,chestSession);}
-  selection=null;dropDraft=null;
+  selection=null;pendingOp=null;
   await withPending(cmd);
 }
 async function onSlot(key,empty){
@@ -356,30 +356,24 @@ async function sortPack(){
 }
 async function organizeChest(op){
   const p=me(),chest=chestBuilding();if(!p||!chest||!chestSession||actionPending)return;
-  if(op!=='store'&&op!=='sort')return;
-  const type=op==='store'?'chestStoreAll':'chestSort';
+  if(op!=='store'&&op!=='stack'&&op!=='sort')return;
+  const type=op==='store'?'chestStoreAll':op==='stack'?'chestStack':'chestSort';
   const cmd={type,chestId:chestSession.chestId,sessionId:chestSession.sessionId,destinationRevision:chest.store.revision};
-  if(type==='chestStoreAll')cmd.inventoryRevision=p.inventory.revision;
+  if(type==='chestStoreAll'||type==='chestStack')cmd.inventoryRevision=p.inventory.revision;
   await withPending(cmd);
 }
 async function operate(op){
   const p=me();if(!p||actionPending)return;
-  if(op==='cancel-drop'){dropDraft=null;refresh();return;}
-  if(op==='confirm-drop'){
-    const draft=dropDraft;if(!draft)return;
-    dropDraft=null;selection=null;
-    const cmd={type:'dropItem',uid:draft.uid,quantity:draft.quantity,inventoryRevision:p.inventory.revision};
-    if(draft.where==='equipment')cmd.equipmentRevision=p.equipmentRevision;
-    await withPending(cmd);return;
-  }
   if(!selection)return;
   const loc=locateUid(p,selection.uid);if(!loc?.stack){clearSelection();dirty=true;return;}
-  if(op==='drop'){
-    const draft={uid:loc.stack.uid,quantity:chosenQuantity(loc.stack),where:loc.where,name:label(loc.stack.itemId)};
-    clearSelection();dropDraft=draft;refresh();return;
-  }
+  if(actionNeedsCount(op,loc.stack.quantity)&&pendingOp!==op){pendingOp=op;qtyMode='all';chosenQty=loc.stack.quantity;refresh();return;}
   const captured={uid:loc.stack.uid,socket:loc.socket,where:loc.where,quantity:chosenQuantity(loc.stack),itemId:loc.stack.itemId};
-  if(itemActionClearsSelection(op)){selection=null;dropDraft=null;}
+  if(itemActionClearsSelection(op)){selection=null;pendingOp=null;}
+  if(op==='drop'){
+    const cmd={type:'dropItem',uid:captured.uid,quantity:captured.quantity,inventoryRevision:p.inventory.revision};
+    if(captured.where==='equipment')cmd.equipmentRevision=p.equipmentRevision;
+    await withPending(cmd);return;
+  }
   if(op==='equip'){await withPending({type:'equipItem',uid:captured.uid,socket:equipmentSlotFor(captured.itemId),inventoryRevision:p.inventory.revision,equipmentRevision:p.equipmentRevision});return;}
   if(op==='unequip'){await withPending({type:'unequipItem',uid:captured.uid,socket:captured.socket,inventoryRevision:p.inventory.revision,equipmentRevision:p.equipmentRevision});return;}
   if(op==='eat'||op==='heal'){await withPending({type:'consumeItem',uid:captured.uid,inventoryRevision:p.inventory.revision});return;}
@@ -390,9 +384,9 @@ async function operate(op){
     await commitMove(loc,dest,captured.quantity,{insert:true});
   }
 }
-function onQuantity(op){const loc=selection&&locateUid(me(),selection.uid);if(!loc?.stack)return;qtyMode=op==='inc'||op==='dec'?'set':op;chosenQty=adjustQuantity(loc.stack.quantity,chosenQuantity(loc.stack),op);refresh();}
-function onShift(key){selectKey(key);if(!chestSession||!selection)return;qtyMode='all';const loc=locateUid(me(),selection.uid);if(loc)void operate('transfer');}
-function activateSelection(){if(!selection||dropDraft)return;const loc=locateUid(me(),selection.uid);if(!loc?.stack)return;const ops=operationsFor({itemId:loc.stack.itemId,where:loc.where,chestOpen:!!chestSession});const preferred=['transfer','equip','eat','heal','take','unequip'].find(op=>ops.includes(op));if(preferred)void operate(preferred);}
+function onQuantity(op){const loc=selection&&locateUid(me(),selection.uid);if(!loc?.stack||!pendingOp)return;qtyMode=op==='inc'||op==='dec'?'set':op;chosenQty=adjustQuantity(loc.stack.quantity,chosenQuantity(loc.stack),op);void operate(pendingOp);}
+function onShift(key){selectKey(key);if(!chestSession||!selection)return;pendingOp=null;qtyMode='all';const loc=locateUid(me(),selection.uid);if(loc)void operate('transfer');}
+function activateSelection(){if(!selection)return;if(pendingOp){void operate(pendingOp);return;}const loc=locateUid(me(),selection.uid);if(!loc?.stack)return;const ops=operationsFor({itemId:loc.stack.itemId,where:loc.where,chestOpen:!!chestSession});const preferred=['transfer','equip','eat','heal','take','unequip'].find(op=>ops.includes(op));if(preferred)void operate(preferred);}
 function ensurePanel(){
   if(inventoryPanel?.root?.isConnected)return;
   discardPanel();
@@ -403,7 +397,7 @@ function makeCell(key,stack,kind,index,mark=''){
   const equipped=kind==='socket'&&!!stack;
   const name=stack?label(stack.itemId):mark;
   const maxDurability=stack?stackMaxDurability(stack.itemId):null;
-  return {key,stack,mark,maxDurability,equipped,accept:kind!=='recovery',selected:!!(stack&&selection?.uid===stack.uid),iconHTML:stack?icon(stack.itemId):'',aria:slotLabel({empty:!stack,name,quantity:stack?.quantity||0,durability:stack?.durability??null,maxDurability,equipped,index,kind:kind==='socket'?'socket':kind})};
+  return {key,stack,mark,maxDurability,equipped,accept:kind!=='recovery',selected:!!(stack&&selection?.uid===stack.uid),tip:stack?label(stack.itemId):'',iconHTML:stack?icon(stack.itemId):'',aria:slotLabel({empty:!stack,name,quantity:stack?.quantity||0,durability:stack?.durability??null,maxDurability,equipped,index,kind:kind==='socket'?'socket':kind})};
 }
 function inventoryView(p){
   const chest=chestBuilding();
@@ -421,12 +415,10 @@ function inventoryView(p){
   }
   const loc=selection?locateUid(p,selection.uid):null;
   let detail=null;
-  if(dropDraft)detail={name:dropDraft.name,meta:' ',chosen:dropDraft.quantity,maxQuantity:dropDraft.quantity,ops:[],dropConfirm:true,confirmText:`Drop ${dropDraft.quantity} ${dropDraft.name}?`};
-  else if(loc?.stack){
+  if(loc?.stack){
     const where=loc.where;
     const ops=operationsFor({itemId:loc.stack.itemId,where,chestOpen:!!chestSession});
-    const wear=stackMaxDurability(loc.stack.itemId)?`Condition ${Math.ceil(loc.stack.durability)} / ${stackMaxDurability(loc.stack.itemId)}`:'';
-    detail={name:label(loc.stack.itemId),meta:[effectLine(loc.stack.itemId),wear].filter(Boolean).join(' · ')||' ',chosen:chosenQuantity(loc.stack),maxQuantity:loc.stack.quantity,ops,dropConfirm:false,confirmText:''};
+    detail={name:label(loc.stack.itemId),chosen:chosenQuantity(loc.stack),maxQuantity:loc.stack.quantity,ops,pendingOp};
   }
   const sprite=theme.sprites[p.character]||theme.sprites.ember;
   return {portraitHTML:`${portrait(p.character)}<small>${escapeHtml(p.name)}</small>`,occupied:p.inventory.slots.filter(Boolean).length,slotMax:p.inventory.slots.length,charm:!!p.charm,sockets,slots,recovery,chest:chestView,selection:detail,pending:actionPending||chestOpening,pendingText:chestOpening?'Opening chest…':actionPending?'Waiting for camp…':'',sprite};
@@ -439,7 +431,7 @@ function guideHTML(){
     ['Keep the fire alive','Feed the Heartfire from its Feed button. Cook opens that fire’s recipes. Firelight restores courage; darkness drains it, then your health. A Light button appears when you carry a usable lantern. Soul lanterns never go out.'],
     ['Eat, farm, recover','Open Inventory, select the food, and press Eat. A burning fire cooks pumpkins, mushrooms, and meat. A cauldron cooks stew. Plant a farm with a seed, then harvest it when it is ready. Bedrolls heal by day and spend hunger.'],
     ['Tend the camp','Build lists only what you can place from where you opened it. Choose Maintain camp to repair a damaged structure or hold Dismantle. The Heartfire cannot be dismantled. A chest someone else has open cannot be dismantled either.'],
-    ['Share a chest','One wanderer opens a chest at a time. Your pack has twelve slots. A chest has twenty-four. Store all moves what fits from your pack. Sort orders a chest or your pack and stacks matching piles. Choose a quantity, then Transfer, or tap the destination slot. Close the panel to let someone else in.'],
+    ['Share a chest','One wanderer opens a chest at a time. Your pack has twelve slots. A chest has twenty-four. Store all moves what fits from your pack. Stack fills piles the chest already holds. Sort orders a chest or your pack and stacks matching piles. Choose a quantity, then Transfer, or tap the destination slot. Close the panel to let someone else in.'],
     ['Stand together','Hold Attack to use the weapon you have equipped. Dodge the glowing attack circles. Armor absorbs damage only while worn. Hold Revive beside a fallen friend for three seconds. Everyone has one last-chance charm. Fallen wanderers return at dawn if the camp survives.'],
     ['Explore for treasure','The hollow is vast. Beyond the meadow lie the Autumn Woods and the Graveyard; farther still the Hollow Mire, the Moonshard Crags and the Barrow Fields. Crates, iron-bound chests, moonlit coffers and hollow reliquaries hide out there: hold Open beside one. Better caches sit farther from camp, and guardians watch them. Caches refill after a few days.'],
     ['Grow stronger','Kills, caches, gathering and new regions give experience. Each level adds health and damage. Loot comes in five rarities: common, uncommon, rare, epic and legendary. Bows fire arrows at the nearest foe, staffs throw bursting bolts, broadswords cleave, and the Grimoire of Ash burns everything around you. Heartstones raise your health for good.'],
@@ -492,7 +484,6 @@ function setTabs(html){if(html!==tabsMarkup){$('sheet-tabs').innerHTML=html;tabs
 function renderSheet(){
   if(!sheet)return;
   const p=me();
-  $('sheet-menu').hidden=sheet==='menu'||sheet==='guide';
   let title='',kicker='THE WANDERER’S COMPANION';
   if(sheet==='guide'){title='A field guide';kicker='FIELD NOTES';setTabs('');replaceContent(guideHTML());}
   else if(sheet==='menu'){title='By the fire';kicker=mode==='solo'?'EXPEDITION PAUSED':linkLost?'CONNECTION CLOSED':'THE EXPEDITION CONTINUES';setTabs('');replaceContent(menuHTML());}
@@ -583,12 +574,10 @@ function ui(){
   if($('room-panel')&&!$('room-panel').hidden){$('roster').innerHTML=world.players.filter(p=>p.online).map(p=>`<div class="roster-row">${portrait(p.character)}<span>${escapeHtml(p.name)}</span><small>${p.id==='host'?'HOST':'READY'}</small></div>`).join('')+Array.from({length:Math.max(0,4-world.players.filter(p=>p.online).length)},()=>'<div class="roster-row"><span class="party-dot" style="opacity:.3"></span><span class="muted small">Waiting for a wanderer…</span></div>').join('');}
   const p=me();
   if(!$('game').hidden&&p){
-    paintVital('hp',p.hp/maxHealth(p)*100,'Health');$('level-number').textContent=String(p.level||1);$('xp-bar').style.width=`${clamp((p.xp||0)/xpToNext(p.level||1)*100,0,100)}%`;$('level-chip').setAttribute('aria-label',`Level ${p.level||1}, ${Math.round((p.xp||0)/xpToNext(p.level||1)*100)} percent to next`);$('region-name').textContent=(REGIONS[regionAt(p.x,p.z)]?.name||'').toUpperCase();paintVital('hunger',p.hunger,'Hunger');paintVital('courage',p.courage,'Courage');
+    paintVital('hp',p.hp/maxHealth(p)*100,'Health');$('level-number').textContent=String(p.level||1);const xpPct=clamp((p.xp||0)/xpToNext(p.level||1)*100,0,100);$('xp-ring').style.setProperty('--xp',`${xpPct}%`);$('xp-ring').setAttribute('aria-valuenow',String(Math.round(xpPct)));$('level-chip').setAttribute('aria-label',`Open settings, level ${p.level||1}, ${Math.round(xpPct)} percent to next`);$('region-name').textContent=(REGIONS[regionAt(p.x,p.z)]?.name||'').toUpperCase();paintVital('hunger',p.hunger,'Hunger');paintVital('courage',p.courage,'Courage');
     $('stamina-bar').style.width=`${p.stamina}%`;
     $('day-number').textContent=`DAY ${String(dayAt(world.time)).padStart(2,'0')}`;
     $('day-progress').style.left=`${(world.time%RULES.cycle)/RULES.cycle*100}%`;
-    const seconds=Math.ceil(phaseRemaining(world.time));
-    $('phase-time').textContent=`${phaseAt(world.time)==='day'?'DAYLIGHT':phaseAt(world.time).toUpperCase()} · ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
     paintClock();
     $('party').innerHTML=world.players.filter(q=>q.id!==localId).map(q=>`<div class="party-row"><span class="party-dot" style="background:${CHARACTERS.find(c=>c.id===q.character)?.color}"></span><b>${escapeHtml(q.name)}</b><span>${!q.online?'away':q.down?'needs help!':q.ghost?'returns at dawn':''}</span></div>`).join('');
     if(p.noticeAt&&p.noticeAt!==lastNotice){toast(p.notice);lastNotice=p.noticeAt;}
@@ -619,7 +608,7 @@ function setupControls(){
   $('characters').onclick=e=>{const b=e.target.closest('[data-character]');if(!b)return;character=b.dataset.character;for(const el of $('characters').children)el.setAttribute('aria-pressed',el===b);if(mode==='front')world.players[0].character=character;storeProfile();};
   $('host').onclick=hostCamp;$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;sound.unlock();storeProfile();};
-  $('close-sheet').onclick=closeSheet;$('sheet-menu').onclick=()=>openSheet('menu');$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
+  $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   $('hotbar-inventory').onclick=toggleInventory;$('hotbar-build').onclick=toggleFieldBuild;$('use-charm').onclick=()=>send({type:'interact'});
   const cluster=$('action-cluster');
   cluster.addEventListener('pointerdown',event=>{
@@ -697,7 +686,7 @@ function setupControls(){
     const key=event.key.toLowerCase();
     if([' ','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key))event.preventDefault();
     if(key==='escape'){
-      const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!((selection||dropDraft)&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement||showcaseTool==='remove',maintaining:maintenance});
+      const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!(selection&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement||showcaseTool==='remove',maintaining:maintenance});
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();
       else if(step==='close-details'){clearSelection();refresh();}
       else if(step==='close-panel')closeSheet();

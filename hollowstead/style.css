@@ -10,13 +10,19 @@
 /* P4 HUD: icon vitals, top minimap, two-button hotbar, action cluster, RPG sheet. */
 .game-top{top:calc(12px + env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:8px;pointer-events:none}
 .game-top .vitals,.game-top .clock{pointer-events:none}
-.game-top .vitals{position:static;top:auto;left:auto;display:flex;flex-direction:column;gap:5px;width:auto}
+.game-top .level-chip{pointer-events:auto}
+.game-top .vitals{position:static;top:auto;left:auto;display:flex;flex-direction:row;align-items:center;gap:8px;width:auto}
+.game-top .vitals-bars{display:flex;flex-direction:column;gap:2px}
 .game-top .vital{width:auto;min-height:20px;padding:0;gap:6px;background:none;border:0;box-shadow:none}
 .game-top .vital>span{font-size:18px;width:20px;line-height:1;text-align:center;text-shadow:0 1px 3px #181421}
 .game-top .vital i{width:86px;height:8px;margin:0;background:#bcb39940}
 .game-top .clock{width:auto;min-width:0;justify-self:center;text-align:center}
-.game-top .clock>span,.game-top .clock small{display:block;text-shadow:0 1px 4px #181421;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.game-top .day-track{margin:6px auto;max-width:148px}
+.game-top .clock-meta{display:flex;align-items:baseline;justify-content:center;gap:8px;min-width:0}
+.game-top .clock-meta>span,.game-top .clock-meta small{display:block;text-shadow:0 1px 4px #181421;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.game-top .clock-meta small{font:9px ui-monospace,monospace;letter-spacing:.8px;color:#d8cbb3}
+.game-top .clock-meta>span{font:12px ui-monospace,monospace;letter-spacing:2px}
+.game-top .day-track{margin:6px auto 0;width:min(280px,46vw);max-width:none;height:8px;border-radius:4px}
+.game-top .day-track i{top:0;width:8px;height:8px}
 #minimap-button{position:static;justify-self:end;pointer-events:auto;border:0;background:none;padding:0;min-height:0}
 #minimap{width:96px;height:96px}
 .party{top:calc(112px + env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));width:28vw;max-width:120px;pointer-events:none}
@@ -90,21 +96,18 @@
 .qty-badge{position:absolute;right:3px;bottom:2px;font-size:10px;line-height:1;color:var(--cream);text-shadow:0 1px 2px #120f16}
 .item-slot .wear{position:absolute;left:4px;right:4px;bottom:3px;height:3px;margin:0;background:#bcb39933;border-radius:2px}
 .item-slot .wear em{display:block;height:100%;background:var(--orange)}
-.item-details{flex:none;display:flex;flex-wrap:wrap;gap:6px;align-items:center;border-top:1px solid var(--border);padding-top:8px}
-.detail-copy{flex:1 1 100%;min-width:0}
-.detail-copy b{display:block;font-size:14px}
-.detail-copy p{margin:2px 0 0;color:var(--muted);font-size:11px}
-.qty-row,.detail-ops{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-.qty-row{flex:1 1 100%;flex-wrap:nowrap}
-.qty-row b{min-width:22px;text-align:center;font-size:12px}
+.qty-row,.detail-ops{display:flex;flex-wrap:nowrap;gap:4px;align-items:center;flex:none}
+.qty-row[hidden],.detail-ops:empty{display:none}
 .qty-row button,.detail-ops button,.maintain-button{min-width:44px;min-height:44px;padding:8px}
 .maintain-button{width:100%;margin-bottom:8px}
 .confirm-copy{flex:1 1 100%;margin:0;font-size:12px}
 .drag-ghost{position:fixed;width:48px;height:48px;z-index:80;pointer-events:none;display:grid;place-items:center}
 .drag-ghost .item-icon{width:40px;height:40px}
 .storage-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;flex-wrap:wrap;min-height:44px}
-.storage-tools{display:flex;flex-wrap:wrap;gap:4px;flex:none}
-.storage-tools button{min-width:44px;min-height:44px;padding:8px 10px}
+.storage-tools{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto}
+.storage-tools button{min-width:44px;min-height:44px;padding:8px 10px;flex:none}
+.item-slot[data-tip].is-selected,.item-slot[data-tip]:hover{overflow:visible;z-index:3}
+.item-slot[data-tip].is-selected::after,.item-slot[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);z-index:4;padding:4px 7px;border-radius:4px;background:#211c28f2;border:1px solid #d6ba8e66;color:var(--cream);font:11px Arial,sans-serif;letter-spacing:.2px;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px #17111f66}
 .chest-overflow{flex:none;max-height:34%;overflow:auto;overscroll-behavior:contain}
 .rpg-panel.with-chest .rpg-body{gap:6px;overflow:auto}
 .rpg-panel.with-chest .bag-column,.rpg-panel.with-chest .chest-column{flex:none;min-height:auto;overflow:visible}
@@ -116,10 +119,11 @@
   .sheet[data-sheet="chest"]{width:min(760px,calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
   .rpg-panel.with-chest .rpg-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto auto;align-content:start;gap:8px 16px}
   .rpg-panel.with-chest .equip-column{grid-column:1 / -1;min-height:44px;overflow:visible}
-  .item-details{flex-wrap:nowrap}
-  .detail-copy{flex:1 1 120px}
-  .qty-row{flex:0 0 auto}
-  .detail-ops{flex:0 0 auto}
+}
+@media(max-width:699px){
+  .rpg-panel.with-chest .equip-column{display:none}
+  .rpg-panel.with-chest .chest-column{order:1}
+  .rpg-panel.with-chest .bag-column{order:2}
 }
 @media(max-width:900px){#minimap{width:76px;height:76px}}
 @media(max-width:700px){
@@ -131,9 +135,9 @@
 @media(max-width:380px){#joystick{width:104px;height:104px}}
 @media(max-width:340px){
   .game-top .vital i{width:76px}
-  .game-top .clock>span{font-size:10px;letter-spacing:1px}
-  .game-top .clock small{font-size:8px;letter-spacing:.4px}
-  .game-top .day-track{max-width:96px}
+  .game-top .clock-meta>span{font-size:10px;letter-spacing:1px}
+  .game-top .clock-meta small{font-size:8px;letter-spacing:.4px}
+  .game-top .day-track{width:min(220px,52vw)}
   #minimap{width:72px;height:72px}
 }
 @media(max-height:520px) and (min-width:601px){
@@ -174,14 +178,13 @@
 /* Hollow Harvest ink art (tools/art): icons read as stickers with a firm ink drop. */
 .item-icon{filter:drop-shadow(0 2px 0 #2b2233b0)}.item-slot .item-icon{filter:drop-shadow(0 2px 0 #2b2233b0)}#showcase-panel .showcase-list .item-icon{filter:drop-shadow(0 2px 0 #2b2233b0)}.portrait{background-repeat:no-repeat;filter:drop-shadow(0 2px 0 #2b2233a0)}
 /* Long Night: level chip, rarity glows, map swatches. */
-.level-chip{display:flex;align-items:center;gap:7px;padding:6px 9px;background:#2c2732ca;border:1px solid var(--border);border-radius:6px;min-width:108px;flex-wrap:wrap}
-.level-chip b{font:15px ui-monospace,monospace;color:#f2c14e;min-width:18px;text-align:center;border:1px solid #f2c14e66;border-radius:50%;width:24px;height:24px;line-height:22px}
-.level-chip small{font:7px ui-monospace,monospace;letter-spacing:.8px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.level-chip i{flex-basis:100%;height:3px;background:#bcb39925;display:block;border-radius:3px;overflow:hidden}
-.level-chip em{display:block;height:100%;width:0;background:#f2c14e;transition:width .3s}
+.level-chip{display:grid;place-items:center;gap:0;padding:0;margin:0;min-width:0;min-height:0;width:auto;height:auto;background:none;border:0;border-radius:0;box-shadow:none}
+.level-chip:hover,.level-chip:active{background:none;border:0;transform:none}
+.level-ring{--xp:0%;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;padding:3px;background:conic-gradient(#f2c14e var(--xp),#bcb39935 0)}
+.level-chip b{display:grid;place-items:center;width:100%;height:100%;min-width:0;border:0;border-radius:50%;background:#2c2732ee;font:13px ui-monospace,monospace;color:#f2c14e;line-height:1}
 .item-icon.rarity-uncommon{filter:drop-shadow(0 2px 0 #2b2233b0) drop-shadow(0 0 3px #8fd3a0)}
 .item-icon.rarity-rare{filter:drop-shadow(0 2px 0 #2b2233b0) drop-shadow(0 0 4px #79b8ff)}
 .item-icon.rarity-epic{filter:drop-shadow(0 2px 0 #2b2233b0) drop-shadow(0 0 5px #c49bff)}
 .item-icon.rarity-legendary{filter:drop-shadow(0 2px 0 #2b2233b0) drop-shadow(0 0 6px #f2c14e)}
 .map-legend .swatch{display:inline-block;width:9px;height:7px;border:1px solid #1e1624;margin:0 3px 0 6px;vertical-align:middle}
-@media(max-width:600px){.level-chip{min-width:79px;padding:5px 6px}.level-chip b{font-size:12px;width:20px;height:20px;line-height:18px}.level-chip small{font-size:6px}}
+@media(max-width:600px){.level-ring{width:30px;height:30px}.level-chip b{font-size:12px}}

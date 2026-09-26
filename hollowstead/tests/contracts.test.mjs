@@ -158,7 +158,7 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.deepEqual(INTENTS.placeBuilding.optional, ['stationId']);
   assert.deepEqual(INTENTS.setHarvestTarget.required, ['requestId', 'nodeId', 'mode']);
   assert.deepEqual(INTENTS.chestStoreAll.required, ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']);
-  assert.equal(Object.hasOwn(INTENTS, 'chestStack'), false);
+  assert.deepEqual(INTENTS.chestStack.required, ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']);
   assert.deepEqual(INTENTS.chestSort.required, ['requestId', 'chestId', 'sessionId', 'destinationRevision']);
   assert.deepEqual(INTENTS.packSort.required, ['requestId', 'inventoryRevision']);
   assert.equal(INTENTS.dropItem.required.includes('inventoryRevision'), true);

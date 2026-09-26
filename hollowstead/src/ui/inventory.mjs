@@ -49,10 +49,16 @@ export function slotLabel({empty = false, name = '', quantity = 1, durability = 
 }
 
 const ITEM_ACTIONS = new Set(['equip', 'unequip', 'swap', 'eat', 'heal', 'drop', 'confirm-drop', 'transfer', 'take', 'store']);
+const COUNT_ACTIONS = new Set(['drop', 'transfer', 'take']);
 
 /** Per-item actions clear the UI selection when they are issued. Quantity and inspect do not. */
 export function itemActionClearsSelection(op) {
   return ITEM_ACTIONS.has(op);
+}
+
+/** Drop, transfer, and take ask for 1 / half / all only when the stack can split. */
+export function actionNeedsCount(op, quantity) {
+  return COUNT_ACTIONS.has(op) && quantity > 1;
 }
 
 export function operationsFor({itemId, where, chestOpen = false} = {}) {
@@ -96,9 +102,17 @@ export function createInventoryPanel(root, hooks) {
         <div id="inv-sockets" class="socket-grid slot-grid"></div>
       </section>
       <section class="bag-column" aria-label="Backpack">
-        <div id="inv-meta" class="bag-meta"></div>
-        <div class="storage-tools">
-          <button type="button" id="pack-sort" data-pack-op="sort">Sort</button>
+        <div class="storage-heading">
+          <div id="inv-meta" class="bag-meta"></div>
+          <div class="storage-tools" id="pack-tools">
+            <button type="button" id="pack-sort" data-pack-op="sort">Sort</button>
+            <div id="detail-ops" class="detail-ops"></div>
+            <div id="detail-qty" class="qty-row" hidden aria-label="Quantity">
+              <button type="button" data-qty="one">1</button>
+              <button type="button" data-qty="half">Half</button>
+              <button type="button" data-qty="all">All</button>
+            </div>
+          </div>
         </div>
         <div id="inv-grid" class="slot-grid" role="grid"></div>
         <div id="inv-recovery" class="recovery-block" hidden>
@@ -112,6 +126,7 @@ export function createInventoryPanel(root, hooks) {
           <div id="chest-meta" class="bag-meta"></div>
           <div class="storage-tools" id="chest-tools">
             <button type="button" data-chest-op="store">Store all</button>
+            <button type="button" data-chest-op="stack">Stack</button>
             <button type="button" data-chest-op="sort">Sort</button>
           </div>
         </div>
@@ -122,18 +137,6 @@ export function createInventoryPanel(root, hooks) {
         </div>
       </section>
     </div>
-    <footer id="inv-details" class="item-details" hidden>
-      <div class="detail-copy"><b id="detail-name"></b><p id="detail-meta"></p></div>
-      <div id="detail-qty" class="qty-row" aria-label="Quantity">
-        <button type="button" data-qty="one">1</button>
-        <button type="button" data-qty="half">Half</button>
-        <button type="button" data-qty="all">All</button>
-        <button type="button" data-qty="dec" aria-label="Decrease quantity">−</button>
-        <b id="detail-count"></b>
-        <button type="button" data-qty="inc" aria-label="Increase quantity">+</button>
-      </div>
-      <div id="detail-ops" class="detail-ops"></div>
-    </footer>
     <p id="inv-pending" class="pending-line" role="status"></p>`;
   root.append(panel);
 
@@ -151,10 +154,6 @@ export function createInventoryPanel(root, hooks) {
   const chestOverflowGrid = panel.querySelector('#chest-overflow-grid');
   const packSort = panel.querySelector('#pack-sort');
   const chestTools = panel.querySelector('#chest-tools');
-  const details = panel.querySelector('#inv-details');
-  const detailName = panel.querySelector('#detail-name');
-  const detailMeta = panel.querySelector('#detail-meta');
-  const detailCount = panel.querySelector('#detail-count');
   const qtyRow = panel.querySelector('#detail-qty');
   const ops = panel.querySelector('#detail-ops');
   const pendingLine = panel.querySelector('#inv-pending');
@@ -171,10 +170,13 @@ export function createInventoryPanel(root, hooks) {
 
   function paintSlot(el, cell) {
     const stack = cell.stack;
-    const sig = `${cell.aria}|${stack ? `${stack.uid}:${stack.quantity}:${stack.durability}` : 'empty'}|${cell.selected ? 1 : 0}|${cell.iconHTML || ''}`;
+    const tip = stack ? (cell.tip || '') : '';
+    const sig = `${cell.aria}|${stack ? `${stack.uid}:${stack.quantity}:${stack.durability}` : 'empty'}|${cell.selected ? 1 : 0}|${cell.iconHTML || ''}|${tip}`;
     el.dataset.empty = stack ? 'false' : 'true';
     el.dataset.uid = stack?.uid || '';
     el.dataset.accept = cell.accept === false ? 'false' : 'true';
+    if (tip) { el.dataset.tip = tip; el.title = tip; }
+    else { delete el.dataset.tip; el.removeAttribute('title'); }
     el.classList.toggle('is-selected', !!cell.selected);
     el.classList.toggle('is-equipped', !!cell.equipped);
     el.setAttribute('aria-label', cell.aria);
@@ -262,25 +264,21 @@ export function createInventoryPanel(root, hooks) {
 
   function paintDetails(view) {
     const selection = view.selection;
-    details.hidden = !selection;
-    if (!selection) return;
-    detailName.textContent = selection.name;
-    detailMeta.textContent = selection.meta;
-    detailCount.textContent = String(selection.chosen);
-    qtyRow.hidden = !(selection.maxQuantity > 1);
+    panel.classList.toggle('has-selection', !!selection);
+    if (!selection) {
+      ops.replaceChildren();
+      ops.dataset.sig = '';
+      qtyRow.hidden = true;
+      return;
+    }
+    qtyRow.hidden = !selection.pendingOp;
     for (const qty of qtyRow.querySelectorAll('button')) qty.disabled = !!view.pending;
-    const sig = `${selection.ops.join(',')}|${selection.dropConfirm ? selection.confirmText : ''}`;
+    const shown = selection.pendingOp ? [selection.pendingOp] : selection.ops;
+    const sig = shown.join(',');
     if (ops.dataset.sig !== sig) {
       ops.dataset.sig = sig;
       ops.replaceChildren();
-      if (selection.dropConfirm) {
-        const ask = document.createElement('p');
-        ask.className = 'confirm-copy';
-        ask.textContent = selection.confirmText;
-        ops.append(ask, button('confirm-drop', 'Drop'), button('cancel-drop', 'Back'));
-      } else {
-        for (const op of selection.ops) ops.append(button(op, OP_LABELS[op] || op));
-      }
+      for (const op of shown) ops.append(button(op, OP_LABELS[op] || op));
     }
     for (const el of ops.querySelectorAll('button')) el.disabled = !!view.pending;
   }
@@ -351,7 +349,7 @@ export function createInventoryPanel(root, hooks) {
     hooks.onSlot(slot.dataset.slotKey, slot.dataset.empty === 'true');
   });
   function cancelDrag() { endDrag(false); }
-  function detailsOpen() { return !details.hidden; }
+  function detailsOpen() { return panel.classList.contains('has-selection'); }
   function dragging() { return !!drag?.active; }
   function focusStep(key) {
     const buttons = [...panel.querySelectorAll('.item-slot')];

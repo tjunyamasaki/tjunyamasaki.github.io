@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {World, createDropMotion, dropPresentation} from '../src/engine.mjs';
 import {PICKUP, RULES} from '../src/content.mjs';
+import {DROP_LIFETIME_SECONDS, STACK_LIMIT} from '../src/contracts.mjs';
 import {collectLocations, countItem, duplicateUids} from '../src/inventory.mjs';
 
 function camp(){const w=new World(402);const p=w.addPlayer('host','Jun');w.start();p.x=20;p.z=20;p.dx=1;p.dz=0;return {w,p};}
@@ -196,7 +197,7 @@ test('after the cooldown the dropper uses the normal dwell',()=>{
 test('a full pack does not delete a pile, and overflow keeps the remainder',()=>{
   const blocked=camp();
   blocked.w.clearPack(blocked.p);
-  const blockedFull=blocked.p.inventory.slots.length*20;
+  const blockedFull=blocked.p.inventory.slots.length*STACK_LIMIT;
   assert.equal(blocked.w.stock(blocked.p.inventory,'wood',blockedFull),blockedFull);
   const stuck=blocked.w.mintStack('wood',4);
   const pile=blocked.w.placeDrop(stuck,blocked.p.x,blocked.p.z);
@@ -212,7 +213,7 @@ test('a full pack does not delete a pile, and overflow keeps the remainder',()=>
 
   const {w,p}=camp();
   w.clearPack(p);
-  const full=p.inventory.slots.length*20;
+  const full=p.inventory.slots.length*STACK_LIMIT;
   assert.equal(w.stock(p.inventory,'wood',full-5),full-5);
   const stack=w.mintStack('wood',12);
   const drop=w.placeDrop(stack,p.x,p.z);
@@ -325,6 +326,19 @@ test('flight sampling follows the render clock and a mid-flight snapshot keeps m
   const home=motion.sample(snap,world,PICKUP.flight/2+0.05,0);
   assert.equal(home.x,0);
   assert.equal(home.y,0);
+});
+
+test('floor piles vanish after one day and night cycle',()=>{
+  const {w,p}=camp();
+  w.ambient=false;w.enemies=[];
+  const drop=w.placeDrop(w.mintStack('wood',1),p.x+8,p.z+8);
+  assert.equal(DROP_LIFETIME_SECONDS,RULES.cycle);
+  assert.equal(drop.until,w.time+RULES.cycle);
+  const id=drop.id;
+  sim(w,RULES.cycle-RULES.tick);
+  assert.equal(w.drops.some(entry=>entry.id===id),true);
+  sim(w,RULES.tick*2);
+  assert.equal(w.drops.some(entry=>entry.id===id),false);
 });
 
 function distance(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}

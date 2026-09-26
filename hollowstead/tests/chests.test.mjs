@@ -5,7 +5,7 @@ import {World} from '../src/engine.mjs';
 import {ITEMS,EQUIPMENT} from '../src/content.mjs';
 import {createActionSession} from '../src/transactions.mjs';
 import {collectLocations,duplicateUids,containerId,countItem,totalQuantity} from '../src/inventory.mjs';
-import {CHEST_LEASE_SECONDS} from '../src/contracts.mjs';
+import {CHEST_LEASE_SECONDS, STACK_LIMIT} from '../src/contracts.mjs';
 import {migrateV1Save,remapWorldClock,validateV2World} from '../src/serialization.mjs';
 
 function camp(){
@@ -192,7 +192,7 @@ test('T15 dismantle cannot bypass a lease; destruction spills exactly once with 
 
 test('full backpack transfer is atomic; splits and socket swaps preserve ownership; a full chest does not grow',()=>{
   const {w,p,chest,open,transfer}=camp();const session=open(p).sessionId;
-  w.clearPack(p);w.stock(p.inventory,'stone',p.inventory.slots.length*20);w.stock(chest.store,'berry',2);
+  w.clearPack(p);w.stock(p.inventory,'stone',p.inventory.slots.length*STACK_LIMIT);w.stock(chest.store,'berry',2);
   const berry=chest.store.slots.find(Boolean),before=copy([p.inventory,chest.store]);
   assert.equal(transfer(p,session,chest.store,p.inventory,berry.uid).code,'inventoryFull');
   assert.equal(copy([p.inventory,chest.store]),before);

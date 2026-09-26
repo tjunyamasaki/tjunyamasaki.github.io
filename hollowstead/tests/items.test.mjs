@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {World} from '../src/engine.mjs';
 import {EQUIPMENT, ITEMS, NODES, PICKUP, RULES, phaseAt} from '../src/content.mjs';
 import {
-  CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, V1_PHASE, V2_PHASE,
+  CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, STACK_LIMIT, V1_PHASE, V2_PHASE,
   nextNightWaveTime, phaseProgress, remapPhaseTime,
 } from '../src/contracts.mjs';
 import {
@@ -159,7 +159,7 @@ test('T03 rejected transfers leave both containers unchanged',()=>{
   const stale=planMove({source:p.inventory,destination:p.inventory,sourceSlot:0,destinationSlot:1,uid:p.inventory.slots[0].uid,quantity:1,sourceRevision:p.inventory.revision+9,mintUid:()=>w.nextItemUid()});
   assert.equal(stale.code,'staleRevision');
   assert.equal(JSON.stringify(p.inventory.slots),beforePack);
-  for(const quantity of [0,-1,1.5,21]){
+  for(const quantity of [0,-1,1.5,65]){
     const bad=planMove({source:p.inventory,destination:p.inventory,sourceSlot:0,destinationSlot:empty,uid:p.inventory.slots[0].uid,quantity,mintUid:()=>w.nextItemUid()});
     assert.equal(bad.ok,false);
   }
@@ -177,11 +177,23 @@ test('T03 rejected transfers leave both containers unchanged',()=>{
   assert.equal(owned(w).length,0);
 });
 
+test('stackable supplies reach 64 and tools stay unstacked',()=>{
+  const {w,p}=camp();
+  w.clearPack(p);
+  assert.equal(makeStack('wood-64','wood',64).ok,true);
+  assert.equal(makeStack('wood-65','wood',65).ok,false);
+  assert.equal(makeStack('axe-2','axe',2).ok,false);
+  assert.equal(w.stock(p.inventory,'wood',64),64);
+  assert.equal(p.inventory.slots.filter(Boolean).length,1);
+  assert.equal(w.stock(p.inventory,'wood',1),1);
+  assert.equal(p.inventory.slots.filter(stack=>stack?.itemId==='wood').length,2);
+});
+
 test('T04 slot count limits the backpack, and worn gear uses no pack slot',()=>{
   const {w,p}=camp();
   w.clearPack(p);
   assert.equal(p.inventory.slots.length,12);
-  const full=p.inventory.slots.length*20;
+  const full=p.inventory.slots.length*STACK_LIMIT;
   assert.equal(w.stock(p.inventory,'wood',full),full);
   assert.equal(w.stock(p.inventory,'stone',1),0);
   assert.equal(supplyLoad(p.inventory),full);
@@ -400,7 +412,7 @@ test('T18 craft is all or nothing, and success creates a new item',()=>{
 test('T25 a full pack can still finish a chop, and pickup leaves the exact remainder',()=>{
   const {w,p}=camp();
   w.clearPack(p);
-  const full=p.inventory.slots.length*20;
+  const full=p.inventory.slots.length*STACK_LIMIT;
   assert.equal(w.stock(p.inventory,'wood',full),full);
   const tree=w.nodes.find(node=>node.type==='tree');
   p.x=tree.x;p.z=tree.z+1;
@@ -422,7 +434,7 @@ test('T25 a full pack can still finish a chop, and pickup leaves the exact remai
 
   const other=camp();
   other.w.clearPack(other.p);
-  const otherFull=other.p.inventory.slots.length*20;
+  const otherFull=other.p.inventory.slots.length*STACK_LIMIT;
   assert.equal(other.w.stock(other.p.inventory,'wood',otherFull-5),otherFull-5);
   const pile=other.w.mintStack('wood',12);
   const drop=other.w.placeDrop(pile,other.p.x,other.p.z);
@@ -675,15 +687,17 @@ test('T32 corrupt migration keeps the original, and overflow can be withdrawn',(
   const rejected=planInsert(guest.recovery,probe.stack,{acceptsItems:false,allowPartial:false});
   assert.equal(rejected.ok,false);
   assert.equal(JSON.stringify(guest.recovery.slots),recoverySlots);
-  const woodIndex=guest.inventory.slots.findIndex(stack=>stack?.itemId==='wood');
-  guest.inventory.slots[woodIndex]=null;
-  const ember=guest.recovery.slots.find(stack=>stack?.itemId==='ember');
-  const emberUid=ember.uid, emberQty=ember.quantity;
+  const open=guest.inventory.slots.findIndex(stack=>stack);
+  guest.inventory.slots[open]=null;
+  const spare=guest.recovery.slots.find(Boolean);
+  assert.ok(spare);
+  const spareUid=spare.uid, spareQty=spare.quantity, spareId=spare.itemId;
+  const spareTotal=qty(guest.inventory,spareId)+qty(guest.recovery,spareId);
   guest.cooldown=0;
-  world.action(guest.id,{type:'recover',uid:emberUid});
-  assert.equal(guest.recovery.slots.some(stack=>stack?.uid===emberUid),false);
-  assert.equal(guest.inventory.slots.find(stack=>stack?.uid===emberUid).quantity,emberQty);
-  assert.equal(qty(guest.inventory,'ember')+qty(guest.recovery,'ember'),100);
+  world.action(guest.id,{type:'recover',uid:spareUid});
+  assert.equal(guest.recovery.slots.some(stack=>stack?.uid===spareUid),false);
+  assert.equal(guest.inventory.slots.find(stack=>stack?.uid===spareUid).quantity,spareQty);
+  assert.equal(qty(guest.inventory,spareId)+qty(guest.recovery,spareId),spareTotal);
   assert.notEqual(guest.recovery,null);
   assert.equal(owned(world).length,0);
 

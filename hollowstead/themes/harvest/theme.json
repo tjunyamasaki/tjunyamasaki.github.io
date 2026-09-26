@@ -17,7 +17,7 @@
     "barrow": "#655862"
   },
   "lighting": {
-    "ambientNight": 0.03,
+    "ambientNight": 0.20,
     "litBrightness": 0.92,
     "transitionSeconds": 7,
     "dawnSeconds": 4,

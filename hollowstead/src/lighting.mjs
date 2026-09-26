@@ -16,7 +16,7 @@ export const LIGHT_FIELD_ORIGIN = -45;
 export const LIGHT_FIELD_SPAN = 90;
 
 const DEFAULT_LIGHTING = Object.freeze({
-  ambientNight: 0.03,
+  ambientNight: 0.20,
   litBrightness: 0.92,
   transitionSeconds: 7,
   dawnSeconds: 4,
@@ -78,7 +78,7 @@ export function smoothstep(t){
   return x*x*(3-2*x);
 }
 
-/** Display-referred 0–1 brightness to a linear multiplier. 0.03 stays barely visible. */
+/** Display-referred 0–1 brightness to a linear multiplier. 0.20 keeps unlit night readable. */
 export function linearFromDisplay(display){
   const c=clamp(display, 0, 1);
   return c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4;

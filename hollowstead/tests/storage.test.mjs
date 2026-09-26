@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
 import {createActionSession} from '../src/transactions.mjs';
-import {CHEST_SLOT_COUNT} from '../src/contracts.mjs';
+import {CHEST_SLOT_COUNT, STACK_LIMIT} from '../src/contracts.mjs';
 import {containerId, countItem, createContainer, createRecovery} from '../src/inventory.mjs';
 
 function camp(){
@@ -163,7 +163,7 @@ test('store all moves whole stacks that fit and leaves the rest in the pack', ()
 test('stack fills only item types already in the chest and respects stack limits', ()=>{
   const {w, p, q, chest}=camp();
   w.clearPack(p); w.clearPack(q);
-  chest.store.slots[0]=w.mintStack('wood', 15);
+  chest.store.slots[0]=w.mintStack('wood', STACK_LIMIT - 5);
   chest.store.slots[1]=w.mintStack('stone', 20);
   const packWood=w.mintStack('wood', 10), packStone=w.mintStack('stone', 4), packFiber=w.mintStack('fiber', 6);
   p.inventory.slots[0]=packWood;
@@ -179,11 +179,11 @@ test('stack fills only item types already in the chest and respects stack limits
     inventoryRevision:packRevision, destinationRevision:chestRevision,
   });
   assert.equal(stacked.ok, true);
-  assert.equal(qty(chest.store, 'wood'), 20);
+  assert.equal(qty(chest.store, 'wood'), STACK_LIMIT);
   assert.equal(qty(p.inventory, 'wood'), 5);
   assert.equal(p.inventory.slots.find(stack=>stack?.uid===packWood.uid).quantity, 5);
-  assert.equal(qty(chest.store, 'stone'), 20);
-  assert.equal(qty(p.inventory, 'stone'), 4);
+  assert.equal(qty(chest.store, 'stone'), 24);
+  assert.equal(qty(p.inventory, 'stone'), 0);
   assert.equal(qty(chest.store, 'fiber'), 0);
   assert.equal(qty(p.inventory, 'fiber'), 6);
   assert.equal(chest.store.slots.filter(Boolean).length, 2);

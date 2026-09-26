@@ -21,9 +21,9 @@ def target(t):
 
 
 def registry():
-    import nodes, structures, items, actors, longnight, arsenal
+    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp
     reg = {}
-    for mod in (nodes, structures, items, actors, longnight, arsenal):
+    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp):
         for key, spec in getattr(mod, "SPRITES", getattr(mod, "NODES", {})).items():
             reg[key] = spec
     return reg
@@ -85,6 +85,9 @@ def main():
         svg = lib.build_sheet([fn], 1, 1, (20, 20, 492, 236), cell=(512, 256), out_scale=.5, align="center", center_on_first=False)
         open(os.path.join(SPRITES, f"{k}.svg"), "w").write(svg)
         thumbs.append((k, lib.render_png(svg)))
+    if not a.only or "plaza" in keys:
+        import camp
+        camp.write_decals(SPRITES)
     if not a.only or "magic" in keys:
         import magic
         for k, im in magic.build_magic(ROOT).items():

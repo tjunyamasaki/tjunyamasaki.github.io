@@ -35,8 +35,8 @@
     "tree": {
       "src": "./sprites/tree.svg?v=art3",
       "size": [
-        4.1,
-        6.15
+        4.92,
+        7.38
       ],
       "anchor": [
         0.5,
@@ -238,10 +238,10 @@
       "icon": "./sprites/fire-icon.svg?v=art3"
     },
     "hearth": {
-      "src": "./sprites/hearth.svg?v=art3",
+      "src": "./sprites/hearth.svg?v=art4",
       "size": [
-        3.5,
-        5.25
+        4.5,
+        6.75
       ],
       "anchor": [
         0.5,
@@ -265,8 +265,8 @@
     "bench": {
       "src": "./sprites/bench.svg?v=art3",
       "size": [
-        2.6,
-        3.9
+        2.028,
+        3.042
       ],
       "anchor": [
         0.5,
@@ -286,8 +286,8 @@
     "chest": {
       "src": "./sprites/chest.svg?v=art3",
       "size": [
-        2.3,
-        3.45
+        1.794,
+        2.691
       ],
       "anchor": [
         0.5,
@@ -685,10 +685,10 @@
       "icon": "./sprites/stone-icon.svg?v=art3"
     },
     "ember": {
-      "src": "./sprites/ember.svg?v=art3",
+      "src": "./sprites/ember.svg?v=art4",
       "size": [
-        1.65,
-        2.48
+        2.25,
+        3.38
       ],
       "anchor": [
         0.5,
@@ -991,10 +991,10 @@
       "icon": "./sprites/armor-icon.svg?v=art3"
     },
     "moss": {
-      "src": "./sprites/moss.svg?v=art3",
+      "src": "./sprites/moss.svg?v=art4",
       "size": [
-        1.65,
-        2.48
+        2.25,
+        3.38
       ],
       "anchor": [
         0.5,
@@ -1055,10 +1055,10 @@
       }
     },
     "vesper": {
-      "src": "./sprites/vesper.svg?v=art3",
+      "src": "./sprites/vesper.svg?v=art4",
       "size": [
-        1.65,
-        2.48
+        2.25,
+        3.38
       ],
       "anchor": [
         0.5,
@@ -1119,10 +1119,10 @@
       }
     },
     "cinder": {
-      "src": "./sprites/cinder.svg?v=art3",
+      "src": "./sprites/cinder.svg?v=art4",
       "size": [
-        1.65,
-        2.48
+        2.25,
+        3.38
       ],
       "anchor": [
         0.5,
@@ -1207,8 +1207,8 @@
     "tree-dead": {
       "src": "./sprites/tree-dead.svg?v=art3",
       "size": [
-        4.1,
-        6.15
+        4.92,
+        7.38
       ],
       "anchor": [
         0.5,
@@ -1312,8 +1312,8 @@
     "crate": {
       "src": "./sprites/crate.svg?v=art3",
       "size": [
-        2.3,
-        3.45
+        1.794,
+        2.691
       ],
       "anchor": [
         0.5,
@@ -1336,8 +1336,8 @@
     "ironchest": {
       "src": "./sprites/ironchest.svg?v=art3",
       "size": [
-        2.6,
-        3.9
+        2.028,
+        3.042
       ],
       "anchor": [
         0.5,
@@ -1360,8 +1360,8 @@
     "moonchest": {
       "src": "./sprites/moonchest.svg?v=art3",
       "size": [
-        2.9,
-        4.35
+        2.262,
+        3.393
       ],
       "anchor": [
         0.5,
@@ -1384,8 +1384,8 @@
     "reliquary": {
       "src": "./sprites/reliquary.svg?v=art3",
       "size": [
-        3.3,
-        4.95
+        2.574,
+        3.861
       ],
       "anchor": [
         0.5,
@@ -1855,8 +1855,8 @@
     "held-recurve": {
       "src": "./sprites/recurve.svg?v=art3",
       "size": [
-        1.35,
-        2.0
+        1.358,
+        2.012
       ],
       "anchor": [
         0.5,
@@ -1876,8 +1876,8 @@
     "held-bonebow": {
       "src": "./sprites/bonebow.svg?v=art3",
       "size": [
-        1.4,
-        2.1
+        1.334,
+        2.001
       ],
       "anchor": [
         0.5,
@@ -1897,8 +1897,8 @@
     "held-broadsword": {
       "src": "./sprites/broadsword.svg?v=art3",
       "size": [
-        1.25,
-        1.9
+        1.404,
+        2.133
       ],
       "anchor": [
         0.5,
@@ -1918,8 +1918,8 @@
     "held-flamberge": {
       "src": "./sprites/flamberge.svg?v=art3",
       "size": [
-        1.3,
-        2.0
+        1.128,
+        1.736
       ],
       "anchor": [
         0.5,
@@ -1939,8 +1939,8 @@
     "held-crookstaff": {
       "src": "./sprites/crookstaff.svg?v=art3",
       "size": [
-        1.6,
-        2.4
+        1.338,
+        2.007
       ],
       "anchor": [
         0.5,
@@ -1960,8 +1960,8 @@
     "held-skullstaff": {
       "src": "./sprites/skullstaff.svg?v=art3",
       "size": [
-        1.6,
-        2.4
+        1.334,
+        2.001
       ],
       "anchor": [
         0.5,
@@ -1981,8 +1981,8 @@
     "held-tome": {
       "src": "./sprites/tome.svg?v=art3",
       "size": [
-        0.95,
-        1.4
+        1.573,
+        2.319
       ],
       "anchor": [
         0.5,
@@ -2066,8 +2066,8 @@
     "held-fangs": {
       "src": "./sprites/fangs.svg?v=art4",
       "size": [
-        1.25,
-        1.9
+        1.858,
+        2.824
       ],
       "anchor": [
         0.5,
@@ -2109,8 +2109,8 @@
     "held-soulchain": {
       "src": "./sprites/soulchain.svg?v=art4",
       "size": [
-        1.25,
-        1.9
+        1.279,
+        1.944
       ],
       "anchor": [
         0.5,
@@ -2152,8 +2152,8 @@
     "held-scythe": {
       "src": "./sprites/scythe.svg?v=art4",
       "size": [
-        1.6,
-        2.4
+        1.334,
+        2.001
       ],
       "anchor": [
         0.5,
@@ -2195,8 +2195,8 @@
     "held-wisplantern": {
       "src": "./sprites/wisplantern.svg?v=art4",
       "size": [
-        1.25,
-        1.9
+        1.474,
+        2.241
       ],
       "anchor": [
         0.5,
@@ -2238,8 +2238,8 @@
     "held-stormrod": {
       "src": "./sprites/stormrod.svg?v=art4",
       "size": [
-        1.25,
-        1.9
+        1.474,
+        2.241
       ],
       "anchor": [
         0.5,
@@ -2281,8 +2281,8 @@
     "held-starfall": {
       "src": "./sprites/starfall.svg?v=art4",
       "size": [
-        1.25,
-        1.9
+        1.359,
+        2.065
       ],
       "anchor": [
         0.5,
@@ -2324,8 +2324,8 @@
     "held-crowtotem": {
       "src": "./sprites/crowtotem.svg?v=art4",
       "size": [
-        1.25,
-        1.9
+        1.567,
+        2.381
       ],
       "anchor": [
         0.5,
@@ -2367,8 +2367,8 @@
     "held-jacklantern": {
       "src": "./sprites/jacklantern.svg?v=art4",
       "size": [
-        1.25,
-        1.9
+        1.68,
+        2.553
       ],
       "anchor": [
         0.5,
@@ -2410,8 +2410,8 @@
     "held-wighthorn": {
       "src": "./sprites/wighthorn.svg?v=art4",
       "size": [
-        1.0,
-        1.5
+        1.448,
+        2.172
       ],
       "anchor": [
         0.5,
@@ -2453,8 +2453,8 @@
     "held-censer": {
       "src": "./sprites/censer.svg?v=art4",
       "size": [
-        1.25,
-        1.9
+        1.344,
+        2.043
       ],
       "anchor": [
         0.5,
@@ -2680,6 +2680,429 @@
           "fps": 1
         }
       }
+    },
+    "held-spear": {
+      "src": "./sprites/spear.svg?v=art3",
+      "size": [
+        2.015,
+        3.062
+      ],
+      "anchor": [
+        0.5,
+        0.14
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "held-sword": {
+      "src": "./sprites/sword.svg?v=art3",
+      "size": [
+        2.127,
+        3.234
+      ],
+      "anchor": [
+        0.5,
+        0.14
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "held-axe": {
+      "src": "./sprites/axe.svg?v=art3",
+      "size": [
+        1.925,
+        2.926
+      ],
+      "anchor": [
+        0.5,
+        0.14
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "held-pick": {
+      "src": "./sprites/pick.svg?v=art3",
+      "size": [
+        2.062,
+        3.135
+      ],
+      "anchor": [
+        0.5,
+        0.14
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "glow-crawler": {
+      "src": "./sprites/glow/crawler.png?v=art4",
+      "size": [
+        1.9,
+        2.85
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 6
+        }
+      }
+    },
+    "glow-wraith": {
+      "src": "./sprites/glow/wraith.png?v=art4",
+      "size": [
+        2,
+        3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 6
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 6
+        }
+      }
+    },
+    "glow-brute": {
+      "src": "./sprites/glow/brute.png?v=art4",
+      "size": [
+        2.6,
+        3.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 5
+        }
+      }
+    },
+    "glow-king": {
+      "src": "./sprites/glow/king.png?v=art4",
+      "size": [
+        4.4,
+        6.6
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 5
+        }
+      }
+    },
+    "glow-bonewalker": {
+      "src": "./sprites/glow/bonewalker.png?v=art4",
+      "size": [
+        2.1,
+        3.15
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 6
+        }
+      }
+    },
+    "glow-bogling": {
+      "src": "./sprites/glow/bogling.png?v=art4",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 7
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 6
+        }
+      }
+    },
+    "glow-golem": {
+      "src": "./sprites/glow/golem.png?v=art4",
+      "size": [
+        3.4,
+        5.1
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 6
+        }
+      }
+    },
+    "plaza": {
+      "src": "./sprites/plaza-a.svg?v=art4",
+      "size": [
+        9.6,
+        9.6
+      ],
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "plaza-glow": {
+      "src": "./sprites/plaza-a-glow.svg?v=art4",
+      "size": [
+        9.6,
+        9.6
+      ],
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "plaza-prop": {
+      "src": "./sprites/plaza-a-prop.svg?v=art4",
+      "size": [
+        1.7,
+        2.55
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 3
+        }
+      }
     }
   },
   "motion": {
@@ -2687,11 +3110,75 @@
     "walkTilt": 0.02,
     "idleSway": 0.01,
     "hitSquash": 0.16,
-    "attackTilt": 0.1
+    "attackTilt": 0.1,
+    "playerScale": 1.364
   },
   "art": {
     "style": "Hollow Harvest ink",
     "generator": "tools/art/build.py",
     "legacy": "legacy/"
+  },
+  "choices": {
+    "look": {
+      "default": "hood",
+      "keys": [
+        "ember",
+        "moss",
+        "vesper",
+        "cinder"
+      ],
+      "options": {
+        "hood": {
+          "suffix": "-hood",
+          "name": "Hooded Wayfarer"
+        },
+        "mask": {
+          "suffix": "-mask",
+          "name": "Masked Wanderer"
+        },
+        "witch": {
+          "suffix": "",
+          "name": "Witch (original)"
+        }
+      }
+    },
+    "camp": {
+      "default": "a",
+      "keys": [
+        "hearth",
+        "plaza",
+        "plaza-glow",
+        "plaza-prop"
+      ],
+      "options": {
+        "a": {
+          "name": "Moonwell",
+          "srcs": {
+            "hearth": "./sprites/hearth-a.svg?v=art4",
+            "plaza": "./sprites/plaza-a.svg?v=art4",
+            "plaza-glow": "./sprites/plaza-a-glow.svg?v=art4",
+            "plaza-prop": "./sprites/plaza-a-prop.svg?v=art4"
+          }
+        },
+        "b": {
+          "name": "Arcane brazier",
+          "srcs": {
+            "hearth": "./sprites/hearth-b.svg?v=art4",
+            "plaza": "./sprites/plaza-b.svg?v=art4",
+            "plaza-glow": "./sprites/plaza-b-glow.svg?v=art4",
+            "plaza-prop": "./sprites/plaza-b-prop.svg?v=art4"
+          }
+        },
+        "classic": {
+          "name": "Original Heartfire",
+          "srcs": {
+            "hearth": "./sprites/hearth.svg?v=art4",
+            "plaza": "./sprites/plaza-a.svg?v=art4",
+            "plaza-glow": "./sprites/plaza-a-glow.svg?v=art4",
+            "plaza-prop": "./sprites/plaza-a-prop.svg?v=art4"
+          }
+        }
+      }
+    }
   }
 }

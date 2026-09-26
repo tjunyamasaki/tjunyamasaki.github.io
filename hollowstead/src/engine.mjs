@@ -141,7 +141,9 @@ function generateMap(seed){
   const free=(x,z,gap)=>{const gx=Math.floor(x/cell),gz=Math.floor(z/cell);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const n of grid.get(`${gx+i},${gz+j}`)||[])if(Math.hypot(x-n.x,z-n.z)<gap)return false;return true;};
   const add=(type,x,z)=>{const node={id:`n${nodes.length}`,type,x,z,hits:NODES[type].hits,ready:0};nodes.push(node);const k=key(x,z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(node);return node;};
   // The first clearing guarantees every basic material within a short walk.
-  for(const [t,x,z] of [['tree',-4,-3],['tree',-7,1],['rock',4,-3],['grass',-2,3],['grass',3,3],['bush',5,2],['pumpkin',-4,5],['rock',7,-1],['tree',-6,-6],['grass',1,5],['mushroom',-7,5],['crate',9,6]])add(t,x,z);
+  // Scaled out so the plaza around the Heartfire stays open.
+  for(const [t,x,z] of [['tree',-4,-3],['tree',-7,1],['rock',4,-3],['grass',-2,3],['grass',3,3],['bush',5,2],['pumpkin',-4,5],['rock',7,-1],['tree',-6,-6],['grass',1,5],['mushroom',-7,5]])add(t,x*1.6,z*1.6);
+  add('crate',9,6);
   // Caches first so they keep their spacing; better tiers farther out.
   for(const {type,count,min,max} of CACHE_LAYOUT){
     let placed=0;
@@ -791,7 +793,7 @@ export class World {
         const rate=p?gatherRate(node.type, toolId):0;
         if(!(rate>0)){work.contributors.delete(id);continue;}
         const slot=toolId?equipmentSlotFor(toolId):null;
-        parts.push({p, rate, slot, durability:slot?p.equipment[slot].durability:Infinity});
+        parts.push({p, rate, slot, toolId, durability:slot?p.equipment[slot].durability:Infinity});
       }
       if(!parts.length){this.harvestWork.delete(node.id);return;}
       const sum=parts.reduce((total,part)=>total+part.rate,0);
@@ -802,7 +804,7 @@ export class World {
       for(const part of parts){
         if(part.slot)this.wearEquipped(part.p, part.slot, part.durability-slice<=1e-8?part.durability:slice);
         part.p.stamina=Math.max(0, part.p.stamina-2*slice);
-        part.p.action='gather';part.p.actionUntil=this.time+.3;
+        part.p.action='gather';part.p.actionUntil=this.time+.3;part.p.gatherTool=part.toolId||null;
         const span=Math.max(.1, distance(part.p, node));
         part.p.dx=(node.x-part.p.x)/span;part.p.dz=(node.z-part.p.z)/span;
       }
@@ -983,7 +985,7 @@ export class World {
       const hits=style.arc>0?hostile.filter(entry=>{const d=distance(entry,p);if(d>=range)return false;if(d<.6)return true;const dot=((entry.x-p.x)*p.dx+(entry.z-p.z)*p.dz)/d;return dot>=Math.cos(style.arc*Math.PI/360);}):(target?[target]:[]);
       for(const enemy of hits)this.strike(p, enemy, damage, .32);
       if(armed&&hits.length)this.wearEquipped(p,'weapon',1);
-      if(style.arc>0)this.event('cleave',p.x,p.z,'',{dx:p.dx,dz:p.dz,arc:style.arc,range});
+      this.event(style.arc>0?'cleave':'slash',p.x,p.z,'',{dx:p.dx,dz:p.dz,arc:style.arc||120,range});
       return;
     }
     if(style.style==='nova'){

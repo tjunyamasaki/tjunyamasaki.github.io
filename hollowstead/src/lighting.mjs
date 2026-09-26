@@ -257,3 +257,13 @@ export function writeLightField(data, size, origin, span, sources, lighting=reso
     }
   }
 }
+
+/** How brightly a creature's eyes (or lantern, or crystals) shine: faint by day, fierce at night,
+ * with a slow pulse and a blink every few seconds. Each creature keeps its own rhythm. */
+export function glowStrength(darkness, entity, clock){
+  let seed=0;for(const ch of String(entity?.id??''))seed=(seed*31+ch.charCodeAt(0))%9973;seed/=9973;
+  const period=2.4+seed*2.6,t=(clock+seed*11)%period;
+  const blink=t<.12?0:t<.2?(t-.12)/.08:(seed>.6&&t>.34&&t<.42)?.15:1;
+  const pulse=.82+.18*Math.sin(clock*(2.2+seed)+seed*6);
+  return Math.max(0,Math.min(1,(.18+.82*darkness)*blink*pulse*(entity?.stunned>0?.3:1)));
+}

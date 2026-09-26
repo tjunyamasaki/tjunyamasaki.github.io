@@ -4,6 +4,9 @@ import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-
 import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-16';
 import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-16';
 import {ALLIES} from './progression.mjs?v=harvest-16';
+import {glowStrength} from './lighting.mjs?v=harvest-16';
+/** Standing stones or lamps ringing the Heartfire plaza (presentation only). */
+export function plazaProps(world,theme){const hearth=world.buildings.find(b=>b.type==='hearth');if(!hearth||!theme.sprites['plaza-prop'])return [];return [0,1,2,3,4,5].map(i=>{const a=i*Math.PI/3;return {e:{id:'plaza'+i,x:hearth.x+Math.cos(a)*4.7,z:hearth.z+Math.sin(a)*4.7*.92},key:'plaza-prop',kind:'prop'};});}
 const PROJECTILE_KEYS={arrow:'arrow',bolt:'mbolt',wisp:'wisp',seed:'pumpseed'};
 import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-16';
 import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-16';
@@ -15,8 +18,23 @@ import {
   frameLighting, labelOpacity, linearFromDisplay, spriteTint, warningVisible, writeLightField,
 } from './lighting.mjs?v=harvest-16';
 import {loadImage, loadJson, preloadThemeAssets} from './assets.mjs?v=harvest-16';
+/** Art that ships in more than one version (wanderer look, Heartfire). ?look=mask&hearth=b in the URL,
+ * or a saved pick, chooses; otherwise the theme default. Sprites are swapped by file suffix. */
+export function themeChoice(theme, name){
+  const choice=theme.choices?.[name];if(!choice)return null;
+  let picked=null;
+  try{picked=new URLSearchParams(globalThis.location?.search||'').get(name)||globalThis.localStorage?.getItem(`hollowstead.${name}`);}catch{}
+  return choice.options[picked]?picked:choice.default;
+}
+export function applyThemeChoices(theme){
+  for(const [name,choice] of Object.entries(theme.choices||{})){
+    const option=choice.options[themeChoice(theme,name)]||{};
+    for(const key of choice.keys){const def=theme.sprites[key];if(!def)continue;if(option.srcs?.[key])def.src=option.srcs[key];else if(option.suffix)def.src=def.src.replace(/\.svg(\?|$)/,`${option.suffix}.svg$1`);if(option.size)def.size=option.size;}
+  }
+  return theme;
+}
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
-  const theme=await loadJson(url);theme.url=url;for(const def of Object.values(theme.sprites)){def.src=new URL(def.src,url).href;if(def.icon)def.icon=new URL(def.icon,url).href;}
+  const theme=await loadJson(url);theme.url=url;applyThemeChoices(theme);for(const def of Object.values(theme.sprites)){def.src=new URL(def.src,url).href;if(def.icon)def.icon=new URL(def.icon,url).href;}
   for(const[k,v]of Object.entries(theme.audio))theme.audio[k]=new URL(v,url).href;return theme;
 }
 export class Renderer {
@@ -77,7 +95,7 @@ export class Renderer {
     this.scene.add(sprite);const shadow=new THREE.Mesh(this.shadowGeo,this.shadowMat);shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;shadow.scale.setScalar(def.size[0]*.26);this.scene.add(shadow);
     const o={id,key,sprite,shadow,def,x:0,z:0,initialized:false};this.objects.set(id,o);return o;
   }
-  remove(o){this.scene.remove(o.sprite,o.shadow);o.sprite.material.map.dispose();o.sprite.material.dispose();if(o.glow){this.scene.remove(o.glow);o.glow.geometry.dispose();o.glow.material.dispose();}if(o.danger){this.scene.remove(o.danger);o.danger.geometry.dispose();o.danger.material.dispose();}if(o.health){this.scene.remove(o.health.back,o.health.fill);o.health.back.material.dispose();o.health.fill.material.dispose();}this.objects.delete(o.id);}
+  remove(o){this.scene.remove(o.sprite,o.shadow);o.sprite.material.map.dispose();o.sprite.material.dispose();if(o.glow){this.scene.remove(o.glow);o.glow.geometry.dispose();o.glow.material.dispose();}if(o.eyes){this.scene.remove(o.eyes);o.eyes.material.map.dispose();o.eyes.material.dispose();}if(o.danger){this.scene.remove(o.danger);o.danger.geometry.dispose();o.danger.material.dispose();}if(o.health){this.scene.remove(o.health.back,o.health.fill);o.health.back.material.dispose();o.health.fill.material.dispose();}this.objects.delete(o.id);}
   terrain(seed){
     if(this.ground){this.scene.remove(this.ground);this.ground.geometry.dispose();this.ground.material.dispose();}
     if(this.scatter){this.scene.remove(this.scatter);this.scatter.geometry.dispose();this.scatter.material.dispose();}
@@ -115,12 +133,20 @@ export class Renderer {
     if(event.type==='levelup')this.float(`LEVEL UP · ${event.text}`,event.x,event.z,'#f2c14e');
     if(event.type==='discover')this.float(event.text,event.x,event.z,'#d4fff5');
     if(event.type==='freeze')this.float(event.text,event.x,event.z,'#d6f1ff');
+    if(['slash','cleave'].includes(event.type)){const arc=Math.min(Math.PI*1.9,(event.arc||120)*Math.PI/180),range=event.range||2.5,phi=Math.atan2(event.dz||0,event.dx||1);const geo=new THREE.RingGeometry(range*.5,range*.98,28,1,-phi-arc/2,arc);geo.setDrawRange(0,0);const mat=new THREE.MeshBasicMaterial({color:event.type==='cleave'?0xffe0b0:0xfff4e2,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(geo,mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.5,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,fixed:true,sweep:28});}
     if(['chain','lash'].includes(event.type)){const pts=event.type==='chain'?(event.points||[]).map(([x,z])=>new THREE.Vector3(x,.9,z)):[new THREE.Vector3(event.x,.9,event.z),new THREE.Vector3(event.x+(event.dx||0)*(event.range||4),.9,event.z+(event.dz||0)*(event.range||4))];if(pts.length>1){const bent=[];for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];for(let k=0;k<6;k++){const t=k/6;bent.push(new THREE.Vector3(a.x+(b.x-a.x)*t+(k?(Math.random()-.5)*.35:0),.9+(k?(Math.random()-.5)*.3:0),a.z+(b.z-a.z)*t+(k?(Math.random()-.5)*.35:0)));}}bent.push(pts[pts.length-1]);const mesh=new THREE.Line(new THREE.BufferGeometry().setFromPoints(bent),new THREE.LineBasicMaterial({color:event.type==='chain'?0xbfe8ff:0xc49bff,transparent:true,depthWrite:false}));this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,fixed:true});}}
     if(['starfall','mark','frost','freeze','summon','poof','rend'].includes(event.type)){const color={starfall:0xf2c14e,mark:0xf2c14e,frost:0xbfe8ff,freeze:0xe2f6ff,summon:0x9fd8a8,poof:0x9fd8a8,rend:0xd0504a}[event.type];const mat=new THREE.MeshBasicMaterial({color,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||({freeze:.9,summon:1.1,poof:.8,rend:1}[event.type]||1)});}
     if(['nova','burst'].includes(event.type)){const mat=new THREE.MeshBasicMaterial({color:event.type==='nova'?0xf4a64a:0x7fd6c4,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||2});}
     if(!event.magicPack&&['hit','kill','hurt','build','craft','impact','bolt'].includes(event.type)){
       const mat=new THREE.MeshBasicMaterial({color:event.type==='hurt'?0xd97773:event.type==='bolt'?0xa7e5d8:0xf4c486,transparent:true,depthWrite:false});const mesh=new THREE.Mesh(new THREE.RingGeometry(.06,.2,10),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z});
     }
+  }
+  paintPlaza(world,frame){
+    const hearth=world.buildings.find(b=>b.type==='hearth');
+    if(!hearth||!this.textures.has('plaza')){if(this.plaza){this.plaza.base.visible=false;if(this.plaza.glow)this.plaza.glow.visible=false;}return;}
+    if(!this.plaza){const size=this.theme.sprites.plaza.size[0];const mk=(key,add)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(size,size),new THREE.MeshBasicMaterial({map:this.textures.get(key),transparent:true,depthWrite:false,blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));m.rotation.x=-Math.PI/2;m.renderOrder=add?-1:-2;this.scene.add(m);return m;};this.plaza={base:mk('plaza'),glow:this.textures.has('plaza-glow')?mk('plaza-glow',true):null};}
+    const {base,glow}=this.plaza;base.visible=true;base.position.set(hearth.x,.012,hearth.z);base.material.color.setScalar(Math.min(1,entityBrightness(frame,hearth.x,hearth.z,{emissive:true})));
+    if(glow){glow.visible=true;glow.position.set(hearth.x,.015,hearth.z);glow.material.opacity=(.12+.5*frame.darkness)*(.75+.25*Math.sin(this.clock*1.6));}
   }
   reveal(x,z){if(!this.view)return 1;return labelOpacity(brightnessAt(this.view.sources, x, z, this.view.darkness, this.view.lighting), this.view.darkness, this.view.lighting);}
   syncHeldWeapon(player, body){
@@ -140,11 +166,12 @@ export class Renderer {
     this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);this.camera.position.set(this.focus.x,28,this.focus.z+27);this.camera.lookAt(this.focus.x,0,this.focus.z);this.camera.updateMatrixWorld();
     const frame=frameLighting(world, this.theme);this.view=frame;this.paintField(frame);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).map(e=>({e,key:e.kind==='star'?'star':'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
+    this.paintPlaza(world,frame);
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).map(e=>({e,key:e.kind==='star'?'star':'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme)];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
-      const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
+      const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.eyes)o.eyes.visible=visible;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
       const present=kind==='drop'?this.dropMotion.sample(e,world,this.clock,dt,id=>{const body=this.objects.get('player'+id);return body?.initialized?{x:body.x,z:body.z}:null;}):null;
       const tx=present?present.x:e.x, tz=present?present.z:e.z;
       const smooth=['player','enemy','magic','ally'].includes(kind)&&!demo?Math.min(1,dt*(e.id===localId?22:13)):1;
@@ -172,6 +199,7 @@ export class Renderer {
       const lampStrength=lamp>frame.lighting.ambientNight?Math.min(1,(lamp-frame.lighting.ambientNight)/Math.max(0.01, frame.lighting.litBrightness-frame.lighting.ambientNight)):0;
       this.shadeSprite(o.sprite.material, display, lampStrength, frame.darkness, frame.lighting);
       if(kind==='enemy'&&e.stunned>0)o.sprite.material.color.lerp(new THREE.Color('#bfe8ff'), .65);
+      if(kind==='enemy'&&this.textures.has('glow-'+key)){if(!o.eyes){const gdef=this.theme.sprites['glow-'+key],tex=this.textures.get('glow-'+key).clone();tex.needsUpdate=true;tex.repeat.set(1/(gdef.columns||1),1/(gdef.rows||1));o.eyes=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));o.eyes.center.copy(o.sprite.center);this.scene.add(o.eyes);}o.eyes.material.map.offset.copy(o.sprite.material.map.offset);o.eyes.scale.copy(o.sprite.scale);o.eyes.position.set(o.sprite.position.x,o.sprite.position.y+.03,o.sprite.position.z+.03);o.eyes.material.rotation=o.sprite.material.rotation;o.eyes.visible=o.sprite.visible;o.eyes.material.opacity=glowStrength(frame.darkness,e,this.clock);}
       if(kind==='building'&&key==='farm'&&e.growth>=100&&display>0.55)o.sprite.material.color.lerp(new THREE.Color('#efd394'), .45);
       if(kind!=='zone')o.sprite.material.opacity=e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
       const fade=labelOpacity(display, frame.darkness, frame.lighting);
@@ -189,7 +217,7 @@ export class Renderer {
     this.pathMarker.visible=!!p.goal&&goalFade>0.04;if(p.goal){this.pathMarker.position.set(p.goal.x,.03,p.goal.z);this.pathMarker.material.opacity=.7*goalFade;}
     if(placement){if(!this.ghost||this.ghost.key!==placement.key){if(this.ghost)this.remove(this.ghost);this.ghost=this.sprite(placement.key,'preview');}this.ghost.sprite.position.set(placement.x,0,placement.z);this.ghost.sprite.material.color.set(placement.valid?'#c8e5a6':'#dd7471');this.ghost.sprite.material.opacity=.7;this.ghost.shadow.visible=false;this.ghost.sprite.visible=true;}else if(this.ghost){this.remove(this.ghost);this.ghost=null;}
     for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2)this.effect(ev);this.lastEvent=ev.id;}
-    this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);if(!e.fixed)e.mesh.scale.setScalar(e.radius?.3+Math.min(1,e.life*3)*e.radius:1+e.life*(e.type==='impact'?12:4));e.mesh.material.opacity=Math.max(0,1-e.life*2)*fade;if(e.life>.5){this.scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();return false;}return true;});
+    this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);if(e.sweep)e.mesh.geometry.setDrawRange(0,6*Math.ceil(e.sweep*Math.min(1,e.life/.1)));if(!e.fixed)e.mesh.scale.setScalar(e.radius?.3+Math.min(1,e.life*3)*e.radius:1+e.life*(e.type==='impact'?12:4));e.mesh.material.opacity=Math.max(0,1-e.life*(e.sweep?3.2:2))*fade*(e.sweep?.55:1);if(e.life>.5){this.scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();return false;}return true;});
     this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*(f.alwaysVisible?1:this.reveal(f.x, f.z)));if(f.life>1.8){f.el.remove();return false;}return true;});
     this.magicMesh.update(buildMagicEffects(world,this.magicFrame,this.theme));
     this.gl.render(this.scene,this.camera);

@@ -1,11 +1,11 @@
 // Presentation only. Gameplay modules never read this file. A theme can replace
 // any sprite or override magic.palette / magic.motion without changing combat.
 export const GRAVECRAFT = Object.freeze({
-  'barrow-rattle': {size: [1.85, 1.85], anchor: [.5, .2], motion: 'rattle'},
-  'cinder-staff': {size: [2.8, 2.8], anchor: [.5, .3], motion: 'staff'},
-  'widows-needle': {size: [2.25, 2.25], anchor: [.5, .22], motion: 'needle'},
-  'spirit-fan': {size: [2.15, 2.15], anchor: [.5, .17], motion: 'fan'},
-  'mourning-bell': {size: [1.55, 1.55], anchor: [.5, .62], motion: 'bell'},
+  'barrow-rattle': {size: [1.30, 1.30], anchor: [.5, .2], motion: 'rattle'},
+  'cinder-staff': {size: [1.89, 1.89], anchor: [.5, .3], motion: 'staff'},
+  'widows-needle': {size: [1.28, 1.28], anchor: [.5, .22], motion: 'needle'},
+  'spirit-fan': {size: [1.45, 1.45], anchor: [.5, .17], motion: 'fan'},
+  'mourning-bell': {size: [1.32, 1.32], anchor: [.5, .62], motion: 'bell'},
 });
 
 /** Held poses for the Long Night weapons. Sprites come from the theme under the item id. */
@@ -14,6 +14,7 @@ export const HELD_GEAR = Object.freeze({
   recurve: {motion: 'bow', handY: 1.0, sprite: 'held-recurve'}, bonebow: {motion: 'bow', handY: 1.0, sprite: 'held-bonebow'},
   crookstaff: {motion: 'staff', sprite: 'held-crookstaff'}, skullstaff: {motion: 'staff', sprite: 'held-skullstaff'},
   tome: {motion: 'tome', handY: 1.25, handX: .55, sprite: 'held-tome'},
+  spear: {motion: 'thrust', sprite: 'held-spear'}, sword: {motion: 'swing', sprite: 'held-sword'},
   fangs: {motion: 'thrust', sprite: 'held-fangs'}, soulchain: {motion: 'swing', sprite: 'held-soulchain'},
   scythe: {motion: 'swing', sprite: 'held-scythe'}, wisplantern: {motion: 'bell', handY: 1.0, sprite: 'held-wisplantern'},
   stormrod: {motion: 'staff', sprite: 'held-stormrod'}, starfall: {motion: 'staff', sprite: 'held-starfall'},
@@ -54,32 +55,64 @@ export class MagicClock {
   }
 }
 
+/** Tools shown while gathering with them. */
+export const TOOL_GEAR = Object.freeze({
+  axe: {motion: 'chop', sprite: 'held-axe'}, pick: {motion: 'chop', sprite: 'held-pick'},
+});
+const inOut = n => {n = clamp(n); return n < .5 ? 4*n*n*n : 1-(-2*n+2)**3/2;};
+const easeIn = n => clamp(n)**3;
+const CHOP_PERIOD = .45;   // matches the engine's gathering hit rhythm
+const SWING_SECONDS = .46;
+
+/** Chop: slow wind-up, a hard fast strike, a small settle. Loops while gathering. */
+export function chopAngle(t){
+  if(t < .6) return -.4+1.9*inOut(t/.6);
+  if(t < .78) return 1.5-2.4*easeIn((t-.6)/.18);
+  return -.9+.5*ease((t-.78)/.22);
+}
+/** Melee swing: anticipation behind the shoulder, a wide fast arc, a smooth recovery. */
+export function swingAngle(t){
+  if(t < .2) return -.1+1.9*ease(t/.2);
+  if(t < .52) return 1.8-4.0*inOut((t-.2)/.32);
+  return -2.2+2.1*ease((t-.52)/.48);
+}
+
 export function heldWeaponPose(player, time, theme={}){
-  const id = player.equipment?.weapon?.itemId;
-  if(!GRAVECRAFT[id] && !HELD_GEAR[id]) return null;
-  const spec = {...(GRAVECRAFT[id] || HELD_GEAR[id]), ...theme.magic?.weapons?.[id]};
+  const tool = player.action === 'gather' && TOOL_GEAR[player.gatherTool] ? player.gatherTool : null;
+  const id = tool || player.equipment?.weapon?.itemId;
+  const base = tool ? TOOL_GEAR[tool] : (GRAVECRAFT[id] || HELD_GEAR[id]);
+  if(!base) return null;
+  const spec = {...base, ...theme.magic?.weapons?.[id]};
   const side = player.dx < -.1 ? -1 : 1;
   const cast = player.magicCast;
   const age = cast?.itemId === id ? time-cast.at : Infinity;
-  const duration = theme.magic?.motion?.castSeconds || .6;
+  const melee = spec.motion === 'swing' || spec.motion === 'thrust';
+  const duration = melee ? SWING_SECONDS : theme.magic?.motion?.castSeconds || .6;
   const t = clamp(age / duration);
-  const active = age >= 0 && age < duration;
-  let rotation = -.10*side, reach = 0, scale = 1;
-  if(active){
+  const active = tool ? true : age >= 0 && age < duration;
+  let rotation = -.10*side, reach = 0, scale = 1, lift = 0;
+  if(tool){
+    const phase = (time % CHOP_PERIOD) / CHOP_PERIOD;
+    rotation = side*chopAngle(phase);
+    reach = .18*Math.max(0, -chopAngle(phase)); lift = .1*Math.max(0, chopAngle(phase));
+  }else if(active){
     const fade = 1-t;
     if(spec.motion === 'rattle') rotation += Math.sin(t*28)*.48*fade;
     if(spec.motion === 'staff') rotation += side*(-.65*Math.exp(-t*10)+.55*Math.sin(t*Math.PI)*fade);
     if(spec.motion === 'needle'){reach = Math.sin(Math.min(1,t*2.2)*Math.PI)*.8; rotation += side*.9*Math.sin(t*Math.PI);}
     if(spec.motion === 'fan'){rotation += side*Math.sin(t*Math.PI)*1.4; scale = .75+.25*Math.sin(t*Math.PI);}
     if(spec.motion === 'bell') rotation += Math.sin(t*21)*.8*fade;
-    if(spec.motion === 'swing') rotation += side*(1.1-2.6*ease(t))*fade;
-    if(spec.motion === 'thrust'){reach = Math.sin(Math.min(1,t*2)*Math.PI)*.9; rotation += side*.7;}
+    if(spec.motion === 'swing'){rotation = side*swingAngle(t); reach = .35*Math.sin(clamp((t-.15)/.5)*Math.PI); scale = 1+.08*Math.sin(clamp((t-.2)/.32)*Math.PI); lift = .12*Math.sin(clamp(t/.3)*Math.PI);}
+    if(spec.motion === 'thrust'){
+      const pull = t < .22 ? -.35*ease(t/.22) : t < .45 ? -.35+1.4*ease((t-.22)/.23) : 1.05*(1-inOut((t-.45)/.55));
+      reach = pull; rotation = side*(-.1-1.25*ease(Math.min(1, t/.18))*(t < .8 ? 1 : 1-ease((t-.8)/.2)));
+    }
     if(spec.motion === 'bow'){rotation += side*.25*fade; reach = -.15*Math.sin(t*Math.PI);}
     if(spec.motion === 'tome'){scale = 1+.25*Math.sin(t*Math.PI); rotation += Math.sin(t*14)*.2*fade;}
   }
-  const length = Math.hypot(player.dx||0,player.dz||0)||1;
-  return {key: spec.sprite || id, x: side*(spec.handX??.48)+(player.dx||0)/length*reach, z: .04+(player.dz||0)/length*reach,
-    y: (spec.handY??1.12)+Math.sin(time*2.4)*.025+(active?Math.sin(t*Math.PI)*.12:0),
+  const length = Math.hypot(player.dx||0,player.dz||0)||1, k = theme.motion?.playerScale || 1;
+  return {key: spec.sprite || id, x: side*(spec.handX??.48)*k+(player.dx||0)/length*reach, z: .04+(player.dz||0)/length*reach,
+    y: (spec.handY??1.12)*k+Math.sin(time*2.4)*.025+lift+(active&&!melee&&!tool?Math.sin(t*Math.PI)*.12:0),
     rotation, side, scale: scale*(spec.heldScale??1), active};
 }
 

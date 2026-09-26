@@ -8,7 +8,7 @@ import {
   ACTION_RESULT_FIELDS, ACTION_RESULT_TYPE, BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CONTEXT_ACTIONS,
   CONTRACT, EQUIPMENT_SLOTS, EQUIPMENT_SLOT_ITEMS, FIELD_BUILD_RECIPES, FIRE_COOK_RECIPES,
   INTENTS, MIGRATION_PREFERRED_WEAPON, NIGHT_WAVE_FRACTIONS, PROTOCOL_V1, PROTOCOL_V2,
-  RECIPE_CONTEXTS, REMOVED_GAMEPLAY_COMMANDS, RESULT_CODES, SAVE_VERSION_V1, STACK_LIMIT,
+  RECIPE_CONTEXTS, REMOVED_GAMEPLAY_COMMANDS, RESULT_CODES, SAVE_VERSION_V1, STACK_LIMIT, DROP_LIFETIME_SECONDS,
   SUPPLY_CAPACITY, SUPPLY_ITEM_IDS, TRANSPORT_HEARTBEAT, V1_PHASE, V1_SAVE_FIELDS, V2_PHASE,
   WORKBENCH_BUILD_RECIPES, WORKBENCH_CRAFT_RECIPES, CAULDRON_COOK_RECIPES,
   containerId, equipmentSlotFor, inCraftRange, inPlaceRange, inReach, itemDefinition,
@@ -122,7 +122,10 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(BACKPACK_SLOT_COUNT, 12);
   assert.equal(SUPPLY_CAPACITY, 120);
   assert.equal(CHEST_SLOT_COUNT, 24);
-  assert.deepEqual(splitStackQuantities(45), [20, 20, 5]);
+  assert.equal(STACK_LIMIT, 64);
+  assert.equal(DROP_LIFETIME_SECONDS, RULES.cycle);
+  assert.deepEqual(splitStackQuantities(45), [45]);
+  assert.deepEqual(splitStackQuantities(130), [64, 64, 2]);
   assert.equal(splitStackQuantities(0), null);
 
   const both = legacyEquipmentPlan({axe: 999, pick: 12, spear: 15, sword: 40, armor: 3, torch: 1.5, relic: 1});

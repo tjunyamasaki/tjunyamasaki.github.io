@@ -181,7 +181,7 @@ export function planInsert(container, stack, options={}){
     }
   }
 
-  while(remaining>0){
+  while(remaining>0&&options.existingOnly!==true){
     const room=Math.min(def.stackLimit, remaining, supplyRoom());
     if(room<=0)break;
     let uid;

@@ -170,6 +170,7 @@ export const INTENTS = Object.freeze({
   chestClose: intent('chestClose', ['requestId', 'chestId', 'sessionId']),
   chestTransfer: intent('chestTransfer', ['requestId', 'chestId', 'sessionId', 'sourceContainerId', 'sourceSlot', 'destinationContainerId', 'destinationSlot', 'uid', 'quantity', 'sourceRevision', 'destinationRevision']),
   chestStoreAll: intent('chestStoreAll', ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']),
+  chestStack: intent('chestStack', ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']),
   chestSort: intent('chestSort', ['requestId', 'chestId', 'sessionId', 'destinationRevision']),
   packSort: intent('packSort', ['requestId', 'inventoryRevision']),
   craftRecipe: intent('craftRecipe', ['requestId', 'recipeId', 'stationId']),

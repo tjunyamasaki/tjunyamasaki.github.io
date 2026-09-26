@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hollowstead">
+  <meta name="theme-color" content="#292532"><meta name="description" content="Gather by day. Keep the fire alive at night. A Halloween co-op survival expedition for 1–4 players.">
+  <title>Hollowstead — A little light. A long night.</title>
+  <link rel="icon" type="image/svg+xml" href="./themes/harvest/sprites/pumpkin.svg"><link rel="stylesheet" href="./style.css?v=harvest-16">
+</head>
+<body>
+  <canvas id="world" aria-label="Hollowstead survival world"></canvas><div class="vignette" aria-hidden="true"></div><div id="world-labels" aria-hidden="true"></div>
+  <div id="loading"><span class="flame-mark">♧</span><p>Lighting the way…</p><small id="load-status">Waking the Hollow Harvest</small></div>
+  <main id="front" hidden>
+    <header class="front-header"><a href="../links/" aria-label="Back to games">← GAMES</a><span>THE HOLLOW HARVEST · 01</span><div class="front-tools"><button id="front-fullscreen" class="text-button" type="button">FULLSCREEN</button><button id="front-sound" class="text-button" aria-label="Toggle sound">SOUND ON</button></div></header>
+    <p id="front-fullscreen-note" class="fullscreen-note" hidden></p>
+    <section class="hero"><p class="eyebrow"><span class="tiny-dot"></span> 1–4 WANDERERS · CO-OP SURVIVAL</p><h1>Hollow<span>stead<span class="title-star">✦</span></span></h1><p class="tagline">A little light.<br>A long night.</p><p class="hero-description">Explore the hollow. Crack open its caches.<br>Grow stronger. Outlast every night.</p></section>
+    <section class="front-panel" id="home-panel">
+      <div class="panel-heading"><span class="eyebrow">WHO WILL YOU BE?</span><span class="edition">AUTUMN ’26</span></div>
+      <div id="characters" class="characters" aria-label="Choose your wanderer"></div>
+      <label class="name-field"><span>YOUR NAME</span><input id="player-name" maxlength="18" value="Wanderer" autocomplete="nickname" aria-label="Your name"></label>
+      <button id="host" class="primary wide">Gather your friends <span>↗</span></button>
+      <div class="join-row"><input id="room-input" placeholder="CAMP CODE" maxlength="5" autocomplete="off" autocapitalize="characters" aria-label="Camp code"><button id="join">Join camp →</button></div>
+      <div class="front-secondary"><button id="solo" class="text-button">Venture alone</button><button id="showcase" class="text-button">Showcase</button><button id="continue" class="text-button" hidden>Continue expedition ↗</button></div>
+      <label id="saved-option" class="saved-option" hidden><input type="checkbox" id="host-save"> Host my saved expedition</label>
+      <p class="status" id="front-status" role="status"></p>
+    </section>
+    <section class="front-panel" id="room-panel" hidden><p class="eyebrow">THE CAMP IS OPEN</p><h2>Better together.</h2><p class="muted">Invite your friends, then enter the woods.</p><button id="copy-room" class="room-code" title="Copy invite link"><span id="room-code">·····</span><small>TAP TO COPY INVITE ↗</small></button><div id="roster"></div><button id="launch" class="primary wide">Enter the woods <span>→</span></button><p id="room-note" class="muted small">Friends can also join after you start.</p><button id="cancel-room" class="text-button">← Leave camp</button></section>
+    <footer class="front-footer"><span>ENDLESS NIGHTS. ONE SHARED FIRE.</span><button id="front-guide" class="text-button">A wanderer’s field guide ↗</button></footer>
+  </main>
+  <div id="game" hidden>
+    <header class="game-top">
+      <section class="vitals" aria-label="Survival stats">
+        <button type="button" class="level-chip" id="level-chip" aria-label="Open settings, level 1">
+          <span class="level-ring" id="xp-ring" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Experience"><b id="level-number">1</b></span>
+        </button>
+        <div class="vitals-bars">
+          <div class="vital health" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Health 100"><span aria-hidden="true">♥</span><i><em id="hp-bar"></em></i></div>
+          <div class="vital hunger" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="90" aria-label="Hunger 90"><span aria-hidden="true">◕</span><i><em id="hunger-bar"></em></i></div>
+          <div class="vital courage" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Courage 100"><span aria-hidden="true">✦</span><i><em id="courage-bar"></em></i></div>
+        </div>
+      </section>
+      <div class="clock"><div class="clock-meta"><small id="region-name">THE MEADOW</small><span id="day-number">DAY 01</span></div><div class="day-track" id="day-track"><i id="day-progress"></i></div></div>
+      <button id="minimap-button" type="button" aria-label="Open world map"><canvas id="minimap" width="200" height="200"></canvas></button>
+    </header>
+    <div id="party" class="party"></div>
+    <div id="boss-bar" hidden><span>THE HOLLOW KING</span><i><em></em></i></div>
+    <div id="announcement" role="status"></div><div id="toast" role="status" aria-live="polite"></div><div id="connection-banner" hidden></div>
+    <div class="bottom-controls">
+      <div id="joystick" role="group" aria-label="Movement joystick"><span class="joystick-rim"></span><i id="stick"></i></div>
+      <div class="actions" id="action-cluster" aria-label="Actions">
+        <button type="button" id="context-1" class="round context-extra is-off" tabindex="-1" aria-hidden="true"></button>
+        <button type="button" id="context-2" class="round context-extra is-off" tabindex="-1" aria-hidden="true"></button>
+        <button type="button" id="dodge" class="round small-round" aria-label="Dodge">↝<small>Dodge</small></button>
+        <button type="button" id="context-3" class="round context-extra is-off" tabindex="-1" aria-hidden="true"></button>
+        <button type="button" id="lantern-button" class="round lantern-round is-off" tabindex="-1" aria-hidden="true" aria-label="Lantern"><svg class="fuel-arc" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15"></circle></svg><span>♧</span><small>Light</small></button>
+        <button type="button" id="attack" class="round attack" aria-label="Attack, hold to repeat">⚔<small>Attack</small></button>
+        <button type="button" id="context-0" class="round interact is-off" tabindex="-1" aria-hidden="true"></button>
+        <div class="stamina-track" aria-hidden="true"><i id="stamina-bar"></i></div>
+      </div>
+    </div>
+    <aside id="showcase-panel" hidden aria-label="Showcase spawns"></aside>
+    <nav class="hotbar" aria-label="Game actions"><button type="button" id="hotbar-inventory" aria-label="Inventory"><span aria-hidden="true">▣</span><small>Pack <kbd>I</kbd></small></button><button type="button" id="hotbar-build" aria-label="Build"><span aria-hidden="true">⌂</span><small>Build <kbd>B</kbd></small></button></nav>
+    <div id="downed" hidden><h2>A light is fading.</h2><p id="downed-text"></p><button id="use-charm" class="primary" type="button">Use your last charm</button></div>
+  </div>
+  <section id="sheet" class="sheet" hidden role="dialog" aria-modal="false" aria-labelledby="sheet-title"><header><div><span class="eyebrow" id="sheet-kicker">FIELD NOTES</span><h2 id="sheet-title">Your pack</h2></div><div class="sheet-tools"><button id="close-sheet" class="close-button" type="button" aria-label="Close panel">✕</button></div></header><div id="sheet-tabs"></div><div id="sheet-content"></div></section>
+  <section id="end-screen" hidden><div class="end-card"><p id="end-kicker" class="eyebrow">THE EXPEDITION ENDS</p><h2 id="end-title">The last light.</h2><p id="end-text"></p><div id="end-stats"></div><button id="endless" class="primary wide" hidden>Keep surviving →</button><button id="new-expedition" class="primary wide">Another expedition →</button><button id="end-home" class="text-button">Return to the clearing</button></div></section>
+  <script type="module" src="./src/main.mjs?v=harvest-16"></script>
+</body>
+</html>

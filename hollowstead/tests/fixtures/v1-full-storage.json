@@ -1,0 +1,279 @@
+{
+  "savedAt": 1760000190000,
+  "world": {
+    "version": 1,
+    "seed": 402,
+    "time": 190,
+    "status": "playing",
+    "players": [
+      {
+        "id": "host",
+        "name": "Jun",
+        "character": "ember",
+        "x": 5,
+        "z": 2.5,
+        "dx": 0,
+        "dz": 1,
+        "hp": 64,
+        "hunger": 37,
+        "courage": 22,
+        "stamina": 100,
+        "inventory": {
+          "wood": 40,
+          "stone": 30,
+          "fiber": 20,
+          "berry": 10,
+          "ore": 8,
+          "ember": 5,
+          "seed": 4,
+          "pumpkin": 3
+        },
+        "equipment": {
+          "axe": 48,
+          "pick": 22,
+          "spear": 36,
+          "torch": 167.5,
+          "armor": 77,
+          "sword": 140
+        },
+        "cooldown": 0.3,
+        "dash": 0,
+        "dashCooldown": 0,
+        "down": 0,
+        "ghost": false,
+        "revive": 0,
+        "charm": 1,
+        "online": true,
+        "lantern": true,
+        "rest": false,
+        "action": "idle",
+        "actionUntil": 0,
+        "notice": "Materials stored — nearby crafting uses this chest",
+        "noticeAt": 17,
+        "goal": null
+      },
+      {
+        "id": "guest",
+        "name": "Moss",
+        "character": "moss",
+        "x": 2.8,
+        "z": 1.8,
+        "dx": 0,
+        "dz": 1,
+        "hp": 100,
+        "hunger": 90,
+        "courage": 100,
+        "stamina": 100,
+        "inventory": {
+          "wood": 100,
+          "stone": 100,
+          "fiber": 100,
+          "ore": 100,
+          "ember": 100,
+          "seed": 100,
+          "berry": 100,
+          "pumpkin": 100,
+          "mushroom": 100,
+          "meat": 100,
+          "roast": 100,
+          "stew": 100,
+          "bandage": 100
+        },
+        "equipment": {},
+        "cooldown": 0,
+        "dash": 0,
+        "dashCooldown": 0,
+        "down": 0,
+        "ghost": false,
+        "revive": 0,
+        "charm": 1,
+        "online": true,
+        "lantern": false,
+        "rest": false,
+        "action": "idle",
+        "actionUntil": 0,
+        "notice": "",
+        "noticeAt": 0,
+        "goal": null
+      }
+    ],
+    "buildings": [
+      {
+        "id": "heart",
+        "type": "hearth",
+        "x": 0,
+        "z": 0,
+        "hp": 600,
+        "maxHp": 600,
+        "fuel": 150,
+        "level": 1,
+        "rotation": 0,
+        "open": false,
+        "charges": 3,
+        "growth": 0,
+        "planted": false,
+        "store": {},
+        "cooldown": 0
+      },
+      {
+        "id": "b1",
+        "type": "chest",
+        "x": 4,
+        "z": 2.5,
+        "hp": 180,
+        "maxHp": 180,
+        "fuel": 0,
+        "level": 1,
+        "rotation": 0,
+        "open": false,
+        "charges": 3,
+        "growth": 0,
+        "planted": false,
+        "store": {
+          "wood": 605,
+          "stone": 80,
+          "fiber": 80,
+          "ore": 80,
+          "ember": 80,
+          "seed": 80,
+          "berry": 80,
+          "pumpkin": 80,
+          "mushroom": 80,
+          "meat": 80,
+          "roast": 80,
+          "stew": 80,
+          "bandage": 80
+        },
+        "cooldown": 0
+      },
+      {
+        "id": "b2",
+        "type": "bench",
+        "x": 0.5,
+        "z": 2.5,
+        "hp": 180,
+        "maxHp": 180,
+        "fuel": 0,
+        "level": 1,
+        "rotation": 0,
+        "open": false,
+        "charges": 3,
+        "growth": 0,
+        "planted": false,
+        "store": {},
+        "cooldown": 0
+      }
+    ],
+    "enemies": [],
+    "drops": [
+      {
+        "id": "d3",
+        "type": "stone",
+        "count": 45,
+        "x": 5.5,
+        "z": 2.5,
+        "until": 790
+      },
+      {
+        "id": "d4",
+        "type": "bandage",
+        "count": 21,
+        "x": 5,
+        "z": 3,
+        "until": 790
+      }
+    ],
+    "events": [
+      {
+        "id": 2,
+        "type": "build",
+        "x": 4,
+        "z": 2.5,
+        "text": "Supply chest",
+        "at": 190
+      },
+      {
+        "id": 5,
+        "type": "build",
+        "x": 0.5,
+        "z": 2.5,
+        "text": "Workbench",
+        "at": 190
+      },
+      {
+        "id": 6,
+        "type": "craft",
+        "x": 1.5,
+        "z": 2.5,
+        "text": "Woodcutter’s axe",
+        "at": 190
+      },
+      {
+        "id": 7,
+        "type": "craft",
+        "x": 1.5,
+        "z": 2.5,
+        "text": "Flint pick",
+        "at": 190
+      },
+      {
+        "id": 8,
+        "type": "craft",
+        "x": 1.5,
+        "z": 2.5,
+        "text": "Briar spear",
+        "at": 190
+      },
+      {
+        "id": 9,
+        "type": "craft",
+        "x": 1.5,
+        "z": 2.5,
+        "text": "Hand lantern",
+        "at": 190
+      },
+      {
+        "id": 10,
+        "type": "craft",
+        "x": 1.5,
+        "z": 2.5,
+        "text": "Bark armor",
+        "at": 190
+      },
+      {
+        "id": 11,
+        "type": "craft",
+        "x": 1.5,
+        "z": 2.5,
+        "text": "Moon blade",
+        "at": 190
+      }
+    ],
+    "explored": [],
+    "nodeChanges": [
+      [
+        "n0",
+        0,
+        610
+      ],
+      [
+        "n2",
+        3,
+        0
+      ]
+    ],
+    "idCounter": 5,
+    "eventId": 17,
+    "wave": 0,
+    "nextSpawn": 0,
+    "kills": 0,
+    "bossSlain": false,
+    "bossSpawned": false,
+    "endless": false,
+    "stats": {
+      "gathered": 0,
+      "built": 2,
+      "revives": 0
+    }
+  }
+}

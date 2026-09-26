@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><g stroke="#2b2233" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"><ellipse cx="258" cy="468" rx="90" ry="20" fill="#000" opacity="0.18" stroke="none"/>
+<path d="M214 472 Q234 432 236 390 Q230 350 240 300 L278 300 Q274 352 280 392 Q286 434 306 472 Z" fill="#6e3438"/>
+<path d="M262 364 L266 396 M268 414 L278 452" fill="none" stroke="#f2a869" stroke-width="5"/><path d="M244 416 L240 450" fill="none" stroke="#8f4448" stroke-width="5"/>
+<polygon points="256.0,196.0 298.1,246.0 279.9,250.0 338.1,298.0 311.9,302.0 374.0,352.0 132.1,350.0 194.0,300.0 166.2,296.0 226.0,248.0 208.2,244.0" fill="#8f3a3f"/>
+<path d="M280 262 L296 280 M304 306 L322 326" fill="none" stroke="#f2a869" stroke-width="6"/>
+<polygon points="252.0,118.0 290.0,159.0 275.4,162.3 326.4,201.6 305.3,204.9 359.7,245.9 161.2,244.3 208.4,203.3 185.3,200.0 231.0,160.6 216.1,157.4" fill="#c9653c"/>
+<path d="M268 170 L282 186 M288 206 L304 222" fill="none" stroke="#f7c28c" stroke-width="6"/>
+<polygon points="258.0,40.0 284.0,71.0 272.7,73.5 308.7,103.2 292.5,105.7 330.9,136.7 180.9,135.5 219.4,104.5 202.1,102.0 239.3,72.2 228.2,69.8" fill="#8f3a3f"/>
+<path d="M266 76 L276 90 M280 106 L290 118" fill="none" stroke="#f2a869" stroke-width="5"/>
+<path d="M222 298 L204 318 M232 190 L218 206" fill="none" stroke="#6d2a31" stroke-width="5"/></g></svg>

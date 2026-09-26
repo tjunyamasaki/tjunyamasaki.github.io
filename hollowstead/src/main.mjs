@@ -17,7 +17,7 @@ import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-
 import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-16';
 import {loadMagicModules} from './magic/load.mjs?v=harvest-16';
 import {installMagicSprites} from './magic/registry.mjs?v=harvest-16';
-import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-16';
+import {clampShowcaseMobCount, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-16';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -29,7 +29,7 @@ async function bounded(promise){let timer;try{return await Promise.race([promise
 
 let theme,renderer,sound,world,network=null,mode='front',localId='host',character='ember',room='',paused=false,remotePaused=false,hiddenPause=false,linkLost=false;
 let sheet=null,category='all',selected=null,placement=null,maintenance=false,maintenanceTarget=null;
-let showcaseCategory='materials',showcaseTool='',showcaseListOpen=false,showcaseMarkupCache='',showcaseHistoryClosing=false,fullscreenNote='';
+let showcaseCategory='materials',showcaseTool='',showcaseListOpen=false,showcaseMobCount=1,showcaseMarkupCache='',showcaseHistoryClosing=false,fullscreenNote='';
 let lastNotice=0,lastEvent=0,lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,saveTime=0,pingTime=0,lastMode='normal';
 let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:0},dirty=true;
 let stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
@@ -186,7 +186,7 @@ function showShowcase(open){
 }
 function paintShowcase(){
   const panel=$('showcase-panel');if(!panel||panel.hidden||!world?.showcase)return;
-  const html=showcaseMarkup({active:showcaseCategory,tool:showcaseTool,open:showcaseListOpen,icon});
+  const html=showcaseMarkup({active:showcaseCategory,tool:showcaseTool,open:showcaseListOpen,icon,mobCount:showcaseMobCount});
   if(html===showcaseMarkupCache)return;
   showcaseMarkupCache=html;panel.innerHTML=html;
 }
@@ -209,7 +209,7 @@ function startShowcase(){
   sound.unlock();storeProfile();
   world=new World((Math.random()*0xffffffff)>>>0,{showcase:true});
   world.addPlayer('host',$('player-name').value,character);
-  mode='solo';room='';showcaseCategory='materials';showcaseTool='';showcaseListOpen=false;showcaseMarkupCache='';
+  mode='solo';room='';showcaseCategory='materials';showcaseTool='';showcaseListOpen=false;showcaseMobCount=1;showcaseMarkupCache='';
   cancelPlacement();cancelMaintenance();clearSelection();
   enterGame();
 }
@@ -224,7 +224,7 @@ function armShowcase(kind,id){
     dirty=true;closeShowcaseList();return;
   }
   cancelMaintenance();endContextHold();
-  placement={key:id,kind,showcase:true,x:Math.round((p.x+p.dx*3)*2)/2,z:Math.round((p.z+p.dz*3)*2)/2,rotation:0,valid:false,anchored:false,pending:false,reason:'',stationId:null};
+  placement={key:id,kind,showcase:true,count:kind==='mob'?showcaseMobCount:1,x:Math.round((p.x+p.dx*3)*2)/2,z:Math.round((p.z+p.dz*3)*2)/2,rotation:0,valid:false,anchored:false,pending:false,reason:'',stationId:null};
   selected=null;closeShowcaseList();refresh();
 }
 function commitShowcase(x,z){
@@ -234,9 +234,10 @@ function commitShowcase(x,z){
   const reason=showcasePlaceReason(world,p,placement.kind,placement.key,point.x,point.z);
   placement.x=point.x;placement.z=point.z;placement.anchored=true;placement.valid=!reason;placement.reason=reason||'';
   if(reason){toast(reason);refresh();return;}
-  const result=placeShowcase(world,p,placement.kind,placement.key,point.x,point.z);
+  const result=placeShowcase(world,p,placement.kind,placement.key,point.x,point.z,placement.count);
   if(!result.ok){toast(result.reason||'Cannot place that here');return;}
-  toast(`${showcaseSpawnName(placement.kind,placement.key)} placed`);
+  const name=showcaseSpawnName(placement.kind,placement.key);
+  toast(result.count>1?`${result.count} ${name} placed`:`${name} placed`);
   cancelPlacement();
   refresh();
 }
@@ -770,9 +771,11 @@ async function init(){
   showcasePanel?.addEventListener('click',event=>{
     event.stopPropagation();
     const cat=event.target.closest('[data-showcase-cat]');
+    const count=event.target.closest('[data-showcase-count]');
     const spawn=event.target.closest('[data-showcase-spawn]');
     const tool=event.target.closest('[data-showcase-tool]');
     if(cat){showcaseCategory=cat.dataset.showcaseCat;showcaseMarkupCache='';paintShowcase();return;}
+    if(count){showcaseMobCount=clampShowcaseMobCount(count.dataset.showcaseCount);showcaseMarkupCache='';paintShowcase();return;}
     if(tool?.dataset.showcaseTool==='open'){showcaseListOpen?closeShowcaseList():openShowcaseList();return;}
     if(tool?.dataset.showcaseTool==='close'){closeShowcaseList();return;}
     if(tool?.dataset.showcaseTool==='clear'){clearShowcaseWorld(world);cancelPlacement();showcaseTool='';if(sheet)closeSheet();toast('The clearing is empty');showcaseMarkupCache='';paintShowcase();return;}

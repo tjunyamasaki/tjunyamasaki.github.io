@@ -6,7 +6,7 @@ import {
   keyboardAction, keyboardPrimary, resolveMode, showsLantern, usableLantern,
 } from '../src/ui/actions.mjs';
 import {catalogModel, inCategory} from '../src/ui/catalog.mjs';
-import {adjustQuantity, gridStep, itemActionClearsSelection, operationsFor, slotLabel} from '../src/ui/inventory.mjs';
+import {actionNeedsCount, adjustQuantity, gridStep, itemActionClearsSelection, operationsFor, slotLabel} from '../src/ui/inventory.mjs';
 
 test('mode precedence puts panels above placement and combat', () => {
   assert.equal(resolveMode({ended: true, panel: 'inventory'}), 'end');
@@ -160,6 +160,12 @@ test('slot labels, quantities, and operations stay explicit', () => {
   for (const op of ['cancel-drop', 'one', 'half', 'all', 'inc', 'dec']) {
     assert.equal(itemActionClearsSelection(op), false, op);
   }
+  assert.equal(actionNeedsCount('drop', 8), true);
+  assert.equal(actionNeedsCount('transfer', 2), true);
+  assert.equal(actionNeedsCount('take', 4), true);
+  assert.equal(actionNeedsCount('drop', 1), false);
+  assert.equal(actionNeedsCount('eat', 8), false);
+  assert.equal(actionNeedsCount('equip', 2), false);
   assert.equal(gridStep(0, 24, 4, 'arrowdown'), 4);
   assert.equal(gridStep(1, 24, 6, 'arrowleft'), 0);
 });

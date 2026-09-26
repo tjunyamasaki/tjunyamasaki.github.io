@@ -237,7 +237,7 @@ test('T30 active lights match courage safety, including downed players and empty
 
 test('theme lighting falls back and does not change safety radii',()=>{
   const lighting=resolveLighting(null);
-  assert.equal(lighting.ambientNight,0.03);
+  assert.equal(lighting.ambientNight,0.20);
   assert.equal(lighting.litBrightness,0.92);
   assert.equal(lighting.transitionSeconds,7);
   assert.equal(lighting.dawnSeconds,4);
@@ -261,7 +261,7 @@ test('theme lighting falls back and does not change safety radii',()=>{
   assert.equal(w.lit(p), inSafeLight(sources, p.x, p.z));
   const frame=frameLighting(w, {lighting:wide});
   const far=brightnessAt(frame.sources, 30, 30, 1, frame.lighting);
-  assert.ok(far<0.05);
+  assert.equal(far, frame.lighting.ambientNight);
   assert.equal(canInspect(frame, 30, 30, p, RULES.reach), false);
   assert.equal(canInspect(frame, p.x+1, p.z, p, RULES.reach), true);
   assert.equal(labelOpacity(far, 1, frame.lighting), 0);
@@ -277,7 +277,7 @@ test('theme lighting falls back and does not change safety radii',()=>{
   assert.ok(warm.r>warm.b);
   const self=entityBrightness(frame, 30, 30, {local:true});
   assert.ok(self>=frame.lighting.localSilhouette);
-  assert.ok(self<0.2);
+  assert.ok(self<0.3);
   const css=readFileSync(new URL('../style.css', import.meta.url),'utf8');
   assert.equal(css.includes('58%'), false);
   assert.equal(css.includes('69%'), false);

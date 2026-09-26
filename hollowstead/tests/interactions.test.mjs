@@ -5,7 +5,7 @@ import {EQUIPMENT, NODES, PICKUP, RULES, STRUCTURES} from '../src/content.mjs';
 import {countItem} from '../src/inventory.mjs';
 import {
   CAULDRON_COOK_RECIPES, CONTEXT_ACTIONS, DISMANTLE_HOLD_SECONDS, FIELD_BUILD_RECIPES,
-  FIRE_COOK_RECIPES, WORKBENCH_BUILD_RECIPES, WORKBENCH_CRAFT_RECIPES,
+  FIRE_COOK_RECIPES, STACK_LIMIT, WORKBENCH_BUILD_RECIPES, WORKBENCH_CRAFT_RECIPES,
 } from '../src/contracts.mjs';
 import {contextActionIds, contextRecipeIds, dismantleRule, gatherRate, selectTarget} from '../src/interactions.mjs';
 
@@ -579,7 +579,7 @@ test('T24 chopped and mined yields stay on the floor until a new pickup',()=>{
   const grass=w.nodes.find(node=>node.type==='grass'&&!(node.ready>w.time));
   stand(p,grass);
   w.clearPack(p);
-  const full=p.inventory.slots.length*20;
+  const full=p.inventory.slots.length*STACK_LIMIT;
   assert.equal(w.stock(p.inventory,'fiber',full),full);
   hold(w,[{p,target:grass.id}],0.9);
   assert.equal(qty(p.inventory,'fiber'),full);

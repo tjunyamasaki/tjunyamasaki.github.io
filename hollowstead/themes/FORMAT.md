@@ -56,7 +56,7 @@ Omit `lighting`, or omit any field, and the game uses these defaults. An older t
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `ambientNight` | `0.03` | Display brightness of unlit midnight. About 0.03 is barely visible. |
+| `ambientNight` | `0.20` | Display brightness of unlit midnight. Dim enough to read as night, bright enough to see the ground. |
 | `litBrightness` | `0.92` | Display brightness inside a lamp. Normally lit ground sits around 0.85–1. |
 | `transitionSeconds` | `7` | After dusk, this many seconds of night finish the fade to full dark. |
 | `dawnSeconds` | `4` | Opening seconds of the next day, fading from night back to daylight. |

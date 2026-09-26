@@ -14,9 +14,9 @@ import {
   LIGHT_FIELD_ORIGIN, LIGHT_FIELD_SIZE, LIGHT_FIELD_SPAN, brightnessAt, canInspect, entityBrightness,
   frameLighting, labelOpacity, linearFromDisplay, spriteTint, warningVisible, writeLightField,
 } from './lighting.mjs?v=harvest-16';
+import {loadImage, loadJson, preloadThemeAssets} from './assets.mjs?v=harvest-16';
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
-  const response=await fetch(url);if(!response.ok)throw new Error('The harvest art could not be loaded. Please reload.');
-  const theme=await response.json();theme.url=url;for(const def of Object.values(theme.sprites)){def.src=new URL(def.src,url).href;if(def.icon)def.icon=new URL(def.icon,url).href;}
+  const theme=await loadJson(url);theme.url=url;for(const def of Object.values(theme.sprites)){def.src=new URL(def.src,url).href;if(def.icon)def.icon=new URL(def.icon,url).href;}
   for(const[k,v]of Object.entries(theme.audio))theme.audio[k]=new URL(v,url).href;return theme;
 }
 export class Renderer {
@@ -34,7 +34,7 @@ export class Renderer {
     this.lightUniforms={
       uNightLight:{value:this.lightTexture},
       uNightCover:{value:0},
-      uNightAmbient:{value:0.03},
+      uNightAmbient:{value:0.20},
       uNightLit:{value:0.92},
       uNightOrigin:{value:new THREE.Vector2(LIGHT_FIELD_ORIGIN,LIGHT_FIELD_ORIGIN)},
       uNightSpan:{value:LIGHT_FIELD_SPAN},
@@ -67,7 +67,7 @@ export class Renderer {
     const channel=byte=>linearFromDisplay(Math.min(1, Math.max(0, display*(byte/255))));
     material.color.setRGB(channel(tint.r), channel(tint.g), channel(tint.b));
   }
-  async preload(){const loader=new THREE.TextureLoader();await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{const map=await loader.loadAsync(def.src);map.colorSpace=THREE.SRGBColorSpace;map.minFilter=THREE.LinearFilter;map.magFilter=THREE.LinearFilter;this.textures.set(key,map);}));}
+  async preload(){await preloadThemeAssets(this.theme);await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{const map=new THREE.Texture(await loadImage(def.src));map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;map.minFilter=THREE.LinearFilter;map.magFilter=THREE.LinearFilter;this.textures.set(key,map);}));}
   resize(){const size=viewSize(this.canvas);const w=size.width,h=size.height;this.viewWidth=w;this.viewHeight=h;this.gl.setSize(w,h,false);const aspect=w/Math.max(1,h),half=orthographicHalf(w,h);this.camera.left=-half*aspect/this.zoom;this.camera.right=half*aspect/this.zoom;this.camera.top=half/this.zoom;this.camera.bottom=-half/this.zoom;this.camera.updateProjectionMatrix();}
   setZoom(value){this.zoom=Math.max(.65,Math.min(1.6,value));this.resize();}
   sprite(key,id){
@@ -106,10 +106,11 @@ export class Renderer {
     }
     return best;
   }
-  float(text,x,z,color='#f8dfb3'){if(!text)return;const el=document.createElement('div');el.className='world-label';el.textContent=text;el.style.color=color;document.getElementById('world-labels').append(el);this.floaters.push({el,x,z,life:0});}
+  float(text,x,z,color='#f8dfb3',opts={}){if(!text)return;const el=document.createElement('div');el.className=opts.className||'world-label';el.textContent=text;el.style.color=color;document.getElementById('world-labels').append(el);this.floaters.push({el,x,z,life:0,alwaysVisible:!!opts.alwaysVisible});}
   effect(event){
     if(event.type==='hit')for(const o of this.objects.values())if(Math.hypot(o.x-event.x,o.z-event.z)<.2)o.hitUntil=this.clock+.22;
     if(['loot','damage','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
+    if(event.type==='hurt')this.float(event.text,event.x,event.z,'#e53935',{className:'world-label player-hurt',alwaysVisible:true});
     if(event.type==='rare')this.float(`✦ ${event.text}`,event.x,event.z,RARITY_COLORS[rarityOf(event.itemId)]);
     if(event.type==='levelup')this.float(`LEVEL UP · ${event.text}`,event.x,event.z,'#f2c14e');
     if(event.type==='discover')this.float(event.text,event.x,event.z,'#d4fff5');
@@ -189,7 +190,7 @@ export class Renderer {
     if(placement){if(!this.ghost||this.ghost.key!==placement.key){if(this.ghost)this.remove(this.ghost);this.ghost=this.sprite(placement.key,'preview');}this.ghost.sprite.position.set(placement.x,0,placement.z);this.ghost.sprite.material.color.set(placement.valid?'#c8e5a6':'#dd7471');this.ghost.sprite.material.opacity=.7;this.ghost.shadow.visible=false;this.ghost.sprite.visible=true;}else if(this.ghost){this.remove(this.ghost);this.ghost=null;}
     for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2)this.effect(ev);this.lastEvent=ev.id;}
     this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);if(!e.fixed)e.mesh.scale.setScalar(e.radius?.3+Math.min(1,e.life*3)*e.radius:1+e.life*(e.type==='impact'?12:4));e.mesh.material.opacity=Math.max(0,1-e.life*2)*fade;if(e.life>.5){this.scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();return false;}return true;});
-    this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*this.reveal(f.x, f.z));if(f.life>1.8){f.el.remove();return false;}return true;});
+    this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*(f.alwaysVisible?1:this.reveal(f.x, f.z)));if(f.life>1.8){f.el.remove();return false;}return true;});
     this.magicMesh.update(buildMagicEffects(world,this.magicFrame,this.theme));
     this.gl.render(this.scene,this.camera);
   }

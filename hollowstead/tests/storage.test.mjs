@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
 import {createActionSession} from '../src/transactions.mjs';
-import {CHEST_SLOT_COUNT} from '../src/contracts.mjs';
+import {CHEST_SLOT_COUNT, STACK_LIMIT} from '../src/contracts.mjs';
 import {containerId, countItem, createContainer, createRecovery} from '../src/inventory.mjs';
 
 function camp(){
@@ -160,6 +160,46 @@ test('store all moves whole stacks that fit and leaves the rest in the pack', ()
   assert.equal(qty(chest.store, 'stone'), 460);
 });
 
+test('stack fills only item types already in the chest and respects stack limits', ()=>{
+  const {w, p, q, chest}=camp();
+  w.clearPack(p); w.clearPack(q);
+  chest.store.slots[0]=w.mintStack('wood', STACK_LIMIT - 5);
+  chest.store.slots[1]=w.mintStack('stone', 20);
+  const packWood=w.mintStack('wood', 10), packStone=w.mintStack('stone', 4), packFiber=w.mintStack('fiber', 6);
+  p.inventory.slots[0]=packWood;
+  p.inventory.slots[1]=packStone;
+  p.inventory.slots[2]=packFiber;
+  q.inventory.slots[0]=w.mintStack('wood', 3);
+  const guestBefore=JSON.stringify(q.inventory.slots);
+  const actor=runner(w, p);
+  const opened=actor.run({type:'chestOpen', chestId:chest.id});
+  const packRevision=p.inventory.revision, chestRevision=chest.store.revision;
+  const stacked=actor.run({
+    type:'chestStack', chestId:chest.id, sessionId:opened.sessionId,
+    inventoryRevision:packRevision, destinationRevision:chestRevision,
+  });
+  assert.equal(stacked.ok, true);
+  assert.equal(qty(chest.store, 'wood'), STACK_LIMIT);
+  assert.equal(qty(p.inventory, 'wood'), 5);
+  assert.equal(p.inventory.slots.find(stack=>stack?.uid===packWood.uid).quantity, 5);
+  assert.equal(qty(chest.store, 'stone'), 24);
+  assert.equal(qty(p.inventory, 'stone'), 0);
+  assert.equal(qty(chest.store, 'fiber'), 0);
+  assert.equal(qty(p.inventory, 'fiber'), 6);
+  assert.equal(chest.store.slots.filter(Boolean).length, 2);
+  assert.equal(p.inventory.revision, packRevision+1);
+  assert.equal(chest.store.revision, chestRevision+1);
+  assert.equal(JSON.stringify(q.inventory.slots), guestBefore);
+  const again=actor.run({
+    type:'chestStack', chestId:chest.id, sessionId:opened.sessionId,
+    inventoryRevision:p.inventory.revision, destinationRevision:chest.store.revision,
+  });
+  assert.equal(again.ok, true);
+  assert.equal(qty(p.inventory, 'wood'), 5);
+  assert.equal(qty(p.inventory, 'fiber'), 6);
+  assert.equal(chest.store.revision, chestRevision+1);
+});
+
 test('sort combines identical supplies, keeps damaged tools apart, and a guest cannot sort another pack', ()=>{
   const {w, p, q, chest}=camp();
   w.clearPack(p); w.clearPack(q);
@@ -186,9 +226,6 @@ test('sort combines identical supplies, keeps damaged tools apart, and a guest c
   assert.equal(chest.store.slots.filter(stack=>stack?.itemId==='axe').length, 2);
   assert.equal(qty(chest.store, 'wood'), 10);
   assert.equal(chest.store.slots.filter(stack=>stack?.itemId==='wood').length, 1);
-  const rejectedStack=actor.run({type:'chestStack', chestId:chest.id, sessionId:opened.sessionId, destinationRevision:chest.store.revision});
-  assert.equal(rejectedStack.code, 'unsupported');
-  assert.equal(chest.store.revision, sortedRevision+1);
   assert.deepEqual(chest.store.slots.filter(Boolean).map(stack=>stack.uid), [firstAxe.uid, secondAxe.uid, woodSmall.uid]);
   assert.equal(chest.store.slots.find(stack=>stack?.uid===firstAxe.uid).durability, 10);
   assert.equal(chest.store.slots.find(stack=>stack?.uid===secondAxe.uid).durability, 40);

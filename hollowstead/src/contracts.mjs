@@ -50,11 +50,11 @@ export const NIGHT_WAVE_FRACTIONS = Object.freeze([0, 0.4, 0.8]);
 const PHASE_EDGE_EPSILON = 1e-8;
 
 export const BACKPACK_SLOT_COUNT = 12;
-export const STACK_LIMIT = 20;
+export const STACK_LIMIT = 64;
 /** Legacy v1 supply counter. A backpack is limited by its slots and stack size, not this number. */
 export const SUPPLY_CAPACITY = RULES.capacity;
 export const CHEST_SLOT_COUNT = 24;
-export const DROP_LIFETIME_SECONDS = 600;
+export const DROP_LIFETIME_SECONDS = RULES.cycle;
 export const CHEST_LEASE_SECONDS = 12;
 export const CHEST_RENEW_SECONDS = 3;
 export const DISMANTLE_HOLD_SECONDS = 0.8;
@@ -170,6 +170,7 @@ export const INTENTS = Object.freeze({
   chestClose: intent('chestClose', ['requestId', 'chestId', 'sessionId']),
   chestTransfer: intent('chestTransfer', ['requestId', 'chestId', 'sessionId', 'sourceContainerId', 'sourceSlot', 'destinationContainerId', 'destinationSlot', 'uid', 'quantity', 'sourceRevision', 'destinationRevision']),
   chestStoreAll: intent('chestStoreAll', ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']),
+  chestStack: intent('chestStack', ['requestId', 'chestId', 'sessionId', 'inventoryRevision', 'destinationRevision']),
   chestSort: intent('chestSort', ['requestId', 'chestId', 'sessionId', 'destinationRevision']),
   packSort: intent('packSort', ['requestId', 'inventoryRevision']),
   craftRecipe: intent('craftRecipe', ['requestId', 'recipeId', 'stationId']),

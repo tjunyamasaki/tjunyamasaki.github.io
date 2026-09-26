@@ -59,6 +59,7 @@ export function chestIntent(world, player, cmd){
   }
   if(cmd.type==='chestTransfer')return moveItems(world,player,cmd,chest);
   if(cmd.type==='chestStoreAll')return storeAll(world,player,cmd,chest);
+  if(cmd.type==='chestStack')return stackMatching(world,player,cmd,chest);
   if(cmd.type==='chestSort')return organizeChest(world,chest,cmd);
   return result('unsupported');
 }
@@ -179,6 +180,36 @@ export function storeAll(world, player, cmd, chest){
   chest.store.slots=dest.slots;
   chest.store.revision=cmd.destinationRevision+1;
   if(blocked)world.tell(player, 'Stored what fit');
+  world.assertItems();
+  return result('ok');
+}
+
+export function stackMatching(world, player, cmd, chest){
+  if(!Number.isSafeInteger(cmd.inventoryRevision)||!Number.isSafeInteger(cmd.destinationRevision))return result('staleRevision');
+  if(player.inventory.revision!==cmd.inventoryRevision||chest.store.revision!==cmd.destinationRevision)return result('staleRevision');
+  const pack=cloneSlots(player.inventory.slots);
+  const dest=activeContainer({kind:'chest', container:chest.store});
+  const present=new Set(dest.slots.filter(stack=>stack).map(stack=>stack.itemId));
+  let moved=0, blocked=0;
+  for(let index=0;index<pack.length;index++){
+    const stack=pack[index];
+    if(!stack||!present.has(stack.itemId))continue;
+    const before=world.idCounter;
+    const inserted=planInsert(dest, cloneStack(stack), {
+      supplyCapacity:null, grow:false, allowPartial:true, existingOnly:true, acceptsItems:true, mintUid:()=>world.nextItemUid(),
+    });
+    if(!inserted.ok){world.idCounter=before;blocked++;continue;}
+    dest.slots=inserted.slots;
+    dest.revision=inserted.revision;
+    pack[index]=inserted.remainder;
+    moved+=inserted.accepted;
+  }
+  if(moved<=0)return result('ok');
+  player.inventory.slots=pack;
+  player.inventory.revision=cmd.inventoryRevision+1;
+  chest.store.slots=dest.slots;
+  chest.store.revision=cmd.destinationRevision+1;
+  if(blocked)world.tell(player, 'Stacked what fit');
   world.assertItems();
   return result('ok');
 }

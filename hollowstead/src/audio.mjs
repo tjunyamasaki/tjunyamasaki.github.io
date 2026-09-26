@@ -1,9 +1,10 @@
 // Optional theme files replace these small synthesized cues without simulation changes.
+import {cachedSrc} from './assets.mjs?v=harvest-16';
 export class Sound {
   constructor(theme){this.theme=theme;this.enabled=true;this.context=null;this.last=0;this.clips=new Map();}
   unlock(){if(!this.enabled)return;try{this.context??=new (window.AudioContext||window.webkitAudioContext)();void this.context.resume();}catch{}}
   play(type){
-    if(!this.enabled)return;const source=this.theme.audio?.[type];if(source){let a=this.clips.get(type);if(!a){a=new Audio(source);this.clips.set(type,a);}a.currentTime=0;a.volume=.35;void a.play().catch(()=>{});return;}
+    if(!this.enabled)return;const source=this.theme.audio?.[type];if(source){let a=this.clips.get(type);if(!a){a=new Audio(cachedSrc(source));this.clips.set(type,a);}a.currentTime=0;a.volume=.35;void a.play().catch(()=>{});return;}
     if(!this.context||this.context.state!=='running')return;const t=this.context.currentTime;if(t-this.last<.07)return;this.last=t;
     if(type==='bell'){
       for(const [frequency,volume] of [[220,.035],[440,.02],[613,.013],[837,.007]]){

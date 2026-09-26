@@ -3,6 +3,14 @@ import { ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES, label } from './co
 import { clearMagicLists, deleteMagicEntity, magicItems, magicMobById, magicMobEntries } from './magic/registry.mjs?v=harvest-16';
 
 const PLACE_RANGE = 5.5;
+export const SHOWCASE_MOB_COUNTS = [1, 5, 10, 20];
+export const SHOWCASE_MOB_COUNT_MAX = 20;
+
+export function clampShowcaseMobCount(count){
+  const n = Math.floor(Number(count));
+  if(!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(n, SHOWCASE_MOB_COUNT_MAX);
+}
 
 export function showcaseCategories(){
   const materials = [];
@@ -40,17 +48,26 @@ function escapeHtml(value){
   return String(value).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 }
 
-export function showcaseMarkup({active = 'materials', tool = '', open = false, icon = () => ''} = {}){
+export function showcaseMarkup({active = 'materials', tool = '', open = false, icon = () => '', mobCount = 1} = {}){
   const removing = tool === 'remove';
+  const count = clampShowcaseMobCount(mobCount);
   const bar = `<div class="showcase-bar"><button type="button" data-showcase-tool="open" aria-expanded="${open ? 'true' : 'false'}">Spawn</button><button type="button" data-showcase-tool="remove" aria-pressed="${removing ? 'true' : 'false'}">${removing ? 'Remove armed' : 'Remove'}</button><button type="button" data-showcase-tool="clear">Clear</button></div>`;
   if(!open) return bar;
   const categories = showcaseCategories();
   const current = categories.find(category => category.id === active) || categories[0];
   const chips = categories.map(category => `<button type="button" class="chip ${category.id === current.id ? 'active' : ''}" data-showcase-cat="${category.id}">${escapeHtml(category.label)}</button>`).join('');
   const rows = current.entries.length
-    ? current.entries.map(entry => `<button type="button" data-showcase-spawn="${escapeHtml(entry.kind)}:${escapeHtml(entry.id)}">${current.id==='magic'?icon(entry.id):''}<span>${escapeHtml(entry.name)}</span></button>`).join('')
+    ? current.entries.map(entry => `<button type="button" data-showcase-spawn="${escapeHtml(entry.kind)}:${escapeHtml(entry.id)}">${entry.kind==='item'?icon(entry.id):''}<span>${escapeHtml(entry.name)}</span></button>`).join('')
     : '<p class="muted small">Nothing in this list yet.</p>';
-  return `${bar}<div class="showcase-sheet" role="dialog" aria-label="Spawn list"><div class="showcase-head"><span>Spawn</span><button type="button" data-showcase-tool="close">Close</button></div><div class="showcase-cats">${chips}</div><div class="showcase-list" role="list">${rows}</div><p class="muted small showcase-note">${removing ? 'Tap an object or creature to delete it.' : 'Items go into the pack. Tap the ground to place an armed object.'}</p></div>`;
+  const counts = current.id === 'mobs'
+    ? `<div class="showcase-counts" role="group" aria-label="Mob count">${SHOWCASE_MOB_COUNTS.map(value => `<button type="button" class="chip ${value === count ? 'active' : ''}" data-showcase-count="${value}">${value}</button>`).join('')}</div>`
+    : '';
+  const note = removing
+    ? 'Tap an object or creature to delete it.'
+    : current.id === 'mobs' && count > 1
+      ? `Items go into the pack. Tap the ground to place ${count} creatures.`
+      : 'Items go into the pack. Tap the ground to place an armed object.';
+  return `${bar}<div class="showcase-sheet" role="dialog" aria-label="Spawn list"><div class="showcase-head"><span>Spawn</span><button type="button" data-showcase-tool="close">Close</button></div><div class="showcase-cats">${chips}</div>${counts}<div class="showcase-list" role="list">${rows}</div><p class="muted small showcase-note">${note}</p></div>`;
 }
 
 function separation(kind, type){
@@ -75,7 +92,26 @@ export function showcasePlaceReason(world, player, kind, type, x, z){
   return '';
 }
 
-export function placeShowcase(world, player, kind, type, x, z){
+function showcaseMobOffset(index, total){
+  if(total <= 1) return [0, 0];
+  const ring = Math.floor(index / 8);
+  const slot = index % 8;
+  const around = Math.min(8, total - ring * 8);
+  const radius = 0.85 + ring * 0.7;
+  const angle = (slot / around) * Math.PI * 2;
+  return [Math.cos(angle) * radius, Math.sin(angle) * radius];
+}
+
+function spawnShowcaseMob(world, player, type, x, z){
+  const magic = magicMobById(type);
+  if(magic) return spawnMagicMob(world, magic, x, z, player) || null;
+  if(!ENEMIES[type]) return null;
+  const enemy = world.spawnEnemy(type, x, z);
+  if(enemy) enemy.spawned = true;
+  return enemy;
+}
+
+export function placeShowcase(world, player, kind, type, x, z, count = 1){
   const reason = showcasePlaceReason(world, player, kind, type, x, z);
   if(reason) return {ok: false, reason};
   if(kind === 'node'){
@@ -89,17 +125,15 @@ export function placeShowcase(world, player, kind, type, x, z){
     world.buildings.push(building);
     return {ok: true, entity: building};
   }
-  const magic = magicMobById(type);
-  if(magic){
-    const spawned = spawnMagicMob(world, magic, x, z, player);
-    if(spawned) return {ok: true, entity: spawned};
+  const n = clampShowcaseMobCount(count);
+  const entities = [];
+  for(let i = 0; i < n; i++){
+    const [ox, oz] = showcaseMobOffset(i, n);
+    const spawned = spawnShowcaseMob(world, player, type, x + ox, z + oz);
+    if(spawned) entities.push(spawned);
   }
-  if(!ENEMIES[type]) return {ok: false, reason: 'Unknown creature'};
-  const count = world.enemies.length;
-  world.spawnEnemy(type, x, z);
-  const enemy = world.enemies[count] || null;
-  if(enemy) enemy.spawned = true;
-  return {ok: true, entity: enemy};
+  if(!entities.length) return {ok: false, reason: 'Unknown creature'};
+  return {ok: true, entity: entities[0], entities, count: entities.length};
 }
 
 function spawnMagicMob(world, magic, x, z, player){

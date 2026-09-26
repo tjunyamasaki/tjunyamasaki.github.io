@@ -4,7 +4,7 @@ import {World} from '../src/engine.mjs';
 import {ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES} from '../src/content.mjs';
 import {makeStack} from '../src/inventory.mjs';
 import {collectMagicSprites, magicItems, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-16';
-import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseCategories, showcaseMarkup} from '../src/showcase.mjs';
+import {SHOWCASE_MOB_COUNT_MAX, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseCategories, showcaseMarkup} from '../src/showcase.mjs';
 
 test('showcase catalog stays closed until Spawn and can be dismissed', () => {
   const closed = showcaseMarkup({open: false, tool: ''});
@@ -18,6 +18,22 @@ test('showcase catalog stays closed until Spawn and can be dismissed', () => {
   assert.match(open, /data-showcase-cat="materials"/);
   assert.match(open, /data-showcase-spawn="item:/);
   assert.match(open, /showcase-sheet/);
+});
+
+test('showcase item rows use the shared icon helper', () => {
+  const icon = id => `<img class="item-icon" data-icon="${id}" alt="">`;
+  for (const active of ['materials', 'food', 'gear']) {
+    const html = showcaseMarkup({open: true, active, icon});
+    assert.match(html, /class="item-icon"/);
+    assert.match(html, /data-showcase-spawn="item:/);
+  }
+  const materials = showcaseMarkup({open: true, active: 'materials', icon});
+  assert.match(materials, /data-icon="wood"/);
+  const mobs = showcaseMarkup({open: true, active: 'mobs', icon, mobCount: 10});
+  assert.equal(mobs.includes('class="item-icon"'), false);
+  assert.match(mobs, /data-showcase-count="1"/);
+  assert.match(mobs, /data-showcase-count="10"/);
+  assert.match(mobs, /place 10 creatures/);
 });
 
 test('showcase world has no nodes and the player takes no damage or hunger loss', () => {
@@ -71,7 +87,16 @@ test('showcase list follows the live content tables and can place, remove, and c
   assert.equal(world.nodes.length, 0);
   const mob = placeShowcase(world, player, 'mob', 'crawler', 1.5, 0.5);
   assert.equal(mob.ok, true);
+  assert.equal(mob.count, 1);
   assert.equal(world.enemies.length, 1);
+  const batch = placeShowcase(world, player, 'mob', 'crawler', 2, 0, 10);
+  assert.equal(batch.ok, true);
+  assert.equal(batch.count, 10);
+  assert.equal(world.enemies.length, 11);
+  const capped = placeShowcase(world, player, 'mob', 'crawler', -2, 0, 99);
+  assert.equal(capped.ok, true);
+  assert.equal(capped.count, SHOWCASE_MOB_COUNT_MAX);
+  assert.equal(world.enemies.length, 11 + SHOWCASE_MOB_COUNT_MAX);
   clearShowcaseWorld(world);
   assert.equal(world.nodes.length, 0);
   assert.equal(world.buildings.length, 0);

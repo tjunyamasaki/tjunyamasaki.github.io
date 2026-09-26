@@ -1,7 +1,7 @@
 import {magicItems} from './magic/registry.mjs?v=harvest-16';
 // Simulation identifiers are deliberately independent of art, names and animations.
 const DAY=180, DUSK=30, NIGHT=100;
-export const RULES = Object.freeze({version:1, tick:1/20, radius:42, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2, finalNight:5});
+export const RULES = Object.freeze({version:1, tick:1/20, radius:96, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2, finalNight:5});
 /**
  * Loose floor piles. Measured in this world: movement clearance 0.33, structure
  * occupancy 0.4, character billboard 1.65 wide (art padding included), interact
@@ -24,11 +24,24 @@ export const ITEMS = {
   mushroom:{name:'Mushroom',icon:'mushroom',food:9,courage:-8},meat:{name:'Raw morsel',icon:'meat',food:12,heal:-4},
   roast:{name:'Roasted supper',icon:'roast',food:32,heal:12,courage:8},stew:{name:'Harvest stew',icon:'stew',food:65,heal:35,courage:25},
   bandage:{name:'Bandage',icon:'bandage',heal:35},
+  shard:{name:'Moonshard',icon:'shard'},bone:{name:'Barrow bone',icon:'bone'},spore:{name:'Glowcap spore',icon:'spore'},
+  elixir:{name:'Vigor draught',icon:'elixir',heal:60,courage:20},
+  heartstone:{name:'Heartstone',icon:'heartstone',boost:'vigor'},
 };
 export const EQUIPMENT = {
   axe:{name:'Woodcutter’s axe',icon:'axe',durability:70},pick:{name:'Flint pick',icon:'pick',durability:70},
   spear:{name:'Briar spear',icon:'spear',durability:100,damage:24},sword:{name:'Moon blade',icon:'sword',durability:160,damage:40},
   armor:{name:'Bark armor',icon:'armor',durability:110},torch:{name:'Hand lantern',icon:'lantern',durability:180},
+  recurve:{name:'Hunter’s recurve',icon:'recurve',durability:150,damage:16},
+  bonebow:{name:'Barrow longbow',icon:'bonebow',durability:220,damage:28},
+  broadsword:{name:'Knight’s broadsword',icon:'broadsword',durability:230,damage:46},
+  flamberge:{name:'Ember flamberge',icon:'flamberge',durability:280,damage:62},
+  crookstaff:{name:'Moonshard crook',icon:'crookstaff',durability:170,damage:30},
+  skullstaff:{name:'Hollow skull staff',icon:'skullstaff',durability:220,damage:46},
+  tome:{name:'Grimoire of Ash',icon:'tome',durability:260,damage:72},
+  bonemail:{name:'Barrow bonemail',icon:'bonemail',durability:240},
+  shardplate:{name:'Moonshard plate',icon:'shardplate',durability:360},
+  everlantern:{name:'Everburning lantern',icon:'everlantern',durability:999},
 };
 export const NODES = {
   tree:{name:'Crooked pine',hits:4,workSeconds:4,handRate:1,tool:'axe',toolRate:2,output:'floor',loot:{wood:5,fiber:1},regrow:420,radius:.55},
@@ -39,6 +52,13 @@ export const NODES = {
   mushroom:{name:'Mooncap patch',hits:1,workSeconds:1,handRate:1,output:'backpack',loot:{mushroom:3},regrow:200,radius:0},
   ore:{name:'Moon iron seam',hits:6,workSeconds:3.5,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{ore:3,stone:2},regrow:600,radius:.6},
   grave:{name:'Restless grave',hits:4,workSeconds:3,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{ember:3,stone:2},regrow:600,radius:.5},
+  shardrock:{name:'Moonshard spire',hits:5,workSeconds:4,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{shard:3,stone:1},regrow:700,radius:.6},
+  bones:{name:'Barrow bone pile',hits:2,workSeconds:2,handRate:1,output:'floor',loot:{bone:3},regrow:420,radius:.3},
+  glowcap:{name:'Giant glowcap',hits:2,workSeconds:2.2,handRate:1,output:'backpack',loot:{spore:2,mushroom:1},regrow:360,radius:.35},
+  crate:{name:'Weathered crate',hits:1,workSeconds:1.2,handRate:1,output:'floor',loot:{},table:'crate',regrow:900,radius:.45},
+  ironchest:{name:'Iron-bound chest',hits:1,workSeconds:1.8,handRate:1,output:'floor',loot:{},table:'ironchest',regrow:1400,radius:.5},
+  moonchest:{name:'Moonlit coffer',hits:1,workSeconds:2.4,handRate:1,output:'floor',loot:{},table:'moonchest',regrow:2200,radius:.5},
+  reliquary:{name:'Hollow reliquary',hits:1,workSeconds:3,handRate:1,output:'floor',loot:{},table:'reliquary',regrow:3400,radius:.6},
 };
 export const STRUCTURES = {
   hearth:{name:'Heartfire',hp:600,radius:1,light:8},fire:{name:'Campfire',hp:160,radius:.55,light:6},
@@ -66,6 +86,13 @@ export const RECIPES = {
   pot:{kind:'build',cost:{stone:6,ore:1},station:'bench',desc:'Turn pumpkin, berries and a morsel into harvest stew.'},
   lantern:{kind:'build',cost:{wood:3,ember:3},station:'bench',desc:'Permanent safe light without wood fuel.'},
   bed:{kind:'build',cost:{fiber:6,wood:2},desc:'Rest by day: trade hunger for health and courage.'},
+  recurve:{kind:'tool',cost:{wood:4,fiber:4},station:'bench',desc:'A light bow. Arrows fly at the nearest foe.'},
+  bonebow:{kind:'tool',cost:{bone:6,wood:3,fiber:3},station:'bench',desc:'Heavy arrows that pierce two foes.'},
+  broadsword:{kind:'tool',cost:{ore:4,bone:3,wood:2},station:'bench',desc:'Wide cleaving swings. Hits every foe in front.'},
+  crookstaff:{kind:'tool',cost:{shard:4,spore:2,wood:3},station:'bench',desc:'Moonshard bolts that burst on impact.'},
+  bonemail:{kind:'tool',cost:{bone:8,fiber:4},station:'bench',desc:'Absorb 55% of damage until it breaks.'},
+  shardplate:{kind:'tool',cost:{shard:8,ore:4,bone:4},station:'bench',desc:'Absorb 65% of damage until it breaks.'},
+  elixir:{kind:'item',cost:{spore:2,berry:2},station:'bench',desc:'Restore 60 health and 20 courage.'},
   ward:{kind:'build',cost:{stone:5,ore:2,ember:4},station:'bench',desc:'A soul-powered defense. Damages nearby enemies.'},
   roast:{kind:'cook',cost:{pumpkin:1},station:'fire',desc:'Cook a pumpkin into a restorative supper.'},
   roastMeat:{kind:'cook',result:'roast',cost:{meat:1},station:'fire',desc:'Cook a raw morsel safely.'},
@@ -77,6 +104,9 @@ export const ENEMIES = {
   wraith:{name:'Lantern wraith',hp:60,speed:2.6,damage:12,range:1.4,period:1.6,loot:{ember:2}},
   brute:{name:'Gravekeeper',hp:160,speed:1.4,damage:23,range:1.5,period:2,loot:{ore:2,ember:2,meat:2}},
   king:{name:'The Hollow King',hp:950,speed:1.3,damage:30,range:2,period:2.2,loot:{ember:15}},
+  bonewalker:{name:'Bonewalker',hp:90,speed:2.5,damage:14,range:1.2,period:1.2,loot:{bone:2}},
+  bogling:{name:'Bogling',hp:75,speed:1.8,damage:12,range:1.2,period:1.4,loot:{spore:1,fiber:1}},
+  golem:{name:'Moonshard golem',hp:280,speed:1.2,damage:30,range:1.6,period:2.2,loot:{shard:2,stone:2}},
 };
 export const CHARACTERS = [
   {id:'ember',name:'Ember',detail:'The lost lantern keeper',color:'#f6a35d'},

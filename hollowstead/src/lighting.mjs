@@ -119,6 +119,7 @@ export function structureLightRadius(building){
 /** Full radius until the last LANTERN_FADE_SECONDS, then a smoothstep down to nothing. */
 export function playerLanternRadius(player){
   if(!equippedLanternLit(player))return 0;
+  if(player.equipment.light.itemId==='everlantern')return PLAYER_LIGHT_RADIUS*1.45;
   const fuel=Number(player.equipment?.light?.durability);
   const fade=LANTERN_FADE_SECONDS;
   if(!(fuel>0)||!(fade>0))return 0;
@@ -244,10 +245,11 @@ export function shadeHex(hex, displayBrightness, darkness, lighting=resolveLight
 
 /** Byte field of lamp strength, row 0 at high z, for a CanvasTexture with flipY. */
 export function writeLightField(data, size, origin, span, sources, lighting=resolveLighting(null)){
+  const ox=typeof origin==='number'?origin:origin.x, oz=typeof origin==='number'?origin:origin.z;
   for(let row=0;row<size;row++){
-    const z=origin+(1-(row+0.5)/size)*span;
+    const z=oz+(1-(row+0.5)/size)*span;
     for(let col=0;col<size;col++){
-      const x=origin+(col+0.5)/size*span;
+      const x=ox+(col+0.5)/size*span;
       const byte=Math.round(clamp(combinedStrength(sources, x, z, lighting), 0, 1)*255);
       const i=(row*size+col)*4;
       data[i]=data[i+1]=data[i+2]=byte;

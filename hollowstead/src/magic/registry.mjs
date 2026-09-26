@@ -5,8 +5,9 @@ import {GRAVECRAFT, gravecraftSprite, skeletonSprite} from './art.mjs?v=harvest-
 export const magicItems = Object.create(null);
 export const magicModules = [];
 const allyTypes = new Set();
+// world.projectiles belongs to the engine's arrows and staff bolts, drawn by the renderers directly.
 const listNames = new Set([
-  'bolts', 'projectiles', 'sweeps', 'darts', 'magic', 'summons', 'skeletons',
+  'bolts', 'sweeps', 'darts', 'magic', 'summons', 'skeletons',
   'magicBolts', 'magicPuffs', 'magicCasts', 'magicSweeps', 'magicDarts', 'magicPins', 'magicRoots', 'magicSummons', 'magicWaves',
 ]);
 const SNAP_LISTS = [
@@ -126,7 +127,7 @@ export function readPendingBurn(enemy){
 }
 
 const LIST_ROLE = {
-  magicBolts: 'projectile', bolts: 'projectile', projectiles: 'projectile',
+  magicBolts: 'projectile', bolts: 'projectile',
   magicPuffs: 'impact', magicCasts: 'cast', magicSweeps: 'sweep', sweeps: 'sweep',
   magicDarts: 'dart', darts: 'dart', magicPins: 'pin',
 };

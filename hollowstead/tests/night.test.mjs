@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {World} from '../src/engine.mjs';
+import {waveSize} from '../src/progression.mjs';
 import {RULES, phaseAt, dayAt, phaseRemaining} from '../src/content.mjs';
 import {
   CLOCK_V2, NIGHT_WAVE_FRACTIONS, V1_PHASE, V2_PHASE, nightWaveOffsets, phaseProgress, remapPhaseTime,
@@ -16,7 +17,7 @@ import {
 
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 const loadFixture = name => JSON.parse(readFileSync(new URL(name, fixtureDir), 'utf8'));
-function camp(){const w=new World(402);const p=w.addPlayer('host','Jun');w.start();return {w,p};}
+function camp(){const w=new World(402);const p=w.addPlayer('host','Jun');w.start();w.ambient=false;w.enemies=[];p.regions=['meadow','woods','graveyard','mire','crags','barrow'];return {w,p};}
 function brace(w){const hearth=w.buildings[0];hearth.hp=1e7;hearth.maxHp=1e7;hearth.fuel=100000;return hearth;}
 
 test('T28 phaseAt, dayAt, and remaining agree on 180/210/310 and later days',()=>{
@@ -49,7 +50,7 @@ test('T28 phaseAt, dayAt, and remaining agree on 180/210/310 and later days',()=
   assert.equal(RULES.cycle*RULES.finalNight,1550);
 });
 
-test('T29 a night has three wave opportunities, the boss once, and victory at the later dawn',()=>{
+test('T29 a night has three wave opportunities, the boss every fifth night, and no victory screen',()=>{
   assert.deepEqual(NIGHT_WAVE_FRACTIONS,[0,0.4,0.8]);
   assert.deepEqual(nightWaveOffsets(RULES.night),[0,40,80]);
   const {w,p}=camp();
@@ -58,7 +59,7 @@ test('T29 a night has three wave opportunities, the boss once, and victory at th
   w.tick(0.05);
   assert.equal(phaseAt(w.time),'night');
   assert.equal(w.wave,1);
-  assert.equal(w.enemies.length,Math.min(11,2+dayAt(w.time)));
+  assert.equal(w.enemies.length,waveSize(dayAt(w.time),1));
   const nightStart=RULES.day+RULES.dusk;
   const spawned=[w.time];
   while(w.time<RULES.cycle-0.05){
@@ -106,8 +107,11 @@ test('T29 a night has three wave opportunities, the boss once, and victory at th
   assert.equal(boss.w.bossSlain,true);
   boss.w.time=RULES.cycle*5-0.02;
   boss.w.tick();
-  assert.equal(boss.w.status,'victory');
-  assert.equal(boss.w.time>=1550||RULES.cycle*5===1550,true);
+  assert.equal(boss.w.status,'playing');
+  boss.w.time=RULES.cycle*9+RULES.day+RULES.dusk-0.02;
+  boss.w.tick(0.05);
+  assert.equal(boss.w.enemies.filter(enemy=>enemy.type==='king').length,1);
+  assert.equal(boss.w.bossNight,10);
 });
 
 test('T29 a migrated night does not replay its start or grow a fourth wave',()=>{

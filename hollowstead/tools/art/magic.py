@@ -49,7 +49,7 @@ def skeleton(P):
     body += line(f"M230 {336 + by} Q243 {332 + by} 250 {336 + by} M262 {336 + by} Q269 {332 + by} 282 {336 + by}", 6, SK_E)
     body += line(f"M230 {352 + by} Q243 {348 + by} 250 {352 + by} M262 {352 + by} Q269 {348 + by} 282 {352 + by}", 6, SK_E)
     body += line(f"M256 {318 + by} L256 {368 + by}", 6, SK_SS)
-    body += fill(f"M222 {380 + by} L290 {380 + by} L294 {404 + by} L280 {398 + by} L270 {414 + by} L258 {400 + by} L246 {416 + by} L236 {400 + by} L218 {406 + by} Z", SK_CLOTH, 7)
+    body += fill(f"M222 {380 + by} L290 {380 + by} L294 {404 + by} L280 {398 + by} L270 {414 + by} L258 {400 + by} L246 {416 + by} L236 {400 + by} L218 {406 + by} Z", P.get("cloth", SK_CLOTH), 7)
     body += rrect(220, 376 + by, 72, 12, 5, SK_BELT, 6) + rrect(249, 377 + by, 14, 10, 2, SK_BUCK, 4)
     # head
     h = ""
@@ -58,12 +58,29 @@ def skeleton(P):
     h += f'<ellipse cx="256" cy="180" rx="118" ry="106" fill="{SK_B}" stroke="none"/><rect x="198" y="236" width="116" height="64" rx="20" fill="{SK_B}" stroke="none"/>'
     h += fill("M172 170 L244 194 Q248 238 208 240 Q168 238 170 198 Z", SK_E, 7) + fill("M340 170 L268 194 Q264 238 304 240 Q344 238 342 198 Z", SK_E, 7)
     h += fill_ns("M256 234 L246 252 Q256 256 266 252 Z", SK_E)
+    if P.get("glow"):
+        for ex in (210, 302):
+            h += f'<circle cx="{ex}" cy="214" r="16" fill="{P["glow"]}" stroke="none" opacity=".35"/><circle cx="{ex}" cy="214" r="8" fill="{P["glow"]}" stroke="none"/>'
+    if P.get("helm"):
+        h += fill("M140 150 Q150 56 256 50 Q362 56 372 150 Q320 128 256 128 Q192 128 140 150 Z", P["helm"], 8) + line("M256 52 L256 128", 6) + brush((170, 120), (200, 80), (246, 66), 8, "#ffffff", .3)
     jaw = P.get("jaw", 0)
     h += f'<g transform="translate(0 {jaw})">' + line("M226 270 L226 294 M244 272 L244 298 M262 272 L262 298 M280 270 L280 296", 5) + '</g>'
     h += line("M268 76 L276 98 L264 112 L272 128", 5) + line("M356 142 L340 152 L346 166 L332 176", 5) + line("M148 196 L162 202 L156 216", 5) + line("M214 84 L222 100 L212 108", 4)
     body += f'<g transform="translate(0 {by}) rotate({tilt} 256 300)">{h}</g>'
+    blade = ""
+    if P.get("blade"):
+        a2 = P.get("ar", (20, 15))[1]
+        tip = seg(hr, a2 + 180 + P.get("blade_tilt", 25), 150)
+        base = seg(hr, a2 + 180 + P.get("blade_tilt", 25), 10)
+        blade += line(f"M{f(hr[0])} {f(hr[1])} L{f(tip[0])} {f(tip[1])}", 38) + line(f"M{f(base[0])} {f(base[1])} L{f(tip[0])} {f(tip[1])}", 24, "#b9bccf")
+        mid = ((base[0] + tip[0]) / 2, (base[1] + tip[1]) / 2)
+        blade += line(f"M{f(base[0])} {f(base[1])} L{f(tip[0])} {f(tip[1])}", 5, "#7d7f96") + f'<circle cx="{f(mid[0])}" cy="{f(mid[1])}" r="6" fill="#b5733f" stroke="none"/>'
+        g1 = seg(hr, a2 + 90 + P.get("blade_tilt", 25), 22); g2 = seg(hr, a2 - 90 + P.get("blade_tilt", 25), 22)
+        blade += line(f"M{f(g1[0])} {f(g1[1])} L{f(g2[0])} {f(g2[1])}", 18) + line(f"M{f(g1[0])} {f(g1[1])} L{f(g2[0])} {f(g2[1])}", 8, "#6e3438")
     if P.get("front_r"):
-        body += ar
+        body += blade + ar
+    else:
+        body = blade + body
     fx = P.get("fx")
     if fx == "slash":
         body += brush((hr[0] - 30, hr[1] - 110), (hr[0] + 110, hr[1] - 40), (hr[0] + 40, hr[1] + 90), 22, SK_B, .85)

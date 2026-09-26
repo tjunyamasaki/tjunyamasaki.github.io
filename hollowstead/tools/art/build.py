@@ -21,9 +21,9 @@ def target(t):
 
 
 def registry():
-    import nodes, structures, items, actors
+    import nodes, structures, items, actors, longnight
     reg = {}
-    for mod in (nodes, structures, items, actors):
+    for mod in (nodes, structures, items, actors, longnight):
         for key, spec in getattr(mod, "SPRITES", getattr(mod, "NODES", {})).items():
             reg[key] = spec
     return reg
@@ -71,6 +71,18 @@ def main():
         im = lib.render_png(svg)
         thumbs.append((k, im))
         print("built", k, im.size)
+    import longnight
+    for k, fn in longnight.ICONS.items():
+        if a.only and k not in keys:
+            continue
+        svg = lib.build_sheet([fn], 1, 1, (36, 36, 476, 476), cell=(512, 512), out_scale=.375, align="center", center_on_first=False)
+        open(os.path.join(SPRITES, f"{k}-icon.svg"), "w").write(svg)
+    for k, fn in longnight.WIDE.items():
+        if a.only and k not in keys:
+            continue
+        svg = lib.build_sheet([fn], 1, 1, (20, 20, 492, 236), cell=(512, 256), out_scale=.5, align="center", center_on_first=False)
+        open(os.path.join(SPRITES, f"{k}.svg"), "w").write(svg)
+        thumbs.append((k, lib.render_png(svg)))
     if not a.only or "magic" in keys:
         import magic
         for k, im in magic.build_magic(ROOT).items():

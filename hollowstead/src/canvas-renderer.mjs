@@ -7,6 +7,7 @@ import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-16';
 import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-16';
 import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-16';
 import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-16';
+import {RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-16';
 import {
   brightnessAt, canInspect, entityBrightness, frameLighting, labelOpacity, shadeHex, warningVisible,
 } from './lighting.mjs?v=harvest-16';
@@ -38,7 +39,7 @@ export class CanvasRenderer {
     const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||this.images.get('ember'),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
     const special=magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0?'attack':'walk'):e.action||'idle'),clip=def.clips[clipName]||def.clips.walk||def.clips.attack||def.clips.idle;
     const cols=def.columns||1,rows=def.rows||1,frameIndex=key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
-    let w=(kind==='drop'?.85:def.size[0])*this.scale,h=(kind==='drop'?1.28:def.size[1])*this.scale;if(kind==='drop'&&e.flightT){const shrink=1-e.flightT*0.35;w*=shrink;h*=shrink;}if(e.down||e.ghost){w*=.8;h*=.65;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
+    let w=(kind==='drop'?.85:def.size[0])*this.scale,h=(kind==='drop'?1.28:def.size[1])*this.scale;if(kind==='drop'&&e.flightT){const shrink=1-e.flightT*0.35;w*=shrink;h*=shrink;}if(e.down||e.ghost){w*=.8;h*=.65;}if(kind==='enemy'&&e.elite){w*=1.3;h*=1.3;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
     const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob*this.scale:kind==='enemy'&&key==='wraith'?(Math.sin(this.clock*3)*.1+.2)*this.scale:0;
     const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e));
     let display=kind==='preview'?Math.max(0.72, entityBrightness(frame, e.x, e.z)):entityBrightness(frame, e.x, e.z, {local:kind==='player'&&e.id===p.id, emissive});
@@ -83,12 +84,12 @@ export class CanvasRenderer {
       c.fillStyle=`rgba(35,31,42,${hash*.07*display})`;c.fillRect(a.x,a.y,b.x-a.x+1,b.y-a.y+1);
       if(display>0.2){for(let i=0;i<2;i++){const s=this.screenPoint(x+hash*1.9,z+(hash+i*.5)%1*size);c.strokeStyle=hash>.5?`rgba(182,153,108,${display*.4})`:`rgba(53,78,72,${display*.4})`;c.lineWidth=1;c.beginPath();c.moveTo(s.x-2,s.y+1);c.lineTo(s.x,s.y-2);c.lineTo(s.x+3,s.y);c.stroke();}}
     };
-    for(let z=Math.max(-44,Math.floor((this.focus.z-halfZ)/2)*2);z<Math.min(44,this.focus.z+halfZ);z+=2)for(let x=Math.max(-44,Math.floor((this.focus.x-halfX)/2)*2);x<Math.min(44,this.focus.x+halfX);x+=2)paintTile(x,z,2,true);
+    for(let z=Math.max(-RULES.radius-6,Math.floor((this.focus.z-halfZ)/2)*2);z<Math.min(RULES.radius+6,this.focus.z+halfZ);z+=2)for(let x=Math.max(-RULES.radius-6,Math.floor((this.focus.x-halfX)/2)*2);x<Math.min(RULES.radius+6,this.focus.x+halfX);x+=2)paintTile(x,z,2,true);
     if(frame.darkness>0.05){
       for(const source of frame.sources){
         const reach=source.radius*frame.lighting.ambientFraction+0.75;
-        const x0=Math.max(-44,Math.floor((source.x-reach)*2)/2),x1=Math.min(44,source.x+reach);
-        const z0=Math.max(-44,Math.floor((source.z-reach)*2)/2),z1=Math.min(44,source.z+reach);
+        const x0=Math.max(-RULES.radius-6,Math.floor((source.x-reach)*2)/2),x1=Math.min(RULES.radius+6,source.x+reach);
+        const z0=Math.max(-RULES.radius-6,Math.floor((source.z-reach)*2)/2),z1=Math.min(RULES.radius+6,source.z+reach);
         for(let z=z0;z<z1;z+=0.5)for(let x=x0;x<x1;x+=0.5){
           if(Math.hypot(x+0.25-source.x,z+0.25-source.z)>reach)continue;
           paintTile(x,z,0.5,false);
@@ -100,7 +101,7 @@ export class CanvasRenderer {
     if(target&&!placement){const fade=this.reveal(target.x, target.z);if(fade>0.05){c.save();c.globalAlpha=fade;c.setLineDash([5,4]);c.lineDashOffset=-this.clock*6;this.ellipse(target.x,target.z,1,'#edc48c',false);c.setLineDash([]);c.restore();}}
     if(p.goal){const fade=Math.max(this.reveal(p.goal.x, p.goal.z), distance(p, p.goal)<8?.28:0);if(fade>0.04){c.save();c.globalAlpha=fade;this.ellipse(p.goal.x,p.goal.z,.2,'#eadaba',false);c.restore();}}
     for(const e of world.enemies)if(e.windup>0){const radius=e.type==='king'?4:1.9;if(!warningVisible(frame, e.tx, e.tz, radius, p))continue;const alpha=frame.darkness>0.5?.16:.28;this.ellipse(e.tx,e.tz,radius,`rgba(240,118,100,${alpha+Math.sin(this.clock*12)*.04})`);this.ellipse(e.tx,e.tz,radius,`rgba(241,149,123,${frame.darkness>0.5?.45:.8})`,false);}
-    const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
+    const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:e.kind==='arrow'?'arrow':'mbolt',kind:'projectile'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
     const drawn=entities.map(entry=>{
       if(entry.key==='gravecraft-skeleton'){
         const last=this.magicActors.get(entry.e.id)||{x:entry.e.x,z:entry.e.z};
@@ -115,8 +116,8 @@ export class CanvasRenderer {
     this.dropMotion.retain(new Set(world.drops.map(drop=>drop.id)));
     const summonIds=new Set((world.magicSummons||[]).map(e=>e.id));for(const id of this.magicActors.keys())if(!summonIds.has(id))this.magicActors.delete(id);
     if(placement){c.save();c.globalAlpha=.7;this.drawSprite(placement.key,{x:placement.x,z:placement.z},'preview',world,frame,p);c.restore();this.ellipse(placement.x,placement.z,.9,placement.valid?'#bbdca5':'#d67d79',false);}
-    for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2){if(['loot','damage','heal','build','craft'].includes(ev.type))this.float(ev.text,ev.x,ev.z,ev.type==='damage'?'#f5c2a9':ev.type==='heal'?'#b9e2ba':'#fbe1ad');if(!ev.magicPack&&['hit','kill','hurt','impact','bolt'].includes(ev.type))this.effects.push({...ev,life:0});}this.lastEvent=ev.id;}
-    this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);c.save();c.globalAlpha=fade;this.ellipse(e.x,e.z,.2+e.life*(e.type==='impact'?8:3),`rgba(246,194,131,${Math.max(0,1-e.life*2)})`,false);c.restore();return e.life<.5;});
+    for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2){if(['loot','damage','heal','build','craft'].includes(ev.type))this.float(ev.text,ev.x,ev.z,ev.type==='damage'?'#f5c2a9':ev.type==='heal'?'#b9e2ba':'#fbe1ad');if(ev.type==='rare')this.float(`✦ ${ev.text}`,ev.x,ev.z,RARITY_COLORS[rarityOf(ev.itemId)]);if(ev.type==='levelup')this.float(`LEVEL UP · ${ev.text}`,ev.x,ev.z,'#f2c14e');if(ev.type==='discover')this.float(ev.text,ev.x,ev.z,'#d4fff5');if(!ev.magicPack&&['hit','kill','hurt','impact','bolt','nova','burst'].includes(ev.type))this.effects.push({...ev,life:0});}this.lastEvent=ev.id;}
+    this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);c.save();c.globalAlpha=fade;this.ellipse(e.x,e.z,e.radius?.3+Math.min(1,e.life*3)*e.radius:.2+e.life*(e.type==='impact'?8:3),e.type==='burst'?`rgba(127,214,196,${Math.max(0,1-e.life*2)})`:`rgba(246,194,131,${Math.max(0,1-e.life*2)})`,false);c.restore();return e.life<.5;});
     drawMagicCanvas(c,buildMagicEffects(world,this.magicFrame,this.theme),(x,z,y)=>this.screenPoint(x,z,y));
     this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*this.reveal(f.x, f.z));if(f.life>1.8){f.el.remove();return false;}return true;});
   }

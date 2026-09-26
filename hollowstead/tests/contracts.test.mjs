@@ -72,7 +72,8 @@ function assertV1World(world){
   if (world.enemies.length) {
     const probe = new World(3);
     probe.spawnEnemy('crawler', 1, 1);
-    for (const enemy of world.enemies) assert.deepEqual(keys(enemy), keys(probe.enemies[0]));
+    // Long Night enemies add power, level and elite; every v1 field still exists.
+    for (const enemy of world.enemies) for (const key of keys(enemy)) assert.equal(Object.hasOwn(probe.enemies[0], key), true, key);
   }
   assert.throws(() => World.restore(JSON.parse(JSON.stringify(world))), /not a Hollowstead expedition/);
 }
@@ -104,11 +105,11 @@ test('runtime clock is 180/30/100 while the protocol is hollowstead-2', () => {
 
 test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.deepEqual(EQUIPMENT_SLOTS, ['chop', 'mine', 'weapon', 'body', 'light']);
-  assert.deepEqual(EQUIPMENT_SLOT_ITEMS.weapon, ['spear', 'sword']);
+  assert.deepEqual(EQUIPMENT_SLOT_ITEMS.weapon, ['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome']);
   assert.equal(MIGRATION_PREFERRED_WEAPON, 'sword');
   assert.equal(equipmentSlotFor('torch'), 'light');
   assert.equal(equipmentSlotFor('berry'), null);
-  assert.deepEqual(SUPPLY_ITEM_IDS, ['wood', 'stone', 'fiber', 'ore', 'ember', 'seed', 'berry', 'pumpkin', 'mushroom', 'meat', 'roast', 'stew', 'bandage']);
+  assert.deepEqual(SUPPLY_ITEM_IDS, ['wood', 'stone', 'fiber', 'ore', 'ember', 'seed', 'berry', 'pumpkin', 'mushroom', 'meat', 'roast', 'stew', 'bandage', 'shard', 'bone', 'spore', 'elixir', 'heartstone']);
   assert.equal(itemDefinition('wood').stackLimit, STACK_LIMIT);
   assert.equal(itemDefinition('wood').supplyUnits, 1);
   assert.equal(itemDefinition('axe').supplyUnits, 0);
@@ -134,7 +135,7 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
 
   assert.deepEqual(FIELD_BUILD_RECIPES, ['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed']);
   assert.deepEqual(WORKBENCH_BUILD_RECIPES, [...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward']);
-  assert.deepEqual(WORKBENCH_CRAFT_RECIPES, ['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword']);
+  assert.deepEqual(WORKBENCH_CRAFT_RECIPES, ['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir']);
   assert.deepEqual(FIRE_COOK_RECIPES, ['roast', 'roastMeat', 'roastCaps']);
   assert.deepEqual(CAULDRON_COOK_RECIPES, ['stew']);
   assert.equal(RECIPE_CONTEXTS.fieldBuild.source, 'field');
@@ -236,8 +237,9 @@ test('v1 fixtures keep the legacy save shape and cannot resume as container worl
   assert.equal(host.equipment.sword > 0 && host.equipment.spear > 0, true);
   assert.equal(legacyEquipmentPlan(host.equipment).sockets.weapon.itemId, 'sword');
   assert.equal(legacyEquipmentPlan(host.equipment).backpack[0].itemId, 'spear');
-  assert.equal(Object.keys(guest.inventory).length, SUPPLY_ITEM_IDS.length);
-  assert.equal(supplyLoad(guest.inventory), SUPPLY_ITEM_IDS.length * 100);
+  // v1 saves predate the Long Night materials: they hold the original 13 supplies.
+  assert.equal(Object.keys(guest.inventory).length, 13);
+  assert.equal(supplyLoad(guest.inventory), 13 * 100);
   assert.equal(stackCount(guest.inventory) > BACKPACK_SLOT_COUNT, true);
   const fullChest = full.world.buildings.find(building => building.type === 'chest');
   assert.equal(stackCount(fullChest.store) > CHEST_SLOT_COUNT, true);

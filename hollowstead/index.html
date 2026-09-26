@@ -16,7 +16,7 @@
   <main id="front" hidden>
     <header class="front-header"><a href="../links/" aria-label="Back to games">← GAMES</a><span>THE HOLLOW HARVEST · 01</span><div class="front-tools"><button id="front-fullscreen" class="text-button" type="button">FULLSCREEN</button><button id="front-sound" class="text-button" aria-label="Toggle sound">SOUND ON</button></div></header>
     <p id="front-fullscreen-note" class="fullscreen-note" hidden></p>
-    <section class="hero"><p class="eyebrow"><span class="tiny-dot"></span> 1–4 WANDERERS · CO-OP SURVIVAL</p><h1>Hollow<span>stead<span class="title-star">✦</span></span></h1><p class="tagline">A little light.<br>A long night.</p><p class="hero-description">Gather what the woods will give.<br>Build a home. Keep each other alive.</p></section>
+    <section class="hero"><p class="eyebrow"><span class="tiny-dot"></span> 1–4 WANDERERS · CO-OP SURVIVAL</p><h1>Hollow<span>stead<span class="title-star">✦</span></span></h1><p class="tagline">A little light.<br>A long night.</p><p class="hero-description">Explore the hollow. Crack open its caches.<br>Grow stronger. Outlast every night.</p></section>
     <section class="front-panel" id="home-panel">
       <div class="panel-heading"><span class="eyebrow">WHO WILL YOU BE?</span><span class="edition">AUTUMN ’26</span></div>
       <div id="characters" class="characters" aria-label="Choose your wanderer"></div>
@@ -28,7 +28,7 @@
       <p class="status" id="front-status" role="status"></p>
     </section>
     <section class="front-panel" id="room-panel" hidden><p class="eyebrow">THE CAMP IS OPEN</p><h2>Better together.</h2><p class="muted">Invite your friends, then enter the woods.</p><button id="copy-room" class="room-code" title="Copy invite link"><span id="room-code">·····</span><small>TAP TO COPY INVITE ↗</small></button><div id="roster"></div><button id="launch" class="primary wide">Enter the woods <span>→</span></button><p id="room-note" class="muted small">Friends can also join after you start.</p><button id="cancel-room" class="text-button">← Leave camp</button></section>
-    <footer class="front-footer"><span>FIVE NIGHTS. ONE SHARED FIRE.</span><button id="front-guide" class="text-button">A wanderer’s field guide ↗</button></footer>
+    <footer class="front-footer"><span>ENDLESS NIGHTS. ONE SHARED FIRE.</span><button id="front-guide" class="text-button">A wanderer’s field guide ↗</button></footer>
   </main>
   <div id="game" hidden>
     <header class="game-top">
@@ -36,6 +36,7 @@
         <div class="vital health" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Health 100"><span aria-hidden="true">♥</span><i><em id="hp-bar"></em></i></div>
         <div class="vital hunger" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="90" aria-label="Hunger 90"><span aria-hidden="true">◕</span><i><em id="hunger-bar"></em></i></div>
         <div class="vital courage" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Courage 100"><span aria-hidden="true">✦</span><i><em id="courage-bar"></em></i></div>
+        <div class="level-chip" id="level-chip" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Level 1"><b id="level-number">1</b><small id="region-name">THE MEADOW</small><i><em id="xp-bar"></em></i></div>
       </section>
       <div class="clock"><span id="day-number">DAY 01</span><div class="day-track" id="day-track"><i id="day-progress"></i></div><small id="phase-time">DAYLIGHT · 3:00</small></div>
       <button id="minimap-button" type="button" aria-label="Open world map"><canvas id="minimap" width="200" height="200"></canvas></button>

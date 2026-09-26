@@ -432,7 +432,7 @@ export function serializeContainer(container){return cloneContainer(container);}
 
 export function equippedLanternLit(player){
   const light=player?.equipment?.light;
-  return !!(player&&player.online&&!player.down&&!player.ghost&&player.lantern&&light?.itemId==='torch'&&typeof light.durability==='number'&&light.durability>0);
+  return !!(player&&player.online&&!player.down&&!player.ghost&&player.lantern&&(light?.itemId==='torch'||light?.itemId==='everlantern')&&typeof light.durability==='number'&&light.durability>0);
 }
 
 // Presentation only: a theme may list `variants` for a sprite key. Each entity

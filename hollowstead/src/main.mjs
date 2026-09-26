@@ -1,4 +1,5 @@
-import {World,clamp,distance,biome} from './engine.mjs?v=harvest-16';
+import {World,clamp,distance,biome,EXPLORE_CELL,EXPLORE_SIZE} from './engine.mjs?v=harvest-16';
+import {RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-16';
 import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,phaseRemaining} from './content.mjs?v=harvest-16';
 import {Renderer,loadTheme} from './renderer.mjs?v=harvest-16';
 import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-16';
@@ -47,7 +48,7 @@ function storeProfile(){try{localStorage.setItem(PROFILE,JSON.stringify({name:$(
 function showStatus(text,error=false){const el=$('front-status');if(el){el.textContent=text;el.style.color=error?'var(--red)':'var(--orange)';}connectionText=text;dirty=true;}
 function toast(text){const now=performance.now();if(text&&text===lastToast.text&&now-lastToast.at<2500)return;lastToast={text,at:now};$('toast').textContent=text;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3200);}
 function announce(text){$('announcement').textContent=text;$('announcement').classList.add('visible');clearTimeout(announceTimer);announceTimer=setTimeout(()=>$('announcement').classList.remove('visible'),4100);}
-function icon(key){const spriteKey=itemSpriteKey(key)||(STRUCTURES[key]?key:null),src=spriteKey&&(theme.sprites[spriteKey]?.icon||theme.sprites[spriteKey]?.src);if(!src)return '';return `<img class="item-icon" src="${escapeHtml(src)}" alt="" draggable="false">`;}
+function icon(key){const spriteKey=itemSpriteKey(key)||(STRUCTURES[key]?key:null),src=spriteKey&&(theme.sprites[spriteKey]?.icon||theme.sprites[spriteKey]?.src);if(!src)return '';const rarity=STRUCTURES[key]&&!itemSpriteKey(key)?'common':rarityOf(key);return `<img class="item-icon rarity-${rarity}" src="${escapeHtml(src)}" alt="" draggable="false">`;}
 function portrait(key){return `<span class="portrait" style="background-image:url('${theme.sprites[key]?.src||theme.sprites.ember.src}');background-size:${(theme.sprites[key]?.columns||1)*100}% ${(theme.sprites[key]?.rows||1)*100}%"></span>`;}
 function me(){return world?.player(localId);}
 function commandError(result){return result?.message||({chestInUse:'Chest in use',sessionExpired:'Chest access ended',wrongSession:'Chest access changed',outOfRange:'Move closer',inventoryFull:'No room for that',staleRevision:'Items changed. Try again.',notOwner:'That item is not available',unknownItem:'That item is no longer here',incompatibleSocket:'That item does not fit this equipment slot',pending:'Wait for the current action',timeout:'Action not confirmed. Check the current inventory before trying again.',disconnected:'Connection closed',worldChanged:'The expedition changed',rateLimited:'Please wait a moment',notReady:'Waiting for the camp',paused:'The host has paused the expedition',stationRequired:'That needs the right station',missingFuel:'The fire needs wood',invalidQuantity:'Choose a smaller amount'})[result?.code]||'That action is not available';}
@@ -439,7 +440,9 @@ function guideHTML(){
     ['Tend the camp','Build lists only what you can place from where you opened it. Choose Maintain camp to repair a damaged structure or hold Dismantle. The Heartfire cannot be dismantled. A chest someone else has open cannot be dismantled either.'],
     ['Share a chest','One wanderer opens a chest at a time. Your pack has twelve slots. A chest has twenty-four. Store all moves what fits from your pack. Sort orders a chest or your pack and stacks matching piles. Choose a quantity, then Transfer, or tap the destination slot. Close the panel to let someone else in.'],
     ['Stand together','Hold Attack to use the weapon you have equipped. Dodge the glowing attack circles. Armor absorbs damage only while worn. Hold Revive beside a fallen friend for three seconds. Everyone has one last-chance charm. Fallen wanderers return at dawn if the camp survives.'],
-    ['Break the curse','Survive five nights and defeat the Hollow King on night five. Guard the Heartfire: losing it ends the expedition. Awaken it with soul embers from the eastern graveyard and night creatures. After victory, you can keep surviving.'],
+    ['Explore for treasure','The hollow is vast. Beyond the meadow lie the Autumn Woods and the Graveyard; farther still the Hollow Mire, the Moonshard Crags and the Barrow Fields. Crates, iron-bound chests, moonlit coffers and hollow reliquaries hide out there: hold Open beside one. Better caches sit farther from camp, and guardians watch them. Caches refill after a few days.'],
+    ['Grow stronger','Kills, caches, gathering and new regions give experience. Each level adds health and damage. Loot comes in five rarities: common, uncommon, rare, epic and legendary. Bows fire arrows at the nearest foe, staffs throw bursting bolts, broadswords cleave, and the Grimoire of Ash burns everything around you. Heartstones raise your health for good.'],
+    ['Outlast the night','Every night is harder than the last, with more creatures and elder champions. The Hollow King returns every fifth night, stronger each time. Guard the Heartfire: losing it ends the expedition. How many nights can you survive?'],
   ];
   return `<p class="guide-intro">The woods are unkind.<br>Your friends don’t have to be.</p>${steps.map(([title,text],index)=>`<div class="guide-step"><b>0${index+1}</b><div><h3>${title}</h3><p>${text}</p></div></div>`).join('')}<div class="key-help"><span>WASD / arrows · Move</span><span>E · Context action</span><span>Space · Attack</span><span>Shift · Dodge</span><span>I · Inventory</span><span>B · Build</span><span>F · Lantern</span><span>M · Map</span><span>1–4 · More actions</span><span>Esc · Menu</span></div><p class="muted small">The host saves the expedition automatically. Continue it alone, or host the saved expedition to open a new camp. Keep the host’s tab open during co-op; switching away pauses everyone.</p>`;
 }
@@ -494,8 +497,9 @@ function renderSheet(){
   else if(sheet==='menu'){title='By the fire';kicker=mode==='solo'?'EXPEDITION PAUSED':linkLost?'CONNECTION CLOSED':'THE EXPEDITION CONTINUES';setTabs('');replaceContent(menuHTML());}
   else if(sheet==='map'){
     title='The Hollow Harvest';kicker=`DAY ${dayAt(world.time)} · SHARED EXPLORATION`;setTabs('');
-    const place=p?({meadow:'Pumpkin meadow',woods:'Crooked woods',graveyard:'Old graveyard'})[biome(p.x,p.z)]:'';
-    replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Explored world map"></canvas><p class="map-legend">✦ Heartfire &nbsp; ● Wanderers &nbsp; ◆ Camp structures<br>Amber · pumpkin meadows<br>Green · crooked woods<br>Violet · haunted graveyard<br>${place?`You are in the ${escapeHtml(place.toLowerCase())}.<br>`:''}Dark areas are unexplored. Travel together to reveal them.</p>`);
+    const place=p?REGIONS[regionAt(p.x,p.z)]?.name:'';const found=p?.regions?.length||1;
+    const swatch=(color,text)=>`<span class="swatch" style="background:${color}"></span>${text}`;
+    replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Explored world map"></canvas><p class="map-legend">✦ Heartfire &nbsp; ● Wanderers &nbsp; ◆ Camp &nbsp; <span style="color:#e0776b">●</span> Guardians<br>${swatch(RARITY_COLORS.common,'Crate')} ${swatch(RARITY_COLORS.rare,'Iron-bound chest')} ${swatch(RARITY_COLORS.epic,'Moonlit coffer')} ${swatch(RARITY_COLORS.legendary,'Reliquary')}<br>${place?`You are in ${escapeHtml(place)}. `:''}Regions discovered: ${found} of 6.<br>Danger and treasure grow the farther you travel from the Heartfire.</p>`);
     drawMap($('full-map'),true);
   }else if(!p)return;
   else if(sheet==='catalog'){
@@ -519,13 +523,24 @@ function renderSheet(){
 }
 function drawMap(canvas,full=false){
   if(!canvas)return;
-  const ctx=canvas.getContext('2d'),size=canvas.width,scale=size/84;ctx.clearRect(0,0,size,size);ctx.fillStyle='#282733';ctx.fillRect(0,0,size,size);const explored=new Set(world.explored);
-  for(let z=0;z<21;z++)for(let x=0;x<21;x++){if(!explored.has(z*21+x))continue;ctx.fillStyle=theme.palette[biome(x*4-40,z*4-40)];ctx.fillRect(x*4*scale,z*4*scale,4*scale+.5,4*scale+.5);}
-  const known=e=>explored.has(Math.floor((e.z+42)/4)*21+Math.floor((e.x+42)/4));
-  if(full)for(const n of world.nodes){if(!known(n)||n.ready)continue;ctx.fillStyle=n.type==='tree'?'#374f48':n.type==='grave'||n.type==='ore'?'#d2c5d7':n.type==='pumpkin'?'#e8ae72':'#c1b993';ctx.beginPath();ctx.arc((n.x+42)*scale,(n.z+42)*scale,2,0,Math.PI*2);ctx.fill();}
-  for(const b of world.buildings){if(b.type!=='hearth'&&!known(b))continue;const x=(b.x+42)*scale,y=(b.z+42)*scale;ctx.fillStyle=b.type==='hearth'?'#ffdda0':'#c4b096';ctx.beginPath();ctx.moveTo(x,y-4);ctx.lineTo(x+4,y);ctx.lineTo(x,y+4);ctx.lineTo(x-4,y);ctx.closePath();ctx.fill();}
-  for(const p of world.players.filter(p=>p.online)){ctx.fillStyle=CHARACTERS.find(c=>c.id===p.character)?.color||'#f4e3b2';ctx.strokeStyle='#27222e';ctx.lineWidth=2;ctx.beginPath();ctx.arc((p.x+42)*scale,(p.z+42)*scale,p.id===localId?4.8:3.5,0,Math.PI*2);ctx.fill();ctx.stroke();}
-  if(full){ctx.font='13px monospace';ctx.fillStyle='#e0caaa';ctx.textAlign='center';ctx.fillText('N',size/2,20);ctx.font='12px Georgia';ctx.fillText('HEARTFIRE',size/2,size/2+23);}
+  const ctx=canvas.getContext('2d'),size=canvas.width,R=RULES.radius,N=EXPLORE_SIZE,cell=EXPLORE_CELL;ctx.clearRect(0,0,size,size);ctx.fillStyle='#282733';ctx.fillRect(0,0,size,size);const explored=new Set(world.explored);
+  const me_=world.player(localId)||world.players[0]||{x:0,z:0};
+  // Full map shows the whole hollow; the minimap is a 34-unit window around you.
+  const span=full?R*2+4:68,scale=size/span,cx=full?0:me_.x,cz=full?0:me_.z;
+  const sx=x=>(x-cx)*scale+size/2,sz=z=>(z-cz)*scale+size/2,vis=(x,z)=>Math.abs(x-cx)<span/2+cell&&Math.abs(z-cz)<span/2+cell;
+  for(const index of explored){const gx=index%N,gz=Math.floor(index/N),x=gx*cell-R,z=gz*cell-R;if(!vis(x,z))continue;ctx.fillStyle=theme.palette[biome(x+cell/2,z+cell/2)]||theme.palette.meadow;ctx.fillRect(sx(x),sz(z),cell*scale+.6,cell*scale+.6);}
+  const known=e=>explored.has(Math.floor((e.z+R)/cell)*N+Math.floor((e.x+R)/cell));
+  const cacheColor={crate:RARITY_COLORS.common,ironchest:RARITY_COLORS.rare,moonchest:RARITY_COLORS.epic,reliquary:RARITY_COLORS.legendary};
+  for(const n of world.nodes){
+    if(!known(n)||!vis(n.x,n.z))continue;
+    if(isCache(n.type)){const x=sx(n.x),y=sz(n.z),r=full?4.5:5;ctx.globalAlpha=n.ready?.35:1;ctx.fillStyle=cacheColor[n.type];ctx.strokeStyle='#1e1624';ctx.lineWidth=1.5;ctx.fillRect(x-r,y-r*.7,r*2,r*1.4);ctx.strokeRect(x-r,y-r*.7,r*2,r*1.4);ctx.globalAlpha=1;continue;}
+    if(!full||n.ready)continue;
+    ctx.fillStyle=n.type==='tree'?'#374f48':['grave','ore','shardrock'].includes(n.type)?'#d2c5d7':n.type==='pumpkin'?'#e8ae72':'#c1b993';ctx.beginPath();ctx.arc(sx(n.x),sz(n.z),1.6,0,Math.PI*2);ctx.fill();
+  }
+  for(const e of world.enemies){if(!e.guardOf||!known(e)||!vis(e.x,e.z))continue;ctx.fillStyle='#e0776b';ctx.beginPath();ctx.arc(sx(e.x),sz(e.z),full?1.8:2.4,0,Math.PI*2);ctx.fill();}
+  for(const b of world.buildings){if(b.type!=='hearth'&&!known(b))continue;let x=sx(b.x),y=sz(b.z);if(b.type==='hearth'&&!full){x=clamp(x,8,size-8);y=clamp(y,8,size-8);}else if(!vis(b.x,b.z))continue;ctx.fillStyle=b.type==='hearth'?'#ffdda0':'#c4b096';const r=b.type==='hearth'?6:4;ctx.beginPath();ctx.moveTo(x,y-r);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r);ctx.lineTo(x-r,y);ctx.closePath();ctx.fill();}
+  for(const q of world.players.filter(q=>q.online)){if(!vis(q.x,q.z))continue;ctx.fillStyle=CHARACTERS.find(c=>c.id===q.character)?.color||'#f4e3b2';ctx.strokeStyle='#27222e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sx(q.x),sz(q.z),q.id===localId?5:3.8,0,Math.PI*2);ctx.fill();ctx.stroke();}
+  if(full){ctx.strokeStyle='#d8c29a44';ctx.lineWidth=1;ctx.beginPath();ctx.arc(sx(0),sz(0),R*scale,0,Math.PI*2);ctx.stroke();ctx.font='13px monospace';ctx.fillStyle='#e0caaa';ctx.textAlign='center';ctx.fillText('N',size/2,16);ctx.font='11px Georgia';ctx.fillText('HEARTFIRE',sx(0),sz(0)+18);}
 }
 function paintVital(key,value,name){const bar=$(`${key}-bar`);if(!bar)return;const amount=clamp(value,0,100);bar.style.width=`${amount}%`;const row=bar.closest('[role="progressbar"]');if(!row)return;const shown=String(Math.ceil(amount));row.setAttribute('aria-valuenow',shown);row.setAttribute('aria-label',`${name} ${shown}`);}
 function paintClock(){
@@ -567,7 +582,7 @@ function ui(){
   if($('room-panel')&&!$('room-panel').hidden){$('roster').innerHTML=world.players.filter(p=>p.online).map(p=>`<div class="roster-row">${portrait(p.character)}<span>${escapeHtml(p.name)}</span><small>${p.id==='host'?'HOST':'READY'}</small></div>`).join('')+Array.from({length:Math.max(0,4-world.players.filter(p=>p.online).length)},()=>'<div class="roster-row"><span class="party-dot" style="opacity:.3"></span><span class="muted small">Waiting for a wanderer…</span></div>').join('');}
   const p=me();
   if(!$('game').hidden&&p){
-    paintVital('hp',p.hp,'Health');paintVital('hunger',p.hunger,'Hunger');paintVital('courage',p.courage,'Courage');
+    paintVital('hp',p.hp/maxHealth(p)*100,'Health');$('level-number').textContent=String(p.level||1);$('xp-bar').style.width=`${clamp((p.xp||0)/xpToNext(p.level||1)*100,0,100)}%`;$('level-chip').setAttribute('aria-label',`Level ${p.level||1}, ${Math.round((p.xp||0)/xpToNext(p.level||1)*100)} percent to next`);$('region-name').textContent=(REGIONS[regionAt(p.x,p.z)]?.name||'').toUpperCase();paintVital('hunger',p.hunger,'Hunger');paintVital('courage',p.courage,'Courage');
     $('stamina-bar').style.width=`${p.stamina}%`;
     $('day-number').textContent=`DAY ${String(dayAt(world.time)).padStart(2,'0')}`;
     $('day-progress').style.left=`${(world.time%RULES.cycle)/RULES.cycle*100}%`;
@@ -576,7 +591,7 @@ function ui(){
     paintClock();
     $('party').innerHTML=world.players.filter(q=>q.id!==localId).map(q=>`<div class="party-row"><span class="party-dot" style="background:${CHARACTERS.find(c=>c.id===q.character)?.color}"></span><b>${escapeHtml(q.name)}</b><span>${!q.online?'away':q.down?'needs help!':q.ghost?'returns at dawn':''}</span></div>`).join('');
     if(p.noticeAt&&p.noticeAt!==lastNotice){toast(p.notice);lastNotice=p.noticeAt;}
-    for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(distance(p,ev)<20||ev.type==='phase')sound.play(ev.type);}}
+    for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(ev.type==='rare'&&distance(p,ev)<14)toast(`Found ${ev.text} · ${rarityOf(ev.itemId)}`);if(distance(p,ev)<20||ev.type==='phase')sound.play(ev.type);}}
     $('downed').hidden=!p.down&&!p.ghost;
     if(p.down||p.ghost){$('downed-text').textContent=p.charm?'Use your one last-chance charm, or let a teammate hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds until your supplies drop.`:'Your supplies are on the ground. You return at dawn if the camp survives.';$('use-charm').hidden=!p.charm;if(sheet)closeSheet();cancelPlacement();cancelMaintenance();inventoryPanel?.cancelDrag();}
     const boss=world.enemies.find(e=>e.type==='king');$('boss-bar').hidden=!boss;document.body.classList.toggle('boss',!!boss);if(boss)$('boss-bar').querySelector('em').style.width=`${boss.hp/boss.maxHp*100}%`;
@@ -589,7 +604,7 @@ function ui(){
     if(sheet==='catalog'&&catalog.source==='station'){const station=world.buildings.find(b=>b.id===catalog.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(maintenance&&maintenanceTarget&&!world.buildings.some(b=>b.id===maintenanceTarget&&b.hp>0))maintenanceTarget=null;
     paintCluster(currentMode(),p);drawMap($('minimap'));
-    if(['victory','defeat'].includes(world.status)&&lastEnd!==world.status){lastEnd=world.status;resetInput();endContextHold();cancelPlacement();cancelMaintenance();closeSheet();save();$('end-screen').hidden=false;const won=world.status==='victory';$('end-kicker').textContent=won?'THE CURSE IS BROKEN':'THE EXPEDITION ENDS';$('end-title').textContent=won?'Morning, at last.':'The last light.';$('end-text').textContent=won?'Five nights in the hollow. One fire kept alive. You made a home where nothing was meant to live.':world.buildings.some(b=>b.type==='hearth')?'The woods claimed every wanderer. A stronger camp and a friend’s helping hand can turn the next night.':'The Heartfire was destroyed. Walls, traps and a well-fed fire will help your next camp endure.';$('end-stats').innerHTML=`<span><b>${dayAt(world.time)}</b>DAYS</span><span><b>${world.kills}</b>FOES</span><span><b>${world.stats.built}</b>BUILT</span>`;$('endless').hidden=!won||mode==='guest';$('new-expedition').hidden=mode==='guest';}
+    if(['victory','defeat'].includes(world.status)&&lastEnd!==world.status){lastEnd=world.status;resetInput();endContextHold();cancelPlacement();cancelMaintenance();closeSheet();save();$('end-screen').hidden=false;const won=world.status==='victory';$('end-kicker').textContent=won?'THE CURSE IS BROKEN':'THE EXPEDITION ENDS';$('end-title').textContent=won?'Morning, at last.':'The last light.';$('end-text').textContent=won?'Five nights in the hollow. One fire kept alive. You made a home where nothing was meant to live.':world.buildings.some(b=>b.type==='hearth')?'The woods claimed every wanderer. A stronger camp and a friend’s helping hand can turn the next night.':'The Heartfire was destroyed. Walls, traps and a well-fed fire will help your next camp endure.';const top=Math.max(...world.players.map(q=>q.level||1));$('end-text').textContent+=world.best?.loot?` Best find: ${label(world.best.loot)}.`:'';$('end-stats').innerHTML=`<span><b>${Math.max(0,dayAt(world.time)-1)}</b>NIGHTS</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=!won||mode==='guest';$('new-expedition').hidden=mode==='guest';}
   }
   if(sheet&&dirty)renderSheet();
   dirty=false;

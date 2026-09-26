@@ -63,9 +63,9 @@ export const EQUIPMENT_SLOTS = Object.freeze(['chop', 'mine', 'weapon', 'body', 
 export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
   chop: Object.freeze(['axe']),
   mine: Object.freeze(['pick']),
-  weapon: Object.freeze(['spear', 'sword']),
-  body: Object.freeze(['armor']),
-  light: Object.freeze(['torch']),
+  weapon: Object.freeze(['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome']),
+  body: Object.freeze(['armor', 'bonemail', 'shardplate']),
+  light: Object.freeze(['torch', 'everlantern']),
 });
 /** v1 saves that contain both weapons equip the sword and keep the spear in the backpack. */
 export const MIGRATION_PREFERRED_WEAPON = 'sword';
@@ -93,7 +93,7 @@ export const FIRE_STATION_TYPES = Object.freeze(['hearth', 'fire']);
 
 export const FIELD_BUILD_RECIPES = Object.freeze(['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed']);
 export const WORKBENCH_BUILD_RECIPES = Object.freeze([...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward']);
-export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword']);
+export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir']);
 export const FIRE_COOK_RECIPES = Object.freeze(['roast', 'roastMeat', 'roastCaps']);
 export const CAULDRON_COOK_RECIPES = Object.freeze(['stew']);
 
@@ -135,6 +135,13 @@ export const CONTEXT_ACTIONS = Object.freeze({
   bush: Object.freeze(['gather']),
   pumpkin: Object.freeze(['gather']),
   mushroom: Object.freeze(['gather']),
+  shardrock: Object.freeze(['mine']),
+  bones: Object.freeze(['gather']),
+  glowcap: Object.freeze(['gather']),
+  crate: Object.freeze(['unlock']),
+  ironchest: Object.freeze(['unlock']),
+  moonchest: Object.freeze(['unlock']),
+  reliquary: Object.freeze(['unlock']),
   drop: Object.freeze([]),
 });
 
@@ -220,14 +227,14 @@ export function itemDefinition(itemId){
     return Object.freeze({
       itemId, kind:'equipment', stackLimit:1, supplyUnits:0, equipmentSlot:equipmentSlotFor(itemId),
       maxDurability:EQUIPMENT[itemId].durability, use:null,
-      retainsAtZeroDurability:itemId==='torch',
+      retainsAtZeroDurability:itemId==='torch'||itemId==='everlantern',
     });
   }
   if(Object.hasOwn(ITEMS, itemId)){
     const item=ITEMS[itemId];
     return Object.freeze({
       itemId, kind:'supply', stackLimit:STACK_LIMIT, supplyUnits:1, equipmentSlot:null, maxDurability:null,
-      use:item.food?'eat':item.heal?'heal':null,
+      use:item.food?'eat':item.heal?'heal':item.boost?'heal':null,
       retainsAtZeroDurability:false,
     });
   }

@@ -616,7 +616,8 @@ test('T31 v1 migration preserves items without moving the live clock',()=>{
   assert.equal(guest.inventory.slots.length,12);
   assert.equal(guest.inventory.slots.filter(Boolean).length,12);
   assert.ok(guest.recovery.slots.length>12);
-  for(const itemId of Object.keys(ITEMS)){
+  // The v1 fixture holds the original 13 supplies; Long Night materials came later.
+  for(const itemId of Object.keys(ITEMS).slice(0,13)){
     const mine=qty(guest.inventory,itemId)+qty(guest.recovery,itemId);
     assert.equal(mine,100,itemId);
   }

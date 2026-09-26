@@ -7,6 +7,7 @@ import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harve
 import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-16';
 import {MagicMesh} from './magic/effects-three.mjs?v=harvest-16';
 import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-16';
+import {RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-16';
 import {
   LIGHT_FIELD_ORIGIN, LIGHT_FIELD_SIZE, LIGHT_FIELD_SPAN, brightnessAt, canInspect, entityBrightness,
   frameLighting, labelOpacity, linearFromDisplay, spriteTint, warningVisible, writeLightField,
@@ -53,7 +54,9 @@ export class Renderer {
     this.lightUniforms.uNightCover.value=frame.darkness;
     this.lightUniforms.uNightAmbient.value=linearFromDisplay(frame.lighting.ambientNight);
     this.lightUniforms.uNightLit.value=linearFromDisplay(frame.lighting.litBrightness);
-    if(frame.darkness>0.001)writeLightField(this.lightImage.data, LIGHT_FIELD_SIZE, LIGHT_FIELD_ORIGIN, LIGHT_FIELD_SPAN, frame.sources, frame.lighting);
+    // The field follows the camera so lamps light the ground anywhere on the larger map.
+    const origin={x:Math.round(this.focus.x)-LIGHT_FIELD_SPAN/2,z:Math.round(this.focus.z)-LIGHT_FIELD_SPAN/2};this.lightUniforms.uNightOrigin.value.set(origin.x,origin.z);
+    if(frame.darkness>0.001)writeLightField(this.lightImage.data, LIGHT_FIELD_SIZE, origin, LIGHT_FIELD_SPAN, frame.sources, frame.lighting);
     else this.lightImage.data.fill(0);
     this.lightCtx.putImageData(this.lightImage,0,0);this.lightTexture.needsUpdate=true;
   }
@@ -77,14 +80,15 @@ export class Renderer {
     if(this.ground){this.scene.remove(this.ground);this.ground.geometry.dispose();this.ground.material.dispose();}
     if(this.scatter){this.scene.remove(this.scatter);this.scatter.geometry.dispose();this.scatter.material.dispose();}
     const rng=random(seed),positions=[],colors=[];const col=new THREE.Color();const tile=2;
-    for(let z=-44;z<44;z+=tile)for(let x=-44;x<44;x+=tile){
+    const edge=RULES.radius+8;
+    for(let z=-edge;z<edge;z+=tile)for(let x=-edge;x<edge;x+=tile){
       const b=biome(x,z);col.set(this.theme.palette[b]);const path=Math.abs(x+Math.sin(z*.16)*3)<1.8||Math.abs(z-Math.sin(x*.17)*4)<1.6;
       if(path)col.lerp(new THREE.Color(this.theme.palette.path),.6);col.multiplyScalar(.92+rng()*.15);
       for(const [a,b]of [[x,z],[x,z+tile],[x+tile,z],[x+tile,z],[x,z+tile],[x+tile,z+tile]]){positions.push(a,-.04,b);colors.push(col.r,col.g,col.b);}
     }
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
     this.ground=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true}));this.bindNight(this.ground.material);this.scene.add(this.ground);
-    const pos=[],cols=[];for(let i=0;i<1700;i++){const x=(rng()-.5)*84,z=(rng()-.5)*84,s=.05+rng()*.2;col.set(rng()<.5?'#bc9767':'#4b5350');for(const[a,b]of [[x,z],[x+s,z+s],[x-s,z+s*.6]]){pos.push(a,.001,b);cols.push(col.r,col.g,col.b);}}
+    const pos=[],cols=[];for(let i=0;i<8000;i++){const x=(rng()-.5)*2*edge,z=(rng()-.5)*2*edge,s=.05+rng()*.2;col.set(rng()<.5?'#bc9767':'#4b5350');for(const[a,b]of [[x,z],[x+s,z+s],[x-s,z+s*.6]]){pos.push(a,.001,b);cols.push(col.r,col.g,col.b);}}
     const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));sg.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));this.scatter=new THREE.Mesh(sg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));this.bindNight(this.scatter.material);this.scene.add(this.scatter);
     this.seed=seed;
   }
@@ -104,6 +108,10 @@ export class Renderer {
   effect(event){
     if(event.type==='hit')for(const o of this.objects.values())if(Math.hypot(o.x-event.x,o.z-event.z)<.2)o.hitUntil=this.clock+.22;
     if(['loot','damage','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
+    if(event.type==='rare')this.float(`✦ ${event.text}`,event.x,event.z,RARITY_COLORS[rarityOf(event.itemId)]);
+    if(event.type==='levelup')this.float(`LEVEL UP · ${event.text}`,event.x,event.z,'#f2c14e');
+    if(event.type==='discover')this.float(event.text,event.x,event.z,'#d4fff5');
+    if(['nova','burst'].includes(event.type)){const mat=new THREE.MeshBasicMaterial({color:event.type==='nova'?0xf4a64a:0x7fd6c4,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||2});}
     if(!event.magicPack&&['hit','kill','hurt','build','craft','impact','bolt'].includes(event.type)){
       const mat=new THREE.MeshBasicMaterial({color:event.type==='hurt'?0xd97773:event.type==='bolt'?0xa7e5d8:0xf4c486,transparent:true,depthWrite:false});const mesh=new THREE.Mesh(new THREE.RingGeometry(.06,.2,10),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z});
     }
@@ -126,11 +134,11 @@ export class Renderer {
     this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);this.camera.position.set(this.focus.x,28,this.focus.z+27);this.camera.lookAt(this.focus.x,0,this.focus.z);this.camera.updateMatrixWorld();
     const frame=frameLighting(world, this.theme);this.view=frame;this.paintField(frame);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:e.kind==='arrow'?'arrow':'mbolt',kind:'projectile'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'}))];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
-      const id=kind+e.id;alive.add(id);let o=this.objects.get(id);if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
+      const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
       const present=kind==='drop'?this.dropMotion.sample(e,world,this.clock,dt,id=>{const body=this.objects.get('player'+id);return body?.initialized?{x:body.x,z:body.z}:null;}):null;
       const tx=present?present.x:e.x, tz=present?present.z:e.z;
       const smooth=['player','enemy','magic'].includes(kind)&&!demo?Math.min(1,dt*(e.id===localId?22:13)):1;
@@ -141,11 +149,13 @@ export class Renderer {
       const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob:kind==='enemy'&&key==='wraith'?.2+Math.sin(this.clock*3)*.1:0;
       let sx=o.def.size[0],sy=o.def.size[1];if(kind==='drop'){sx=.85;sy=1.28;if(present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}}
       if(e.down||e.ghost){sx*=.8;sy*=.65;}
+      if(kind==='enemy'&&e.elite){sx*=1.3;sy*=1.3;}
       if(key==='gravecraft-skeleton')sy*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
       if(o.hitUntil>this.clock){const squash=Math.sin((o.hitUntil-this.clock)*14)*(motion.hitSquash||0);sx*=1+squash;sy*=1-squash;}
       const flip=(kind==='player'&&e.dx<-.1)||(kind==='magic'&&e.facing===-1);
-      o.sprite.scale.set(flip?-sx:sx,sy,1);o.sprite.position.set(o.x,bob+(present?.y||0),o.z);o.shadow.position.set(o.x,.018,o.z);
-      if(Number.isFinite(e.aim))o.sprite.material.rotation=e.aim;
+      o.sprite.scale.set(flip?-sx:sx,sy,1);o.sprite.position.set(o.x,bob+(present?.y||0)+(kind==='projectile'?.9:0),o.z);if(kind==='projectile')o.shadow.visible=false;o.shadow.position.set(o.x,.018,o.z);
+      if(kind==='projectile')o.sprite.material.rotation=-(e.aim||0);
+      else if(Number.isFinite(e.aim))o.sprite.material.rotation=e.aim;
       else{o.sprite.material.rotation=moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;if(['attack','gather'].includes(e.action)&&e.actionUntil>world.time)o.sprite.material.rotation=motion.attackTilt*Math.sin((e.actionUntil-world.time)*12);}
       const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e));
       let display=entityBrightness(frame, o.x, o.z, {local:kind==='player'&&e.id===localId, emissive});
@@ -159,7 +169,7 @@ export class Renderer {
       if(kind==='building'&&STRUCTURES[key].light){const lit=key==='lantern'||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
       if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);}
       if(kind==='building'&&key==='gate'&&e.open)o.sprite.scale.x*=.35;
-      if((kind==='enemy'||kind==='building')&&e.hp<e.maxHp&&fade>0.04){if(!o.health){const back=new THREE.Sprite(new THREE.SpriteMaterial({color:0x302834,transparent:true,depthWrite:false})),fill=new THREE.Sprite(new THREE.SpriteMaterial({color:kind==='enemy'?0xdf9383:0xd2c395,transparent:true,depthWrite:false}));fill.center.set(0,.5);this.scene.add(back,fill);o.health={back,fill};}const y=(kind==='enemy'?key==='king'?5.4:key==='brute'?3.3:key==='wraith'?2.2:1.3:key==='hearth'?3.6:1.8);o.health.back.position.set(o.x,y,o.z);o.health.fill.position.set(o.x-.65,y,o.z+.025);o.health.back.scale.set(1.4,.1,1);o.health.fill.scale.set(1.3*Math.max(0,e.hp/e.maxHp),.055,1);o.health.back.material.opacity=o.health.fill.material.opacity=fade;o.health.back.visible=o.health.fill.visible=true;}
+      if((kind==='enemy'||kind==='building')&&e.hp<e.maxHp&&fade>0.04){if(!o.health){const back=new THREE.Sprite(new THREE.SpriteMaterial({color:0x302834,transparent:true,depthWrite:false})),fill=new THREE.Sprite(new THREE.SpriteMaterial({color:kind==='enemy'?0xdf9383:0xd2c395,transparent:true,depthWrite:false}));fill.center.set(0,.5);this.scene.add(back,fill);o.health={back,fill};}const y=(kind==='enemy'?({king:5.4,brute:3.3,wraith:2.2,golem:3.4,bonewalker:2.4,bogling:1.6}[key]||1.3)*(e.elite?1.3:1):key==='hearth'?3.6:1.8);o.health.back.position.set(o.x,y,o.z);o.health.fill.position.set(o.x-.65,y,o.z+.025);o.health.back.scale.set(1.4,.1,1);o.health.fill.scale.set(1.3*Math.max(0,e.hp/e.maxHp),.055,1);o.health.back.material.opacity=o.health.fill.material.opacity=fade;o.health.back.visible=o.health.fill.visible=true;}
       if(kind==='enemy'&&e.windup>0){const radius=key==='king'?4:1.9;if(warningVisible(frame, e.tx, e.tz, radius, p)){if(!o.danger){o.danger=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),new THREE.MeshBasicMaterial({color:0xf5947b,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));o.danger.rotation.x=-Math.PI/2;this.scene.add(o.danger);}o.danger.visible=true;o.danger.position.set(e.tx,.08,e.tz);o.danger.scale.setScalar(radius);o.danger.material.opacity=(frame.darkness>0.5?.34:.55)+Math.sin(this.clock*14)*.12;}}
     }
     for(const o of this.objects.values())if(!alive.has(o.id)&&o!==this.ghost)this.remove(o);
@@ -170,7 +180,7 @@ export class Renderer {
     this.pathMarker.visible=!!p.goal&&goalFade>0.04;if(p.goal){this.pathMarker.position.set(p.goal.x,.03,p.goal.z);this.pathMarker.material.opacity=.7*goalFade;}
     if(placement){if(!this.ghost||this.ghost.key!==placement.key){if(this.ghost)this.remove(this.ghost);this.ghost=this.sprite(placement.key,'preview');}this.ghost.sprite.position.set(placement.x,0,placement.z);this.ghost.sprite.material.color.set(placement.valid?'#c8e5a6':'#dd7471');this.ghost.sprite.material.opacity=.7;this.ghost.shadow.visible=false;this.ghost.sprite.visible=true;}else if(this.ghost){this.remove(this.ghost);this.ghost=null;}
     for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2)this.effect(ev);this.lastEvent=ev.id;}
-    this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);e.mesh.scale.setScalar(1+e.life*(e.type==='impact'?12:4));e.mesh.material.opacity=Math.max(0,1-e.life*2)*fade;if(e.life>.5){this.scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();return false;}return true;});
+    this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);e.mesh.scale.setScalar(e.radius?.3+Math.min(1,e.life*3)*e.radius:1+e.life*(e.type==='impact'?12:4));e.mesh.material.opacity=Math.max(0,1-e.life*2)*fade;if(e.life>.5){this.scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();return false;}return true;});
     this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*this.reveal(f.x, f.z));if(f.life>1.8){f.el.remove();return false;}return true;});
     this.magicMesh.update(buildMagicEffects(world,this.magicFrame,this.theme));
     this.gl.render(this.scene,this.camera);

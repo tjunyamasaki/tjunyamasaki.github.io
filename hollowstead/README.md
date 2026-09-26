@@ -1,6 +1,6 @@
 # Hollowstead
 
-**A little light. A long night.** A Halloween survival expedition for 1–4 friends. Gather by day, make a home, defend the Heartfire, and defeat the Hollow King on the fifth night.
+**A little light. A long night.** An endless Halloween survival RPG for 1–4 friends. Explore a wide hollow by day, crack open loot caches, grow stronger, and keep the Heartfire burning through nights that get harder every day. The Hollow King returns every fifth night.
 
 Play at **[tjunyamasaki.github.io/hollowstead/](https://tjunyamasaki.github.io/hollowstead/)**.
 
@@ -20,9 +20,21 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
 5. Hold **Attack** to use the weapon you have equipped. Dodge the glowing enemy attack circles. Repair walls, rearm traps, and use wards to help defend the camp.
 6. Hold **Revive** beside a fallen friend for about three seconds. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable. Open **Build**, then **Maintain camp**, to repair a damaged structure or hold **Dismantle**. The Heartfire cannot be dismantled, and a chest someone else has open cannot either.
-7. Awaken the Heartfire with soul embers. The fifth night brings the Hollow King. Defeat him and survive until dawn to break the curse, then choose to keep surviving if you wish.
+7. Awaken the Heartfire with soul embers. Every fifth night brings the Hollow King, stronger each time.
 
 Losing the Heartfire ends the expedition. If everyone falls and has spent their charm, the expedition also ends.
+
+## Explore and grow
+
+The hollow is ringed by six regions. The Meadow around camp is safe; the Autumn woods and the Graveyard beyond it are riskier; the Hollow mire, Moonshard crags and Barrow fields at the edges are the most dangerous and the richest. Discovering a region grants XP. The map remembers where you have been.
+
+- **Caches.** Weathered crates, iron-bound chests, moonlit coffers and hollow reliquaries are hidden around the map, the better ones farther out. Hold **Open** beside one. Loot spills onto the ground with a rarity colour: common, uncommon, rare, epic, legendary. Caches refill after a few days. The best ones are guarded.
+- **Mobs.** Region residents roam by day and stay near home. Every creature has a drop table; Elder (elite) creatures are larger, tougher and drop better loot.
+- **Levels.** Kills (shared with nearby friends), caches, gathering and discoveries grant XP. Each level adds health and damage and heals you fully. Heartstones raise max health for good.
+- **Weapons.** Spears and swords strike ahead; broadswords and flamberges cleave; recurves and longbows fire arrows (longbows pierce); the moonshard crook and skull staff fire bursting bolts; the Grimoire of Ash burns everything around you. Armour goes from bark to bonemail to moonshard plate. The everburning lantern never runs out.
+- **The curve.** Night 1 is a handful of briarlings. Each day adds more creatures, more health and damage, new kinds and more elites. The Heartfire mends by day and spits embers at whatever claws at it, but it will not hold alone for long.
+
+See `docs/GAMEPLAY_PLAN.md` for the full design.
 
 ## Shared chests
 

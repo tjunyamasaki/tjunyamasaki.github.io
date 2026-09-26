@@ -5,6 +5,7 @@
 import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-16';
 import {magicItems} from '../magic/registry.mjs?v=harvest-16';
 import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-16';
+import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-16';
 
 const SPECS = Object.freeze({
   feed: {icon: '▥', label: 'Feed', activation: 'tap'},
@@ -22,6 +23,7 @@ const SPECS = Object.freeze({
   chop: {icon: '⚒', label: 'Chop', activation: 'hold'},
   mine: {icon: '⚒', label: 'Mine', activation: 'hold'},
   gather: {icon: '✦', label: 'Gather', activation: 'hold'},
+  unlock: {icon: '✧', label: 'Open', activation: 'hold'},
   revive: {icon: '♥', label: 'Revive', activation: 'hold'},
   pickup: {icon: '↑', label: 'Pick up', activation: 'hold'},
   place: {icon: '✓', label: 'Place', activation: 'tap'},
@@ -29,7 +31,7 @@ const SPECS = Object.freeze({
   dismantle: {icon: '⌫', label: 'Dismantle', activation: 'hold'},
 });
 
-const HARVEST_IDS = new Set(['chop', 'mine', 'gather']);
+const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock']);
 
 function make(id, extra = {}) {
   const spec = SPECS[id];
@@ -124,14 +126,15 @@ export function isHarvestAction(id) {
 export function usableLantern(player) {
   if (!player || player.down || player.ghost) return null;
   const light = player.equipment?.light;
-  const equipped = light?.itemId === 'torch' && light.durability > 0 ? light : null;
+  const lights = ['torch', 'everlantern'];
+  const equipped = lights.includes(light?.itemId) && light.durability > 0 ? light : null;
   let carried = null;
   for (const stack of player.inventory?.slots || []) {
-    if (stack?.itemId === 'torch' && stack.durability > 0) { carried = stack; break; }
+    if (lights.includes(stack?.itemId) && stack.durability > 0) { carried = stack; break; }
   }
   if (!equipped && !carried) return null;
   const shown = equipped || carried;
-  const max = EQUIPMENT.torch?.durability || 1;
+  const max = EQUIPMENT[shown.itemId]?.durability || 1;
   return {
     equipped,
     carried,
@@ -298,16 +301,29 @@ export function clusterFor(mode, {context = null, placement = null, maintenance 
   return describeContext(context);
 }
 
+const STYLE_WORD = {melee: 'Melee', arrow: 'Arrows', bolt: 'Bursting bolts', nova: 'Fire nova'};
+
 export function effectLine(itemId) {
+  const rarity = rarityOf(itemId);
+  const tag = rarity === 'common' ? '' : `${rarity[0].toUpperCase()}${rarity.slice(1)} · `;
   const magic = magicItems[itemId];
-  if (magic) return magic.blurb || (magic.damage ? `${magic.damage} damage` : 'Magic weapon');
+  if (magic) return tag + (magic.blurb || (magic.damage ? `${magic.damage} damage` : 'Magic weapon'));
+  const gear = EQUIPMENT[itemId];
+  if (gear) {
+    const style = weaponStyle(itemId);
+    if (gear.damage) return `${tag}${gear.damage} damage · ${STYLE_WORD[style?.style] || 'Melee'}${style?.arc ? ' · cleaves' : ''}${style?.pierce ? ' · pierces' : ''}`;
+    if (ARMOR_REDUCTION[itemId]) return `${tag}Absorbs ${Math.round(ARMOR_REDUCTION[itemId] * 100)}% damage`;
+    if (itemId === 'everlantern') return `${tag}Never runs out · wider light`;
+    return tag.replace(/ · $/, '');
+  }
   const item = ITEMS[itemId];
   if (!item) return '';
+  if (item.boost === 'vigor') return `${tag}Use: +15 max health, forever`;
   const parts = [];
   if (item.food) parts.push(`Hunger +${item.food}`);
   if (item.heal) parts.push(`Health ${item.heal > 0 ? '+' : ''}${item.heal}`);
   if (item.courage) parts.push(`Courage ${item.courage > 0 ? '+' : ''}${item.courage}`);
-  return parts.join(' · ');
+  return tag + parts.join(' · ');
 }
 
 export function itemDisplayName(itemId) {

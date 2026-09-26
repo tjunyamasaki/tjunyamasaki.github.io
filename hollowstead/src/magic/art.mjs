@@ -8,6 +8,14 @@ export const GRAVECRAFT = Object.freeze({
   'mourning-bell': {size: [1.55, 1.55], anchor: [.5, .62], motion: 'bell'},
 });
 
+/** Held poses for the Long Night weapons. Sprites come from the theme under the item id. */
+export const HELD_GEAR = Object.freeze({
+  broadsword: {motion: 'swing', sprite: 'held-broadsword'}, flamberge: {motion: 'swing', sprite: 'held-flamberge'},
+  recurve: {motion: 'bow', handY: 1.0, sprite: 'held-recurve'}, bonebow: {motion: 'bow', handY: 1.0, sprite: 'held-bonebow'},
+  crookstaff: {motion: 'staff', sprite: 'held-crookstaff'}, skullstaff: {motion: 'staff', sprite: 'held-skullstaff'},
+  tome: {motion: 'tome', handY: 1.25, handX: .55, sprite: 'held-tome'},
+});
+
 export const MAGIC_PALETTE = Object.freeze({
   ink: '#2b2233', spirit: '#7fd6c4', core: '#d4fff5', shade: '#45a394',
   ember: '#e8b04a', bronze: '#b98d54', silk: '#d2bbdf', cloth: '#8f3a3f',
@@ -27,6 +35,7 @@ export const skeletonSprite = {
 };
 
 const clamp = (n, lo=0, hi=1) => Math.max(lo, Math.min(hi, n));
+const ease = n => 1-(1-clamp(n))**3;
 
 // Bounded extrapolation between host snapshots; never advances the simulation.
 export class MagicClock {
@@ -42,8 +51,8 @@ export class MagicClock {
 
 export function heldWeaponPose(player, time, theme={}){
   const id = player.equipment?.weapon?.itemId;
-  if(!GRAVECRAFT[id]) return null;
-  const spec = {...GRAVECRAFT[id], ...theme.magic?.weapons?.[id]};
+  if(!GRAVECRAFT[id] && !HELD_GEAR[id]) return null;
+  const spec = {...(GRAVECRAFT[id] || HELD_GEAR[id]), ...theme.magic?.weapons?.[id]};
   const side = player.dx < -.1 ? -1 : 1;
   const cast = player.magicCast;
   const age = cast?.itemId === id ? time-cast.at : Infinity;
@@ -58,9 +67,13 @@ export function heldWeaponPose(player, time, theme={}){
     if(spec.motion === 'needle'){reach = Math.sin(Math.min(1,t*2.2)*Math.PI)*.8; rotation += side*.9*Math.sin(t*Math.PI);}
     if(spec.motion === 'fan'){rotation += side*Math.sin(t*Math.PI)*1.4; scale = .75+.25*Math.sin(t*Math.PI);}
     if(spec.motion === 'bell') rotation += Math.sin(t*21)*.8*fade;
+    if(spec.motion === 'swing') rotation += side*(1.1-2.6*ease(t))*fade;
+    if(spec.motion === 'thrust'){reach = Math.sin(Math.min(1,t*2)*Math.PI)*.9; rotation += side*.7;}
+    if(spec.motion === 'bow'){rotation += side*.25*fade; reach = -.15*Math.sin(t*Math.PI);}
+    if(spec.motion === 'tome'){scale = 1+.25*Math.sin(t*Math.PI); rotation += Math.sin(t*14)*.2*fade;}
   }
   const length = Math.hypot(player.dx||0,player.dz||0)||1;
-  return {key: id, x: side*(spec.handX??.48)+(player.dx||0)/length*reach, z: .04+(player.dz||0)/length*reach,
+  return {key: spec.sprite || id, x: side*(spec.handX??.48)+(player.dx||0)/length*reach, z: .04+(player.dz||0)/length*reach,
     y: (spec.handY??1.12)+Math.sin(time*2.4)*.025+(active?Math.sin(t*Math.PI)*.12:0),
     rotation, side, scale: scale*(spec.heldScale??1), active};
 }

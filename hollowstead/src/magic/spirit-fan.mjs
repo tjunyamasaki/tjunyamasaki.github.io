@@ -7,11 +7,14 @@
 // dx/dz are a world-unit push away from the caster (about 1.6). Players are never queued.
 // step() only ages sweeps whose id starts with "spirit-fan:" and drops them at the end.
 
+import {ownerPower} from './registry.mjs?v=harvest-16';
+
 const ID = 'spirit-fan';
-const DAMAGE = 5;
-const DURABILITY = 80;
-const COOLDOWN = 1.3;
-const RANGE = 4.5;
+// Balance (Long Night): a wide gust that hits hard, shoves, and breaks enemy wind-ups.
+const DAMAGE = 22;
+const DURABILITY = 170;
+const COOLDOWN = 0.8;
+const RANGE = 5.5;
 const PUSH = 1.6;
 const SWEEP_DURATION = 0.35;
 const HALF_ARC = (110 * Math.PI / 180) / 2;
@@ -27,7 +30,8 @@ export const magicPack = {
     damage: DAMAGE,
     durability: DURABILITY,
     cooldown: COOLDOWN,
-    blurb: 'A dried-leaf and bone fan. Its gust shoves the restless dead aside.',
+    stamina: 8,
+    blurb: 'A dried-leaf and bone fan. Its gust shoves foes aside and breaks their swings.',
   },
   mobs: [],
   sprites: {
@@ -110,13 +114,15 @@ export function use(world, player) {
   if (!Number.isFinite(player.x) || !Number.isFinite(player.z)) return null;
 
   const facing = unitFacing(player);
+  const power = ownerPower(world, player);
   const seen = new Set();
   for (const mob of hostiles(world)) {
     if (seen.has(mob.id)) continue;
     const knock = knockFrom(player, facing, mob);
     if (!knock) continue;
     seen.add(mob.id);
-    queue(world, 'pendingHit', {targetId: mob.id, amount: DAMAGE});
+    queue(world, 'pendingHit', {targetId: mob.id, amount: Math.round(DAMAGE * power)});
+    if (mob.windup > 0 && mob.type !== 'king') mob.windup = 0;
     queue(world, 'pendingKnock', {targetId: mob.id, dx: knock.dx, dz: knock.dz});
   }
 

@@ -37,20 +37,23 @@
 // is the current cell, skeleton-<anim>-<0-3>.png. facing is -1 toward -x and
 // 1 toward +x.
 
+import { ownerPower } from './registry.mjs?v=harvest-16'
+
 const ROOT = 'assets/magic/barrow-rattle'
 const CAP = 4
-const COOLDOWN = 2.2
+// Balance (Long Night): sturdier, harder-hitting skeletons that hostiles now fight back.
+const COOLDOWN = 1.5
 const LIFE = 24
-const SKELETON_HP = 24
-const SKELETON_DAMAGE = 6
-const RANGE = 0.8
+const SKELETON_HP = 60
+const SKELETON_DAMAGE = 18
+const RANGE = 1.25
 const SPEED = 3.5
 const CATCHUP = 4.4
 const SIGHT = 12
 const FOLLOW = 1.15
 const SWING = 0.44
 const HIT_AT = 0.22
-const PERIOD = 1.15
+const PERIOD = 1.0
 const FRAMES = 4
 const FRAME = ['0', '1', '2', '3']
 
@@ -64,8 +67,9 @@ export const magicPack = {
     kind: 'weapon',
     slot: 'weapon',
     damage: 4,
-    durability: 60,
+    durability: 110,
     cooldown: COOLDOWN,
+    stamina: 8,
     blurb: 'A grave-bone rattle. Shake it and a skeleton climbs out of the barrow. Four will walk with you.',
   },
   mobs: [{
@@ -210,7 +214,7 @@ function emit(world, type, x, z, text){
 }
 
 function strike(world, summon, target){
-  const amount = SKELETON_DAMAGE
+  const amount = Math.round(SKELETON_DAMAGE * (summon.power || 1))
   if(typeof target.hp !== 'number'){
     summon.pendingHit = {targetId: target.id, amount}
     return
@@ -272,10 +276,8 @@ function steer(world, summon, vx, vz, dt){
   }
   summon.x += vx * dt
   summon.z += vz * dt
-  if(summon.x > 41) summon.x = 41
-  if(summon.x < -41) summon.x = -41
-  if(summon.z > 41) summon.z = 41
-  if(summon.z < -41) summon.z = -41
+  const r = Math.hypot(summon.x, summon.z)
+  if(r > 94){ summon.x *= 94 / r; summon.z *= 94 / r }
   return true
 }
 
@@ -302,10 +304,11 @@ export function use(world, player){
   const summon = {
     id: mintId(world),
     ownerId,
-    x: Math.max(-40, Math.min(40, player.x + dx / span * 0.95)),
-    z: Math.max(-40, Math.min(40, player.z + dz / span * 0.95)),
-    hp: SKELETON_HP,
-    maxHp: SKELETON_HP,
+    x: player.x + dx / span * 0.95,
+    z: player.z + dz / span * 0.95,
+    hp: Math.round(SKELETON_HP * ownerPower(world, player)),
+    maxHp: Math.round(SKELETON_HP * ownerPower(world, player)),
+    power: ownerPower(world, player),
     age: 0,
     facing: dx < 0 ? -1 : 1,
     anim: 'idle',

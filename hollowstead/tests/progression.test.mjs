@@ -181,3 +181,100 @@ test('Long Night fields survive a save and a network frame',()=>{
   const saved=World.restore(JSON.parse(JSON.stringify(w.snapshot({purpose:'save'}))));
   assert.equal(saved.players[0].maxHp,108);
 });
+
+// ------------------------------------------------------------------ the arsenal
+const LOOT_ONLY=['fangs','soulchain','scythe','wisplantern','stormrod','starfall','crowtotem','jacklantern','wighthorn','censer'];
+function foes(w,points,type='crawler'){return points.map(([x,z])=>{const e=w.spawnEnemy(type,x,z,{elite:false});e.hp=e.maxHp=500;return e;});}
+function ready(p){p.cooldown=0;p.stamina=100;}
+
+test('ten new weapons are loot only, rarity-pooled, and described',async()=>{
+  const {RECIPES}=await import('../src/content.mjs');
+  const {effectLine}=await import('../src/ui/actions.mjs');
+  for(const id of LOOT_ONLY){
+    assert.equal(RECIPES[id],undefined,id);
+    assert.ok(EQUIPMENT[id].damage>0,id);
+    assert.equal(equipmentSlotFor(id),'weapon');
+    assert.ok(['rare','epic','legendary'].includes(rarityOf(id)),id);
+    assert.ok(WEAPON_STYLES[id].blurb,id);
+    assert.match(effectLine(id),/damage/);
+  }
+  const seen=new Set();const rng=seeded(3);
+  for(let i=0;i<3000;i++)for(const table of ['ironchest','moonchest','reliquary','king'])for(const {itemId} of rollLoot(table,rng,1))seen.add(itemId);
+  for(const id of LOOT_ONLY)assert.ok(seen.has(id),`${id} never dropped`);
+});
+
+test('hollow fangs rend on every fourth cut: extra damage, a bleed and a lunge',()=>{
+  const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'fangs');
+  const [e]=foes(w,[[1.8,0]]);const hits=[];
+  for(let i=0;i<4;i++){ready(p);const before=e.hp;w.attack(p);hits.push(before-e.hp);}
+  assert.equal(hits[0],EQUIPMENT.fangs.damage);assert.equal(hits[3],Math.round(EQUIPMENT.fangs.damage*WEAPON_STYLES.fangs.rend));
+  assert.ok(e.dot&&e.dot.remaining>0);assert.ok(p.x>0);
+  const hp=e.hp;sim(w,1);assert.ok(e.hp<hp);
+});
+
+test('soulchain lashes a whole line and drags it in; the scythe heals per foe',()=>{
+  const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'soulchain');
+  const line=foes(w,[[2,0],[3.5,.3],[5,-.3]]),off=foes(w,[[2,3]])[0];
+  const far=line[2].x;w.attack(p);
+  for(const e of line)assert.equal(e.hp,500-EQUIPMENT.soulchain.damage);
+  assert.equal(off.hp,500);assert.ok(line[2].x<far);
+  w.enemies=[];arm(w,p,'scythe');ready(p);p.hp=50;
+  foes(w,[[2,0],[0,2],[1,-2]]);w.attack(p);
+  assert.ok(p.hp>50);assert.ok(w.enemies.every(e=>e.hp<500));
+});
+
+test('wisps home in on separate foes and the storm rod chains between them',()=>{
+  const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'wisplantern');
+  const spread=foes(w,[[6,4],[6,-4],[7,0]]);w.attack(p);
+  assert.equal(w.projectiles.filter(s=>s.kind==='wisp').length,3);
+  sim(w,2.5);for(const e of spread)assert.ok(e.hp<500);
+  w.enemies=[];w.projectiles=[];arm(w,p,'stormrod');ready(p);
+  const chain=foes(w,[[4,0],[7,1],[9,3],[11,5],[30,0]]);w.attack(p);
+  const hit=chain.filter(e=>e.hp<500);
+  assert.equal(hit.length,1+WEAPON_STYLES.stormrod.jumps);assert.equal(chain[4].hp,500);
+  assert.ok(chain[0].hp<chain[3].hp);
+  assert.ok(w.events.some(e=>e.type==='chain'&&e.points.length===5));
+});
+
+test('a star lands after its delay and crushes everything near the mark',()=>{
+  const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'starfall');
+  const [a,b]=foes(w,[[8,0],[9,1]]);w.attack(p);
+  assert.equal(w.zones.length,1);assert.equal(a.hp,500);
+  sim(w,WEAPON_STYLES.starfall.delay+.1);
+  assert.ok(a.hp<500&&b.hp<500);assert.equal(w.zones.length,0);
+});
+
+test('the censer slows, then freezes foes solid so their blows never land',()=>{
+  const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'censer');
+  const [e]=foes(w,[[4,0]],'brute');w.attack(p);
+  sim(w,.3);assert.ok(e.slowed>0);assert.ok(e.hp<500);
+  sim(w,WEAPON_STYLES.censer.freezeAfter);
+  assert.ok(e.stunned>0);assert.equal(e.windup,0);
+  const x=e.x;sim(w,.5);assert.equal(e.x,x);
+});
+
+test('summons: crows fly, sentries shoot, the Grave Knight taunts and takes the hits',()=>{
+  const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'crowtotem');
+  w.attack(p);assert.equal(w.allies.filter(a=>a.type==='crow').length,WEAPON_STYLES.crowtotem.count);
+  ready(p);w.attack(p);ready(p);w.attack(p);
+  assert.equal(w.allies.filter(a=>a.type==='crow').length,WEAPON_STYLES.crowtotem.cap);
+  const [prey]=foes(w,[[5,0]]);sim(w,3);assert.ok(prey.hp<500);
+  w.allies=[];w.enemies=[];arm(w,p,'jacklantern');
+  for(let i=0;i<3;i++){ready(p);w.attack(p);}
+  assert.equal(w.allies.filter(a=>a.type==='jack').length,WEAPON_STYLES.jacklantern.cap);
+  const [mark]=foes(w,[[6,0]]);mark.speed=0;sim(w,2);assert.ok(mark.hp<500);
+  w.allies=[];w.enemies=[];arm(w,p,'wighthorn');ready(p);w.attack(p);
+  const knight=w.allies.find(a=>a.type==='wight');assert.ok(knight);
+  knight.x=6;knight.z=0;p.x=-6;
+  const [brute]=foes(w,[[8,0]],'brute');
+  sim(w,4);
+  assert.ok(knight.hp<knight.maxHp,'the knight drew the attack');assert.equal(p.hp,100);assert.ok(brute.hp<500);
+  ready(p);const hp=knight.hp;w.attack(p);assert.ok(knight.hp>hp);assert.equal(w.allies.filter(a=>a.type==='wight').length,1);
+  const copy=World.restore(JSON.parse(JSON.stringify(w.snapshot())));
+  assert.equal(copy.allies.length,w.allies.length);
+});
+
+test('allies expire, and belong to their summoner',()=>{
+  const {w,p}=camp();p.x=0;p.z=0;arm(w,p,'crowtotem');w.attack(p);
+  sim(w,15);assert.equal(w.allies.length,0);
+});

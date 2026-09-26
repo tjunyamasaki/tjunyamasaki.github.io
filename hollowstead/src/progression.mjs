@@ -73,6 +73,8 @@ const ITEM_RARITY = Object.freeze({
   sword:'uncommon', torch:'common', recurve:'uncommon', bonebow:'rare', broadsword:'rare', crookstaff:'rare',
   flamberge:'epic', skullstaff:'epic', tome:'legendary', bonemail:'rare', shardplate:'epic', everlantern:'legendary',
   'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic',
+  fangs:'rare', wisplantern:'rare', crowtotem:'rare', soulchain:'epic', stormrod:'epic', jacklantern:'epic', censer:'epic',
+  scythe:'legendary', starfall:'legendary', wighthorn:'legendary',
 });
 export const rarityOf = itemId=>ITEM_RARITY[itemId]||'common';
 export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
@@ -82,9 +84,9 @@ export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
 // from a rarity pool so new gear only needs a rarity to join the tables.
 const POOLS = Object.freeze({
   uncommon:['recurve','sword','elixir','elixir','torch','bandage'],
-  rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle'],
-  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell'],
-  legendary:['tome','everlantern'],
+  rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem'],
+  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer'],
+  legendary:['tome','everlantern','scythe','starfall','wighthorn'],
 });
 export const LOOT_TABLES = Object.freeze({
   crate:{xp:12, rolls:[
@@ -159,15 +161,43 @@ export const EVERLANTERN_RADIUS_SCALE=1.45;
 /** How each non-magic weapon attacks. Damage comes from EQUIPMENT[id].damage. */
 export const WEAPON_STYLES = Object.freeze({
   fist:{style:'melee', damage:9, range:2, arc:0, cooldown:.65, stamina:7},
+  // crafted
   spear:{style:'melee', range:3.3, arc:0, cooldown:.55, stamina:7},
   sword:{style:'melee', range:3.3, arc:0, cooldown:.55, stamina:7},
-  broadsword:{style:'melee', range:3.2, arc:110, cooldown:.62, stamina:9},
-  flamberge:{style:'melee', range:3.6, arc:160, cooldown:.7, stamina:11},
-  recurve:{style:'arrow', range:13, speed:18, cooldown:.55, stamina:5, pierce:0},
-  bonebow:{style:'arrow', range:15, speed:21, cooldown:.7, stamina:6, pierce:2},
-  crookstaff:{style:'bolt', range:11, speed:12, cooldown:.9, stamina:9, splash:1.7},
-  skullstaff:{style:'bolt', range:12, speed:12, cooldown:1, stamina:11, splash:2.3, slow:2},
+  recurve:{style:'arrow', range:13, speed:18, cooldown:.6, stamina:6, pierce:0},
+  bonebow:{style:'arrow', range:15, speed:21, cooldown:.75, stamina:7, pierce:2},
+  broadsword:{style:'melee', range:3.2, arc:110, cooldown:.7, stamina:10},
+  crookstaff:{style:'bolt', range:11, speed:12, cooldown:.95, stamina:9, splash:1.7},
+  // loot only
+  flamberge:{style:'melee', range:3.6, arc:150, cooldown:.8, stamina:12},
+  skullstaff:{style:'bolt', range:12, speed:12, cooldown:1.05, stamina:11, splash:2.3, slow:2},
   tome:{style:'nova', range:4.6, cooldown:1.5, stamina:18},
+  fangs:{style:'combo', range:2.6, cooldown:.3, stamina:4, window:1.2, every:4, rend:2.5, bleed:.5, bleedSeconds:3, lunge:.8,
+    blurb:'Twin daggers. Every fourth cut rends: a lunge, heavy damage and a bleed'},
+  soulchain:{style:'lash', range:5.5, width:.85, pull:1.6, cooldown:.85, stamina:10,
+    blurb:'Lashes everything in a long line and drags it toward you'},
+  scythe:{style:'reap', range:3.9, arc:240, cooldown:.9, stamina:13, leech:.03, leechCap:3,
+    blurb:'A huge reaping arc. Each foe struck heals you'},
+  wisplantern:{style:'wisps', count:3, seek:11, range:14, speed:9, turn:7, cooldown:1.05, stamina:9,
+    blurb:'Frees three homing wisps that seek separate foes'},
+  stormrod:{style:'chain', range:9, jumps:3, jump:4.5, falloff:.75, shock:.25, cooldown:1.05, stamina:11,
+    blurb:'Lightning that leaps to three more foes and jolts them'},
+  starfall:{style:'meteor', range:12, delay:.7, radius:2.6, cooldown:1.6, stamina:16,
+    blurb:'Calls a star down on the nearest foe. Huge blast'},
+  crowtotem:{style:'crows', count:3, cap:6, sight:9, cooldown:1.6, stamina:10,
+    blurb:'Calls three carrion crows that fly to your foes (up to six)'},
+  jacklantern:{style:'sentry', cap:2, sight:8, cooldown:2.2, stamina:12,
+    blurb:'Plants a pumpkin sentry that spits burning seeds (up to two)'},
+  wighthorn:{style:'wight', mend:.35, sight:10, cooldown:3, stamina:16,
+    blurb:'Raises a Grave Knight who taunts and cleaves. Blow again to mend him'},
+  censer:{style:'frost', range:8, radius:2.6, life:4, freezeAfter:1.2, freeze:1.8, cooldown:2.3, stamina:14,
+    blurb:'Swings out a freezing fog. Foes inside slow, then freeze solid'},
+});
+/** Summoned allies. Each blow deals the summoning weapon's damage (level-scaled); hp scales with level when `scales` is set. */
+export const ALLIES = Object.freeze({
+  crow:{name:'Carrion crow', hp:18, life:14, speed:7, sight:9, leash:16, range:.9, period:.75, follow:1.4, fly:true, scales:true},
+  jack:{name:'Pumpkin sentry', hp:110, life:24, sight:8, leash:30, period:.8, shot:13, ranged:true, scales:true},
+  wight:{name:'Grave Knight', hp:300, life:40, speed:3.2, sight:10, leash:18, range:1.9, arc:140, period:1.2, follow:1.6, taunt:7, guard:.7, scales:true},
 });
 export function weaponStyle(itemId){return WEAPON_STYLES[itemId]||null;}
 

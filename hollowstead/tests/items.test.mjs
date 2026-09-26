@@ -269,7 +269,7 @@ test('T06 only the equipped tool, weapon, and armor change the outcome',()=>{
   assert.equal(strike(null).hp,39);
   assert.equal(strike('pack').hp,39);
   assert.equal(strike('pack').durability,160);
-  assert.equal(strike('worn').hp,8);
+  assert.equal(strike('worn').hp,48-EQUIPMENT.sword.damage);
   assert.equal(strike('worn').durability,159);
 
   const blow=(where)=>{

@@ -14,6 +14,11 @@ export const HELD_GEAR = Object.freeze({
   recurve: {motion: 'bow', handY: 1.0, sprite: 'held-recurve'}, bonebow: {motion: 'bow', handY: 1.0, sprite: 'held-bonebow'},
   crookstaff: {motion: 'staff', sprite: 'held-crookstaff'}, skullstaff: {motion: 'staff', sprite: 'held-skullstaff'},
   tome: {motion: 'tome', handY: 1.25, handX: .55, sprite: 'held-tome'},
+  fangs: {motion: 'thrust', sprite: 'held-fangs'}, soulchain: {motion: 'swing', sprite: 'held-soulchain'},
+  scythe: {motion: 'swing', sprite: 'held-scythe'}, wisplantern: {motion: 'bell', handY: 1.0, sprite: 'held-wisplantern'},
+  stormrod: {motion: 'staff', sprite: 'held-stormrod'}, starfall: {motion: 'staff', sprite: 'held-starfall'},
+  crowtotem: {motion: 'rattle', sprite: 'held-crowtotem'}, jacklantern: {motion: 'bell', handY: 1.0, sprite: 'held-jacklantern'},
+  wighthorn: {motion: 'tome', handY: 1.2, sprite: 'held-wighthorn'}, censer: {motion: 'bell', handY: 1.0, sprite: 'held-censer'},
 });
 
 export const MAGIC_PALETTE = Object.freeze({

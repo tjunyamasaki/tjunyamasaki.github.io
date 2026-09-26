@@ -311,6 +311,7 @@ export function effectLine(itemId) {
   const gear = EQUIPMENT[itemId];
   if (gear) {
     const style = weaponStyle(itemId);
+    if (gear.damage && style?.blurb) return `${tag}${gear.damage} damage · ${style.blurb}`;
     if (gear.damage) return `${tag}${gear.damage} damage · ${STYLE_WORD[style?.style] || 'Melee'}${style?.arc ? ' · cleaves' : ''}${style?.pierce ? ' · pierces' : ''}`;
     if (ARMOR_REDUCTION[itemId]) return `${tag}Absorbs ${Math.round(ARMOR_REDUCTION[itemId] * 100)}% damage`;
     if (itemId === 'everlantern') return `${tag}Never runs out · wider light`;

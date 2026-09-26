@@ -1,10 +1,11 @@
-import {isMagicAlly} from './registry.mjs?v=harvest-16';
+import {isMagicAlly, ownerPower} from './registry.mjs?v=harvest-16';
 
-export const BELL = Object.freeze({delay: .28, travel: .65, linger: .32, radius: 5, damage: 9, push: 1.2, cooldown: 2.4});
+// Balance (Long Night): the widest ring in the game, delayed, one heavy toll per foe.
+export const BELL = Object.freeze({delay: .28, travel: .65, linger: .32, radius: 5.5, damage: 30, push: 1.2, cooldown: 1.5, stamina: 10});
 export const magicPack = {
   id: 'mourning-bell',
   item: {id: 'mourning-bell', name: 'Mourning Bell', kind: 'weapon', slot: 'weapon',
-    icon: 'mourning-bell', durability: 65, damage: BELL.damage, cooldown: BELL.cooldown,
+    icon: 'mourning-bell', durability: 150, damage: BELL.damage, cooldown: BELL.cooldown, stamina: BELL.stamina,
     blurb: 'Toll for the restless. A delayed spirit ring strikes and pushes nearby foes once.'},
   worldLists: ['magicWaves'],
   sprites: {item: 'assets/magic/gravecraft/mourning-bell.png'},
@@ -18,7 +19,7 @@ export function use(world, player){
     player.down || player.ghost || player.online === false || player.cooldown>.05 ||
     !Number.isFinite(player.x) || !Number.isFinite(player.z)) return null;
   const wave = {id: world.nextId('bell'), packId: magicPack.id, ownerId: player.id,
-    x: player.x, z: player.z, age: 0, hitIds: [], radius: BELL.radius,
+    x: player.x, z: player.z, age: 0, hitIds: [], radius: BELL.radius, power: ownerPower(world, player),
     life: BELL.delay+BELL.travel+BELL.linger};
   (world.magicWaves ||= []).push(wave);
   world.wearEquipped(player, 'weapon', 1);
@@ -44,7 +45,7 @@ export function step(world, dt){
         // Only the travelling front deals damage. The fading echoes are cosmetic.
         if(!Number.isFinite(span) || span>outer || (before>=BELL.delay && span<Math.max(0,inner-.3))) continue;
         wave.hitIds.push(enemy.id);
-        (world.pendingHit ||= []).push({targetId: enemy.id, amount: BELL.damage});
+        (world.pendingHit ||= []).push({targetId: enemy.id, amount: Math.round(BELL.damage*(wave.power||1))});
         (world.pendingKnock ||= []).push({targetId: enemy.id, dx:(span?dx/span:1)*BELL.push, dz:(span?dz/span:0)*BELL.push});
       }
     }

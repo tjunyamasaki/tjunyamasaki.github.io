@@ -37,13 +37,16 @@
  * Sprite src values are relative to hollowstead/ (assets/magic/widows-needle/).
  */
 
+import { ownerPower } from './registry.mjs?v=harvest-16';
+
 const PACK = 'widows-needle';
-const RANGE = 7;
+const RANGE = 9;
 const CONE = 35 * Math.PI / 180;
 const CONE_COS = Math.cos(CONE / 2);
 const ROOT = 2.5;
-const IMPACT = 3;
-const BLEED = 2;
+// Balance (Long Night): a 26 point pin, then 12 more bleeding out across the root.
+const IMPACT = 26;
+const BLEED = 12;
 const DART_SPEED = 20;
 const FRAME_FPS = 12;
 const FRAME_COUNT = 4;
@@ -108,8 +111,9 @@ export const magicPack = {
     kind: 'weapon',
     slot: 'weapon',
     damage: IMPACT,
-    durability: 70,
-    cooldown: 1.7,
+    durability: 140,
+    cooldown: 1.0,
+    stamina: 6,
     blurb: 'A pale bone needle wrapped in grave-silk. The dart pins the nearest foe ahead.',
   },
   mobs: [],
@@ -152,6 +156,7 @@ export function use(world, player) {
     packId: PACK,
     kind: 'dart',
     ownerId: player.id,
+    power: ownerPower(world, player),
     x: player.x,
     z: player.z,
     originX: player.x,
@@ -307,8 +312,8 @@ function placeDart(dart) {
 function tryPin(world, dart) {
   const mob = findHostile(world, dart.targetId);
   if (!mob) return false;
-  const killing = mob.hp <= IMPACT;
-  offer(world, mob, IMPACT);
+  const killing = mob.hp <= IMPACT * (dart.power || 1);
+  offer(world, mob, Math.round(IMPACT * (dart.power || 1)));
   if (killing) return true;
   if (!Array.isArray(world.magicRoots)) world.magicRoots = [];
   let root = world.magicRoots.find(entry => entry && entry.packId === PACK && entry.targetId === mob.id);
@@ -327,6 +332,7 @@ function tryPin(world, dart) {
   root.age = 0;
   root.fresh = true;
   root.bleedSent = 0;
+  root.power = dart.power || 1;
   root.remaining = ROOT;
   root.pinX = mob.x;
   root.pinZ = mob.z;
@@ -366,7 +372,7 @@ function advanceRoot(world, root, dt) {
   const due = root.age >= ROOT - 1e-8 ? BLEED : Math.floor(BLEED * (elapsed / ROOT) + 1e-9);
   const slice = due - (Number(root.bleedSent) || 0);
   root.bleedSent = due;
-  if (slice > 0) offer(world, mob, slice);
+  if (slice > 0) offer(world, mob, slice * (root.power || 1));
   root.frame = Math.floor(root.age * 8) % FRAME_COUNT;
   if (root.age >= ROOT - 1e-8) {
     release(mob);

@@ -63,7 +63,8 @@ export const EQUIPMENT_SLOTS = Object.freeze(['chop', 'mine', 'weapon', 'body', 
 export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
   chop: Object.freeze(['axe']),
   mine: Object.freeze(['pick']),
-  weapon: Object.freeze(['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome']),
+  weapon: Object.freeze(['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome',
+    'fangs', 'soulchain', 'scythe', 'wisplantern', 'stormrod', 'starfall', 'crowtotem', 'jacklantern', 'wighthorn', 'censer']),
   body: Object.freeze(['armor', 'bonemail', 'shardplate']),
   light: Object.freeze(['torch', 'everlantern']),
 });

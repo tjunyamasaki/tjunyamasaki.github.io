@@ -27,12 +27,15 @@
  */
 
 const PACK = 'cinder-staff';
-const SPEED = 9;
-const MAX_RANGE = 8;
+import { ownerPower } from './registry.mjs?v=harvest-16';
+
+const SPEED = 12;
+const MAX_RANGE = 11;
 const HIT_RADIUS = 0.8;
 const SPAWN_AHEAD = 0.55;
-const BURN_DPS = 2;
-const BURN_DURATION = 2;
+// Balance (Long Night): 20 on impact, then 4 a second for 3 seconds.
+const BURN_DPS = 4;
+const BURN_DURATION = 3;
 const FRAME_COUNT = 4;
 const FRAME_FPS = 12;
 const CAST_LIFE = FRAME_COUNT / FRAME_FPS;
@@ -92,9 +95,10 @@ export const magicPack = {
     name: 'Cinder Staff',
     kind: 'weapon',
     slot: 'weapon',
-    damage: 8,
-    durability: 90,
-    cooldown: 0.9,
+    damage: 20,
+    durability: 150,
+    cooldown: 0.8,
+    stamina: 6,
     icon: 'cinder-staff',
     blurb: 'A crooked staff. Its ember throws a firebolt that burns the first hostile it hits.',
   },
@@ -143,7 +147,8 @@ export function use(world, player) {
     vz: face.z * SPEED,
     age: 0,
     maxRange: MAX_RANGE,
-    damage: DAMAGE,
+    damage: DAMAGE * ownerPower(world, player),
+    power: ownerPower(world, player),
     frame: 0,
     traveled: 0,
     sprite: 'cinder-staff-bolt',
@@ -204,7 +209,7 @@ function flyBolt(world, bolt, dt) {
     bolt.z = hit.z;
     const amount = bolt.damage > 0 ? bolt.damage : DAMAGE;
     harmHostile(world, hit.enemy, amount);
-    attachBurn(world, hit.enemy.id);
+    attachBurn(world, hit.enemy.id, bolt.power || 1);
     spawnPuff(world, hit.x, hit.z, 0);
     return false;
   }
@@ -349,16 +354,16 @@ function harmHostile(world, enemy, amount) {
   emit(world, 'damage', enemy.x, enemy.z, String(shown > 0 ? shown : amount));
 }
 
-function attachBurn(world, targetId) {
+function attachBurn(world, targetId, power = 1) {
   if (targetId == null) return null;
   if (!Array.isArray(world.magicBurns)) world.magicBurns = [];
   const existing = world.magicBurns.find(burn => burn && burn.packId === PACK && burn.targetId === targetId);
   if (existing) {
     existing.remaining = BURN_DURATION;
-    existing.dps = BURN_DPS;
+    existing.dps = BURN_DPS * power;
     return existing;
   }
-  const burn = { targetId, remaining: BURN_DURATION, dps: BURN_DPS, tick: 0, packId: PACK };
+  const burn = { targetId, remaining: BURN_DURATION, dps: BURN_DPS * power, tick: 0, packId: PACK };
   world.magicBurns.push(burn);
   return burn;
 }

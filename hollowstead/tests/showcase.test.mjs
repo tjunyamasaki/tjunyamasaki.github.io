@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
 import {ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES} from '../src/content.mjs';
 import {makeStack} from '../src/inventory.mjs';
-import {collectMagicSprites, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-16';
+import {collectMagicSprites, magicItems, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-16';
 import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseCategories, showcaseMarkup} from '../src/showcase.mjs';
 
 test('showcase catalog stays closed until Spawn and can be dismissed', () => {
@@ -138,6 +138,7 @@ test('present magic weapons hit hostiles once and a placed skeleton can be remov
   player.dz = 0;
   world.spawnEnemy('crawler', 2, 0);
   const crawler = world.enemies[0];
+  crawler.hp = crawler.maxHp = 1000;
 
   arm(player, 'widows-needle', 70);
   world.attack(player);
@@ -148,7 +149,7 @@ test('present magic weapons hit hostiles once and a placed skeleton can be remov
     rooted = crawler.magicRootRemaining > 0;
   }
   assert.equal(rooted, true);
-  assert.equal(crawler.hp, 45);
+  assert.equal(crawler.hp, 1000 - magicItems['widows-needle'].damage);
   const pinned = crawler.x;
   for(let i = 0; i < 10; i++) world.tick();
   assert.equal(crawler.x, pinned);
@@ -159,7 +160,7 @@ test('present magic weapons hit hostiles once and a placed skeleton can be remov
   const beforeFan = crawler.hp;
   const fanX = crawler.x;
   world.attack(player);
-  assert.equal(crawler.hp, beforeFan - 5);
+  assert.equal(crawler.hp, beforeFan - magicItems['spirit-fan'].damage);
   assert.ok(crawler.x > fanX);
   assert.equal(world.magicSweeps.length, 1);
 
@@ -171,10 +172,10 @@ test('present magic weapons hit hostiles once and a placed skeleton can be remov
   let burned = false;
   for(let i = 0; i < 40 && crawler.hp > 0; i++){
     world.tick();
-    if(crawler.hp <= beforeBolt - 8){burned = true; break;}
+    if(crawler.hp <= beforeBolt - magicItems['cinder-staff'].damage){burned = true; break;}
   }
   assert.equal(burned, true);
-  assert.ok(crawler.hp > beforeBolt - 16);
+  assert.ok(crawler.hp > beforeBolt - magicItems['cinder-staff'].damage * 2);
 
   crawler.magicRootRemaining = 0;
   delete crawler.magicRootX;

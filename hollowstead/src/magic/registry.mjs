@@ -1,6 +1,13 @@
 // Mutable registry for magic weapons. Modules register at startup.
 // The engine stays the authority for damage, knockback, burns, and roots.
 import {GRAVECRAFT, gravecraftSprite, skeletonSprite} from './art.mjs?v=harvest-16';
+import {powerOf} from '../progression.mjs?v=harvest-16';
+
+/** Level scaling for pack damage: the same multiplier crafted weapons get. */
+export function ownerPower(world, owner){
+  const p = typeof owner === 'object' && owner ? owner : world?.players?.find(q => q.id === owner);
+  return p ? powerOf(p) : 1;
+}
 
 export const magicItems = Object.create(null);
 export const magicModules = [];

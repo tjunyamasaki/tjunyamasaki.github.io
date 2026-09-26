@@ -17,6 +17,7 @@ import {
   ARMOR_REDUCTION, LOOT_TABLES, eliteChance, enemyScale, enemyXp, isBossNight, isCache, maxHealth, nightRoster, pickWeighted, powerOf, rarityRank, regionAt, rollLoot,
   tierAt, waveSize, weaponStyle, xpToNext,
 } from './progression.mjs?v=harvest-16';
+import {ARSENAL, landBlow, preyFor, stepArsenal} from './arsenal.mjs?v=harvest-16';
 import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, readPendingKnock, restoreMagicFields} from './magic/registry.mjs?v=harvest-16';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -164,7 +165,7 @@ export class World {
     this.showcase=options?.showcase===true;
     this.nodes=this.showcase?[]:makeMap(seed);
     this.buildings=this.showcase?[]:[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
-    this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=true;this.wipe=0;this.bossNight=0;this.roamTimer=ROAM.interval;this.guardsDay=0;this.projectiles=[];this.best={day:1,level:1,loot:null,lootRank:-1};this.ambient=options?.ambient!==false;
+    this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=true;this.wipe=0;this.bossNight=0;this.roamTimer=ROAM.interval;this.guardsDay=0;this.projectiles=[];this.allies=[];this.zones=[];this.best={day:1,level:1,loot:null,lootRank:-1};this.ambient=options?.ambient!==false;
     this.networkId=crypto.randomUUID();this.transactionRevision=0;this.chestSessions=new Map();
     this.harvestWork=new Map();this.reviveWork=new Map();this.activations=new Map();this.dismantleHolds=new Map();this.toolNoticeAt=new Map();this.damagedAt=new Map();this.pickupDwell=new Map();this.packNoticeAt=new Map();this.previewUid=1;
     this.stats={gathered:0,built:0,revives:0};this.inputs=new Map();this.rng=random(seed^0x1234);this.spawnRng=random(seed^0x5eed);this.lootRng=random(seed^0x100f);this.discoverTimer=0;
@@ -970,12 +971,14 @@ export class World {
     const stamina=style.stamina??7;
     if(p.stamina<stamina){this.tell(p,'Catch your breath');return;}
     const hostile=this.enemies.filter(entry=>!isMagicAlly(entry)&&entry.hp>0);
-    const range=armed&&style.style==='melee'?style.range:style.range??2;
+    const range=style.range??style.sight??2;
     const target=hostile.filter(entry=>distance(entry,p)<range).sort((a,b)=>distance(a,p)-distance(b,p))[0];
     const damage=(armed?EQUIPMENT[weapon.itemId].damage:style.damage)*powerOf(p);
     p.stamina-=stamina;p.cooldown=style.cooldown;p.rest=false;p.action='attack';p.actionUntil=this.time+.32;this.event('swing',p.x,p.z);
     if(target){const span=Math.max(.1,distance(target,p));p.dx=(target.x-p.x)/span;p.dz=(target.z-p.z)/span;}
     if(armed)p.magicCast={itemId:weapon.itemId,at:this.time,x:p.x,z:p.z,dx:p.dx,dz:p.dz};
+    const special=ARSENAL[style.style];
+    if(special){special(this,p,{style,damage,weapon,hostile});return;}
     if(style.style==='melee'){
       const hits=style.arc>0?hostile.filter(entry=>{const d=distance(entry,p);if(d>=range)return false;if(d<.6)return true;const dot=((entry.x-p.x)*p.dx+(entry.z-p.z)*p.dz)/d;return dot>=Math.cos(style.arc*Math.PI/360);}):(target?[target]:[]);
       for(const enemy of hits)this.strike(p, enemy, damage, .32);
@@ -992,7 +995,7 @@ export class World {
     }
     // arrows and bolts
     const len=Math.hypot(p.dx,p.dz)||1;
-    this.projectiles.push({id:this.nextId('pr'),kind:style.style,owner:p.id,x:p.x+p.dx/len*.5,z:p.z+p.dz/len*.5,vx:p.dx/len*style.speed,vz:p.dz/len*style.speed,
+    this.projectiles.push({id:this.nextId('pr'),kind:style.style,owner:p.id,x:p.x+p.dx/len*.2,z:p.z+p.dz/len*.2,vx:p.dx/len*style.speed,vz:p.dz/len*style.speed,
       damage,range:style.range,traveled:0,pierce:style.pierce||0,splash:style.splash||0,slow:style.slow||0,hit:[],age:0,aim:Math.atan2(p.dz/len,p.dx/len)});
     this.wearEquipped(p,'weapon',1);
   }
@@ -1008,15 +1011,19 @@ export class World {
     if(!this.projectiles.length)return;
     const hostile=this.enemies.filter(e=>!isMagicAlly(e)&&e.hp>0);
     for(const shot of this.projectiles){
-      const step=Math.hypot(shot.vx,shot.vz)*dt;
+      if(shot.homing){const mark=hostile.find(e=>e.id===shot.homing&&e.hp>0)||hostile.filter(e=>!shot.hit.includes(e.id)&&Math.hypot(e.x-shot.x,e.z-shot.z)<6).sort((a,b)=>Math.hypot(a.x-shot.x,a.z-shot.z)-Math.hypot(b.x-shot.x,b.z-shot.z))[0];
+        if(mark){shot.homing=mark.id;const want=Math.atan2(mark.z-shot.z,mark.x-shot.x),have=Math.atan2(shot.vz,shot.vx),speed=Math.hypot(shot.vx,shot.vz);let turn=((want-have+Math.PI*3)%(Math.PI*2))-Math.PI;turn=Math.max(-shot.turn*dt,Math.min(shot.turn*dt,turn));const a=have+turn;shot.vx=Math.cos(a)*speed;shot.vz=Math.sin(a)*speed;shot.aim=a;}}
+      const step=Math.hypot(shot.vx,shot.vz)*dt,x0=shot.x,z0=shot.z;
       shot.x+=shot.vx*dt;shot.z+=shot.vz*dt;shot.traveled+=step;shot.age+=dt;
+      // Swept test: a fast arrow cannot skip over a foe standing point-blank.
+      const gap=enemy=>{const sx=shot.x-x0,sz=shot.z-z0,len2=sx*sx+sz*sz||1e-9,t=Math.max(0,Math.min(1,((enemy.x-x0)*sx+(enemy.z-z0)*sz)/len2));return Math.hypot(enemy.x-(x0+sx*t),enemy.z-(z0+sz*t));};
       const owner=this.player(shot.owner);
       for(const enemy of hostile){
         if(shot.done||shot.hit.includes(enemy.id))continue;
         const reach=enemy.type==='king'?1.3:enemy.type==='golem'||enemy.type==='brute'?1:.75;
-        if(Math.hypot(enemy.x-shot.x,enemy.z-shot.z)>reach)continue;
+        if(gap(enemy)>reach)continue;
         shot.hit.push(enemy.id);
-        this.strike(owner, enemy, shot.damage, shot.kind==='arrow'?.18:.3);
+        this.strike(owner, enemy, shot.damage, shot.kind==='bolt'?.3:.18);
         if(shot.slow)enemy.slowed=Math.max(enemy.slowed||0,shot.slow);
         if(shot.splash){for(const other of hostile)if(other!==enemy&&other.hp>0&&Math.hypot(other.x-shot.x,other.z-shot.z)<shot.splash)this.strike(owner, other, shot.damage*.55, .2);this.event('burst',shot.x,shot.z,'',{radius:shot.splash});shot.done=true;}
         else if(shot.hit.length>shot.pierce)shot.done=true;
@@ -1167,6 +1174,7 @@ export class World {
     }
   }
   tickRoot(enemy, dt){
+    if(enemy.stunned>0){enemy.stunned=Math.max(0,enemy.stunned-dt);enemy.windup=0;return true;}
     if(!(enemy.magicRootRemaining>0))return false;
     enemy.magicRootRemaining=Math.max(0, enemy.magicRootRemaining-dt);
     if(Number.isFinite(enemy.magicRootX)&&Number.isFinite(enemy.magicRootZ)){enemy.x=enemy.magicRootX;enemy.z=enemy.magicRootZ;}
@@ -1184,7 +1192,8 @@ export class World {
   move(p,dx,dz,dt,obstacles){
     const R=RULES.radius-1;const can=(x,z)=>Math.hypot(x,z)<R&&!obstacles.some(o=>o.id!==p.id&&Math.hypot(o.x-x,o.z-z)<o.radius+.33);
     const x=p.x+dx*dt,z=p.z+dz*dt;
-    if(can(x,z)){p.x=x;p.z=z;return true;}
+    // Something knocked or summoned inside a trunk may always walk back out.
+    if(can(x,z)||(Math.hypot(x,z)<R&&!can(p.x,p.z))){p.x=x;p.z=z;return true;}
     let moved=false;if(can(x,p.z)){p.x=x;moved=true;}if(can(p.x,z)){p.z=z;moved=true;}return moved;
   }
   hurt(p,amount){if(this.showcase||p.dash>0||p.down||p.ghost)return;this.damagedAt.set(p.id,this.time);const armor=p.equipment.body;if(armor&&ARMOR_REDUCTION[armor.itemId]&&armor.durability>0){this.wearEquipped(p,'body',amount);amount*=1-ARMOR_REDUCTION[armor.itemId];}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
@@ -1300,7 +1309,7 @@ export class World {
       if(p.cooldown<=0){if(input.attack)this.attack(p);else if(input.act){const aimed=this.target(p, typeof input.target==='string'?input.target:null);if(aimed?.kind==='building')this.interact(p, aimed.entity.id);}}
       if(this.showcase){p.hp=maxHealth(p);p.hunger=100;p.courage=100;p.down=0;p.ghost=false;}
     }
-    this.stepMagic(dt);this.stepProjectiles(dt);
+    this.stepMagic(dt);this.stepProjectiles(dt);stepArsenal(this, dt, obstacles);
     for(const b of this.buildings){
       b.cooldown=Math.max(0,b.cooldown-dt);if(b.type==='hearth'&&b.hp>0&&phase==='day'&&!this.showcase)b.hp=Math.min(b.maxHp,b.hp+dt*1.5);if(['hearth','fire'].includes(b.type))b.fuel=Math.max(0,b.fuel-dt*(phase==='day'?.18:1));
       if(b.type==='farm'&&b.planted)b.growth=Math.min(100,b.growth+dt*(phase==='day'?1:.35));
@@ -1318,7 +1327,7 @@ export class World {
           e.windup-=dt;
           if(e.windup<=0&&def){
             const people=this.players.filter(p=>p.online&&!p.down&&!p.ghost);
-            for(const person of people)if(Math.hypot(person.x-e.tx,person.z-e.tz)<(e.type==='king'?4:1.9))this.hurt(person,def.damage*(e.power||1));
+            for(const person of people)if(Math.hypot(person.x-e.tx,person.z-e.tz)<(e.type==='king'?4:1.9))this.hurt(person,def.damage*(e.power||1));landBlow(this,e,def.damage*(e.power||1),e.type==='king'?4:1.9);
             for(const building of this.buildings)if(Math.hypot(building.x-e.tx,building.z-e.tz)<(e.type==='king'?4:1.4))building.hp-=def.damage*(e.power||1)*structureHit(building);
             this.event('impact',e.tx,e.tz,'');e.cooldown=def.period;
           }
@@ -1329,12 +1338,12 @@ export class World {
       const people=this.players.filter(p=>p.online&&!p.down&&!p.ghost).sort((a,b)=>distance(a,e)-distance(b,e));
       const hearth=this.buildings.find(b=>b.type==='hearth');let target;
       if(e.home){
-        const prey=people.find(q=>distance(q,e)<(e.aggro?ROAM.aggro+6:ROAM.aggro)&&Math.hypot(q.x-e.home.x,q.z-e.home.z)<e.leash+8)||null;
+        const prey=[preyFor(this,e,people,e.aggro?ROAM.aggro+6:ROAM.aggro)].find(q=>q&&Math.hypot(q.x-e.home.x,q.z-e.home.z)<e.leash+8)||null;
         if(prey){e.aggro=true;target=prey;}
         else{e.aggro=false;if(Math.hypot(e.x-e.home.x,e.z-e.home.z)<1.2){if(e.hp<e.maxHp)e.hp=Math.min(e.maxHp,e.hp+dt*e.maxHp*.05);continue;}target={x:e.home.x,z:e.home.z,homing:true};}
-      }else{const near=people[0]&&distance(people[0],e)<12?people[0]:null;target=near||hearth||(this.showcase?people[0]:null);}
+      }else{const near=preyFor(this,e,people,12);target=near||hearth||(this.showcase?people[0]:null);}
       if(!target)continue;
-      if(e.windup>0){e.windup-=dt;if(e.windup<=0){for(const person of people)if(Math.hypot(person.x-e.tx,person.z-e.tz)<(e.type==='king'?4:1.9))this.hurt(person,def.damage*(e.power||1));for(const building of this.buildings)if(Math.hypot(building.x-e.tx,building.z-e.tz)<(e.type==='king'?4:1.4))building.hp-=def.damage*(e.power||1)*structureHit(building);this.event('impact',e.tx,e.tz,'');e.cooldown=def.period;}continue;}
+      if(e.windup>0){e.windup-=dt;if(e.windup<=0){for(const person of people)if(Math.hypot(person.x-e.tx,person.z-e.tz)<(e.type==='king'?4:1.9))this.hurt(person,def.damage*(e.power||1));landBlow(this,e,def.damage*(e.power||1),e.type==='king'?4:1.9);for(const building of this.buildings)if(Math.hypot(building.x-e.tx,building.z-e.tz)<(e.type==='king'?4:1.4))building.hp-=def.damage*(e.power||1)*structureHit(building);this.event('impact',e.tx,e.tz,'');e.cooldown=def.period;}continue;}
       const d=distance(e,target);const barricade=!target.homing&&this.buildings.find(b=>['wall','gate'].includes(b.type)&&!b.open&&distance(b,e)<1.65);
       if(barricade&&e.cooldown<=0){barricade.hp-=def.damage*(e.power||1)*STRUCTURE_HIT;e.cooldown=def.period;this.event('hit',barricade.x,barricade.z);continue;}
       if(!target.homing&&d<def.range+.5&&e.cooldown<=0){e.tx=target.x;e.tz=target.z;e.windup=e.type==='king'?1.35:.6;continue;}
@@ -1370,7 +1379,7 @@ export class World {
       nodeChanges:this.nodes.filter(n=>n.ready||n.hits!==NODES[n.type].hits).map(n=>({id:n.id, hits:n.hits, ready:n.ready})),
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
-      projectiles:this.projectiles, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
+      projectiles:this.projectiles, allies:this.allies, zones:this.zones, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
       ...magicSnapshotFields(this),
     };
     if(purpose==='network'){pruneChests(this);data.chestBusy=[...this.chestSessions.values()].map(s=>({...s}));data.worldId=this.networkId;data.transactionRevision=this.transactionRevision;}
@@ -1380,7 +1389,7 @@ export class World {
     if(data&&typeof data==='object')settleStorage(data);
     if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
     const world=new World(data.seed);
-    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','bossNight','guardsDay','best','roamTimer'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','bossNight','guardsDay','best','roamTimer'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     world.endless=true;if(world.status==='victory')world.status='playing';
     for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];}
     world.version=SAVE_VERSION_V2;world.clock=CLOCK_V2;

@@ -105,7 +105,8 @@ test('runtime clock is 180/30/100 while the protocol is hollowstead-2', () => {
 
 test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.deepEqual(EQUIPMENT_SLOTS, ['chop', 'mine', 'weapon', 'body', 'light']);
-  assert.deepEqual(EQUIPMENT_SLOT_ITEMS.weapon, ['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome']);
+  assert.deepEqual(EQUIPMENT_SLOT_ITEMS.weapon, ['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome',
+    'fangs', 'soulchain', 'scythe', 'wisplantern', 'stormrod', 'starfall', 'crowtotem', 'jacklantern', 'wighthorn', 'censer']);
   assert.equal(MIGRATION_PREFERRED_WEAPON, 'sword');
   assert.equal(equipmentSlotFor('torch'), 'light');
   assert.equal(equipmentSlotFor('berry'), null);

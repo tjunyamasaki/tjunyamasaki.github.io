@@ -18,6 +18,7 @@ import {adjustQuantity,createInventoryPanel,itemActionClearsSelection,operations
 import {loadMagicModules} from './magic/load.mjs?v=harvest-16';
 import {installMagicSprites} from './magic/registry.mjs?v=harvest-16';
 import {clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-16';
+import {cachedSrc} from './assets.mjs?v=harvest-16';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -48,8 +49,8 @@ function storeProfile(){try{localStorage.setItem(PROFILE,JSON.stringify({name:$(
 function showStatus(text,error=false){const el=$('front-status');if(el){el.textContent=text;el.style.color=error?'var(--red)':'var(--orange)';}connectionText=text;dirty=true;}
 function toast(text){const now=performance.now();if(text&&text===lastToast.text&&now-lastToast.at<2500)return;lastToast={text,at:now};$('toast').textContent=text;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3200);}
 function announce(text){$('announcement').textContent=text;$('announcement').classList.add('visible');clearTimeout(announceTimer);announceTimer=setTimeout(()=>$('announcement').classList.remove('visible'),4100);}
-function icon(key){const spriteKey=itemSpriteKey(key)||(STRUCTURES[key]?key:null),src=spriteKey&&(theme.sprites[spriteKey]?.icon||theme.sprites[spriteKey]?.src);if(!src)return '';const rarity=STRUCTURES[key]&&!itemSpriteKey(key)?'common':rarityOf(key);return `<img class="item-icon rarity-${rarity}" src="${escapeHtml(src)}" alt="" draggable="false">`;}
-function portrait(key){return `<span class="portrait" style="background-image:url('${theme.sprites[key]?.src||theme.sprites.ember.src}');background-size:${(theme.sprites[key]?.columns||1)*100}% ${(theme.sprites[key]?.rows||1)*100}%"></span>`;}
+function icon(key){const spriteKey=itemSpriteKey(key)||(STRUCTURES[key]?key:null),src=spriteKey&&(theme.sprites[spriteKey]?.icon||theme.sprites[spriteKey]?.src);if(!src)return '';const rarity=STRUCTURES[key]&&!itemSpriteKey(key)?'common':rarityOf(key);return `<img class="item-icon rarity-${rarity}" src="${escapeHtml(cachedSrc(src))}" alt="" draggable="false">`;}
+function portrait(key){return `<span class="portrait" style="background-image:url('${cachedSrc(theme.sprites[key]?.src||theme.sprites.ember.src)}');background-size:${(theme.sprites[key]?.columns||1)*100}% ${(theme.sprites[key]?.rows||1)*100}%"></span>`;}
 function me(){return world?.player(localId);}
 function commandError(result){return result?.message||({chestInUse:'Chest in use',sessionExpired:'Chest access ended',wrongSession:'Chest access changed',outOfRange:'Move closer',inventoryFull:'No room for that',staleRevision:'Items changed. Try again.',notOwner:'That item is not available',unknownItem:'That item is no longer here',incompatibleSocket:'That item does not fit this equipment slot',pending:'Wait for the current action',timeout:'Action not confirmed. Check the current inventory before trying again.',disconnected:'Connection closed',worldChanged:'The expedition changed',rateLimited:'Please wait a moment',notReady:'Waiting for the camp',paused:'The host has paused the expedition',stationRequired:'That needs the right station',missingFuel:'The fire needs wood',invalidQuantity:'Choose a smaller amount'})[result?.code]||'That action is not available';}
 function send(cmd,{quiet=false}={}){

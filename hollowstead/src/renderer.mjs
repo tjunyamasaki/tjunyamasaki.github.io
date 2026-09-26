@@ -14,9 +14,9 @@ import {
   LIGHT_FIELD_ORIGIN, LIGHT_FIELD_SIZE, LIGHT_FIELD_SPAN, brightnessAt, canInspect, entityBrightness,
   frameLighting, labelOpacity, linearFromDisplay, spriteTint, warningVisible, writeLightField,
 } from './lighting.mjs?v=harvest-16';
+import {loadImage, loadJson, preloadThemeAssets} from './assets.mjs?v=harvest-16';
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
-  const response=await fetch(url);if(!response.ok)throw new Error('The harvest art could not be loaded. Please reload.');
-  const theme=await response.json();theme.url=url;for(const def of Object.values(theme.sprites)){def.src=new URL(def.src,url).href;if(def.icon)def.icon=new URL(def.icon,url).href;}
+  const theme=await loadJson(url);theme.url=url;for(const def of Object.values(theme.sprites)){def.src=new URL(def.src,url).href;if(def.icon)def.icon=new URL(def.icon,url).href;}
   for(const[k,v]of Object.entries(theme.audio))theme.audio[k]=new URL(v,url).href;return theme;
 }
 export class Renderer {
@@ -67,7 +67,7 @@ export class Renderer {
     const channel=byte=>linearFromDisplay(Math.min(1, Math.max(0, display*(byte/255))));
     material.color.setRGB(channel(tint.r), channel(tint.g), channel(tint.b));
   }
-  async preload(){const loader=new THREE.TextureLoader();await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{const map=await loader.loadAsync(def.src);map.colorSpace=THREE.SRGBColorSpace;map.minFilter=THREE.LinearFilter;map.magFilter=THREE.LinearFilter;this.textures.set(key,map);}));}
+  async preload(){await preloadThemeAssets(this.theme);await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{const map=new THREE.Texture(await loadImage(def.src));map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;map.minFilter=THREE.LinearFilter;map.magFilter=THREE.LinearFilter;this.textures.set(key,map);}));}
   resize(){const size=viewSize(this.canvas);const w=size.width,h=size.height;this.viewWidth=w;this.viewHeight=h;this.gl.setSize(w,h,false);const aspect=w/Math.max(1,h),half=orthographicHalf(w,h);this.camera.left=-half*aspect/this.zoom;this.camera.right=half*aspect/this.zoom;this.camera.top=half/this.zoom;this.camera.bottom=-half/this.zoom;this.camera.updateProjectionMatrix();}
   setZoom(value){this.zoom=Math.max(.65,Math.min(1.6,value));this.resize();}
   sprite(key,id){

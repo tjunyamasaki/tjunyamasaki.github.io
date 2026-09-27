@@ -6,10 +6,10 @@ import {DASH, NIGHT_CAP, enemyScale, maxHealth, powerOf, waveSize} from '../src/
 import {HOTBAR_SLOTS} from '../src/contracts.mjs';
 import {createActionSession} from '../src/transactions.mjs';
 import {frameLighting} from '../src/lighting.mjs';
-import {loadMagicModules} from '../src/magic/load.mjs?v=harvest-17';
-import {ATTACKS, MOVES, buildField, fieldStep, telegraphOf} from '../src/mobs.mjs?v=harvest-17';
-import {ARENA, STARTERS, aliveCap, arenaScale, waveBudget, waveChampions} from '../src/arena.mjs?v=harvest-17';
-import {hotbarView, offerMarkup} from '../src/ui/arena.mjs?v=harvest-17';
+import {loadMagicModules} from '../src/magic/load.mjs?v=harvest-18';
+import {ATTACKS, MOVES, buildField, fieldStep, telegraphOf} from '../src/mobs.mjs?v=harvest-18';
+import {ARENA, STARTERS, aliveCap, arenaScale, waveBudget, waveChampions} from '../src/arena.mjs?v=harvest-18';
+import {hotbarView, offerMarkup} from '../src/ui/arena.mjs?v=harvest-18';
 import {keyboardAction} from '../src/ui/actions.mjs';
 
 await loadMagicModules();
@@ -144,7 +144,7 @@ test('with no stick input a dodge leaps away from the nearest threat', () => {
 });
 
 // ------------------------------------------------------------------ auto-aim
-test('every weapon aims itself: a staff fires behind you, a bow leads a runner, a sword closes the gap', () => {
+test('every weapon aims itself: a staff fires behind you, a bow leads a runner, a sword stays put', () => {
   const {w, p} = camp();
   arm(w, p, 'cinder-staff'); p.dx = 1; p.dz = 0;
   const behind = w.spawnEnemy('crawler', -6, 0, {elite: false}); behind.hp = behind.maxHp = 500;
@@ -161,9 +161,16 @@ test('every weapon aims itself: a staff fires behind you, a bow leads a runner, 
   const blade = camp();
   arm(blade.w, blade.p, 'sword'); blade.p.dx = -1; blade.p.dz = 0;
   const far = blade.w.spawnEnemy('crawler', 3.9, 0, {elite: false}); far.hp = far.maxHp = 500;
+  const x0 = blade.p.x;
   blade.w.attack(blade.p);
-  assert.ok(far.hp < 500, 'the swing stepped in and connected');
+  assert.equal(far.hp, 500, 'a swing does not dash in to reach a foe outside the blade');
+  assert.ok(Math.abs(blade.p.x - x0) < .05, 'the wanderer stays put');
   assert.ok(blade.p.dx > .9, 'and turned to face it');
+  const close = blade.w.spawnEnemy('crawler', 2.2, 0, {elite: false}); close.hp = close.maxHp = 500;
+  blade.p.cooldown = 0; blade.p.stamina = 100;
+  blade.w.attack(blade.p);
+  assert.ok(close.hp < 500, 'a foe already in reach is still struck');
+  assert.ok(Math.abs(blade.p.x - x0) < .05, 'and that swing does not step forward either');
 });
 
 test('running while fighting keeps facing the foe you struck', () => {

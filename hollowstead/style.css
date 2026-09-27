@@ -206,6 +206,7 @@
 #action-cluster #attack.armed small{margin-top:0}
 #action-cluster #dodge{position:relative}
 #action-cluster #dodge::after{content:"";position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(#bfe0ffcc calc(var(--cd,0) * 1turn),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));pointer-events:none}
+#action-cluster #dodge .dodge-count{position:absolute;right:-4px;top:-4px;min-width:14px;height:14px;padding:0 2px;border-radius:7px;background:#1a2430;color:#d7f2ff;border:1px solid #bfe0ff88;font:9px/12px ui-monospace,monospace;text-align:center;pointer-events:none}
 .world-label.dodge-label{font-size:17px;letter-spacing:.6px;color:#bfe8ff}
 body.arena .vital.hunger,body.arena .vital.courage,body.arena #hotbar-inventory,body.arena #hotbar-build,body.arena #action-cluster .stamina-track,body.arena #lantern-button{display:none}
 body.arena .weapon-bar{border-right:0;padding-right:0;margin-right:0}

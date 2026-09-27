@@ -19,10 +19,10 @@
 //   enemy.act        seconds left in an active charge
 //   enemy.face       -1 / 1, which way the sprite looks
 //   world.hostile    enemy projectiles and lobbed spores
-import {ENEMIES, STRUCTURES} from './content.mjs?v=harvest-17';
-import {ALLIES, ROAM} from './progression.mjs?v=harvest-17';
-import {isMagicAlly} from './magic/registry.mjs?v=harvest-17';
-import {landBlow, preyFor} from './arsenal.mjs?v=harvest-17';
+import {ENEMIES, STRUCTURES} from './content.mjs?v=harvest-18';
+import {ALLIES, ROAM} from './progression.mjs?v=harvest-18';
+import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
+import {landBlow, preyFor} from './arsenal.mjs?v=harvest-18';
 
 /** Creatures chew through camp structures at half their bite, so a lone explorer's fire survives an early night. */
 export const STRUCTURE_HIT = .5, HEARTH_HIT = .35;

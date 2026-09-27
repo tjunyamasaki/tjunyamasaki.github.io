@@ -2,11 +2,11 @@
 // strength. Before each wave every wanderer picks one of three weapons (a weapon already carried
 // ranks up instead). Health and level are the only other growth. No hunger, courage, stamina,
 // durability or loot. The World owns the simulation; this module owns the wave rules and the picks.
-import {itemDefinition} from './inventory.mjs?v=harvest-17';
-import {label} from './content.mjs?v=harvest-17';
-import {HOTBAR_SLOTS} from './contracts.mjs?v=harvest-17';
-import {ARENA_GROWTH, ELITE, WEAPON_STYLES, enemyXp, pickWeighted, rarityOf} from './progression.mjs?v=harvest-17';
-import {magicItems, isMagicAlly} from './magic/registry.mjs?v=harvest-17';
+import {itemDefinition} from './inventory.mjs?v=harvest-18';
+import {label} from './content.mjs?v=harvest-18';
+import {HOTBAR_SLOTS} from './contracts.mjs?v=harvest-18';
+import {ARENA_GROWTH, ELITE, WEAPON_STYLES, enemyXp, pickWeighted, rarityOf} from './progression.mjs?v=harvest-18';
+import {magicItems, isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 
 export const ARENA = Object.freeze({
   radius: 22,          // world radius: the walkable disc is radius-1

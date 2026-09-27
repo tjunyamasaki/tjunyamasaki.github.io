@@ -1,9 +1,9 @@
 // Battle arena and weapon hotbar views. Pure: builds markup and labels from plain world data,
 // never mutates the world. main.mjs owns the DOM and sends the picks.
 
-import {RECIPES, label} from '../content.mjs?v=harvest-17';
-import {magicItems} from '../magic/registry.mjs?v=harvest-17';
-import {ARENA_GROWTH, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-17';
+import {RECIPES, label} from '../content.mjs?v=harvest-18';
+import {magicItems} from '../magic/registry.mjs?v=harvest-18';
+import {ARENA_GROWTH, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-18';
 
 const escape = value => String(value).replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
 

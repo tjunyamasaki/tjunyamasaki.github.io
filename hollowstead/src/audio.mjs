@@ -1,5 +1,5 @@
 // Optional theme files replace these small synthesized cues without simulation changes.
-import {cachedSrc} from './assets.mjs?v=harvest-17';
+import {cachedSrc} from './assets.mjs?v=harvest-18';
 export class Sound {
   constructor(theme){this.theme=theme;this.enabled=true;this.context=null;this.last=0;this.clips=new Map();}
   unlock(){if(!this.enabled)return;try{this.context??=new (window.AudioContext||window.webkitAudioContext)();void this.context.resume();}catch{}}

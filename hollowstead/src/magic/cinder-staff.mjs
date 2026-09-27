@@ -27,7 +27,7 @@
  */
 
 const PACK = 'cinder-staff';
-import { ownerPower } from './registry.mjs?v=harvest-17';
+import { ownerPower } from './registry.mjs?v=harvest-18';
 
 const SPEED = 12 * 1.15;
 const MAX_RANGE = 11;

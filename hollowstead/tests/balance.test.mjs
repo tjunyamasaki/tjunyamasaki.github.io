@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
 import {ENEMIES, FIRST_MOB, PICKUP, RULES, SPEED_SCALE} from '../src/content.mjs';
 import {ALLIES, DASH, WEAPON_STYLES} from '../src/progression.mjs';
-import {ATTACKS} from '../src/mobs.mjs?v=harvest-17';
+import {ATTACKS} from '../src/mobs.mjs?v=harvest-18';
 import {countItem} from '../src/inventory.mjs';
 
 const T = RULES.tick;
@@ -22,7 +22,7 @@ function sim(w, seconds, input = {x: 0, z: 0}){
   }
 }
 
-test('dodge holds at most two charges and each spent charge returns after 10s', () => {
+test('dodge holds two charges and each charge cools for 10s, one at a time', () => {
   const {w, p} = camp();
   assert.equal(DASH.charges, 2);
   assert.equal(DASH.recharge, 10);
@@ -32,17 +32,24 @@ test('dodge holds at most two charges and each spent charge returns after 10s', 
   assert.equal(p.dashCharges, 1);
   assert.equal(p.dashRecharge.length, 1);
   assert.ok(Math.abs(p.dashRecharge[0] - 10) < 1e-6);
-  sim(w, 1);
+  // Spend the second charge 5s later. The first cooldown keeps the time it already spent.
+  sim(w, 5);
   assert.equal(w.action(p.id, {type: 'dash'}).ok, true);
   assert.equal(p.dashCharges, 0);
   assert.equal(p.dashRecharge.length, 2);
+  assert.ok(Math.abs(p.dashRecharge[0] - 5) < .08, 'first charge still has about 5s left');
+  assert.ok(Math.abs(p.dashRecharge[1] - 10) < 1e-6, 'the second charge is waiting on its own 10s');
   assert.equal(w.action(p.id, {type: 'dash'}).ok, false);
-  sim(w, 8.9);
+  sim(w, 2);
   assert.equal(p.dashCharges, 0);
-  assert.equal(w.action(p.id, {type: 'dash'}).ok, false);
-  sim(w, 0.2);
+  assert.ok(Math.abs(p.dashRecharge[1] - 10) < 1e-6, 'the queued charge does not cool yet');
+  sim(w, 3.05);
+  assert.equal(p.dashCharges, 1, '5s after the second dodge, the first charge is back');
+  assert.equal(p.dashRecharge.length, 1);
+  assert.ok(p.dashRecharge[0] > 9.5, 'the second charge then starts its own 10s');
+  sim(w, 9.4);
   assert.equal(p.dashCharges, 1);
-  sim(w, 1);
+  sim(w, .8);
   assert.equal(p.dashCharges, 2);
   assert.equal(p.dashRecharge.length, 0);
   w.action(p.id, {type: 'dash'});

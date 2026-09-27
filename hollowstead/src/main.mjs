@@ -1,27 +1,27 @@
-import {World,clamp,distance,biome,EXPLORE_CELL,EXPLORE_SIZE} from './engine.mjs?v=harvest-17';
-import {RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-17';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt} from './content.mjs?v=harvest-17';
-import {Renderer,loadTheme} from './renderer.mjs?v=harvest-17';
-import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-17';
-import {createNetwork} from './network.mjs?v=harvest-17';
-import {Sound} from './audio.mjs?v=harvest-17';
-import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-17';
-import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-17';
-import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-17';
-import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-17';
+import {World,clamp,distance,biome,EXPLORE_CELL,EXPLORE_SIZE} from './engine.mjs?v=harvest-18';
+import {RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-18';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt} from './content.mjs?v=harvest-18';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-18';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-18';
+import {createNetwork} from './network.mjs?v=harvest-18';
+import {Sound} from './audio.mjs?v=harvest-18';
+import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-18';
+import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-18';
+import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-18';
+import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-18';
 import {
   allowsCombat,allowsMovement,clusterFor,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
-} from './ui/actions.mjs?v=harvest-17';
-import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-17';
-import {actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-17';
-import {loadMagicModules} from './magic/load.mjs?v=harvest-17';
-import {installMagicSprites,isMagicAlly} from './magic/registry.mjs?v=harvest-17';
-import {waveLeft} from './arena.mjs?v=harvest-17';
-import {hotbarView,offerMarkup,rankStars,replaceMarkup} from './ui/arena.mjs?v=harvest-17';
-import {DASH} from './progression.mjs?v=harvest-17';
-import {clampShowcaseMobCount, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-17';
-import {cachedSrc} from './assets.mjs?v=harvest-17';
+} from './ui/actions.mjs?v=harvest-18';
+import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-18';
+import {actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-18';
+import {loadMagicModules} from './magic/load.mjs?v=harvest-18';
+import {installMagicSprites,isMagicAlly} from './magic/registry.mjs?v=harvest-18';
+import {waveLeft} from './arena.mjs?v=harvest-18';
+import {hotbarView,offerMarkup,rankStars,replaceMarkup} from './ui/arena.mjs?v=harvest-18';
+import {DASH} from './progression.mjs?v=harvest-18';
+import {clampShowcaseMobCount, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-18';
+import {cachedSrc} from './assets.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -455,7 +455,7 @@ function guideHTML(){
     ['Eat, farm, recover','Open Inventory, select the food, and press Eat. A burning fire cooks pumpkins, mushrooms, and meat. A cauldron cooks stew. Plant a farm with a seed, then harvest it when it is ready. Bedrolls heal by day and spend hunger.'],
     ['Tend the camp','Build lists only what you can place from where you opened it. Choose Maintain camp to repair a damaged structure or hold Dismantle. The Heartfire cannot be dismantled. A chest someone else has open cannot be dismantled either.'],
     ['Share a chest','One wanderer opens a chest at a time. Your pack has twelve slots. A chest has twenty-four. Store all moves what fits from your pack. Stack fills piles the chest already holds. Sort orders a chest or your pack and stacks matching piles. Choose a quantity, then Transfer, or tap the destination slot. Close the panel to let someone else in.'],
-    ['Stand together','Your weapon aims itself, and with Auto-attack on (the menu) it swings whenever a foe is in reach; hold Attack to swing yourself. Keep three weapons on the hotbar and tap one to swap. Every creature marks its blow on the ground before it lands: step or Dodge out of it, or dodge just as it lands to slip through untouched. Armor absorbs damage only while worn. Hold Revive beside a fallen friend for three seconds. Everyone has one last-chance charm. Fallen wanderers return at dawn if the camp survives.'],
+    ['Stand together','Your weapon aims itself; hold Attack to swing. Keep three weapons on the hotbar and tap one to swap. Dodge stores two charges, and each one cools on its own: the next charge starts only after the previous one returns. Every creature marks its blow on the ground before it lands: step or Dodge out of it, or dodge just as it lands to slip through untouched. Armor absorbs damage only while worn. Hold Revive beside a fallen friend for three seconds. Everyone has one last-chance charm. Fallen wanderers return at dawn if the camp survives.'],
     ['Explore for treasure','The hollow is vast. Beyond the meadow lie the Autumn Woods and the Graveyard; farther still the Hollow Mire, the Moonshard Crags and the Barrow Fields. Crates, iron-bound chests, moonlit coffers and hollow reliquaries hide out there: hold Open beside one. Better caches sit farther from camp, and guardians watch them. Caches refill after a few days.'],
     ['Grow stronger','Kills, caches, gathering and new regions give experience. Each level adds health and damage. Loot comes in five rarities: common, uncommon, rare, epic and legendary. Bows fire arrows at the nearest foe, staffs throw bursting bolts, broadswords cleave, and the Grimoire of Ash burns everything around you. Heartstones raise your health for good.'],
     ['Outlast the night','Every night is harder than the last, with more creatures and elder champions. The Hollow King returns every fifth night, stronger each time. Guard the Heartfire: losing it ends the expedition. How many nights can you survive?'],
@@ -490,7 +490,8 @@ async function toggleFullscreen(){
 }
 function menuHTML(){
   const camp=room?`Camp ${escapeHtml(room)}`:world?.arena?'Battle arena':world?.showcase?'Showcase':'Solo expedition';
-  return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div><div class="menu-row"><span>Auto-attack</span><button type="button" data-command="auto" aria-pressed="${autoAttack}">${autoAttack?'On':'Off'}</button></div><div class="menu-row"><span>Fullscreen</span><button type="button" data-command="fullscreen">${isFullscreen()?'Exit fullscreen':'Fullscreen'}</button></div>${fullscreenNote?`<p class="muted small">${escapeHtml(fullscreenNote)}</p>`:''}<div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'&&!world?.arena&&!world?.showcase?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">${world?.arena?'Leave the arena':'Save & return to title'}</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
+  const auto=world?.arena?`<div class="menu-row"><span>Auto-attack</span><button type="button" data-command="auto" aria-pressed="${autoAttack}">${autoAttack?'On':'Off'}</button></div>`:'';
+  return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div>${auto}<div class="menu-row"><span>Fullscreen</span><button type="button" data-command="fullscreen">${isFullscreen()?'Exit fullscreen':'Fullscreen'}</button></div>${fullscreenNote?`<p class="muted small">${escapeHtml(fullscreenNote)}</p>`:''}<div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'&&!world?.arena&&!world?.showcase?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">${world?.arena?'Leave the arena':'Save & return to title'}</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
 }
 function replaceContent(html){
   const content=$('sheet-content');
@@ -622,7 +623,16 @@ function paintAttack(p){
   $('attack').innerHTML=weapon?`${icon(weapon.itemId)}<small>Attack</small>`:'⚔<small>Attack</small>';
   $('attack').classList.toggle('armed',!!weapon);
 }
-function paintDodge(p){const el=$('dodge');if(el&&p){const wait=(p.dashCharges??0)>0?0:(p.dashRecharge?.[0]||p.dashCooldown||0);el.style.setProperty('--cd',String(clamp(wait/DASH.recharge,0,1)));}}
+function paintDodge(p){
+  const el=$('dodge');if(!el||!p)return;
+  const charges=clamp(p.dashCharges??DASH.charges,0,DASH.charges);
+  const cooling=p.dashRecharge?.[0]||0;
+  el.dataset.charges=String(charges);
+  el.style.setProperty('--cd',String(charges>=DASH.charges||!(cooling>0)?0:clamp(cooling/DASH.recharge,0,1)));
+  const count=el.querySelector('.dodge-count');if(count&&count.textContent!==String(charges))count.textContent=String(charges);
+  const label=`Dodge, ${charges} of ${DASH.charges}`;
+  if(el.getAttribute('aria-label')!==label)el.setAttribute('aria-label',label);
+}
 function paintArenaClock(){
   const a=world.arena,left=waveLeft(world);
   $('region-name').textContent=a.phase==='fight'?`${left} LEFT`:a.phase==='pick'?'CHOOSE A WEAPON':a.phase==='countdown'?`GET READY · ${Math.max(1,Math.ceil(a.timer))}`:'WAVE CLEARED';
@@ -844,13 +854,12 @@ function setupControls(){
   $('player-name').addEventListener('change',storeProfile);
 }
 /**
- * Auto-attack: swing whenever a hostile is within the weapon's reach. It never interrupts a held
- * Gather or Revive, and on an expedition it keeps enough stamina in reserve for a dodge.
+ * Arena auto-attack: swing whenever a hostile is within the weapon's reach. The expedition has no
+ * auto-attack. It never interrupts a held Gather or Revive.
  */
 function autoSwing(modeName){
-  if(!autoAttack||!allowsCombat(modeName)||hold.act||holdKind)return false;
+  if(!world?.arena||!autoAttack||!allowsCombat(modeName)||hold.act||holdKind)return false;
   const p=me();if(!p||p.down||p.ghost||p.cooldown>.05)return false;
-  if(!world.arena&&p.stamina<DASH.stamina+12)return false;
   const reach=world.weaponReach(p);
   return world.enemies.some(e=>e.hp>0&&!isMagicAlly(e)&&distance(e,p)<reach);
 }

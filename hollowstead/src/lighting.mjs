@@ -3,9 +3,9 @@
 // feathering; it cannot change who is safe.
 // This module must not import Three.js or a renderer.
 
-import {EQUIPMENT, RULES, STRUCTURES} from './content.mjs?v=harvest-17';
-import {RANGES} from './contracts.mjs?v=harvest-17';
-import {equippedLanternLit} from './inventory.mjs?v=harvest-17';
+import {EQUIPMENT, RULES, STRUCTURES} from './content.mjs?v=harvest-18';
+import {RANGES} from './contracts.mjs?v=harvest-18';
+import {equippedLanternLit} from './inventory.mjs?v=harvest-18';
 
 export const HEARTH_LEVEL_STEP = 1.5;
 export const PLAYER_LIGHT_RADIUS = RANGES.lanternLight;

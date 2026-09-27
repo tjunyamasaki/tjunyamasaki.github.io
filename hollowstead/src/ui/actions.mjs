@@ -2,10 +2,10 @@
 // Emits intent descriptions for the local player. Never reads a guest-supplied
 // actor id and never mutates the world. The host rechecks every command.
 
-import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-17';
-import {magicItems} from '../magic/registry.mjs?v=harvest-17';
-import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-17';
-import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-17';
+import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-18';
+import {magicItems} from '../magic/registry.mjs?v=harvest-18';
+import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-18';
+import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-18';
 
 const SPECS = Object.freeze({
   feed: {icon: '▥', label: 'Feed', activation: 'tap'},

@@ -1,11 +1,11 @@
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {STRUCTURES, RULES} from './content.mjs?v=harvest-17';
-import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-17';
-import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-17';
-import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-17';
-import {ALLIES, DASH} from './progression.mjs?v=harvest-17';
-import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-17';
-import {glowStrength} from './lighting.mjs?v=harvest-17';
+import {STRUCTURES, RULES} from './content.mjs?v=harvest-18';
+import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-18';
+import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-18';
+import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-18';
+import {ALLIES, DASH} from './progression.mjs?v=harvest-18';
+import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-18';
+import {glowStrength} from './lighting.mjs?v=harvest-18';
 /** Standing stones or lamps ringing the Heartfire plaza (presentation only). */
 export function plazaProps(world,theme){const hearth=world.buildings.find(b=>b.type==='hearth');if(!hearth||!theme.sprites['plaza-prop'])return [];return [0,1,2,3,4,5].map(i=>{const a=i*Math.PI/3;return {e:{id:'plaza'+i,x:hearth.x+Math.cos(a)*4.7,z:hearth.z+Math.sin(a)*4.7*.92},key:'plaza-prop',kind:'prop'};});}
 /** Runestones ringing the battle arena's wall (presentation only; nothing collides with them). */
@@ -20,16 +20,16 @@ export function arenaTile(x,z,R){
   return Math.floor(r/3.2)%2?'#6b6270':'#615968';
 }
 const PROJECTILE_KEYS={arrow:'arrow',bolt:'mbolt',wisp:'wisp',seed:'pumpseed'};
-import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-17';
-import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-17';
-import {MagicMesh} from './magic/effects-three.mjs?v=harvest-17';
-import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-17';
-import {RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-17';
+import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-18';
+import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-18';
+import {MagicMesh} from './magic/effects-three.mjs?v=harvest-18';
+import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-18';
+import {RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-18';
 import {
   LIGHT_FIELD_ORIGIN, LIGHT_FIELD_SIZE, LIGHT_FIELD_SPAN, brightnessAt, canInspect, entityBrightness,
   frameLighting, labelOpacity, linearFromDisplay, spriteTint, warningVisible, writeLightField,
-} from './lighting.mjs?v=harvest-17';
-import {loadImage, loadJson, preloadThemeAssets} from './assets.mjs?v=harvest-17';
+} from './lighting.mjs?v=harvest-18';
+import {loadImage, loadJson, preloadThemeAssets} from './assets.mjs?v=harvest-18';
 /** Art that ships in more than one version (wanderer look, Heartfire). ?look=mask&hearth=b in the URL,
  * or a saved pick, chooses; otherwise the theme default. Sprites are swapped by file suffix. */
 export function themeChoice(theme, name){

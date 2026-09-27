@@ -1,21 +1,21 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
-import {STRUCTURES, RULES} from './content.mjs?v=harvest-17';
-import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-17';
-import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-17';
-import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-17';
-import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-17';
-import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-17';
-import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-17';
-import {ALLIES, DASH, RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-17';
-import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-17';
-import {arenaProps, arenaTile, plazaProps} from './renderer.mjs?v=harvest-17';
-import {glowStrength} from './lighting.mjs?v=harvest-17';
+import {STRUCTURES, RULES} from './content.mjs?v=harvest-18';
+import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-18';
+import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-18';
+import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-18';
+import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-18';
+import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-18';
+import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-18';
+import {ALLIES, DASH, RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-18';
+import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-18';
+import {arenaProps, arenaTile, plazaProps} from './renderer.mjs?v=harvest-18';
+import {glowStrength} from './lighting.mjs?v=harvest-18';
 const PROJECTILE_KEYS={arrow:'arrow',bolt:'mbolt',wisp:'wisp',seed:'pumpseed'};
 import {
   brightnessAt, canInspect, entityBrightness, frameLighting, labelOpacity, shadeHex, warningVisible,
-} from './lighting.mjs?v=harvest-17';
-import {loadImage, preloadThemeAssets} from './assets.mjs?v=harvest-17';
+} from './lighting.mjs?v=harvest-18';
+import {loadImage, preloadThemeAssets} from './assets.mjs?v=harvest-18';
 /** Swarm fights spray numbers; old labels give way so the DOM stays light on phones. */
 const MAX_FLOATERS=36;
 export class CanvasRenderer {

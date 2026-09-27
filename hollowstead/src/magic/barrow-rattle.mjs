@@ -37,7 +37,7 @@
 // is the current cell, skeleton-<anim>-<0-3>.png. facing is -1 toward -x and
 // 1 toward +x.
 
-import { ownerPower } from './registry.mjs?v=harvest-17'
+import { ownerPower } from './registry.mjs?v=harvest-18'
 
 const ROOT = 'assets/magic/barrow-rattle'
 const CAP = 4

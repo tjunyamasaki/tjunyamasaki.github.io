@@ -164,9 +164,11 @@ export function powerOf(p){
 // ------------------------------------------------------------------ gear
 export const ARMOR_REDUCTION = Object.freeze({armor:.45, bonemail:.55, shardplate:.65});
 /**
- * Dodge: a 3.91-unit burst over .18s, invulnerable for .32s from the press. Two charges; each spent
- * charge returns 10s after it was used. A blow that lands inside the i-frames is a perfect dodge:
- * that charge comes back almost at once and some stamina returns.
+ * Dodge: a 3.91-unit burst over .18s, invulnerable for .32s from the press. Two charges. Each spent
+ * charge has its own 10s cooldown, and only one of those cooldowns runs at a time — the next charge
+ * does not start cooling until the one ahead of it returns. Spending a charge never resets a cooldown
+ * already running. Dodge, wait 5s, dodge again: one charge is back 5s later, and the second 10s after that.
+ * A blow inside the i-frames is a perfect dodge: that charge comes back almost at once and some stamina returns.
  */
 export const DASH = Object.freeze({distance:3.4*1.15, time:.18, iframes:.32, charges:2, recharge:10, stamina:22, perfectCooldown:.15, perfectStamina:12});
 export const LIGHT_ITEMS = Object.freeze(['torch','everlantern']);

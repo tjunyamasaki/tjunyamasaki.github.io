@@ -19,7 +19,7 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 2. Place a workbench from **Build**. It does not need another station. Open the workbench to craft an axe and a pick, then tap **Equip**. Moon iron and haunted graves need a worn pick. Spare tools in your pack do nothing until worn. Cauldrons, soul lanterns, and wards are built from the workbench, not the field list.
 3. Cook at a burning fire. Grow pumpkins in farm plots, make bandages at a workbench, and build a cauldron for stew. Eat from your pack: open it and tap Eat on the stack you want.
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
-5. Fight with the weapon in your hand. Every weapon aims itself at the best foe in reach, so you can run one way and fight the other. **Auto-attack** (on by default, in the menu) swings whenever a foe is in reach; hold **Attack** to swing yourself. Keep up to three weapons on the **hotbar** and tap one to swap mid-fight. Every creature telegraphs its blow on the ground; **Dodge** out of it, or dodge at the last moment to pass through untouched. Repair walls, rearm traps, and use wards to help defend the camp.
+5. Fight with the weapon in your hand. Every weapon aims itself at the best foe in reach, so you can run one way and fight the other. Hold **Attack** to swing. Keep up to three weapons on the **hotbar** and tap one to swap mid-fight. Every creature telegraphs its blow on the ground; **Dodge** out of it, or dodge at the last moment to pass through untouched. Dodge holds two charges. Each charge has its own cooldown, and the next one starts only after the previous charge returns. Repair walls, rearm traps, and use wards to help defend the camp.
 6. Hold **Revive** beside a fallen friend for about three seconds. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable. Open **Build**, then **Maintain camp**, to repair a damaged structure or hold **Dismantle**. The Heartfire cannot be dismantled, and a chest someone else has open cannot either.
 7. Awaken the Heartfire with soul embers. Every fifth night brings the Hollow King, stronger each time.
 
@@ -46,7 +46,7 @@ See `docs/GAMEPLAY_PLAN.md` for the full design.
 3. When the last one falls you heal a third of your health, and pick again from three weapons. A weapon you already carry ranks up instead (★, up to five: more damage each rank). With three weapons on the hotbar, a new one replaces one you choose, or you keep yours.
 4. Kills give experience to everyone standing. Each level adds health and damage and heals you fully.
 
-The arena keeps only health and level: no hunger, courage, stamina, weapon wear or loot. When you fall, the run ends; **Fight again** starts a new one.
+The arena keeps only health and level: no hunger, courage, stamina, weapon wear or loot. **Auto-attack** (on by default, in the arena menu) swings whenever a foe is in reach. When you fall, the run ends; **Fight again** starts a new one.
 
 ## Shared chests
 
@@ -59,9 +59,9 @@ Only one wanderer can open a chest at a time. The same panel shows your pack, wo
 | Move | Left stick, or tap the ground | WASD / arrows |
 | Context action | The large circle. Its name follows what you are standing at: Gather, Chop, Feed, Cook, Open, Place, and so on. | E, hold when the action says to hold |
 | More actions | The smaller circles beside it. A campfire can show Feed, Cook, Awaken, and Repair at once. | 1–4 |
-| Attack | Automatic when a foe is in reach (menu: Auto-attack). Or hold Attack. Aims itself. | Hold Space |
+| Attack | Hold Attack. Aims itself. The expedition does not swing for you. In the battle arena, Auto-attack in the menu can. | Hold Space |
 | Swap weapon | Tap a weapon on the hotbar | R or Tab cycles |
-| Dodge | Dodge: a quick dash, invulnerable for a moment. With the stick still, you leap away from the nearest foe. | Shift |
+| Dodge | Two charges. A quick dash, invulnerable for a moment. Each charge cools on its own, and the next cooldown starts when the previous charge returns. With the stick still, you leap away from the nearest foe. | Shift |
 | Inventory / Build | Bottom bar | I / B |
 | Eat, equip, drop | Open Inventory, select the stack, then Eat, Equip, or Drop | Arrows, Enter, Escape |
 | Lantern | A light circle appears when you carry a usable lantern | F |

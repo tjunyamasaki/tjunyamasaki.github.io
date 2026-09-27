@@ -1,4 +1,4 @@
-import {magicItems} from './magic/registry.mjs?v=harvest-17';
+import {magicItems} from './magic/registry.mjs?v=harvest-18';
 // Simulation identifiers are deliberately independent of art, names and animations.
 const DAY=180, DUSK=30, NIGHT=100;
 export const SPEED_SCALE = 1.15;

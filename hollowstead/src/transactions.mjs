@@ -1,6 +1,6 @@
-import {ACTION_RESULT_CACHE_LIMIT, HOTBAR_SLOTS, INTENTS} from './contracts.mjs?v=harvest-17';
-import {containerId, planSortSlots} from './inventory.mjs?v=harvest-17';
-import {chestIntent, moveItems} from './chests.mjs?v=harvest-17';
+import {ACTION_RESULT_CACHE_LIMIT, HOTBAR_SLOTS, INTENTS} from './contracts.mjs?v=harvest-18';
+import {containerId, planSortSlots} from './inventory.mjs?v=harvest-18';
+import {chestIntent, moveItems} from './chests.mjs?v=harvest-18';
 
 export const TRANSACTION_PROTOCOL=1;
 const outcome=code=>({ok:code==='ok',code});

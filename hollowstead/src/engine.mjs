@@ -1,26 +1,26 @@
-import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-17';
+import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label} from './content.mjs?v=harvest-18';
 import {
   CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createChest, createContainer,
   containerId, duplicateUids, emptyEquipment, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
   supplyLoad, wearStack,
-} from './inventory.mjs?v=harvest-17';
-import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-17';
-import {DISMANTLE_HOLD_SECONDS, HOTBAR_SLOTS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-17';
-import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-17';
-import {pruneChests, releaseChests} from './chests.mjs?v=harvest-17';
-import {inventoryIntent} from './transactions.mjs?v=harvest-17';
-import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-17';
+} from './inventory.mjs?v=harvest-18';
+import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-18';
+import {DISMANTLE_HOLD_SECONDS, HOTBAR_SLOTS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-18';
+import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-18';
+import {pruneChests, releaseChests} from './chests.mjs?v=harvest-18';
+import {inventoryIntent} from './transactions.mjs?v=harvest-18';
+import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule} from './interactions.mjs?v=harvest-18';
 import {
   CACHE_GUARDS, CACHE_LAYOUT, DASH, DISCOVER_XP, ELITE, GATHER_XP, HEARTSTONE_HP, LIGHT_ITEMS, MAX_LEVEL, NODE_POOLS, REGIONS, RESIDENTS, ROAM, SHARE_RADIUS,
   ARMOR_REDUCTION, LOOT_TABLES, NIGHT_CAP, eliteChance, enemyScale, enemyXp, isBossNight, isCache, maxHealth, nightRoster, pickWeighted, powerOf, rarityRank, regionAt, rollLoot,
   tierAt, waveSize, weaponStyle, xpToNext,
-} from './progression.mjs?v=harvest-17';
-import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-17';
-import {stepMobs} from './mobs.mjs?v=harvest-17';
-import {ARENA, arenaEliteChance, arenaKill, arenaPick, arenaScale, setupArena, stepArena} from './arena.mjs?v=harvest-17';
-import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, readPendingKnock, restoreMagicFields} from './magic/registry.mjs?v=harvest-17';
+} from './progression.mjs?v=harvest-18';
+import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
+import {stepMobs} from './mobs.mjs?v=harvest-18';
+import {ARENA, arenaEliteChance, arenaKill, arenaPick, arenaScale, setupArena, stepArena} from './arena.mjs?v=harvest-18';
+import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, readPendingKnock, restoreMagicFields} from './magic/registry.mjs?v=harvest-18';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.z||0)-(b.z||0));
@@ -1050,7 +1050,7 @@ export class World {
   }
   /**
    * How the equipped weapon finds a foe: `reach` is how far auto-aim looks, `speed` leads a moving
-   * target for shots, `assist` is the short step a melee swing takes to close the last gap.
+   * target for shots. A melee swing stays where the wanderer is standing.
    */
   aimProfile(p){
     const weapon=p?.equipment?.weapon;
@@ -1059,16 +1059,16 @@ export class World {
     const style=weaponStyle(itemId)||weaponStyle('fist');
     const range=style.range??style.sight??2;
     switch(style.style){
-      case 'melee':case 'combo':return {reach:range+1.3,assist:1.1,range};
-      case 'reap':return {reach:range+.9,assist:.8,range};
+      case 'melee':case 'combo':return {reach:range+1.3,range};
+      case 'reap':return {reach:range+.9,range};
       case 'arrow':case 'bolt':return {reach:range,speed:style.speed,range};
       case 'wisps':return {reach:style.seek,range:style.seek};
       case 'crows':case 'sentry':case 'wight':return {reach:style.sight,range:style.sight};
       default:return {reach:range,range};
     }
   }
-  /** How far a hostile can be for the wanderer's current weapon to be worth swinging (auto-attack). */
-  weaponReach(p){return this.aimProfile(p).reach;}
+  /** How far a hostile can be before a swing can connect. */
+  weaponReach(p){const aim=this.aimProfile(p);return aim.range??aim.reach;}
   /**
    * Auto-aim: the best foe in reach (near, in front, already locked, or winding up), leading it for
    * shots. Turns the wanderer to face it and keeps that facing briefly while they run.
@@ -1105,8 +1105,6 @@ export class World {
     if(p.stamina<stamina){this.tell(p,'Catch your breath');return;}
     const hostile=this.enemies.filter(entry=>!isMagicAlly(entry)&&entry.hp>0);
     const range=style.range??style.sight??2;
-    // Melee assist: a short step closes the last gap to the locked foe, so swings connect on the run.
-    if(locked&&aim.assist){const d=distance(locked,p);if(d>range*.8&&d<range+aim.assist){const step=Math.min(aim.assist,d-range*.7);this.move(p,(locked.x-p.x)/d*step/.05,(locked.z-p.z)/d*step/.05,.05,this.frameObstacles||this.obstacles());}}
     const target=locked&&distance(locked,p)<range?locked:hostile.filter(entry=>distance(entry,p)<range).sort((a,b)=>distance(a,p)-distance(b,p))[0];
     const damage=(armed?EQUIPMENT[weapon.itemId].damage:style.damage)*powerOf(p);
     p.stamina-=stamina;p.cooldown=style.cooldown;p.rest=false;p.action='attack';p.actionUntil=this.time+.32;this.event('swing',p.x,p.z);
@@ -1393,15 +1391,21 @@ export class World {
   }
   tickDash(p,dt){
     this.readyDash(p);
-    p.dashRecharge=p.dashRecharge.map(left=>left-dt);
-    const recovered=p.dashRecharge.filter(left=>left<=0).length;
-    p.dashRecharge=p.dashRecharge.filter(left=>left>0);
-    p.dashCharges=Math.min(DASH.charges,p.dashCharges+recovered);
+    // Charges cool one at a time. A queued charge keeps its own full cooldown until the one ahead returns.
+    let left=dt;
+    while(p.dashRecharge.length&&left>0){
+      p.dashRecharge[0]-=left;
+      if(p.dashRecharge[0]>1e-8)break;
+      left=-p.dashRecharge[0];
+      p.dashRecharge.shift();
+      if(p.dashCharges<DASH.charges)p.dashCharges++;
+    }
     this.syncDash(p);
   }
   syncDash(p){
     p.dashCharges=Math.min(DASH.charges,Math.max(0,p.dashCharges));
-    p.dashCooldown=p.dashCharges>0?0:Math.min(...(p.dashRecharge.length?p.dashRecharge:[DASH.recharge]));
+    while(p.dashRecharge.length>DASH.charges)p.dashRecharge.pop();
+    p.dashCooldown=p.dashRecharge.length?Math.max(0,p.dashRecharge[0]):0;
   }
   /** Shove a wanderer (heavy blows knock you back); walls and trunks still stop you. */
   shove(p,dx,dz,amount){
@@ -1412,7 +1416,7 @@ export class World {
   hurt(p,amount,source=null){if(this.showcase||p.down||p.ghost)return;
     if(p.iframes>0||p.dash>0){
       // Inside the telegraph, but mid-dodge: the blow passes through. Timed well, it pays back.
-      if(!(this.time-(p.lastDodge??-9)<.35)){p.lastDodge=this.time;this.readyDash(p);if(p.dashRecharge.length)p.dashRecharge[p.dashRecharge.length-1]=Math.min(p.dashRecharge[p.dashRecharge.length-1],DASH.perfectCooldown);this.syncDash(p);if(!this.arena)p.stamina=Math.min(100,p.stamina+DASH.perfectStamina);this.event('dodge',p.x,p.z,'Dodged!',{player:p.id});}
+      if(!(this.time-(p.lastDodge??-9)<.35)){p.lastDodge=this.time;this.readyDash(p);if(p.dashRecharge.length){p.dashRecharge[p.dashRecharge.length-1]=Math.min(p.dashRecharge[p.dashRecharge.length-1],DASH.perfectCooldown);const refund=p.dashRecharge.pop();p.dashRecharge.unshift(refund);}this.syncDash(p);if(!this.arena)p.stamina=Math.min(100,p.stamina+DASH.perfectStamina);this.event('dodge',p.x,p.z,'Dodged!',{player:p.id});}
       return;
     }this.damagedAt.set(p.id,this.time);const armor=p.equipment.body;if(armor&&ARMOR_REDUCTION[armor.itemId]&&armor.durability>0){this.wearEquipped(p,'body',amount);amount*=1-ARMOR_REDUCTION[armor.itemId];}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
   revivePlayer(p){p.down=0;p.ghost=false;p.hp=Math.round(maxHealth(p)/2);p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}this.event('heal',p.x,p.z,'Back on your feet');}

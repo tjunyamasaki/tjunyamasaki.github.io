@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [master, feat/hollowstead-battle]
+    branches: [master, feat/progression-and-generation]
   workflow_dispatch:
 
 permissions:

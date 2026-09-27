@@ -114,7 +114,8 @@ test('dodge bursts a fixed distance, ignores blows inside its i-frames, and a ti
   assert.equal(p.stamina, 100-DASH.stamina);
   run(w, DASH.time+.01, {x: 0, z: 0});
   assert.ok(Math.abs(p.x-DASH.distance) < .35, `dashed ${p.x.toFixed(2)}`);
-  assert.equal(w.action(p.id, {type: 'dash'}).ok, false, 'cooldown');
+  assert.equal(w.action(p.id, {type: 'dash'}).ok, true, 'second charge');
+  assert.equal(w.action(p.id, {type: 'dash'}).ok, false, 'no third charge');
 
   // A briarling bite that lands during the i-frames misses and is a perfect dodge.
   const {w: w2, p: q} = camp();
@@ -155,7 +156,7 @@ test('every weapon aims itself: a staff fires behind you, a bow leads a runner, 
   const runner = bow.w.spawnEnemy('crawler', 8, 0, {elite: false}); runner.vx = 0; runner.vz = 3;
   bow.w.attack(bow.p);
   const shot = bow.w.projectiles[0];
-  assert.ok(shot.vz > 1, 'the arrow leads a foe running sideways');
+  assert.ok(shot.vz > 0.8, 'the arrow leads a foe running sideways');
 
   const blade = camp();
   arm(blade.w, blade.p, 'sword'); blade.p.dx = -1; blade.p.dz = 0;

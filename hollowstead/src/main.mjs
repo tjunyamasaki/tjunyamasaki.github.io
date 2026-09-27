@@ -598,7 +598,7 @@ function paintCluster(modeName,p){
   const lantern=$('lantern-button');
   lantern.classList.toggle('is-off',!light);lantern.tabIndex=light?0:-1;lantern.setAttribute('aria-hidden',light?'false':'true');
   if(light){lantern.classList.toggle('is-lit',light.lit);lantern.setAttribute('aria-label',`Lantern, ${light.lit?'lit':'unlit'}, fuel ${Math.ceil(light.fuel*100)} percent`);const circle=lantern.querySelector('circle');if(circle){const span=(94.2*light.fuel).toFixed(2);circle.setAttribute('stroke-dasharray',`${span} 94.2`);}}
-  const weary=!p||p.dashCooldown>0||(!world.arena&&p.stamina<DASH.stamina)||p.down||p.ghost;$('dodge').classList.toggle('is-disabled',!combat||weary);
+  const weary=!p||(p.dashCharges??0)<1||(!world.arena&&p.stamina<DASH.stamina)||p.down||p.ghost;$('dodge').classList.toggle('is-disabled',!combat||weary);
   $('hotbar-inventory').classList.toggle('active',sheet==='inventory'||sheet==='chest');
   $('hotbar-build').classList.toggle('active',sheet==='catalog'&&catalog.source==='field');
 }
@@ -622,7 +622,7 @@ function paintAttack(p){
   $('attack').innerHTML=weapon?`${icon(weapon.itemId)}<small>Attack</small>`:'⚔<small>Attack</small>';
   $('attack').classList.toggle('armed',!!weapon);
 }
-function paintDodge(p){const el=$('dodge');if(el&&p)el.style.setProperty('--cd',String(clamp((p.dashCooldown||0)/DASH.cooldown,0,1)));}
+function paintDodge(p){const el=$('dodge');if(el&&p){const wait=(p.dashCharges??0)>0?0:(p.dashRecharge?.[0]||p.dashCooldown||0);el.style.setProperty('--cd',String(clamp(wait/DASH.recharge,0,1)));}}
 function paintArenaClock(){
   const a=world.arena,left=waveLeft(world);
   $('region-name').textContent=a.phase==='fight'?`${left} LEFT`:a.phase==='pick'?'CHOOSE A WEAPON':a.phase==='countdown'?`GET READY · ${Math.max(1,Math.ceil(a.timer))}`:'WAVE CLEARED';
@@ -722,7 +722,7 @@ function setupControls(){
     const button=event.target.closest('button');if(!button||button.classList.contains('is-off'))return;
     event.preventDefault();try{button.setPointerCapture?.(event.pointerId);}catch{}sound?.unlock();
     if(button.id==='attack'){if(!allowsCombat(currentMode()))return;hold.attack=true;captured={pointerId:event.pointerId,kind:'attack'};void send({type:'attack'});return;}
-    if(button.id==='dodge'){const actor=me();if(!actor||actor.dashCooldown>0||(!world.arena&&actor.stamina<DASH.stamina)||actor.down||actor.ghost)return;void send({type:'dash'},{quiet:true});return;}
+    if(button.id==='dodge'){const actor=me();if(!actor||(actor.dashCharges??0)<1||(!world.arena&&actor.stamina<DASH.stamina)||actor.down||actor.ghost)return;void send({type:'dash'},{quiet:true});return;}
     if(button.id==='lantern-button'){if(usableLantern(me()))void send({type:'lanternToggle'});return;}
     const action=liveActions.find(entry=>entry.id===button.dataset.action);
     captured={pointerId:event.pointerId,kind:'context',mode:button.dataset.mode,id:action?.id};

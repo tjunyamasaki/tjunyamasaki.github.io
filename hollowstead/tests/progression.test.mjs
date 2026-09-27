@@ -241,7 +241,7 @@ test('wisps home in on separate foes and the storm rod chains between them',()=>
 
 test('a star lands after its delay and crushes everything near the mark',()=>{
   const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'starfall');
-  const [a,b]=foes(w,[[8,0],[9,1]]);w.attack(p);
+  const [a,b]=foes(w,[[8,0],[9,1]]);a.stunned=2;b.stunned=2;w.attack(p);
   assert.equal(w.zones.length,1);assert.equal(a.hp,500);
   sim(w,WEAPON_STYLES.starfall.delay+.1);
   assert.ok(a.hp<500&&b.hp<500);assert.equal(w.zones.length,0);

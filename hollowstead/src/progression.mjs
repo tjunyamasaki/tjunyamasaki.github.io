@@ -164,10 +164,11 @@ export function powerOf(p){
 // ------------------------------------------------------------------ gear
 export const ARMOR_REDUCTION = Object.freeze({armor:.45, bonemail:.55, shardplate:.65});
 /**
- * Dodge: a 3.4-unit burst over .18s, invulnerable for .32s from the press. A blow that lands inside
- * the i-frames is a perfect dodge: the dodge comes back almost at once and some stamina returns.
+ * Dodge: a 3.91-unit burst over .18s, invulnerable for .32s from the press. Two charges; each spent
+ * charge returns 10s after it was used. A blow that lands inside the i-frames is a perfect dodge:
+ * that charge comes back almost at once and some stamina returns.
  */
-export const DASH = Object.freeze({distance:3.4, time:.18, iframes:.32, cooldown:.8, stamina:22, perfectCooldown:.15, perfectStamina:12});
+export const DASH = Object.freeze({distance:3.4*1.15, time:.18, iframes:.32, charges:2, recharge:10, stamina:22, perfectCooldown:.15, perfectStamina:12});
 export const LIGHT_ITEMS = Object.freeze(['torch','everlantern']);
 export const EVERLANTERN_RADIUS_SCALE=1.45;
 
@@ -177,13 +178,13 @@ export const WEAPON_STYLES = Object.freeze({
   // crafted
   spear:{style:'melee', range:3.3, arc:0, cooldown:.55, stamina:7},
   sword:{style:'melee', range:3.3, arc:0, cooldown:.55, stamina:7},
-  recurve:{style:'arrow', range:13, speed:18, cooldown:.6, stamina:6, pierce:0},
-  bonebow:{style:'arrow', range:15, speed:21, cooldown:.75, stamina:7, pierce:2},
+  recurve:{style:'arrow', range:13, speed:18*1.15, cooldown:.6, stamina:6, pierce:0},
+  bonebow:{style:'arrow', range:15, speed:21*1.15, cooldown:.75, stamina:7, pierce:2},
   broadsword:{style:'melee', range:3.2, arc:110, cooldown:.7, stamina:10},
-  crookstaff:{style:'bolt', range:11, speed:12, cooldown:.95, stamina:9, splash:1.7},
+  crookstaff:{style:'bolt', range:11, speed:12*1.15, cooldown:.95, stamina:9, splash:1.7},
   // loot only
   flamberge:{style:'melee', range:3.6, arc:150, cooldown:.8, stamina:12},
-  skullstaff:{style:'bolt', range:12, speed:12, cooldown:1.05, stamina:11, splash:2.3, slow:2},
+  skullstaff:{style:'bolt', range:12, speed:12*1.15, cooldown:1.05, stamina:11, splash:2.3, slow:2},
   tome:{style:'nova', range:4.6, cooldown:1.5, stamina:18},
   fangs:{style:'combo', range:2.6, cooldown:.3, stamina:4, window:1.2, every:4, rend:2.5, bleed:.5, bleedSeconds:3, lunge:.8,
     blurb:'Twin daggers. Every fourth cut rends: a lunge, heavy damage and a bleed'},
@@ -191,7 +192,7 @@ export const WEAPON_STYLES = Object.freeze({
     blurb:'Lashes everything in a long line and drags it toward you'},
   scythe:{style:'reap', range:3.9, arc:240, cooldown:.9, stamina:13, leech:.03, leechCap:3,
     blurb:'A huge reaping arc. Each foe struck heals you'},
-  wisplantern:{style:'wisps', count:3, seek:11, range:14, speed:9, turn:7, cooldown:1.05, stamina:9,
+  wisplantern:{style:'wisps', count:3, seek:11, range:14, speed:9*1.15, turn:7, cooldown:1.05, stamina:9,
     blurb:'Frees three homing wisps that seek separate foes'},
   stormrod:{style:'chain', range:9, jumps:3, jump:4.5, falloff:.75, shock:.25, cooldown:1.05, stamina:11,
     blurb:'Lightning that leaps to three more foes and jolts them'},
@@ -208,9 +209,9 @@ export const WEAPON_STYLES = Object.freeze({
 });
 /** Summoned allies. Each blow deals the summoning weapon's damage (level-scaled); hp scales with level when `scales` is set. */
 export const ALLIES = Object.freeze({
-  crow:{name:'Carrion crow', hp:18, life:14, speed:7, sight:9, leash:16, range:.9, period:.75, follow:1.4, fly:true, scales:true},
-  jack:{name:'Pumpkin sentry', hp:110, life:24, sight:8, leash:30, period:.8, shot:13, ranged:true, scales:true},
-  wight:{name:'Grave Knight', hp:300, life:40, speed:3.2, sight:10, leash:18, range:1.9, arc:140, period:1.2, follow:1.6, taunt:7, guard:.7, scales:true},
+  crow:{name:'Carrion crow', hp:18, life:14, speed:7*1.15, sight:9, leash:16, range:.9, period:.75, follow:1.4, fly:true, scales:true},
+  jack:{name:'Pumpkin sentry', hp:110, life:24, sight:8, leash:30, period:.8, shot:13*1.15, ranged:true, scales:true},
+  wight:{name:'Grave Knight', hp:300, life:40, speed:3.2*1.15, sight:10, leash:18, range:1.9, arc:140, period:1.2, follow:1.6, taunt:7, guard:.7, scales:true},
 });
 export function weaponStyle(itemId){return WEAPON_STYLES[itemId]||null;}
 

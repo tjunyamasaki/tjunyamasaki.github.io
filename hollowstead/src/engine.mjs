@@ -127,7 +127,7 @@ const rollXp=type=>LOOT_TABLES[NODES[type]?.table]?.xp||10;
 const OBSTACLE_CELL=4;
 /** Auto-aim for the Gravecraft packs, which aim along the wanderer's facing. */
 const MAGIC_AIM=Object.freeze({
-  'cinder-staff':{reach:11,speed:12,range:11},'widows-needle':{reach:9,speed:20,range:9},
+  'cinder-staff':{reach:11,speed:12*1.15,range:11},'widows-needle':{reach:9,speed:20*1.15,range:9},
   'spirit-fan':{reach:5.5,range:5.5},'barrow-rattle':{reach:10,range:10},'mourning-bell':{reach:5.2,range:5.2},
 });
 /**
@@ -223,7 +223,7 @@ export class World {
     let p=this.players.find(p=>p.id===id);if(p){p.online=true;return p;}
     if(this.players.filter(p=>p.online).length>=RULES.maxPlayers)return null;
     if(this.players.length>=RULES.maxPlayers){const old=this.players.find(p=>!p.online);if(old){this.spillPlayer(old);this.players=this.players.filter(p=>p!==old);}}
-    p={id,name:String(name).replace(/[<>\x00-\x1f]/g,'').trim().slice(0,18)||'Wanderer',character:CHARACTERS.some(c=>c.id===character)?character:'ember',x:2+this.players.length*.8,z:1.8,dx:0,dz:1,hp:100,hunger:90,courage:100,stamina:100,inventory:createBackpack(id),equipment:emptyEquipment(),equipmentRevision:0,recovery:null,cooldown:0,dash:0,dashCooldown:0,down:0,ghost:false,revive:0,charm:1,online:true,lantern:false,rest:false,action:'idle',actionUntil:0,notice:'',noticeAt:0,goal:null,level:1,xp:0,bonusHp:0,maxHp:100,regions:['meadow'],hotbar:Array(HOTBAR_SLOTS).fill(null),hotbarIndex:0};
+    p={id,name:String(name).replace(/[<>\x00-\x1f]/g,'').trim().slice(0,18)||'Wanderer',character:CHARACTERS.some(c=>c.id===character)?character:'ember',x:2+this.players.length*.8,z:1.8,dx:0,dz:1,hp:100,hunger:90,courage:100,stamina:100,inventory:createBackpack(id),equipment:emptyEquipment(),equipmentRevision:0,recovery:null,cooldown:0,dash:0,dashCharges:DASH.charges,dashRecharge:[],dashCooldown:0,down:0,ghost:false,revive:0,charm:1,online:true,lantern:false,rest:false,action:'idle',actionUntil:0,notice:'',noticeAt:0,goal:null,level:1,xp:0,bonusHp:0,maxHp:100,regions:['meadow'],hotbar:Array(HOTBAR_SLOTS).fill(null),hotbarIndex:0};
     this.players.push(p);
     this.give(p,'wood',3);this.give(p,'stone',2);this.give(p,'fiber',3);this.give(p,'berry',3);
     if(this.showcase||this.arena){
@@ -1371,7 +1371,8 @@ export class World {
   }
   /** A timed dodge: fixed-distance burst in the stick direction (or away from the closest threat), with i-frames. */
   dodge(p){
-    if(p.down||p.ghost||p.dashCooldown>0)return {ok:false,code:'cooldown'};
+    this.readyDash(p);
+    if(p.down||p.ghost||p.dashCharges<1)return {ok:false,code:'cooldown'};
     const cost=this.arena?0:DASH.stamina;
     if(p.stamina<cost){this.tell(p,'Catch your breath');return {ok:false,code:'rejected'};}
     const raw=this.freshInput(p);let dx=raw.x||0,dz=raw.z||0;
@@ -1381,9 +1382,26 @@ export class World {
       else{dx=p.dx||0;dz=p.dz||1;}
     }
     const l=Math.hypot(dx,dz)||1;
-    p.ddx=dx/l;p.ddz=dz/l;p.stamina-=cost;p.dash=DASH.time;p.iframes=DASH.iframes;p.dashCooldown=DASH.cooldown;p.rest=false;p.goal=null;
+    p.ddx=dx/l;p.ddz=dz/l;p.stamina-=cost;p.dash=DASH.time;p.iframes=DASH.iframes;p.dashCharges--;p.dashRecharge.push(DASH.recharge);this.syncDash(p);p.rest=false;p.goal=null;
     this.event('dash',p.x,p.z,'',{dx:p.ddx,dz:p.ddz,player:p.id});
     return {ok:true,code:'ok'};
+  }
+  readyDash(p){
+    if(!Array.isArray(p.dashRecharge))p.dashRecharge=[];
+    if(!Number.isFinite(p.dashCharges))p.dashCharges=p.dashCooldown>0?0:DASH.charges;
+    this.syncDash(p);
+  }
+  tickDash(p,dt){
+    this.readyDash(p);
+    p.dashRecharge=p.dashRecharge.map(left=>left-dt);
+    const recovered=p.dashRecharge.filter(left=>left<=0).length;
+    p.dashRecharge=p.dashRecharge.filter(left=>left>0);
+    p.dashCharges=Math.min(DASH.charges,p.dashCharges+recovered);
+    this.syncDash(p);
+  }
+  syncDash(p){
+    p.dashCharges=Math.min(DASH.charges,Math.max(0,p.dashCharges));
+    p.dashCooldown=p.dashCharges>0?0:Math.min(...(p.dashRecharge.length?p.dashRecharge:[DASH.recharge]));
   }
   /** Shove a wanderer (heavy blows knock you back); walls and trunks still stop you. */
   shove(p,dx,dz,amount){
@@ -1394,7 +1412,7 @@ export class World {
   hurt(p,amount,source=null){if(this.showcase||p.down||p.ghost)return;
     if(p.iframes>0||p.dash>0){
       // Inside the telegraph, but mid-dodge: the blow passes through. Timed well, it pays back.
-      if(!(this.time-(p.lastDodge??-9)<.35)){p.lastDodge=this.time;p.dashCooldown=Math.min(p.dashCooldown,DASH.perfectCooldown);if(!this.arena)p.stamina=Math.min(100,p.stamina+DASH.perfectStamina);this.event('dodge',p.x,p.z,'Dodged!',{player:p.id});}
+      if(!(this.time-(p.lastDodge??-9)<.35)){p.lastDodge=this.time;this.readyDash(p);if(p.dashRecharge.length)p.dashRecharge[p.dashRecharge.length-1]=Math.min(p.dashRecharge[p.dashRecharge.length-1],DASH.perfectCooldown);this.syncDash(p);if(!this.arena)p.stamina=Math.min(100,p.stamina+DASH.perfectStamina);this.event('dodge',p.x,p.z,'Dodged!',{player:p.id});}
       return;
     }this.damagedAt.set(p.id,this.time);const armor=p.equipment.body;if(armor&&ARMOR_REDUCTION[armor.itemId]&&armor.durability>0){this.wearEquipped(p,'body',amount);amount*=1-ARMOR_REDUCTION[armor.itemId];}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
   revivePlayer(p){p.down=0;p.ghost=false;p.hp=Math.round(maxHealth(p)/2);p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}this.event('heal',p.x,p.z,'Back on your feet');}
@@ -1495,11 +1513,11 @@ export class World {
     }
     const obstacles=this.obstacles();
     for(const p of this.players){
-      if(!p.online)continue;p.cooldown=Math.max(0,p.cooldown-dt);p.dashCooldown=Math.max(0,p.dashCooldown-dt);p.iframes=Math.max(0,(p.iframes||0)-dt);
+      if(!p.online)continue;p.cooldown=Math.max(0,p.cooldown-dt);this.tickDash(p,dt);p.iframes=Math.max(0,(p.iframes||0)-dt);
       if(p.ghost){p.dash=0;continue;}
       if(p.down){p.dash=0;p.down-=dt;if(p.down<=0){p.down=0;p.ghost=true;p.revive=0;this.reviveWork.delete(p.id);this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}continue;}
       if(!this.showcase&&!this.arena){
-        p.hunger=Math.max(0,p.hunger-dt*(p.rest?.45:.075));
+        p.hunger=Math.max(0,p.hunger-dt*(p.rest?RULES.hungerRest:RULES.hunger));
         const light=phase!=='night'||this.lit(p);p.courage=clamp(p.courage+dt*(light?.6:-3),0,100);
         if(p.hunger<=0)this.hurtQuiet(p,dt*1.2);if(!light&&p.courage<20)this.hurtQuiet(p,dt*(p.courage<=0?6:2));
       }
@@ -1594,7 +1612,7 @@ export class World {
     for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','bossNight','guardsDay','best','roamTimer','hostile','arena','radius'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     if(world.arena){world.nodes=[];}if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0))world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
-    for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.syncHotbar(p);}
+    for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);}
     world.version=SAVE_VERSION_V2;world.clock=CLOCK_V2;
     for(const change of data.nodeChanges||[]){const node=world.nodes.find(entry=>entry.id===change.id);if(node){node.hits=change.hits;node.ready=change.ready;}}
     if(typeof data.worldId==='string')world.networkId=data.worldId;

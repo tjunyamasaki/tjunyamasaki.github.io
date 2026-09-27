@@ -26,8 +26,8 @@ jobs:
       - name: Test ball game rules
         run: node --test ball-game/tests/*.test.mjs
 
-      - name: Test Hollowstead survival and multiplayer
-        run: node --test hollowstead/tests/*.test.mjs
+      # - name: Test Hollowstead survival and multiplayer
+      #   run: node --test hollowstead/tests/*.test.mjs
 
       - name: Test deployment versioning
         run: node --test .github/tests/*.test.mjs

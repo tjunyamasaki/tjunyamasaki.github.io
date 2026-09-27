@@ -4,7 +4,8 @@ import {spawnSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {World} from '../src/engine.mjs';
-import {EQUIPMENT, ITEMS, NODES, PICKUP, RULES, phaseAt} from '../src/content.mjs';
+import {ENEMIES, EQUIPMENT, ITEMS, NODES, PICKUP, RULES, phaseAt} from '../src/content.mjs';
+import {WEAPON_STYLES} from '../src/progression.mjs';
 import {
   CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, STACK_LIMIT, V1_PHASE, V2_PHASE,
   nextNightWaveTime, phaseProgress, remapPhaseTime,
@@ -278,10 +279,11 @@ test('T06 only the equipped tool, weapon, and armor change the outcome',()=>{
     act(world.w,world.p,{type:'attack'});
     return {hp:world.w.enemies[0].hp, durability:where==='worn'?world.p.equipment.weapon.durability:world.p.inventory.slots.find(stack=>stack?.itemId==='sword')?.durability};
   };
-  assert.equal(strike(null).hp,39);
-  assert.equal(strike('pack').hp,39);
+  const bare=ENEMIES.crawler.hp-WEAPON_STYLES.fist.damage;
+  assert.equal(strike(null).hp,bare);
+  assert.equal(strike('pack').hp,bare);
   assert.equal(strike('pack').durability,160);
-  assert.equal(strike('worn').hp,48-EQUIPMENT.sword.damage);
+  assert.equal(strike('worn').hp,ENEMIES.crawler.hp-EQUIPMENT.sword.damage);
   assert.equal(strike('worn').durability,159);
 
   const blow=(where)=>{

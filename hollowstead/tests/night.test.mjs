@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {World} from '../src/engine.mjs';
-import {waveSize} from '../src/progression.mjs';
+import {NIGHT_CAP, waveSize} from '../src/progression.mjs';
 import {RULES, phaseAt, dayAt, phaseRemaining} from '../src/content.mjs';
 import {
   CLOCK_V2, NIGHT_WAVE_FRACTIONS, V1_PHASE, V2_PHASE, nightWaveOffsets, phaseProgress, remapPhaseTime,
@@ -79,7 +79,7 @@ test('T29 a night has three wave opportunities, the boss every fifth night, and 
   capped.w.time=RULES.day+RULES.dusk-0.02;
   capped.w.tick(0.05);
   assert.equal(capped.w.wave,1);
-  while(capped.w.enemies.length<22)capped.w.spawnEnemy('crawler',20,20);
+  while(capped.w.enemies.length<NIGHT_CAP)capped.w.spawnEnemy('crawler',20,20);
   const held=capped.w.wave;
   capped.w.time=nightStart+0.4*RULES.night-0.02;
   capped.w.nextSpawn=nightStart+0.4*RULES.night;

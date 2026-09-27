@@ -7,11 +7,11 @@
 // dx/dz are a world-unit push away from the caster (about 1.6). Players are never queued.
 // step() only ages sweeps whose id starts with "spirit-fan:" and drops them at the end.
 
-import {ownerPower} from './registry.mjs?v=harvest-16';
+import {ownerPower} from './registry.mjs?v=harvest-17';
 
 const ID = 'spirit-fan';
 // Balance (Long Night): a wide gust that hits hard, shoves, and breaks enemy wind-ups.
-const DAMAGE = 22;
+const DAMAGE = 28;
 const DURABILITY = 170;
 const COOLDOWN = 0.8;
 const RANGE = 5.5;

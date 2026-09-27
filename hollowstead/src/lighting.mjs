@@ -3,9 +3,9 @@
 // feathering; it cannot change who is safe.
 // This module must not import Three.js or a renderer.
 
-import {EQUIPMENT, RULES, STRUCTURES} from './content.mjs?v=harvest-16';
-import {RANGES} from './contracts.mjs?v=harvest-16';
-import {equippedLanternLit} from './inventory.mjs?v=harvest-16';
+import {EQUIPMENT, RULES, STRUCTURES} from './content.mjs?v=harvest-17';
+import {RANGES} from './contracts.mjs?v=harvest-17';
+import {equippedLanternLit} from './inventory.mjs?v=harvest-17';
 
 export const HEARTH_LEVEL_STEP = 1.5;
 export const PLAYER_LIGHT_RADIUS = RANGES.lanternLight;
@@ -192,7 +192,8 @@ export function brightnessAt(sources, x, z, darkness, lighting=resolveLighting(n
 
 export function frameLighting(world, theme){
   const lighting=resolveLighting(theme);
-  const darkness=phaseDarkness(world?.time||0, clockSchedule(), lighting);
+  // The battle arena keeps no clock: it is always lit enough to read every telegraph.
+  const darkness=world?.arena?0:phaseDarkness(world?.time||0, clockSchedule(), lighting);
   const sources=collectLightSources(world);
   return {lighting, darkness, sources};
 }

@@ -9,6 +9,7 @@ Play at **[tjunyamasaki.github.io/hollowstead/](https://tjunyamasaki.github.io/h
 - **Venture alone** starts immediately, without a connection service.
 - **Gather your friends** opens a waiting camp. Share its invite link or five-character code, then select **Enter the woods**. Friends can join an expedition already underway.
 - **Continue expedition** resumes the last save on this browser. Select **Host my saved expedition** before opening a camp to resume it with friends.
+- **Battle arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
 
 The host keeps the shared save and must keep the game tab open. Switching away pauses the expedition for everyone. Returning to the title closes that camp. Reopen the saved expedition and share its new code to continue. A guest rejoining from the same browser tab keeps their equipment and supplies. A different tab joins as a new wanderer.
 
@@ -18,7 +19,7 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 2. Place a workbench from **Build**. It does not need another station. Open the workbench to craft an axe and a pick, then tap **Equip**. Moon iron and haunted graves need a worn pick. Spare tools in your pack do nothing until worn. Cauldrons, soul lanterns, and wards are built from the workbench, not the field list.
 3. Cook at a burning fire. Grow pumpkins in farm plots, make bandages at a workbench, and build a cauldron for stew. Eat from your pack: open it and tap Eat on the stack you want.
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
-5. Hold **Attack** to use the weapon you have equipped. Dodge the glowing enemy attack circles. Repair walls, rearm traps, and use wards to help defend the camp.
+5. Fight with the weapon in your hand. Every weapon aims itself at the best foe in reach, so you can run one way and fight the other. **Auto-attack** (on by default, in the menu) swings whenever a foe is in reach; hold **Attack** to swing yourself. Keep up to three weapons on the **hotbar** and tap one to swap mid-fight. Every creature telegraphs its blow on the ground; **Dodge** out of it, or dodge at the last moment to pass through untouched. Repair walls, rearm traps, and use wards to help defend the camp.
 6. Hold **Revive** beside a fallen friend for about three seconds. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable. Open **Build**, then **Maintain camp**, to repair a damaged structure or hold **Dismantle**. The Heartfire cannot be dismantled, and a chest someone else has open cannot either.
 7. Awaken the Heartfire with soul embers. Every fifth night brings the Hollow King, stronger each time.
 
@@ -29,12 +30,23 @@ Losing the Heartfire ends the expedition. If everyone falls and has spent their 
 The hollow is ringed by six regions. The Meadow around camp is safe; the Autumn woods and the Graveyard beyond it are riskier; the Hollow mire, Moonshard crags and Barrow fields at the edges are the most dangerous and the richest. Discovering a region grants XP. The map remembers where you have been.
 
 - **Caches.** Weathered crates, iron-bound chests, moonlit coffers and hollow reliquaries are hidden around the map, the better ones farther out. Hold **Open** beside one. Loot spills onto the ground with a rarity colour: common, uncommon, rare, epic, legendary. Caches refill after a few days. The best ones are guarded.
-- **Mobs.** Region residents roam by day and stay near home. Every creature has a drop table; Elder (elite) creatures are larger, tougher and drop better loot.
+- **Mobs.** Region residents roam by day in packs and stay near home. Every creature has a drop table; Elder (elite) creatures are larger, tougher and drop better loot. Each kind fights differently: briarlings swarm and surround you, bonewalkers back off and charge in a line, lantern wraiths keep their distance and throw orbs, boglings lob spores where you are heading, and gravekeepers, golems and the Hollow King wind up long, heavy blows. Creatures find their way round trees and walls.
 - **Levels.** Kills (shared with nearby friends), caches, gathering and discoveries grant XP. Each level adds health and damage and heals you fully. Heartstones raise max health for good.
 - **Weapons.** Twenty-four weapons in all. Craft spears, swords, bows, a broadsword and a crook at the workbench. Everything stronger is loot: twin daggers that rend, a soulchain that drags foes in, a reaper's scythe that heals, homing wisps, chain lightning, a falling star, carrion crows, a pumpkin sentry, a taunting Grave Knight, a freezing censer, and the five Gravecraft weapons. Armour goes from bark to bonemail to moonshard plate. The everburning lantern never runs out. See `docs/WEAPONS.md` for every weapon and how they are balanced.
-- **The curve.** Night 1 is a handful of briarlings. Each day adds more creatures, more health and damage, new kinds and more elites. The Heartfire mends by day and spits embers at whatever claws at it, but it will not hold alone for long.
+- **The curve.** Night 1 is a handful of briarlings. Each day adds many more creatures, a little more health and damage, new kinds and more elites: the nights get more crowded faster than any one creature gets tougher. The Heartfire mends by day and spits embers at whatever claws at it, but it will not hold alone for long.
 
 See `docs/GAMEPLAY_PLAN.md` for the full design.
+
+## Battle arena
+
+**Battle arena** on the title screen (or `?arena` in the address) starts a solo run in a small walled clearing with nothing in it but creatures. It is not saved.
+
+1. Pick one of three weapons: something close, something far, something that bursts.
+2. Survive the wave. Creatures pour in from the wall in packs; each wave brings more of them, a little stronger. Every fifth wave brings champions; every tenth, the Hollow King.
+3. When the last one falls you heal a third of your health, and pick again from three weapons. A weapon you already carry ranks up instead (★, up to five: more damage each rank). With three weapons on the hotbar, a new one replaces one you choose, or you keep yours.
+4. Kills give experience to everyone standing. Each level adds health and damage and heals you fully.
+
+The arena keeps only health and level: no hunger, courage, stamina, weapon wear or loot. When you fall, the run ends; **Fight again** starts a new one.
 
 ## Shared chests
 
@@ -47,8 +59,9 @@ Only one wanderer can open a chest at a time. The same panel shows your pack, wo
 | Move | Left stick, or tap the ground | WASD / arrows |
 | Context action | The large circle. Its name follows what you are standing at: Gather, Chop, Feed, Cook, Open, Place, and so on. | E, hold when the action says to hold |
 | More actions | The smaller circles beside it. A campfire can show Feed, Cook, Awaken, and Repair at once. | 1–4 |
-| Attack | Hold Attack. Uses the weapon you have equipped. | Hold Space |
-| Dodge | Dodge | Shift |
+| Attack | Automatic when a foe is in reach (menu: Auto-attack). Or hold Attack. Aims itself. | Hold Space |
+| Swap weapon | Tap a weapon on the hotbar | R or Tab cycles |
+| Dodge | Dodge: a quick dash, invulnerable for a moment. With the stick still, you leap away from the nearest foe. | Shift |
 | Inventory / Build | Bottom bar | I / B |
 | Eat, equip, drop | Open Inventory, select the stack, then Eat, Equip, or Drop | Arrows, Enter, Escape |
 | Lantern | A light circle appears when you carry a usable lantern | F |

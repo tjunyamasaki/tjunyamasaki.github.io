@@ -1,18 +1,20 @@
-import {ACTION_RESULT_CACHE_LIMIT, INTENTS} from './contracts.mjs?v=harvest-16';
-import {containerId, planSortSlots} from './inventory.mjs?v=harvest-16';
-import {chestIntent, moveItems} from './chests.mjs?v=harvest-16';
+import {ACTION_RESULT_CACHE_LIMIT, HOTBAR_SLOTS, INTENTS} from './contracts.mjs?v=harvest-17';
+import {containerId, planSortSlots} from './inventory.mjs?v=harvest-17';
+import {chestIntent, moveItems} from './chests.mjs?v=harvest-17';
 
 export const TRANSACTION_PROTOCOL=1;
 const outcome=code=>({ok:code==='ok',code});
 // Gameplay ping and automatic eat are not world actions. Legacy inventory
 // packets stay excluded: their replacements require revisions.
-const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','dash','lantern','repair','dismantle','upgrade']);
+const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','dash','lantern','repair','dismantle','upgrade','hotbar','arenaPick']);
 function validWorldAction(cmd){
   if(typeof cmd.type!=='string')return false;
   if(['move','build'].includes(cmd.type)&&(!Number.isFinite(cmd.x)||!Number.isFinite(cmd.z)))return false;
   if(['craft','build'].includes(cmd.type)&&typeof cmd.recipe!=='string')return false;
   if(['repair','dismantle'].includes(cmd.type)&&typeof cmd.target!=='string')return false;
   if(['interact','move'].includes(cmd.type)&&cmd.target!=null&&typeof cmd.target!=='string')return false;
+  if(cmd.type==='hotbar'&&!(Number.isInteger(cmd.slot)&&cmd.slot>=0&&cmd.slot<HOTBAR_SLOTS))return false;
+  if(cmd.type==='arenaPick'&&(!Number.isInteger(cmd.choice)||(cmd.replace!=null&&!(Number.isInteger(cmd.replace)&&cmd.replace>=0&&cmd.replace<HOTBAR_SLOTS))))return false;
   return true;
 }
 

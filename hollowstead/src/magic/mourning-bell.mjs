@@ -1,4 +1,4 @@
-import {isMagicAlly, ownerPower} from './registry.mjs?v=harvest-16';
+import {isMagicAlly, ownerPower} from './registry.mjs?v=harvest-17';
 
 // Balance (Long Night): the widest ring in the game, delayed, one heavy toll per foe.
 export const BELL = Object.freeze({delay: .28, travel: .65, linger: .32, radius: 5.5, damage: 30, push: 1.2, cooldown: 1.5, stamina: 10});

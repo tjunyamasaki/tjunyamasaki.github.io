@@ -2,10 +2,10 @@
 // Emits intent descriptions for the local player. Never reads a guest-supplied
 // actor id and never mutates the world. The host rechecks every command.
 
-import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-16';
-import {magicItems} from '../magic/registry.mjs?v=harvest-16';
-import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-16';
-import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-16';
+import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-17';
+import {magicItems} from '../magic/registry.mjs?v=harvest-17';
+import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-17';
+import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-17';
 
 const SPECS = Object.freeze({
   feed: {icon: '▥', label: 'Feed', activation: 'tap'},
@@ -97,12 +97,13 @@ export function escapeStep({dragging = false, detailsOpen = false, panel = null,
   return 'open-menu';
 }
 
-/** Keys that still exist. C, Q, and G are intentionally absent. */
+/** Keys that still exist. C, Q, and G are intentionally absent. R and Tab cycle the weapon hotbar. */
 export function keyboardAction(key) {
   const map = {
     i: 'inventory', b: 'build', m: 'map', f: 'lantern', e: 'primary',
     ' ': 'attack', shift: 'dodge', enter: 'confirm', escape: 'escape',
     '1': 'action-1', '2': 'action-2', '3': 'action-3', '4': 'action-4',
+    r: 'weapon-next', tab: 'weapon-next',
   };
   return map[key] || null;
 }

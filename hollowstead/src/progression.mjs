@@ -62,7 +62,7 @@ export const CACHE_LAYOUT = Object.freeze([
 export const CACHE_TYPES = Object.freeze(CACHE_LAYOUT.map(entry=>entry.type));
 export const isCache = type=>CACHE_TYPES.includes(type);
 /** How many guardians wait beside each cache tier. */
-export const CACHE_GUARDS = Object.freeze({crate:0, ironchest:1, moonchest:2, reliquary:3});
+export const CACHE_GUARDS = Object.freeze({crate:0, ironchest:2, moonchest:3, reliquary:4});
 
 // ------------------------------------------------------------------ rarity
 export const RARITIES = Object.freeze(['common','uncommon','rare','epic','legendary']);
@@ -108,12 +108,13 @@ export const LOOT_TABLES = Object.freeze({
     {chance:.5, entries:[['legendary',1,1]]},
   ]},
   // Hostiles: bonus drops on top of ENEMIES[type].loot. Elites add +1 luck.
-  crawler:{xp:6, rolls:[{chance:.05, entries:[['uncommon',1,1]]}]},
-  wraith:{xp:10, rolls:[{chance:.08, entries:[['uncommon',1,4],['rare',1,1]]}]},
-  brute:{xp:30, rolls:[{chance:.22, entries:[['uncommon',1,3],['rare',1,2],['epic',1,.3]]}]},
-  bonewalker:{xp:16, rolls:[{chance:.12, entries:[['uncommon',1,3],['rare',1,1]]}]},
-  bogling:{xp:12, rolls:[{chance:.1, entries:[['uncommon',1,3],['elixir',[1,1],2]]}]},
-  golem:{xp:45, rolls:[{chance:.3, entries:[['rare',1,3],['epic',1,1]]}]},
+  // Swarm creatures drop little each: there are many more of them.
+  crawler:{xp:4, rolls:[{chance:.3, entries:[['fiber',[1,2],3],['meat',[1,1],2]]},{chance:.025, entries:[['uncommon',1,1]]}]},
+  wraith:{xp:8, rolls:[{chance:.06, entries:[['uncommon',1,4],['rare',1,1]]}]},
+  brute:{xp:34, rolls:[{chance:.26, entries:[['uncommon',1,3],['rare',1,2],['epic',1,.3]]}]},
+  bonewalker:{xp:11, rolls:[{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]}]},
+  bogling:{xp:10, rolls:[{chance:.08, entries:[['uncommon',1,3],['elixir',[1,1],2]]}]},
+  golem:{xp:52, rolls:[{chance:.34, entries:[['rare',1,3],['epic',1,1]]}]},
   king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]}]},
 });
 
@@ -150,11 +151,23 @@ export const xpToNext = level=>Math.round(40*Math.pow(Math.max(1,level),1.45));
 export const GATHER_XP=2, DISCOVER_XP=35, SHARE_RADIUS=26;
 export const enemyXp = type=>LOOT_TABLES[type]?.xp??8;
 export const HP_PER_LEVEL=8, POWER_PER_LEVEL=.04, HEARTSTONE_HP=15;
-export function maxHealth(p){return 100+HP_PER_LEVEL*((p?.level||1)-1)+(p?.bonusHp||0);}
-export function powerOf(p){return 1+POWER_PER_LEVEL*((p?.level||1)-1);}
+/** In the battle arena levels are the whole of your growth, so each one is worth more. */
+export const ARENA_GROWTH=Object.freeze({hp:12, power:.06, rank:.22, maxRank:5});
+export function maxHealth(p){return 100+(p?.growth==='arena'?ARENA_GROWTH.hp:HP_PER_LEVEL)*((p?.level||1)-1)+(p?.bonusHp||0);}
+/** Damage multiplier: level, and in the arena the rank of the weapon in hand. */
+export function powerOf(p){
+  const level=1+(p?.growth==='arena'?ARENA_GROWTH.power:POWER_PER_LEVEL)*((p?.level||1)-1);
+  const rank=p?.ranks?.[p?.equipment?.weapon?.itemId]||1;
+  return level*(1+ARENA_GROWTH.rank*(Math.min(ARENA_GROWTH.maxRank,rank)-1));
+}
 
 // ------------------------------------------------------------------ gear
 export const ARMOR_REDUCTION = Object.freeze({armor:.45, bonemail:.55, shardplate:.65});
+/**
+ * Dodge: a 3.4-unit burst over .18s, invulnerable for .32s from the press. A blow that lands inside
+ * the i-frames is a perfect dodge: the dodge comes back almost at once and some stamina returns.
+ */
+export const DASH = Object.freeze({distance:3.4, time:.18, iframes:.32, cooldown:.8, stamina:22, perfectCooldown:.15, perfectStamina:12});
 export const LIGHT_ITEMS = Object.freeze(['torch','everlantern']);
 export const EVERLANTERN_RADIUS_SCALE=1.45;
 
@@ -202,20 +215,24 @@ export const ALLIES = Object.freeze({
 export function weaponStyle(itemId){return WEAPON_STYLES[itemId]||null;}
 
 // ------------------------------------------------------------------ difficulty
-export function enemyScale(day){return {hp:1+.16*(Math.max(1,day)-1), damage:1+.09*(Math.max(1,day)-1)};}
-export function eliteChance(day, tier=0){return Math.min(.35, .03*(Math.max(1,day)-1)+tier*.06);}
-export const ELITE = Object.freeze({hp:2.2, damage:1.4, luck:1, xp:2.5, scale:1.3});
-export function waveSize(day, humans){return Math.min(18, 1+Math.floor(Math.max(1,day)*1.2)+Math.floor(Math.max(1,humans)/2));}
+// Quantity over toughness: each day adds more creatures faster than it adds health to each one.
+export function enemyScale(day){return {hp:1+.1*(Math.max(1,day)-1), damage:1+.07*(Math.max(1,day)-1)};}
+export function eliteChance(day, tier=0){return Math.min(.18, .02*(Math.max(1,day)-1)+tier*.05);}
+export const ELITE = Object.freeze({hp:1.8, damage:1.25, luck:1, xp:2.2, scale:1.3});
+/** Creatures per night wave. Night 1 is three briarlings; the swarm grows by about two a day. */
+export function waveSize(day, humans){return Math.min(40, 2+Math.floor(Math.max(1,day)*1.9)+(Math.max(1,humans)-1)*3);}
+/** A new night wave waits while this many invaders still roam (keeps phones smooth). */
+export const NIGHT_CAP = 48;
 export const isBossNight = day=>day>0&&day%5===0;
 
 /** Weighted night roster for a given day. */
 export function nightRoster(day){
-  const roster=[['crawler',6]];
-  if(day>=2)roster.push(['wraith',3]);
-  if(day>=3)roster.push(['brute',1+Math.min(3,Math.floor(day/4))]);
-  if(day>=4)roster.push(['bonewalker',3]);
+  const roster=[['crawler',9]];
+  if(day>=2)roster.push(['wraith',2]);
+  if(day>=3)roster.push(['bonewalker',3]);
+  if(day>=4)roster.push(['brute',.6+Math.min(1.4,day/10)]);
   if(day>=6)roster.push(['bogling',2]);
-  if(day>=8)roster.push(['golem',1+Math.floor(day/10)]);
+  if(day>=8)roster.push(['golem',.5+Math.min(1,day/12)]);
   return roster;
 }
 export function pickWeighted(rng, roster){
@@ -223,4 +240,5 @@ export function pickWeighted(rng, roster){
   for(const [id,w] of roster){r-=w;if(r<=0)return id;}
   return roster[0][0];
 }
-export const ROAM = Object.freeze({interval:9, spawnMin:15, spawnMax:21, despawn:46, leash:14, aggro:10, cap:[0,3,5], chance:[0,.3,.55]});
+/** Residents roam in packs: `pack` is how many briarlings (or bonewalkers) turn up together. */
+export const ROAM = Object.freeze({interval:9, spawnMin:15, spawnMax:21, despawn:46, leash:14, aggro:10, cap:[0,6,10], chance:[0,.3,.55], pack:{crawler:[2,4], bonewalker:[1,2]}});

@@ -27,13 +27,13 @@
  */
 
 const PACK = 'cinder-staff';
-import { ownerPower } from './registry.mjs?v=harvest-16';
+import { ownerPower } from './registry.mjs?v=harvest-17';
 
 const SPEED = 12;
 const MAX_RANGE = 11;
 const HIT_RADIUS = 0.8;
 const SPAWN_AHEAD = 0.55;
-// Balance (Long Night): 20 on impact, then 4 a second for 3 seconds.
+// Balance (battle update): 23 on impact, then 4 a second for 3 seconds.
 const BURN_DPS = 4;
 const BURN_DURATION = 3;
 const FRAME_COUNT = 4;
@@ -95,7 +95,7 @@ export const magicPack = {
     name: 'Cinder Staff',
     kind: 'weapon',
     slot: 'weapon',
-    damage: 20,
+    damage: 23,
     durability: 150,
     cooldown: 0.8,
     stamina: 6,

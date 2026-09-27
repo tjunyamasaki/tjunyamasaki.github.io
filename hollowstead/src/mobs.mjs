@@ -39,13 +39,13 @@ export const structureHit = b => b.type === 'hearth' ? HEARTH_HIT : STRUCTURE_HI
 export const ATTACKS = Object.freeze({
   bite:   {shape: 'circle', windup: .42, trigger: 1.35, reach: .95, radius: .95, lunge: .55, dmg: 1},
   swipe:  {shape: 'circle', windup: .5, trigger: 1.6, reach: 1.1, radius: 1.15, lunge: .3, dmg: .8},
-  charge: {shape: 'line', windup: .62, trigger: 5.6, min: 2.2, length: 5.6, width: 1.15, speed: 15, dmg: 1},
-  orb:    {shape: 'aim', windup: .55, trigger: 8.5, length: 2.6, width: .5, speed: 5.4, radius: .34, life: 3.4, dmg: 1},
+  charge: {shape: 'line', windup: .62, trigger: 5.6, min: 2.2, length: 5.6, width: 1.15, speed: 15*1.15, dmg: 1},
+  orb:    {shape: 'aim', windup: .55, trigger: 8.5, length: 2.6, width: .5, speed: 5.4*1.15, radius: .34, life: 3.4, dmg: 1},
   lob:    {shape: 'circle', windup: .45, trigger: 7.5, radius: 1.4, flight: 1.05, dmg: 1},
   slam:   {shape: 'cone', windup: 1.0, trigger: 2.6, radius: 3.1, arc: 110, push: 1.4, dmg: 1},
-  quake:  {shape: 'ring', windup: 1.2, trigger: 2.7, radius: 3.4, push: 1.6, shards: 8, shardSpeed: 4.4, shardDmg: .35, dmg: 1},
+  quake:  {shape: 'ring', windup: 1.2, trigger: 2.7, radius: 3.4, push: 1.6, shards: 8, shardSpeed: 4.4*1.15, shardDmg: .35, dmg: 1},
   kingSlam:   {shape: 'ring', windup: 1.3, trigger: 3.6, radius: 4.3, push: 1.8, dmg: 1},
-  kingNova:   {shape: 'ring', windup: .85, trigger: 12, radius: 1.8, shots: 18, speed: 4.6, life: 4.2, dmg: .45},
+  kingNova:   {shape: 'ring', windup: .85, trigger: 12, radius: 1.8, shots: 18, speed: 4.6*1.15, life: 4.2, dmg: .45},
   kingSummon: {shape: 'ring', windup: .9, trigger: 14, radius: 2.4, summon: 5, dmg: 0},
 });
 

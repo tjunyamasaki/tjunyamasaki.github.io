@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
 import {EQUIPMENT, RULES} from '../src/content.mjs';
 import {TRINKET_IDS} from '../src/contracts.mjs';
-import {LOOT_TABLES, WEAPON_STYLES, powerOf, rarityOf, rollLoot} from '../src/progression.mjs';
+import {DASH, LOOT_TABLES, WEAPON_STYLES, powerOf, rarityOf, rollLoot} from '../src/progression.mjs';
 import {TRINKET, TRINKET_TEXT, revealsCache, trinketEvent, trinketOf, trinketSpeed, wardCooldown} from '../src/trinkets.mjs';
 import {arenaWeapons, setupArena} from '../src/arena.mjs';
 import {effectLine} from '../src/ui/actions.mjs';
@@ -134,12 +134,43 @@ test('wispfeather: +10% walk speed and a quicker dodge recharge', () => {
   wear(w, p, 'wispfeather');
   assert.ok(Math.abs(w.speedFactor(p)/w.speedFactor(q)-TRINKET.speed) < 1e-9);
   q.x = 20;
+  for(let i = 0; i < DASH.charges; i++){
+    assert.equal(w.action(p.id, {type: 'dash'}).ok, true);
+    assert.equal(w.action(q.id, {type: 'dash'}).ok, true);
+  }
+  run(w, 2);
+  assert.equal(p.dashCharges, 0);
+  assert.equal(q.dashCharges, 0);
+  assert.ok(Math.abs(p.dashRecharge[0] - (DASH.recharge-2*(1+TRINKET.dodgeRecharge))) < 1e-6);
+  assert.equal(p.dashRecharge[1], DASH.recharge, 'the bonus only cools the active charge');
+  let readyP = null, readyQ = null, fullP = null, fullQ = null;
+  run(w, DASH.recharge*DASH.charges, () => {
+    if(readyP == null && p.dashCharges > 0) readyP = w.time;
+    if(readyQ == null && q.dashCharges > 0) readyQ = w.time;
+    if(fullP == null && p.dashCharges === DASH.charges) fullP = w.time;
+    if(fullQ == null && q.dashCharges === DASH.charges) fullQ = w.time;
+    assert.equal(p.dashCooldown, p.dashRecharge[0] || 0, 'the HUD cooldown follows the active charge');
+  });
+  const faster = DASH.recharge/(1+TRINKET.dodgeRecharge);
+  assert.ok(Math.abs(readyP-faster) < T*2, `${readyP} vs ${faster}`);
+  assert.ok(Math.abs(readyQ-DASH.recharge) < T*2);
+  assert.ok(Math.abs(fullP-faster*DASH.charges) < T*2);
+  assert.ok(Math.abs(fullQ-DASH.recharge*DASH.charges) < T*2);
+});
+
+test('frost anklet: a perfect dodge refunds its charge and chills the attacker', () => {
+  const {w, p} = camp();
+  wear(w, p, 'frostanklet');
+  const source = foe(w, 1, 0, 50);
   assert.equal(w.action(p.id, {type: 'dash'}).ok, true);
-  assert.equal(w.action(q.id, {type: 'dash'}).ok, true);
-  let readyP = null, readyQ = null;
-  run(w, 1.5, () => {if(readyP == null && !(p.dashCooldown > 0)) readyP = w.time; if(readyQ == null && !(q.dashCooldown > 0)) readyQ = w.time;});
-  assert.ok(readyP < readyQ, `${readyP} < ${readyQ}`);
-  assert.ok(readyQ-readyP > .1);
+  w.hurt(p, 10, source);
+  assert.equal(p.hp, 100);
+  assert.equal(source.slowed, TRINKET.frost.chill);
+  assert.equal(p.dashRecharge.length, 1);
+  assert.equal(p.dashCooldown, DASH.perfectCooldown);
+  w.tickDash(p, DASH.perfectCooldown);
+  assert.equal(p.dashCharges, DASH.charges);
+  assert.deepEqual(p.dashRecharge, []);
 });
 
 test('gravedust: the wearer\'s kills drop loot more often', () => {

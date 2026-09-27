@@ -28,7 +28,8 @@ test('the hollow is bigger: radius 144-150, rings keep their proportions, the ou
   assert.ok(RULES.radius >= 144 && RULES.radius <= 150, `radius ${RULES.radius}`);
   assert.ok(INNER_RING/RULES.radius > .2 && INNER_RING/RULES.radius < .3);
   assert.ok(OUTER_RING/RULES.radius > .55 && OUTER_RING/RULES.radius < .65);
-  assert.ok(OUTER_RING/RULES.speed >= 20, 'the outer ring starts at least 20 s of straight walking out');
+  // The combat update makes walking 15% faster while keeping the Frontier map size.
+  assert.ok(OUTER_RING/RULES.speed >= 18, 'the outer ring still takes at least 18 s of straight walking out');
   assert.ok(EXTENT >= RULES.radius && GRID_SIZE === Math.round(EXTENT*2/CELL));
   for(const seed of SEEDS){
     const shape = worldShape(seed);

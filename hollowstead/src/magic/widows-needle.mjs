@@ -47,7 +47,7 @@ const ROOT = 2.5;
 // Balance (Long Night): a 26 point pin, then 12 more bleeding out across the root.
 const IMPACT = 26;
 const BLEED = 12;
-const DART_SPEED = 20;
+const DART_SPEED = 20 * 1.15;
 const FRAME_FPS = 12;
 const FRAME_COUNT = 4;
 const CAST_LIFE = FRAME_COUNT / FRAME_FPS;

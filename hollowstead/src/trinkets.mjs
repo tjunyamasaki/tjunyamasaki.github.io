@@ -75,7 +75,7 @@ export function trinketEvent(world, p, type, data){
     if(p.might !== might && (might !== 1 || p.might !== undefined)) p.might = might;
     if(!id) return undefined;
     const dt = data?.dt || 0;
-    if(id === 'wispfeather' && p.dashCooldown > 0) p.dashCooldown = Math.max(0, p.dashCooldown - dt*TRINKET.dodgeRecharge);
+    if(id === 'wispfeather' && p.dashCooldown > 0) world.tickDash(p, dt*TRINKET.dodgeRecharge);
     // The engine has already drained courage this tick; give back the share emberheart spares.
     // At zero courage nothing is refunded, so the dark still bites once courage runs out.
     if(id === 'emberheart' && data?.phase === 'night' && p.courage > 0 && p.courage < 100 && !world.lit(p)) p.courage = Math.min(100, p.courage + dt*TRINKET.darkRate*(1 - TRINKET.darkDrain));

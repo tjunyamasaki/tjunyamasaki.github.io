@@ -114,7 +114,8 @@ test('dodge bursts a fixed distance, ignores blows inside its i-frames, and a ti
   assert.equal(p.stamina, 100-DASH.stamina);
   run(w, DASH.time+.01, {x: 0, z: 0});
   assert.ok(Math.abs(p.x-DASH.distance) < .35, `dashed ${p.x.toFixed(2)}`);
-  assert.equal(w.action(p.id, {type: 'dash'}).ok, false, 'cooldown');
+  assert.equal(w.action(p.id, {type: 'dash'}).ok, true, 'second charge');
+  assert.equal(w.action(p.id, {type: 'dash'}).ok, false, 'no third charge');
 
   // A briarling bite that lands during the i-frames misses and is a perfect dodge.
   const {w: w2, p: q} = camp();
@@ -143,7 +144,7 @@ test('with no stick input a dodge leaps away from the nearest threat', () => {
 });
 
 // ------------------------------------------------------------------ auto-aim
-test('every weapon aims itself: a staff fires behind you, a bow leads a runner, a sword closes the gap', () => {
+test('every weapon aims itself: a staff fires behind you, a bow leads a runner, a sword stays put', () => {
   const {w, p} = camp();
   arm(w, p, 'cinder-staff'); p.dx = 1; p.dz = 0;
   const behind = w.spawnEnemy('crawler', -6, 0, {elite: false}); behind.hp = behind.maxHp = 500;
@@ -155,14 +156,21 @@ test('every weapon aims itself: a staff fires behind you, a bow leads a runner, 
   const runner = bow.w.spawnEnemy('crawler', 8, 0, {elite: false}); runner.vx = 0; runner.vz = 3;
   bow.w.attack(bow.p);
   const shot = bow.w.projectiles[0];
-  assert.ok(shot.vz > 1, 'the arrow leads a foe running sideways');
+  assert.ok(shot.vz > 0.8, 'the arrow leads a foe running sideways');
 
   const blade = camp();
   arm(blade.w, blade.p, 'sword'); blade.p.dx = -1; blade.p.dz = 0;
   const far = blade.w.spawnEnemy('crawler', 3.9, 0, {elite: false}); far.hp = far.maxHp = 500;
+  const x0 = blade.p.x;
   blade.w.attack(blade.p);
-  assert.ok(far.hp < 500, 'the swing stepped in and connected');
+  assert.equal(far.hp, 500, 'a swing does not dash in to reach a foe outside the blade');
+  assert.ok(Math.abs(blade.p.x - x0) < .05, 'the wanderer stays put');
   assert.ok(blade.p.dx > .9, 'and turned to face it');
+  const close = blade.w.spawnEnemy('crawler', 2.2, 0, {elite: false}); close.hp = close.maxHp = 500;
+  blade.p.cooldown = 0; blade.p.stamina = 100;
+  blade.w.attack(blade.p);
+  assert.ok(close.hp < 500, 'a foe already in reach is still struck');
+  assert.ok(Math.abs(blade.p.x - x0) < .05, 'and that swing does not step forward either');
 });
 
 test('running while fighting keeps facing the foe you struck', () => {

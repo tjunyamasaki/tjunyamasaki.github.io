@@ -17,7 +17,7 @@ test('pickup distances are the measured body, dwell, flight, and drop cooldown',
   assert.equal(PICKUP.touch,0.42);
   assert.equal(PICKUP.dwell,0.65);
   assert.equal(PICKUP.flight,0.28);
-  assert.equal(PICKUP.dropCooldown,1.25);
+  assert.equal(PICKUP.dropCooldown,15);
   assert.equal(RULES.reach,2.8);
   assert.ok(PICKUP.touch>0.4&&PICKUP.touch<PICKUP.attract);
   assert.ok(PICKUP.attract<RULES.reach);

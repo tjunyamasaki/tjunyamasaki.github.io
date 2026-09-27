@@ -1,11 +1,13 @@
 import {magicItems} from './magic/registry.mjs?v=harvest-18';
 // Simulation identifiers are deliberately independent of art, names and animations.
 const DAY=180, DUSK=30, NIGHT=100;
-export const RULES = Object.freeze({version:1, tick:1/20, radius:148, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2, finalNight:5});
+export const SPEED_SCALE = 1.15;
+export const FIRST_MOB = 'crawler';
+export const RULES = Object.freeze({version:1, tick:1/20, radius:148, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2*SPEED_SCALE, hunger:.09, hungerRest:.54, finalNight:5});
 /**
  * Loose floor piles. Measured in this world: movement clearance 0.33, structure
  * occupancy 0.4, character billboard 1.65 wide (art padding included), interact
- * reach 2.8, walk speed 4.2. Attract is about 3.5 body-clearances and well inside
+ * reach 2.8, walk speed 4.83. Attract is about 3.5 body-clearances and well inside
  * reach, so standing beside a pile starts a dwell without scooping from chop range.
  * Touch matches the body. A full-speed walk crosses the attract diameter in about
  * half a second, so the dwell is long enough that passing by does not collect.
@@ -15,7 +17,7 @@ export const PICKUP = Object.freeze({
   touch: 0.42,
   dwell: 0.65,
   flight: 0.28,
-  dropCooldown: 1.25,
+  dropCooldown: 15,
 });
 export const ITEMS = {
   wood:{name:'Twisted wood',icon:'wood'},stone:{name:'Flint',icon:'stone'},fiber:{name:'Dry grass',icon:'grass'},
@@ -140,13 +142,13 @@ export const RECIPES = {
  * play). Movement and attack patterns live in mobs.mjs.
  */
 export const ENEMIES = {
-  crawler:{name:'Briarling',hp:24,speed:3,damage:6,range:1.35,period:1.3,loot:{}},
-  wraith:{name:'Lantern wraith',hp:34,speed:2.7,damage:7,range:8.5,period:2.8,loot:{ember:1}},
-  brute:{name:'Gravekeeper',hp:190,speed:1.35,damage:28,range:2.6,period:2.6,loot:{ore:2,ember:2,meat:2}},
-  king:{name:'The Hollow King',hp:950,speed:1.35,damage:30,range:3.6,period:2.2,loot:{ember:15}},
-  bonewalker:{name:'Bonewalker',hp:48,speed:2.5,damage:12,range:5.6,period:2.1,loot:{bone:1}},
-  bogling:{name:'Bogling',hp:52,speed:1.8,damage:10,range:7.5,period:3,loot:{spore:1}},
-  golem:{name:'Moonshard golem',hp:320,speed:1.05,damage:36,range:2.7,period:3,loot:{shard:2,stone:2}},
+  crawler:{name:'Briarling',hp:24,speed:5.5,damage:6,range:1.35,period:1.3,loot:{}},
+  wraith:{name:'Lantern wraith',hp:34,speed:2.7*SPEED_SCALE,damage:7,range:8.5,period:2.8,loot:{ember:1}},
+  brute:{name:'Gravekeeper',hp:190,speed:1.35*SPEED_SCALE,damage:28,range:2.6,period:2.6,loot:{ore:2,ember:2,meat:2}},
+  king:{name:'The Hollow King',hp:950,speed:1.35*SPEED_SCALE,damage:30,range:3.6,period:2.2,loot:{ember:15}},
+  bonewalker:{name:'Bonewalker',hp:48,speed:2.5*SPEED_SCALE,damage:12,range:5.6,period:2.1,loot:{bone:1}},
+  bogling:{name:'Bogling',hp:52,speed:1.8*SPEED_SCALE,damage:10,range:7.5,period:3,loot:{spore:1}},
+  golem:{name:'Moonshard golem',hp:320,speed:1.05*SPEED_SCALE,damage:36,range:2.7,period:3,loot:{shard:2,stone:2}},
 };
 export const CHARACTERS = [
   {id:'ember',name:'Ember',detail:'The lost lantern keeper',color:'#f6a35d'},

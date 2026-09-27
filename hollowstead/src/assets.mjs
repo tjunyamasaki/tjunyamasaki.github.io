@@ -1,11 +1,13 @@
 // Session cache for static Hollowstead files. Theme JSON, sprites, icons and
 // audio do not change during play; one fetch and one decode are reused.
+import {releaseAssetUrl} from './release.mjs?v=harvest-18';
+
 const files = new Map();
 const images = new Map();
 const objectUrls = new Map();
 
 function href(url) {
-  return String(url);
+  return releaseAssetUrl(url, undefined, globalThis.location?.href || import.meta.url);
 }
 
 function objectUrl(key, blob) {

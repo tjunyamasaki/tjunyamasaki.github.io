@@ -26,6 +26,7 @@ import {cachedSrc} from './assets.mjs?v=harvest-18';
 import {bindFeatureHud, frameFeatureHud, paintFeatureHud} from './ui/features.mjs?v=harvest-18';
 import {revealsCache, trinketTip} from './ui/trinkets.mjs?v=harvest-18';
 import {exploredGround} from './ui/worldmap.mjs?v=harvest-18';
+import {createUpdateChecker} from './updates.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -51,6 +52,7 @@ let catalog={source:'field',stationId:null,stationType:null,tab:'build'};
 let catalogPending='';
 let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,pendingOp=null,actionPending=false;
 let liveActions=[],holdKind=null,holdTarget=null,holdSource=null,dismantleStarted=0,ringFrame=0,captured=null;
+const checkForUpdate=createUpdateChecker({canReload:()=>mode==='front'&&!busy&&!network&&!document.hidden});
 
 function profile(){try{return JSON.parse(localStorage.getItem(PROFILE)||'{}');}catch{return {};}}
 function readStored(key){try{const raw=localStorage.getItem(key);if(!raw)return null;const data=JSON.parse(raw);return data&&typeof data==='object'?data:{invalid:true};}catch{return {invalid:true};}}
@@ -172,6 +174,7 @@ function enterGame(){
 async function goHome(){
   leaveArena();
   save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;$('room-panel').hidden=true;$('home-panel').hidden=false;$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();demoWorld();
+  void checkForUpdate();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
 function setBusy(value){busy=value;for(const id of ['host','join','solo','continue','showcase','arena']){const el=$(id);if(el)el.disabled=value;}}
@@ -893,6 +896,7 @@ function frame(now){
   const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement,demo:$('game').hidden});if(playing)frameFeatureHud(featureContext(me()),dt);requestAnimationFrame(frame);
 }
 async function init(){
+  if(await checkForUpdate())return;
   await loadMagicModules();
   theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;autoAttack=prefs.autoAttack!==false;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;
   paintClock();demoWorld();setupControls();bindFeatureHud(featureContext(null));syncSaveOption();const params=new URLSearchParams(location.search);
@@ -918,6 +922,9 @@ async function init(){
   document.addEventListener('fullscreenchange',onFullscreenChange);
   document.addEventListener('webkitfullscreenchange',onFullscreenChange);
   window.addEventListener('popstate',onShowcasePop);
+  window.addEventListener('pageshow',()=>void checkForUpdate());
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void checkForUpdate();});
+  setInterval(()=>void checkForUpdate(),60000);
   $('loading').hidden=true;$('front').hidden=false;requestAnimationFrame(frame);
   if(params.has('dev')||params.has('showcase')||params.has('arena'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,setTime(t){world.time=t;},get network(){return network;}};
   if(params.has('showcase'))startShowcase();

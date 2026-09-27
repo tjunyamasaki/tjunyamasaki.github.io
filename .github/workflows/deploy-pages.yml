@@ -29,6 +29,9 @@ jobs:
       - name: Test Hollowstead survival and multiplayer
         run: node --test hollowstead/tests/*.test.mjs
 
+      - name: Test deployment versioning
+        run: node --test .github/tests/*.test.mjs
+
       - name: Write Firebase config from secrets
         env:
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
@@ -61,6 +64,9 @@ jobs:
           cp -r css _site/css
           cp -r js _site/js
           cp -r assets _site/assets
+
+      - name: Version scripts, styles, and Hollowstead assets
+        run: node .github/scripts/stamp-pages.mjs _site "$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 
       - uses: actions/upload-pages-artifact@v3
         with:

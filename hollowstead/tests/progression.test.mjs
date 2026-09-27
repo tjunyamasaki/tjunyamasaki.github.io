@@ -15,10 +15,10 @@ function sim(w,seconds){for(let t=0;t<seconds;t+=RULES.tick)w.tick(RULES.tick);}
 function arm(w,p,itemId){p.equipment[equipmentSlotFor(itemId)]=null;w.grantEquipped(p,itemId,EQUIPMENT[itemId].durability);}
 
 test('the hollow is larger, ringed by six regions whose danger rises outward',()=>{
-  assert.equal(RULES.radius,96);
+  assert.equal(RULES.radius,148);
   assert.equal(regionAt(0,0),'meadow');
   const seen=new Set();
-  for(let x=-90;x<=90;x+=3)for(let z=-90;z<=90;z+=3)if(Math.hypot(x,z)<92)seen.add(regionAt(x,z));
+  for(let x=-138;x<=138;x+=3)for(let z=-138;z<=138;z+=3)if(Math.hypot(x,z)<140)seen.add(regionAt(x,z));
   assert.deepEqual([...seen].sort(),Object.keys(REGIONS).sort());
   assert.equal(tierAt(0,0),0);
   assert.equal(tierAt(85,0)>=1,true);
@@ -161,7 +161,7 @@ test('guards wait beside unopened caches, stay near home, and drop better loot',
 
 test('residents roam near wanderers outside the meadow and discovery pays XP',()=>{
   const {w,p}=camp();w.ambient=true;w.guardsDay=1;
-  const spot=[...Array(200)].map((_,i)=>({x:Math.cos(i)*80,z:Math.sin(i)*80})).find(s=>tierAt(s.x,s.z)===2);
+  const spot=[...Array(200)].map((_,i)=>({x:Math.cos(i)*110,z:Math.sin(i)*110})).find(s=>tierAt(s.x,s.z)===2&&w.walkable(s.x,s.z));
   p.x=spot.x;p.z=spot.z;
   sim(w,60);
   assert.ok(p.regions.length>1);

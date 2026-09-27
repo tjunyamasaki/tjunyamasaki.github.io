@@ -3,9 +3,9 @@
 // World.strike for hits (kill credit, knockback, aggro, floating numbers), World.event for
 // presentation, and plain arrays on the world (allies, zones, projectiles) for anything that
 // lives longer than one swing. Numbers come from WEAPON_STYLES in progression.mjs.
-import {RULES} from './content.mjs?v=harvest-17';
-import {ALLIES, maxHealth, powerOf} from './progression.mjs?v=harvest-17';
-import {isMagicAlly} from './magic/registry.mjs?v=harvest-17';
+import {RULES} from './content.mjs?v=harvest-18';
+import {ALLIES, maxHealth, powerOf} from './progression.mjs?v=harvest-18';
+import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 
 const dist = (a, b) => Math.hypot((a.x||0)-(b.x||0), (a.z||0)-(b.z||0));
 const hostiles = w => w.enemies.filter(e => !isMagicAlly(e) && e.hp > 0);

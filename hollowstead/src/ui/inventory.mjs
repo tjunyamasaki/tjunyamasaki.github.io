@@ -1,12 +1,12 @@
 // RPG inventory surface. Renders slots and reports taps, drags, and quantities.
 // It never writes player inventories, equipment, or chest contents.
 
-import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-17';
-import {equipmentSlotFor} from '../inventory.mjs?v=harvest-17';
-import {itemDefinition} from '../contracts.mjs?v=harvest-17';
+import {EQUIPMENT, ITEMS} from '../content.mjs?v=harvest-18';
+import {equipmentSlotFor} from '../inventory.mjs?v=harvest-18';
+import {itemDefinition} from '../contracts.mjs?v=harvest-18';
 
 export const SOCKET_LABELS = Object.freeze({
-  chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light',
+  chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light', head: 'Head', back: 'Back', trinket: 'Trinket',
 });
 
 const OP_LABELS = Object.freeze({
@@ -251,7 +251,7 @@ export function createInventoryPanel(root, hooks) {
     if (view.chest) {
       const occupied = view.chest.occupied ?? view.chest.slots.filter(cell => cell.stack).length;
       const slotMax = view.chest.slotMax ?? view.chest.slots.length;
-      const chestLine = view.chest.pending ? 'Waiting for camp…' : `Chest · ${occupied} / ${slotMax}`;
+      const chestLine = view.chest.pending ? 'Waiting for camp…' : `${view.chest.name || 'Chest'} · ${occupied} / ${slotMax}`;
       if (chestMeta.textContent !== chestLine) chestMeta.textContent = chestLine;
       syncGroup(chestGrid, view.chest.slots);
       chestOverflow.hidden = !view.chest.overflow?.length;

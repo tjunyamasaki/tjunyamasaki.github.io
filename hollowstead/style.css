@@ -80,7 +80,7 @@
 .character-card{display:flex;align-items:center;justify-content:center;width:40px;flex:none}
 .character-card .portrait{width:29px;height:44px}
 .character-card small{display:none}
-.socket-grid.slot-grid{display:grid;grid-template-columns:repeat(5,44px);gap:4px;flex:none;width:max-content}
+.socket-grid.slot-grid{display:grid;grid-template-columns:repeat(4,44px);gap:4px;flex:none;width:max-content}
 .socket-grid .item-slot{width:44px;height:44px;max-width:44px;min-width:44px;aspect-ratio:auto}
 .bag-column,.chest-column{display:flex;flex-direction:column;gap:6px;min-width:0;flex:none}
 .bag-meta,.charm-line{margin:0;color:var(--muted);font-size:11px}

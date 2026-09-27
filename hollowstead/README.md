@@ -1,6 +1,6 @@
 # Hollowstead
 
-**A little light. A long night.** An endless Halloween survival RPG for 1–4 friends. Explore a wide hollow by day, crack open loot caches, grow stronger, and keep the Heartfire burning through nights that get harder every day. The Hollow King returns every fifth night.
+**A little light. A long night.** An endless Halloween survival RPG for 1–4 friends. Explore a wide hollow by day, crack open loot caches, grow stronger, and keep the Heartfire burning through nights that get harder every day. Every night has a moon: waxing moons bring raids on the fire, new moons a dark night for foraging, and rare blood moons the Hollow King.
 
 Play at **[tjunyamasaki.github.io/hollowstead/](https://tjunyamasaki.github.io/hollowstead/)**.
 
@@ -21,7 +21,7 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
 5. Fight with the weapon in your hand. Every weapon aims itself at the best foe in reach, so you can run one way and fight the other. **Auto-attack** (on by default, in the menu) swings whenever a foe is in reach; hold **Attack** to swing yourself. Keep up to three weapons on the **hotbar** and tap one to swap mid-fight. Every creature telegraphs its blow on the ground; **Dodge** out of it, or dodge at the last moment to pass through untouched. Repair walls, rearm traps, and use wards to help defend the camp.
 6. Hold **Revive** beside a fallen friend for about three seconds. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable. Open **Build**, then **Maintain camp**, to repair a damaged structure or hold **Dismantle**. The Heartfire cannot be dismantled, and a chest someone else has open cannot either.
-7. Awaken the Heartfire with soul embers. Every fifth night brings the Hollow King, stronger each time.
+7. Awaken the Heartfire with soul embers. A blood moon brings the Hollow King, stronger each time; tap the moon by the clock to see tonight's moon and the next.
 
 Losing the Heartfire ends the expedition. If everyone falls and has spent their charm, the expedition also ends.
 

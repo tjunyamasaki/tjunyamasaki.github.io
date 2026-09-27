@@ -37,7 +37,7 @@
  * Sprite src values are relative to hollowstead/ (assets/magic/widows-needle/).
  */
 
-import { ownerPower } from './registry.mjs?v=harvest-17';
+import { ownerPower } from './registry.mjs?v=harvest-18';
 
 const PACK = 'widows-needle';
 const RANGE = 9;

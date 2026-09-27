@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {access, readFile} from 'node:fs/promises';
 import {World} from '../src/engine.mjs';
 import {makeStack} from '../src/inventory.mjs';
-import {loadMagicModules} from '../src/magic/load.mjs?v=harvest-17';
-import {collectMagicSprites, magicItems, magicVisuals} from '../src/magic/registry.mjs?v=harvest-17';
-import {BELL} from '../src/magic/mourning-bell.mjs?v=harvest-17';
-import {MagicClock, heldWeaponPose} from '../src/magic/art.mjs?v=harvest-17';
-import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from '../src/magic/effects.mjs?v=harvest-17';
+import {loadMagicModules} from '../src/magic/load.mjs?v=harvest-18';
+import {collectMagicSprites, magicItems, magicVisuals} from '../src/magic/registry.mjs?v=harvest-18';
+import {BELL} from '../src/magic/mourning-bell.mjs?v=harvest-18';
+import {MagicClock, heldWeaponPose} from '../src/magic/art.mjs?v=harvest-18';
+import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from '../src/magic/effects.mjs?v=harvest-18';
 import {clearShowcaseWorld} from '../src/showcase.mjs';
 
 await loadMagicModules();

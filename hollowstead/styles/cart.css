@@ -1,0 +1,22 @@
+/* cart HUD (src/ui/cart.mjs): a small chip under the minimap while you pull a hand cart. */
+.cart-hud{position:fixed;z-index:6;top:calc(96px + env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));display:flex;align-items:stretch;gap:4px;padding:3px;border:1px solid var(--border,#dac29a28);border-radius:12px;background:#2b2433d9;box-shadow:0 2px 10px #0006;pointer-events:auto;touch-action:manipulation}
+.cart-hud button{min-height:40px;border:0;border-radius:9px;background:#40364166;color:var(--cream,#f0dfbd);padding:3px 8px;display:flex;align-items:center;gap:6px}
+.cart-hud button:hover{background:#51424b}
+.cart-hud .cart-open{padding-left:4px}
+.cart-hud .cart-icon{width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex:none}
+.cart-hud .cart-icon .item-icon{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 1px 1px #0008)}
+.cart-hud .cart-text{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:40px}
+.cart-hud .cart-load{font-size:13px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.3px}
+.cart-hud .cart-level{font-size:9px;line-height:1;color:var(--orange,#edb47a);letter-spacing:.5px}
+.cart-hud .cart-level:empty{display:none}
+.cart-hud .cart-bars{display:flex;flex-direction:column;gap:2px;width:40px}
+.cart-hud .cart-track{display:block;height:3px;border-radius:2px;background:#0000004d;overflow:hidden}
+.cart-hud .cart-bar{display:block;height:100%;border-radius:2px;background:#d8c398;transition:width .25s}
+.cart-hud .cart-bar-hp{background:#df9383}
+.cart-hud.is-full .cart-bar-load{background:var(--orange,#edb47a)}
+.cart-hud.is-hurt{border-color:#df938399}
+.cart-hud .cart-drop{flex-direction:column;justify-content:center;gap:1px;padding:3px 7px;font-size:11px}
+.cart-hud .cart-drop span{font-size:12px;line-height:1;color:var(--muted,#b9ac99)}
+.cart-hud .cart-drop small{font-size:9px;line-height:1;letter-spacing:.3px}
+/* Taller screens have room below the vitals as well; keep the chip compact and clear of the action cluster. */
+@media (min-height:560px){.cart-hud{top:calc(120px + env(safe-area-inset-top))}}

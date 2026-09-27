@@ -19,13 +19,16 @@
 //   enemy.act        seconds left in an active charge
 //   enemy.face       -1 / 1, which way the sprite looks
 //   world.hostile    enemy projectiles and lobbed spores
-import {ENEMIES, STRUCTURES} from './content.mjs?v=harvest-17';
-import {ALLIES, ROAM} from './progression.mjs?v=harvest-17';
-import {isMagicAlly} from './magic/registry.mjs?v=harvest-17';
-import {landBlow, preyFor} from './arsenal.mjs?v=harvest-17';
+import {ENEMIES, STRUCTURES} from './content.mjs?v=harvest-18';
+import {ALLIES, ROAM} from './progression.mjs?v=harvest-18';
+import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
+import {landBlow, preyFor} from './arsenal.mjs?v=harvest-18';
+import {cartTargets} from './cart.mjs?v=harvest-18';
 
 /** Creatures chew through camp structures at half their bite, so a lone explorer's fire survives an early night. */
 export const STRUCTURE_HIT = .5, HEARTH_HIT = .35;
+/** How far a hunting creature (e.hunt, night.mjs) looks for prey. */
+export const HUNT_RANGE = 40;
 export const structureHit = b => b.type === 'hearth' ? HEARTH_HIT : STRUCTURE_HIT;
 
 /**
@@ -88,11 +91,10 @@ export function buildField(world, obstacles, tx, tz, reuse = null){
   const ox = Math.round(tx/FIELD_SIZE)*FIELD_SIZE - FIELD_HALF, oz = Math.round(tz/FIELD_SIZE)*FIELD_SIZE - FIELD_HALF;
   const blocked = reuse?.blocked || new Uint8Array(N2), distance = reuse?.distance || new Float32Array(N2);
   blocked.fill(0); distance.fill(Infinity);
-  const R = (world.radius || 96) - 1;
-  // The edge of the world only matters when the window reaches it.
-  if(Math.hypot(tx, tz)+FIELD_HALF*1.5 >= R) for(let j = 0; j < FIELD_CELLS; j++) for(let i = 0; i < FIELD_CELLS; i++){
+  // Water, thickets, fences and the edge of the world (world.walkable, worldgen.mjs).
+  for(let j = 0; j < FIELD_CELLS; j++) for(let i = 0; i < FIELD_CELLS; i++){
     const x = ox + (i+.5)*FIELD_SIZE, z = oz + (j+.5)*FIELD_SIZE;
-    if(Math.hypot(x, z) >= R) blocked[j*FIELD_CELLS+i] = 1;
+    if(!world.walkable(x, z)) blocked[j*FIELD_CELLS+i] = 1;
   }
   const stamp = o => {
     const reach = o.radius + FIELD_CLEARANCE;
@@ -349,6 +351,7 @@ export function stepHostile(world, dt){
   const R = (world.radius || 96)+2;
   const people = wanderers(world);
   const guards = [...(world.allies || []), ...(world.magicSummons || [])].filter(a => a && a.hp > 0 && Number.isFinite(a.x));
+  const carts = cartTargets(world);
   for(const s of list){
     if(s.kind === 'spore'){
       s.fuse -= dt;
@@ -356,6 +359,7 @@ export function stepHostile(world, dt){
         s.done = true;
         for(const p of people) if(Math.hypot(p.x-s.x, p.z-s.z) < s.r+.3) world.hurt(p, s.dmg, null);
         for(const a of guards) if(Math.hypot(a.x-s.x, a.z-s.z) < s.r+.35) a.hp -= s.dmg*(ALLIES[a.type]?.guard ?? 1);
+        for(const c of carts) if(Math.hypot(c.x-s.x, c.z-s.z) < s.r+STRUCTURES.cart.radius) c.hp -= s.dmg*STRUCTURE_HIT;
         world.event('splat', s.x, s.z, '', {radius: s.r});
       }
       continue;
@@ -369,6 +373,8 @@ export function stepHostile(world, dt){
     }
     if(s.done) continue;
     for(const a of guards) if(Math.hypot(a.x-s.x, a.z-s.z) < s.r+.4){a.hp -= s.dmg*(ALLIES[a.type]?.guard ?? 1); s.done = true; break;}
+    if(s.done) continue;
+    for(const c of carts) if(c.hp > 0 && Math.hypot(c.x-s.x, c.z-s.z) < s.r+STRUCTURES.cart.radius){c.hp -= s.dmg*STRUCTURE_HIT; s.done = true; world.event('hit', s.x, s.z); break;}
   }
   world.hostile = list.filter(s => !s.done);
 }
@@ -383,6 +389,8 @@ export function stepMobs(world, dt, obstacles){
   world.fieldBudget = 3;
   const foes = world.enemies.filter(e => e.hp > 0 && !isMagicAlly(e));
   const people = wanderers(world);
+  // Carts are hunted exactly like wanderers (cart.mjs).
+  const carts = world.arena ? [] : cartTargets(world), prey = carts.length ? people.concat(carts) : people, quarry = prey;
   const hearth = world.buildings.find(b => b.type === 'hearth' && b.hp > 0);
   const sig = obstacles.length+':'+(obstacles.nodes?.length || 0);
   // Crowd hash: who is near whom, for spacing a swarm out.
@@ -415,6 +423,7 @@ export function stepMobs(world, dt, obstacles){
         (e.hitIds ||= []).push(p.id); world.hurt(p, amount, e);
         if(!(p.iframes > 0)) world.shove(p, Math.cos(e.ang+Math.PI/2*(e.flank < 0 ? -1 : 1)), Math.sin(e.ang+Math.PI/2*(e.flank < 0 ? -1 : 1)), .9);
       }
+      for(const c of carts) if(!e.hitIds?.includes(c.id) && Math.hypot(c.x-e.x, c.z-e.z) < bodyOf(e)+.45+STRUCTURES.cart.radius){(e.hitIds ||= []).push(c.id); c.hp -= amount*STRUCTURE_HIT; world.event('hit', c.x, c.z);}
       landBlow(world, {...e, tx: e.x, tz: e.z}, amount*.5, bodyOf(e)+.4);
       if(!moved || e.act <= 0){e.act = 0; e.atk = ''; e.hitIds = null; e.vx *= .2; e.vz *= .2; e.cooldown = Math.max(e.cooldown, cadence(world, e, def)*.9); e.back = (moveOf(e.type).retreat || 0)*e.cooldown*.6;}
       continue;
@@ -423,7 +432,7 @@ export function stepMobs(world, dt, obstacles){
     // Choose prey.
     let target = null;
     if(e.home){
-      const prey = [preyFor(world, e, people, e.aggro ? ROAM.aggro+6 : ROAM.aggro)].find(q => q && Math.hypot(q.x-e.home.x, q.z-e.home.z) < e.leash+8) || null;
+      const prey = [preyFor(world, e, quarry, e.aggro ? ROAM.aggro+6 : ROAM.aggro)].find(q => q && Math.hypot(q.x-e.home.x, q.z-e.home.z) < e.leash+8) || null;
       if(prey){e.aggro = true; target = prey;}
       else{
         e.aggro = false;
@@ -436,11 +445,12 @@ export function stepMobs(world, dt, obstacles){
     }else if(world.arena){
       target = preyFor(world, e, people, 999);
     }else{
-      const near = preyFor(world, e, people, 12);
+      // `hunt`: creatures sent after wanderers in the dark (night.mjs) look much farther for prey.
+      const near = preyFor(world, e, prey, e.hunt ? HUNT_RANGE : 12);
       target = near || hearth || (world.showcase ? people[0] : null);
     }
     if(!target){e.vx = e.vz = 0; continue;}
-    const reach = target.type === 'hearth' ? 1.1 : 0;
+    const reach = target.type === 'hearth' ? 1.1 : target.type === 'cart' ? .35 : 0;
     const d = dist(e, target);
     e.face = target.x < e.x ? -1 : 1;
 
@@ -487,7 +497,7 @@ export function stepMobs(world, dt, obstacles){
       dirX = toX/toD; dirZ = toZ/toD;
       // Round trunks and walls: follow the target's flow field when the straight line is blocked.
       if(!move.fly && d > 1.2){
-        const anchor = target.homing ? null : (people.includes(target) ? target : target.type === 'hearth' ? target : null);
+        const anchor = target.homing ? null : (people.includes(target) || target.type === 'hearth' || target.type === 'cart' ? target : null);
         if(anchor){
           const step = fieldStep(fieldFor(world, obstacles, anchor, sig), e.x, e.z);
           if(step){dirX = step.x; dirZ = step.z;}

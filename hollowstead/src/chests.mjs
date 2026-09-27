@@ -1,10 +1,12 @@
 // Authoritative chest leases and item moves. No browser, transport, or World import.
-import {CHEST_LEASE_SECONDS, CHEST_SLOT_COUNT, EQUIPMENT_SLOTS, inReach} from './contracts.mjs?v=harvest-17';
-import {cloneContainer, cloneSlots, cloneStack, containerId, planInsert, planMove, planSortSlots, validateEquipment} from './inventory.mjs?v=harvest-17';
+import {CHEST_LEASE_SECONDS, CHEST_SLOT_COUNT, EQUIPMENT_SLOTS, STORAGE_TYPES, inReach, storageSlotCount} from './contracts.mjs?v=harvest-18';
+import {cloneContainer, cloneSlots, cloneStack, containerId, planInsert, planMove, planSortSlots, validateEquipment} from './inventory.mjs?v=harvest-18';
 
 const result=(code, extra={})=>({ok:code==='ok', code, ...extra});
 const near=(a,b)=>inReach(Math.hypot(a.x-b.x,a.z-b.z));
 const active=p=>!!(p?.online&&!p.down&&!p.ghost&&p.hp>0);
+// Chests and hand carts (STORAGE_TYPES) open the same way. A pulled cart that rolls out of reach ends the session.
+const storage=(world,id)=>world.buildings.find(b=>b.id===id&&STORAGE_TYPES.includes(b.type)&&b.hp>0);
 
 export function releaseChests(world, ownerId=null){
   for(const [id, session] of world.chestSessions){
@@ -17,7 +19,7 @@ export function releaseChests(world, ownerId=null){
 
 export function pruneChests(world){
   for(const [id, session] of world.chestSessions){
-    const chest=world.buildings.find(b=>b.id===id&&b.type==='chest'&&b.hp>0);
+    const chest=storage(world,id);
     const owner=world.player(session.ownerId);
     if(world.status!=='playing'||!chest||!active(owner)||!near(owner,chest)||session.expiresAt<=world.time){
       world.chestSessions.delete(id);
@@ -28,7 +30,7 @@ export function pruneChests(world){
 
 export function chestIntent(world, player, cmd){
   pruneChests(world);
-  const chest=world.buildings.find(b=>b.id===cmd.chestId&&b.type==='chest'&&b.hp>0);
+  const chest=storage(world,cmd.chestId);
   const session=world.chestSessions.get(cmd.chestId);
   // Closing is legal while downed/out of range, and never releases somebody else's lock.
   if(cmd.type==='chestClose'){
@@ -112,7 +114,7 @@ export function moveItems(world,player,cmd,chest=null){
     const partial=cmd.quantity!==stack.quantity;
     const moving={...cloneStack(stack),quantity:cmd.quantity};
     if(partial)moving.uid=world.nextItemUid();
-    const inserted=planInsert(activeContainer(dest),moving,{
+    const inserted=planInsert(activeContainer(dest,chest),moving,{
       supplyCapacity:null,grow:false,
       allowPartial:false,mintUid:()=>world.nextItemUid(),
     });
@@ -135,7 +137,7 @@ export function moveItems(world,player,cmd,chest=null){
   if(!validSockets(source,plan.sourceSlots)||!validSockets(dest,plan.destSlots)){
     world.idCounter=counter;return result('incompatibleSocket');
   }
-  if(dest.kind==='chest'&&plan.destSlots.length!==CHEST_SLOT_COUNT){world.idCounter=counter;return result('inventoryFull');}
+  if(dest.kind==='chest'&&plan.destSlots.length!==storageSlotCount(chest)){world.idCounter=counter;return result('inventoryFull');}
   commit(player,source,plan.sourceSlots,plan.sourceRevision);
   if(!plan.same)commit(player,dest,plan.destSlots,plan.destRevision);
   world.collapseRecovery(player);
@@ -144,10 +146,11 @@ export function moveItems(world,player,cmd,chest=null){
   return result('ok');
 }
 
-function activeContainer(loc){
+function activeContainer(loc,chest=null){
   if(loc.kind!=='chest')return loc.container;
-  const slots=cloneSlots(loc.container.slots).slice(0, CHEST_SLOT_COUNT);
-  while(slots.length<CHEST_SLOT_COUNT)slots.push(null);
+  const size=chest?storageSlotCount(chest):CHEST_SLOT_COUNT;
+  const slots=cloneSlots(loc.container.slots).slice(0, size);
+  while(slots.length<size)slots.push(null);
   return {id:loc.container.id, revision:loc.container.revision, slots};
 }
 
@@ -159,7 +162,7 @@ export function storeAll(world, player, cmd, chest){
   if(!Number.isSafeInteger(cmd.inventoryRevision)||!Number.isSafeInteger(cmd.destinationRevision))return result('staleRevision');
   if(player.inventory.revision!==cmd.inventoryRevision||chest.store.revision!==cmd.destinationRevision)return result('staleRevision');
   const pack=cloneSlots(player.inventory.slots);
-  const dest=activeContainer({kind:'chest', container:chest.store});
+  const dest=activeContainer({kind:'chest', container:chest.store}, chest);
   let moved=0, blocked=0;
   for(let index=0;index<pack.length;index++){
     const stack=pack[index];
@@ -188,7 +191,7 @@ export function stackMatching(world, player, cmd, chest){
   if(!Number.isSafeInteger(cmd.inventoryRevision)||!Number.isSafeInteger(cmd.destinationRevision))return result('staleRevision');
   if(player.inventory.revision!==cmd.inventoryRevision||chest.store.revision!==cmd.destinationRevision)return result('staleRevision');
   const pack=cloneSlots(player.inventory.slots);
-  const dest=activeContainer({kind:'chest', container:chest.store});
+  const dest=activeContainer({kind:'chest', container:chest.store}, chest);
   const present=new Set(dest.slots.filter(stack=>stack).map(stack=>stack.itemId));
   let moved=0, blocked=0;
   for(let index=0;index<pack.length;index++){
@@ -216,7 +219,7 @@ export function stackMatching(world, player, cmd, chest){
 
 function organizeChest(world, chest, cmd){
   if(!Number.isSafeInteger(cmd.destinationRevision)||chest.store.revision!==cmd.destinationRevision)return result('staleRevision');
-  const active=activeContainer({kind:'chest', container:chest.store}).slots;
+  const active=activeContainer({kind:'chest', container:chest.store}, chest).slots;
   const planned=planSortSlots(active);
   if(!planned.changed)return result('ok');
   chest.store.slots=planned.slots;

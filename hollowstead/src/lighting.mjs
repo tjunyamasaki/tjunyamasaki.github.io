@@ -3,9 +3,11 @@
 // feathering; it cannot change who is safe.
 // This module must not import Three.js or a renderer.
 
-import {EQUIPMENT, RULES, STRUCTURES} from './content.mjs?v=harvest-17';
-import {RANGES} from './contracts.mjs?v=harvest-17';
-import {equippedLanternLit} from './inventory.mjs?v=harvest-17';
+import {EQUIPMENT, RULES, STRUCTURES} from './content.mjs?v=harvest-18';
+import {RANGES} from './contracts.mjs?v=harvest-18';
+import {equippedLanternLit} from './inventory.mjs?v=harvest-18';
+import {moonLighting} from './night.mjs?v=harvest-18';
+import {GRAVELIGHT_RADIUS_SCALE, regionDarkness} from './regions.mjs?v=harvest-18';
 
 export const HEARTH_LEVEL_STEP = 1.5;
 export const PLAYER_LIGHT_RADIUS = RANGES.lanternLight;
@@ -123,8 +125,10 @@ export function playerLanternRadius(player){
   const fuel=Number(player.equipment?.light?.durability);
   const fade=LANTERN_FADE_SECONDS;
   if(!(fuel>0)||!(fade>0))return 0;
-  if(fuel>=fade)return PLAYER_LIGHT_RADIUS;
-  return PLAYER_LIGHT_RADIUS*smoothstep(fuel/fade);
+  // The grave lantern (regions.mjs) throws a much wider pool than the hand lantern, but burns fuel.
+  const full=PLAYER_LIGHT_RADIUS*(player.equipment.light.itemId==='gravelight'?GRAVELIGHT_RADIUS_SCALE:1);
+  if(fuel>=fade)return full;
+  return full*smoothstep(fuel/fade);
 }
 
 /** Active sources only: fueled fires, soul lanterns, and a living equipped lantern. */
@@ -190,10 +194,17 @@ export function brightnessAt(sources, x, z, darkness, lighting=resolveLighting(n
   return (1-cover)+cover*night;
 }
 
-export function frameLighting(world, theme){
-  const lighting=resolveLighting(theme);
+export function frameLighting(world, theme, viewer=null){
+  let lighting=resolveLighting(theme);
   // The battle arena keeps no clock: it is always lit enough to read every telegraph.
-  const darkness=world?.arena?0:phaseDarkness(world?.time||0, clockSchedule(), lighting);
+  let darkness=world?.arena?0:phaseDarkness(world?.time||0, clockSchedule(), lighting);
+  if(world&&!world.arena){
+    // Tonight's moon may tint or deepen the dark; some regions are dark even by day (per viewer).
+    const moon=moonLighting(world);
+    if(moon){lighting={...lighting};if(moon.tint)lighting.nightTint=moon.tint;if(moon.ambient>0)lighting.ambientNight=Math.min(1,lighting.ambientNight*moon.ambient);}
+    const regional=regionDarkness(world, viewer);
+    if(regional>darkness)darkness=Math.min(1,regional);
+  }
   const sources=collectLightSources(world);
   return {lighting, darkness, sources};
 }

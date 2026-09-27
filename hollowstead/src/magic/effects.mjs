@@ -1,7 +1,7 @@
 // World-space ink strokes, ribbons and motes. Both renderers consume this same
 // bounded command list; no particles, animation clocks or random rolls affect damage.
-import {MAGIC_PALETTE, GRAVECRAFT} from './art.mjs?v=harvest-17';
-import {BELL, waveRadius} from './mourning-bell.mjs?v=harvest-17';
+import {MAGIC_PALETTE, GRAVECRAFT} from './art.mjs?v=harvest-18';
+import {BELL, waveRadius} from './mourning-bell.mjs?v=harvest-18';
 
 const TAU=Math.PI*2;
 const clamp=n=>Math.max(0,Math.min(1,n));

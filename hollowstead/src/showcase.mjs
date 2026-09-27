@@ -1,6 +1,6 @@
 // Solo showcase sandbox. The spawn list is built from the live content tables.
-import { ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES, label } from './content.mjs?v=harvest-17';
-import { clearMagicLists, deleteMagicEntity, magicItems, magicMobById, magicMobEntries } from './magic/registry.mjs?v=harvest-17';
+import { ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES, label } from './content.mjs?v=harvest-18';
+import { clearMagicLists, deleteMagicEntity, magicItems, magicMobById, magicMobEntries } from './magic/registry.mjs?v=harvest-18';
 
 const PLACE_RANGE = 5.5;
 export const SHOWCASE_MOB_COUNTS = [1, 5, 10, 20];
@@ -78,7 +78,7 @@ function separation(kind, type){
 
 export function showcasePlaceReason(world, player, kind, type, x, z){
   if(!world?.showcase || !player) return 'Showcase is closed';
-  if(!Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) > RULES.radius - 2 || Math.abs(z) > RULES.radius - 2) return 'Outside the clearing';
+  if(!Number.isFinite(x) || !Number.isFinite(z) || !world.walkable(x, z)) return 'Outside the clearing';
   if(Math.hypot(x - player.x, z - player.z) > PLACE_RANGE) return 'Move closer to this spot';
   if(kind === 'mob') return ENEMIES[type] || magicMobById(type) ? '' : 'Unknown creature';
   if(kind === 'node' && !NODES[type]) return 'Unknown object';

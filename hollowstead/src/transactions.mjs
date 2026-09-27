@@ -1,12 +1,12 @@
-import {ACTION_RESULT_CACHE_LIMIT, HOTBAR_SLOTS, INTENTS} from './contracts.mjs?v=harvest-17';
-import {containerId, planSortSlots} from './inventory.mjs?v=harvest-17';
-import {chestIntent, moveItems} from './chests.mjs?v=harvest-17';
+import {ACTION_RESULT_CACHE_LIMIT, HOTBAR_SLOTS, INTENTS, STORAGE_TYPES} from './contracts.mjs?v=harvest-18';
+import {containerId, planSortSlots} from './inventory.mjs?v=harvest-18';
+import {chestIntent, moveItems} from './chests.mjs?v=harvest-18';
 
 export const TRANSACTION_PROTOCOL=1;
 const outcome=code=>({ok:code==='ok',code});
 // Gameplay ping and automatic eat are not world actions. Legacy inventory
 // packets stay excluded: their replacements require revisions.
-const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','dash','lantern','repair','dismantle','upgrade','hotbar','arenaPick']);
+const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','dash','lantern','repair','dismantle','upgrade','hotbar','arenaPick','cart','strike']);
 function validWorldAction(cmd){
   if(typeof cmd.type!=='string')return false;
   if(['move','build'].includes(cmd.type)&&(!Number.isFinite(cmd.x)||!Number.isFinite(cmd.z)))return false;
@@ -63,7 +63,7 @@ export function revisions(world,actorId,chestId){
     out[containerId('equipment',p.id)]=p.equipmentRevision;
     if(p.recovery)out[p.recovery.id]=p.recovery.revision;
   }
-  const chest=world.buildings.find(b=>b.id===chestId&&b.type==='chest');
+  const chest=world.buildings.find(b=>b.id===chestId&&STORAGE_TYPES.includes(b.type));
   if(chest)out[chest.store.id]=chest.store.revision;
   return out;
 }

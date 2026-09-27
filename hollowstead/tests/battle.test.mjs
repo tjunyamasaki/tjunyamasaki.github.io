@@ -6,10 +6,10 @@ import {DASH, NIGHT_CAP, enemyScale, maxHealth, powerOf, waveSize} from '../src/
 import {HOTBAR_SLOTS} from '../src/contracts.mjs';
 import {createActionSession} from '../src/transactions.mjs';
 import {frameLighting} from '../src/lighting.mjs';
-import {loadMagicModules} from '../src/magic/load.mjs?v=harvest-17';
-import {ATTACKS, MOVES, buildField, fieldStep, telegraphOf} from '../src/mobs.mjs?v=harvest-17';
-import {ARENA, STARTERS, aliveCap, arenaScale, waveBudget, waveChampions} from '../src/arena.mjs?v=harvest-17';
-import {hotbarView, offerMarkup} from '../src/ui/arena.mjs?v=harvest-17';
+import {loadMagicModules} from '../src/magic/load.mjs?v=harvest-18';
+import {ATTACKS, MOVES, buildField, fieldStep, telegraphOf} from '../src/mobs.mjs?v=harvest-18';
+import {ARENA, STARTERS, aliveCap, arenaScale, waveBudget, waveChampions} from '../src/arena.mjs?v=harvest-18';
+import {hotbarView, offerMarkup} from '../src/ui/arena.mjs?v=harvest-18';
 import {keyboardAction} from '../src/ui/actions.mjs';
 
 await loadMagicModules();

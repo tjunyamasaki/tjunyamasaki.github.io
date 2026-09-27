@@ -1,27 +1,31 @@
-import {World,clamp,distance,biome,EXPLORE_CELL,EXPLORE_SIZE} from './engine.mjs?v=harvest-17';
-import {RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-17';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt} from './content.mjs?v=harvest-17';
-import {Renderer,loadTheme} from './renderer.mjs?v=harvest-17';
-import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-17';
-import {createNetwork} from './network.mjs?v=harvest-17';
-import {Sound} from './audio.mjs?v=harvest-17';
-import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-17';
-import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-17';
-import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-17';
-import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS} from './contracts.mjs?v=harvest-17';
+import {World,clamp,distance,biome,EXPLORE_CELL,EXPLORE_SIZE} from './engine.mjs?v=harvest-18';
+import {RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-18';
+import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,nodeAwake} from './content.mjs?v=harvest-18';
+import {Renderer,loadTheme} from './renderer.mjs?v=harvest-18';
+import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-18';
+import {createNetwork} from './network.mjs?v=harvest-18';
+import {Sound} from './audio.mjs?v=harvest-18';
+import {SAVE_KEYS,planContinue} from './serialization.mjs?v=harvest-18';
+import {EQUIPMENT_SLOTS,itemSpriteKey,equipmentSlotFor,containerId} from './inventory.mjs?v=harvest-18';
+import {createActionSession,createActionClient} from './transactions.mjs?v=harvest-18';
+import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS,STORAGE_TYPES} from './contracts.mjs?v=harvest-18';
+import {cartFacts} from './cart.mjs?v=harvest-18';
 import {
   allowsCombat,allowsMovement,clusterFor,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
-} from './ui/actions.mjs?v=harvest-17';
-import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-17';
-import {actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-17';
-import {loadMagicModules} from './magic/load.mjs?v=harvest-17';
-import {installMagicSprites,isMagicAlly} from './magic/registry.mjs?v=harvest-17';
-import {waveLeft} from './arena.mjs?v=harvest-17';
-import {hotbarView,offerMarkup,rankStars,replaceMarkup} from './ui/arena.mjs?v=harvest-17';
-import {DASH} from './progression.mjs?v=harvest-17';
-import {clampShowcaseMobCount, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-17';
-import {cachedSrc} from './assets.mjs?v=harvest-17';
+} from './ui/actions.mjs?v=harvest-18';
+import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-18';
+import {actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-18';
+import {loadMagicModules} from './magic/load.mjs?v=harvest-18';
+import {installMagicSprites,isMagicAlly} from './magic/registry.mjs?v=harvest-18';
+import {waveLeft} from './arena.mjs?v=harvest-18';
+import {hotbarView,offerMarkup,rankStars,replaceMarkup} from './ui/arena.mjs?v=harvest-18';
+import {DASH} from './progression.mjs?v=harvest-18';
+import {clampShowcaseMobCount, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-18';
+import {cachedSrc} from './assets.mjs?v=harvest-18';
+import {bindFeatureHud, frameFeatureHud, paintFeatureHud} from './ui/features.mjs?v=harvest-18';
+import {revealsCache, trinketTip} from './ui/trinkets.mjs?v=harvest-18';
+import {exploredGround} from './ui/worldmap.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -78,7 +82,7 @@ function releaseChestUI(){
   chestToken++;const old=chestSession;chestSession=null;chestRenewing=false;chestOpening=false;
   if(old)void send({type:'chestClose',chestId:old.chestId,sessionId:old.sessionId},{quiet:true});
 }
-function chestBuilding(){return chestSession?world?.buildings.find(b=>b.id===chestSession.chestId&&b.type==='chest'&&b.hp>0)||null:null;}
+function chestBuilding(){return chestSession?world?.buildings.find(b=>b.id===chestSession.chestId&&STORAGE_TYPES.includes(b.type)&&b.hp>0)||null:null;}
 async function openChest(chestId){
   if(chestOpening||!chestId)return;
   if(chestSession?.chestId===chestId&&sheet==='chest')return;
@@ -272,7 +276,7 @@ function contextFacts(p){
   const base={kind:target.kind,id:entity.id,type:entity.type,wood:world.available(p,'wood'),stone:world.available(p,'stone'),seeds:world.available(p,'seed')};
   if(target.kind==='building'){
     const lock=world.chestSessions.get(entity.id);
-    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,phase:phaseAt(world.time),hunger:p.hunger,canAwaken:entity.type==='hearth'&&entity.level<3&&world.canPay(p,world.upgradeCost()),busy:!!(lock&&lock.ownerId!==localId)};
+    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,phase:phaseAt(world.time),hunger:p.hunger,canAwaken:entity.type==='hearth'&&entity.level<3&&world.canPay(p,world.upgradeCost()),busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{})};
   }
   if(target.kind==='node'){const node=NODES[entity.type];return {...base,required:!!node?.required,toolReady:!(node?.tool)||world.hasTool(p,node.tool),toolLabel:node?.tool?label(node.tool).toLowerCase():''};}
   return base;
@@ -420,7 +424,7 @@ function makeCell(key,stack,kind,index,mark=''){
   const equipped=kind==='socket'&&!!stack;
   const name=stack?label(stack.itemId):mark;
   const maxDurability=stack?stackMaxDurability(stack.itemId):null;
-  return {key,stack,mark,maxDurability,equipped,accept:kind!=='recovery',selected:!!(stack&&selection?.uid===stack.uid),tip:stack?label(stack.itemId):'',iconHTML:stack?icon(stack.itemId):'',aria:slotLabel({empty:!stack,name,quantity:stack?.quantity||0,durability:stack?.durability??null,maxDurability,equipped,index,kind:kind==='socket'?'socket':kind})};
+  return {key,stack,mark,maxDurability,equipped,accept:kind!=='recovery',selected:!!(stack&&selection?.uid===stack.uid),tip:stack?trinketTip(stack.itemId):'',iconHTML:stack?icon(stack.itemId):'',aria:slotLabel({empty:!stack,name,quantity:stack?.quantity||0,durability:stack?.durability??null,maxDurability,equipped,index,kind:kind==='socket'?'socket':kind})};
 }
 function inventoryView(p){
   const chest=chestBuilding();
@@ -433,7 +437,7 @@ function inventoryView(p){
     else{
       const slots=chest.store.slots.map((stack,index)=>makeCell(`chest:${index}`,stack,'chest',index));
       const overflow=(chest.overflow?.slots||[]).flatMap((stack,index)=>stack?[makeCell(`overflow:${index}`,stack,'overflow',index)]:[]);
-      chestView={pending:chestOpening||actionPending,slots,overflow,occupied:chest.store.slots.filter(Boolean).length,slotMax:chest.store.slots.length};
+      chestView={pending:chestOpening||actionPending,slots,overflow,occupied:chest.store.slots.filter(Boolean).length,slotMax:chest.store.slots.length,name:chest.type==='cart'?'Cart':'Chest'};
     }
   }
   const loc=selection?locateUid(p,selection.uid):null;
@@ -446,7 +450,7 @@ function inventoryView(p){
   const sprite=theme.sprites[p.character]||theme.sprites.ember;
   return {portraitHTML:`${portrait(p.character)}<small>${escapeHtml(p.name)}</small>`,occupied:p.inventory.slots.filter(Boolean).length,slotMax:p.inventory.slots.length,charm:!!p.charm,sockets,slots,recovery,chest:chestView,selection:detail,pending:actionPending||chestOpening,pendingText:chestOpening?'Opening chest…':actionPending?'Waiting for camp…':'',sprite};
 }
-const SOCKET_NAME={chop:'Chop',mine:'Mine',weapon:'Weapon',body:'Armor',light:'Light'};
+const SOCKET_NAME={chop:'Chop',mine:'Mine',weapon:'Weapon',body:'Armor',light:'Light',head:'Head',back:'Back',trinket:'Trinket'};
 function guideHTML(){
   const steps=[
     ['Gather before dusk','Move with the left stick, or tap the ground. Tap a tree or rock to walk over and harvest it. Hold the action until it falls. Wood and flint land on the ground. Stay beside a pile and it comes to you; step onto it and it is picked up at once. Walk away and it stays where it fell. Grass, berries, pumpkins, and mushrooms go into your pack.'],
@@ -457,10 +461,12 @@ function guideHTML(){
     ['Share a chest','One wanderer opens a chest at a time. Your pack has twelve slots. A chest has twenty-four. Store all moves what fits from your pack. Stack fills piles the chest already holds. Sort orders a chest or your pack and stacks matching piles. Choose a quantity, then Transfer, or tap the destination slot. Close the panel to let someone else in.'],
     ['Stand together','Your weapon aims itself, and with Auto-attack on (the menu) it swings whenever a foe is in reach; hold Attack to swing yourself. Keep three weapons on the hotbar and tap one to swap. Every creature marks its blow on the ground before it lands: step or Dodge out of it, or dodge just as it lands to slip through untouched. Armor absorbs damage only while worn. Hold Revive beside a fallen friend for three seconds. Everyone has one last-chance charm. Fallen wanderers return at dawn if the camp survives.'],
     ['Explore for treasure','The hollow is vast. Beyond the meadow lie the Autumn Woods and the Graveyard; farther still the Hollow Mire, the Moonshard Crags and the Barrow Fields. Crates, iron-bound chests, moonlit coffers and hollow reliquaries hide out there: hold Open beside one. Better caches sit farther from camp, and guardians watch them. Caches refill after a few days.'],
+    ['Brave the frontier','The outer regions punish the unprepared, and every wanderer needs their own answer. The Hollow Mire’s spore fog drains courage, then health: wear a glowcap mask, made from blooms that sprout in the Autumn Woods only after dark. The Moonshard Crags are pitch dark even by day: only your own lit grave lantern, fed by wisp essence that drifts over the Graveyard at night, holds the dark back. The Barrow Fields’ grave-chill slows you: a bone-lined barrow cloak keeps it out. Masks and cloaks wear only inside their region.'],
     ['Grow stronger','Kills, caches, gathering and new regions give experience. Each level adds health and damage. Loot comes in five rarities: common, uncommon, rare, epic and legendary. Bows fire arrows at the nearest foe, staffs throw bursting bolts, broadswords cleave, and the Grimoire of Ash burns everything around you. Heartstones raise your health for good.'],
-    ['Outlast the night','Every night is harder than the last, with more creatures and elder champions. The Hollow King returns every fifth night, stronger each time. Guard the Heartfire: losing it ends the expedition. How many nights can you survive?'],
+    ['Outlast the night','Every night is harder than the last, with more creatures and elder champions. Guard the Heartfire: losing it ends the expedition. How many nights can you survive?'],
+    ['Read the moon','Tap the moon beside the clock to see tonight’s moon and the next. Under a waxing moon the woods raid your fire in waves. A new moon brings no raid but a darker night: the time to gather what only grows in the dark. A rare blood moon brings the Hollow King, stronger each time he returns, and more waves than any other night. Whatever the moon, creatures stalk anyone who wanders far from the fire after dark, more often deeper in the hollow.'],
   ];
-  return `<p class="guide-intro">The woods are unkind.<br>Your friends don’t have to be.</p>${steps.map(([title,text],index)=>`<div class="guide-step"><b>0${index+1}</b><div><h3>${title}</h3><p>${text}</p></div></div>`).join('')}<div class="key-help"><span>WASD / arrows · Move</span><span>E · Context action</span><span>Space · Attack</span><span>Shift · Dodge</span><span>R · Swap weapon</span><span>I · Inventory</span><span>B · Build</span><span>F · Lantern</span><span>M · Map</span><span>1–4 · More actions</span><span>Esc · Menu</span></div><p class="muted small">The host saves the expedition automatically. Continue it alone, or host the saved expedition to open a new camp. Keep the host’s tab open during co-op; switching away pauses everyone.</p>`;
+  return `<p class="guide-intro">The woods are unkind.<br>Your friends don’t have to be.</p>${steps.map(([title,text],index)=>`<div class="guide-step"><b>${String(index+1).padStart(2,'0')}</b><div><h3>${title}</h3><p>${text}</p></div></div>`).join('')}<div class="key-help"><span>WASD / arrows · Move</span><span>E · Context action</span><span>Space · Attack</span><span>Shift · Dodge</span><span>R · Swap weapon</span><span>I · Inventory</span><span>B · Build</span><span>F · Lantern</span><span>M · Map</span><span>1–4 · More actions</span><span>Esc · Menu</span></div><p class="muted small">The host saves the expedition automatically. Continue it alone, or host the saved expedition to open a new camp. Keep the host’s tab open during co-op; switching away pauses everyone.</p>`;
 }
 function fullscreenElement(){return document.fullscreenElement||document.webkitFullscreenElement||null;}
 function isFullscreen(){return !!fullscreenElement();}
@@ -531,8 +537,9 @@ function renderSheet(){
     });
     replaceContent(catalogMarkup({recipes,maintain:model.maintain,pendingId:catalogPending}));
   }else if(sheet==='inventory'||sheet==='chest'){
-    title=sheet==='chest'?'Chest':'Inventory';
-    kicker=sheet==='chest'?'YOUR PACK AND THIS CHEST':'WORN GEAR AND PACK';
+    const cart=sheet==='chest'&&chestBuilding()?.type==='cart';
+    title=sheet==='chest'?(cart?'Hand cart':'Chest'):'Inventory';
+    kicker=sheet==='chest'?(cart?'YOUR PACK AND THIS CART':'YOUR PACK AND THIS CHEST'):'WORN GEAR AND PACK';
     setTabs('');ensurePanel();inventoryPanel.update(inventoryView(p));
   }
   $('sheet-title').textContent=title;$('sheet-kicker').textContent=kicker;
@@ -553,13 +560,13 @@ function drawMap(canvas,full=false){
   // Full map shows the whole hollow; the minimap is a 34-unit window around you.
   const span=full?R*2+4:68,scale=size/span,cx=full?0:me_.x,cz=full?0:me_.z;
   const sx=x=>(x-cx)*scale+size/2,sz=z=>(z-cz)*scale+size/2,vis=(x,z)=>Math.abs(x-cx)<span/2+cell&&Math.abs(z-cz)<span/2+cell;
-  for(const index of explored){const gx=index%N,gz=Math.floor(index/N),x=gx*cell-R,z=gz*cell-R;if(!vis(x,z))continue;ctx.fillStyle=theme.palette[biome(x+cell/2,z+cell/2)]||theme.palette.meadow;ctx.fillRect(sx(x),sz(z),cell*scale+.6,cell*scale+.6);}
+  const ground=exploredGround(world.seed,theme.palette,world.explored,N,cell);if(ground){ctx.imageSmoothingEnabled=true;ctx.drawImage(ground,sx(-R),sz(-R),N*cell*scale,N*cell*scale);}
   const known=e=>explored.has(Math.floor((e.z+R)/cell)*N+Math.floor((e.x+R)/cell));
   const cacheColor={crate:RARITY_COLORS.common,ironchest:RARITY_COLORS.rare,moonchest:RARITY_COLORS.epic,reliquary:RARITY_COLORS.legendary};
   for(const n of world.nodes){
-    if(!known(n)||!vis(n.x,n.z))continue;
+    if(!(known(n)||revealsCache(me_,n))||!vis(n.x,n.z))continue;
     if(isCache(n.type)){const x=sx(n.x),y=sz(n.z),r=full?4.5:5;ctx.globalAlpha=n.ready?.35:1;ctx.fillStyle=cacheColor[n.type];ctx.strokeStyle='#1e1624';ctx.lineWidth=1.5;ctx.fillRect(x-r,y-r*.7,r*2,r*1.4);ctx.strokeRect(x-r,y-r*.7,r*2,r*1.4);ctx.globalAlpha=1;continue;}
-    if(!full||n.ready)continue;
+    if(!full||n.ready||!nodeAwake(n,world.time))continue;
     ctx.fillStyle=n.type==='tree'?'#374f48':['grave','ore','shardrock'].includes(n.type)?'#d2c5d7':n.type==='pumpkin'?'#e8ae72':'#c1b993';ctx.beginPath();ctx.arc(sx(n.x),sz(n.z),1.6,0,Math.PI*2);ctx.fill();
   }
   for(const e of world.enemies){if(!e.guardOf||!known(e)||!vis(e.x,e.z))continue;ctx.fillStyle='#e0776b';ctx.beginPath();ctx.arc(sx(e.x),sz(e.z),full?1.8:2.4,0,Math.PI*2);ctx.fill();}
@@ -668,7 +675,7 @@ function ui(){
     else{$('day-number').textContent=`DAY ${String(dayAt(world.time)).padStart(2,'0')}`;
     $('day-progress').style.left=`${(world.time%RULES.cycle)/RULES.cycle*100}%`;
     paintClock();}
-    paintHotbar(p);paintAttack(p);paintArenaPick(p);
+    paintHotbar(p);paintAttack(p);paintArenaPick(p);paintFeatureHud(featureContext(p));
     $('party').innerHTML=world.players.filter(q=>q.id!==localId).map(q=>`<div class="party-row"><span class="party-dot" style="background:${CHARACTERS.find(c=>c.id===q.character)?.color}"></span><b>${escapeHtml(q.name)}</b><span>${!q.online?'away':q.down?'needs help!':q.ghost?'returns at dawn':''}</span></div>`).join('');
     if(p.noticeAt&&p.noticeAt!==lastNotice){toast(p.notice);lastNotice=p.noticeAt;}
     for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(ev.type==='rare'&&distance(p,ev)<14)toast(`Found ${ev.text} · ${rarityOf(ev.itemId)}`);if(distance(p,ev)<20||ev.type==='phase')sound.play(ev.type);}}
@@ -689,6 +696,8 @@ function ui(){
   if(sheet&&dirty)renderSheet();
   dirty=false;
 }
+/** What the frontier HUD modules (ui/features.mjs) may read and do. */
+function featureContext(p){return {world,me:p,localId,mode,send,toast,icon,theme,renderer,sheet,openSheet,closeSheet,refresh,openChest};}
 function aimEntity(){
   if(maintenance&&maintenanceTarget)return world.buildings.find(b=>b.id===maintenanceTarget)||null;
   return currentTarget()?.entity||null;
@@ -872,12 +881,12 @@ function frame(now){
   if(networkTime>.075){networkTime=0;if(mode==='guest'&&playing)network?.input(input);if(mode==='host')network?.broadcast();}
   if(saveTime>10){saveTime=0;save();}if(pingTime>3){pingTime=0;network?.ping();}
   if(uiTime>.18){uiTime=0;dirty=true;ui();}
-  const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement,demo:$('game').hidden});requestAnimationFrame(frame);
+  const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement,demo:$('game').hidden});if(playing)frameFeatureHud(featureContext(me()),dt);requestAnimationFrame(frame);
 }
 async function init(){
   await loadMagicModules();
   theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;autoAttack=prefs.autoAttack!==false;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;
-  paintClock();demoWorld();setupControls();syncSaveOption();const params=new URLSearchParams(location.search);
+  paintClock();demoWorld();setupControls();bindFeatureHud(featureContext(null));syncSaveOption();const params=new URLSearchParams(location.search);
   const code=params.has('showcase')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showStatus('A place by the fire is waiting. Choose a name and join.');}
   const showcasePanel=$('showcase-panel');
   showcasePanel?.addEventListener('pointerdown',event=>event.stopPropagation());

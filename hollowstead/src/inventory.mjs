@@ -1,12 +1,12 @@
 // Stack, container, and equipment primitives. No DOM, network, rendering, or World.
 
-import {EQUIPMENT, ITEMS} from './content.mjs?v=harvest-17';
-import {magicItems} from './magic/registry.mjs?v=harvest-17';
+import {EQUIPMENT, ITEMS} from './content.mjs?v=harvest-18';
+import {magicItems} from './magic/registry.mjs?v=harvest-18';
 import {
   BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,
-  EQUIPMENT_SLOTS, RESULT_CODES, SAVE_VERSION_V2, SUPPLY_CAPACITY, SUPPLY_ITEM_IDS,
+  EQUIPMENT_SLOTS, EQUIPMENT_SLOT_ITEMS, RESULT_CODES, SAVE_VERSION_V2, SUPPLY_CAPACITY, SUPPLY_ITEM_IDS,
   containerId, equipmentSlotFor, itemDefinition,
-} from './contracts.mjs?v=harvest-17';
+} from './contracts.mjs?v=harvest-18';
 
 export {
   BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS,
@@ -64,7 +64,7 @@ export function createChest(ownerId){return createContainer(containerId('chest',
 export function createRecovery(ownerId, slotCount){return createContainer(containerId('recovery', ownerId), Math.max(0, slotCount|0));}
 
 export function emptyEquipment(){
-  return {chop:null, mine:null, weapon:null, body:null, light:null};
+  return Object.fromEntries(EQUIPMENT_SLOTS.map(slot=>[slot, null]));
 }
 
 export function cloneEquipment(equipment){
@@ -432,7 +432,7 @@ export function serializeContainer(container){return cloneContainer(container);}
 
 export function equippedLanternLit(player){
   const light=player?.equipment?.light;
-  return !!(player&&player.online&&!player.down&&!player.ghost&&player.lantern&&(light?.itemId==='torch'||light?.itemId==='everlantern')&&typeof light.durability==='number'&&light.durability>0);
+  return !!(player&&player.online&&!player.down&&!player.ghost&&player.lantern&&EQUIPMENT_SLOT_ITEMS.light.includes(light?.itemId)&&typeof light.durability==='number'&&light.durability>0);
 }
 
 // Presentation only: a theme may list `variants` for a sprite key. Each entity

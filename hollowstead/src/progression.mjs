@@ -19,7 +19,7 @@ export function valueNoise(x,z){
   return a+(b-a)*xf+(c-a)*zf+(a-b-c+d)*xf*zf;
 }
 
-export const INNER_RING=24, OUTER_RING=58;
+export const INNER_RING=36, OUTER_RING=88;
 
 /** Region name at a world position. Stable for every seed so terrain, minimap and spawns agree. */
 export function regionAt(x,z){
@@ -36,8 +36,8 @@ export const tierAt=(x,z)=>REGIONS[regionAt(x,z)]?.tier??0;
 
 export const NODE_POOLS = Object.freeze({
   meadow:['pumpkin','bush','grass','tree','rock','grass','pumpkin','mushroom'],
-  woods:['tree','tree','tree','tree','grass','mushroom','bush','rock'],
-  graveyard:['grave','grave','ore','rock','tree','bones','mushroom','grass'],
+  woods:['tree','tree','tree','tree','grass','mushroom','bush','rock','glowsprout'],
+  graveyard:['grave','grave','ore','rock','tree','bones','mushroom','grass','gravewisp','gravewisp'],
   mire:['glowcap','glowcap','glowcap','grass','grass','tree','bush','mushroom'],
   crags:['shardrock','shardrock','shardrock','rock','rock','ore','ore','grass'],
   barrow:['bones','bones','bones','grave','grave','ore','tree','rock'],
@@ -54,10 +54,10 @@ export const RESIDENTS = Object.freeze({
 });
 
 export const CACHE_LAYOUT = Object.freeze([
-  {type:'crate', count:30, min:9, max:94},
-  {type:'ironchest', count:16, min:28, max:94},
-  {type:'moonchest', count:9, min:56, max:94},
-  {type:'reliquary', count:4, min:76, max:94},
+  {type:'crate', count:40, min:9, max:120},
+  {type:'ironchest', count:18, min:44, max:132},
+  {type:'moonchest', count:10, min:86, max:128},
+  {type:'reliquary', count:5, min:108, max:138},
 ]);
 export const CACHE_TYPES = Object.freeze(CACHE_LAYOUT.map(entry=>entry.type));
 export const isCache = type=>CACHE_TYPES.includes(type);
@@ -75,6 +75,9 @@ const ITEM_RARITY = Object.freeze({
   'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic',
   fangs:'rare', wisplantern:'rare', crowtotem:'rare', soulchain:'epic', stormrod:'epic', jacklantern:'epic', censer:'epic',
   scythe:'legendary', starfall:'legendary', wighthorn:'legendary',
+  // Trinkets (trinkets.mjs): six rare, four epic. Caches and elites drop them through the pools below.
+  nightfang:'rare', emberheart:'rare', crowseye:'rare', harvestcharm:'rare', wispfeather:'rare', gravedust:'rare',
+  frostanklet:'epic', boneward:'epic', moonlocket:'epic', thornknot:'epic',
 });
 export const rarityOf = itemId=>ITEM_RARITY[itemId]||'common';
 export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
@@ -84,8 +87,8 @@ export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
 // from a rarity pool so new gear only needs a rarity to join the tables.
 const POOLS = Object.freeze({
   uncommon:['recurve','sword','elixir','elixir','torch','bandage'],
-  rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem'],
-  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer'],
+  rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem','nightfang','emberheart','crowseye','harvestcharm','wispfeather','gravedust'],
+  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer','frostanklet','boneward','moonlocket','thornknot'],
   legendary:['tome','everlantern','scythe','starfall','wighthorn'],
 });
 export const LOOT_TABLES = Object.freeze({
@@ -158,7 +161,9 @@ export function maxHealth(p){return 100+(p?.growth==='arena'?ARENA_GROWTH.hp:HP_
 export function powerOf(p){
   const level=1+(p?.growth==='arena'?ARENA_GROWTH.power:POWER_PER_LEVEL)*((p?.level||1)-1);
   const rank=p?.ranks?.[p?.equipment?.weapon?.itemId]||1;
-  return level*(1+ARENA_GROWTH.rank*(Math.min(ARENA_GROWTH.maxRank,rank)-1));
+  // `might`: a temporary multiplier other rules set on the wanderer (trinkets.mjs).
+  const might=p?.might>0?p.might:1;
+  return level*(1+ARENA_GROWTH.rank*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might;
 }
 
 // ------------------------------------------------------------------ gear
@@ -168,7 +173,7 @@ export const ARMOR_REDUCTION = Object.freeze({armor:.45, bonemail:.55, shardplat
  * the i-frames is a perfect dodge: the dodge comes back almost at once and some stamina returns.
  */
 export const DASH = Object.freeze({distance:3.4, time:.18, iframes:.32, cooldown:.8, stamina:22, perfectCooldown:.15, perfectStamina:12});
-export const LIGHT_ITEMS = Object.freeze(['torch','everlantern']);
+export const LIGHT_ITEMS = Object.freeze(['torch','everlantern','gravelight']);
 export const EVERLANTERN_RADIUS_SCALE=1.45;
 
 /** How each non-magic weapon attacks. Damage comes from EQUIPMENT[id].damage. */

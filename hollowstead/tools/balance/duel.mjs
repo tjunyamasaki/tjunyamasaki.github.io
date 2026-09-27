@@ -3,8 +3,8 @@
 import {World} from '../../src/engine.mjs';
 import {RULES, EQUIPMENT, RECIPES} from '../../src/content.mjs';
 import {equipmentSlotFor} from '../../src/inventory.mjs';
-import {loadMagicModules} from '../../src/magic/load.mjs?v=harvest-17';
-import {magicItems} from '../../src/magic/registry.mjs?v=harvest-17';
+import {loadMagicModules} from '../../src/magic/load.mjs?v=harvest-18';
+import {magicItems} from '../../src/magic/registry.mjs?v=harvest-18';
 import {maxHealth, rarityOf, WEAPON_STYLES} from '../../src/progression.mjs';
 
 await loadMagicModules();

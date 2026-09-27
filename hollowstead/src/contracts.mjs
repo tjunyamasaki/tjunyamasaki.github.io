@@ -5,8 +5,8 @@
 // schedule, used only to migrate a saved campaign. Do not import World, the DOM,
 // the network, or a renderer from here.
 
-import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-17';
-import {magicItems} from './magic/registry.mjs?v=harvest-17';
+import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-18';
+import {magicItems} from './magic/registry.mjs?v=harvest-18';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 
@@ -54,12 +54,25 @@ export const STACK_LIMIT = 64;
 /** Legacy v1 supply counter. A backpack is limited by its slots and stack size, not this number. */
 export const SUPPLY_CAPACITY = RULES.capacity;
 export const CHEST_SLOT_COUNT = 24;
+/** Hand cart storage at levels 1..3 (cart.mjs). */
+export const CART_SLOT_COUNTS = Object.freeze([8, 12, 16]);
+/** Buildings whose store opens like a chest: one opener at a time, the same reach and transfers. */
+export const STORAGE_TYPES = Object.freeze(['chest', 'cart']);
+/** Active slots of a storage building's store (0 for anything else). */
+export function storageSlotCount(building){
+  if(building?.type==='chest')return CHEST_SLOT_COUNT;
+  if(building?.type==='cart')return CART_SLOT_COUNTS[Math.min(CART_SLOT_COUNTS.length, Math.max(1, building.level|0))-1];
+  return 0;
+}
 export const DROP_LIFETIME_SECONDS = RULES.cycle;
 export const CHEST_LEASE_SECONDS = 12;
 export const CHEST_RENEW_SECONDS = 3;
 export const DISMANTLE_HOLD_SECONDS = 0.8;
 
-export const EQUIPMENT_SLOTS = Object.freeze(['chop', 'mine', 'weapon', 'body', 'light']);
+/** Worn gear. head/back hold frontier gear (regions.mjs); trinket holds one trinket (trinkets.mjs). */
+export const EQUIPMENT_SLOTS = Object.freeze(['chop', 'mine', 'weapon', 'body', 'light', 'head', 'back', 'trinket']);
+/** The ten trinkets, in catalog order. */
+export const TRINKET_IDS = Object.freeze(['frostanklet', 'nightfang', 'emberheart', 'crowseye', 'harvestcharm', 'boneward', 'wispfeather', 'gravedust', 'moonlocket', 'thornknot']);
 /** Quick-swap weapon slots. Each holds the uid of a weapon the wanderer carries or wears. */
 export const HOTBAR_SLOTS = 3;
 export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
@@ -68,7 +81,10 @@ export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
   weapon: Object.freeze(['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome',
     'fangs', 'soulchain', 'scythe', 'wisplantern', 'stormrod', 'starfall', 'crowtotem', 'jacklantern', 'wighthorn', 'censer']),
   body: Object.freeze(['armor', 'bonemail', 'shardplate']),
-  light: Object.freeze(['torch', 'everlantern']),
+  light: Object.freeze(['torch', 'everlantern', 'gravelight']),
+  head: Object.freeze(['sporemask']),
+  back: Object.freeze(['barrowcloak']),
+  trinket: TRINKET_IDS,
 });
 /** v1 saves that contain both weapons equip the sword and keep the spear in the backpack. */
 export const MIGRATION_PREFERRED_WEAPON = 'sword';
@@ -94,9 +110,9 @@ export const CATALOG_TABS = Object.freeze(['craft', 'build']);
 export const CATALOG_CONTEXT_FIELDS = Object.freeze(['source', 'stationId', 'tab', 'category']);
 export const FIRE_STATION_TYPES = Object.freeze(['hearth', 'fire']);
 
-export const FIELD_BUILD_RECIPES = Object.freeze(['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed']);
+export const FIELD_BUILD_RECIPES = Object.freeze(['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed', 'cart']);
 export const WORKBENCH_BUILD_RECIPES = Object.freeze([...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward']);
-export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir']);
+export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir', 'sporemask', 'gravelight', 'barrowcloak']);
 export const FIRE_COOK_RECIPES = Object.freeze(['roast', 'roastMeat', 'roastCaps']);
 export const CAULDRON_COOK_RECIPES = Object.freeze(['stew']);
 
@@ -122,6 +138,7 @@ export const CONTEXT_ACTIONS = Object.freeze({
   bench: Object.freeze(['craft', 'build', 'repair']),
   pot: Object.freeze(['cook', 'repair']),
   chest: Object.freeze(['open', 'repair']),
+  cart: Object.freeze(['pull', 'open', 'upgrade', 'repair']),
   wall: Object.freeze(['repair']),
   gate: Object.freeze(['toggle', 'repair']),
   trap: Object.freeze(['rearm', 'repair']),
@@ -141,6 +158,8 @@ export const CONTEXT_ACTIONS = Object.freeze({
   shardrock: Object.freeze(['mine']),
   bones: Object.freeze(['gather']),
   glowcap: Object.freeze(['gather']),
+  glowsprout: Object.freeze(['gather']),
+  gravewisp: Object.freeze(['gather']),
   crate: Object.freeze(['unlock']),
   ironchest: Object.freeze(['unlock']),
   moonchest: Object.freeze(['unlock']),

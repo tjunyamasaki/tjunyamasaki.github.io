@@ -1,0 +1,22 @@
+/* trinkets HUD (src/ui/trinkets.mjs): the worn trinket, a small chip under the vitals; its ring shows a charge when it has one. */
+.trinket-chip{position:absolute;top:calc(12px + env(safe-area-inset-top) + 66px);left:max(9px,env(safe-area-inset-left));width:34px;height:34px;min-width:0;min-height:0;padding:0;margin:0;border-radius:50%;border:1px solid #dac29a4d;background:#2c2732d9;box-shadow:0 3px 10px #18132255;display:grid;place-items:center;pointer-events:auto;touch-action:manipulation;z-index:2;--ring:#ffe6a3;--charge:0}
+.trinket-chip[hidden]{display:none}
+.trinket-chip .trinket-icon{width:26px;height:26px;display:grid;place-items:center;pointer-events:none}
+#trinket-chip .item-icon{width:26px;height:26px;min-width:0;min-height:0;margin:0;object-fit:contain;filter:drop-shadow(0 1px 1px #1119)}
+.trinket-charge{position:absolute;inset:-3px;border-radius:50%;pointer-events:none;opacity:0;background:conic-gradient(var(--ring) calc(var(--charge) * 1turn),#ffffff14 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px))}
+.trinket-chip:is([data-state="ready"],[data-state="cooling"],[data-state="active"]) .trinket-charge{opacity:1}
+.trinket-chip[data-state="ready"]{border-color:#efe6d2b0;box-shadow:0 0 0 1px #18132266,0 0 12px #efe6d255}
+.trinket-chip[data-state="cooling"] .trinket-icon{opacity:.55}
+.trinket-chip[data-state="active"]{box-shadow:0 0 0 1px #18132266,0 0 12px color-mix(in srgb,var(--ring) 45%,transparent)}
+.trinket-chip[data-trinket="boneward"]{--ring:#efe6d2}
+.trinket-chip[data-trinket="frostanklet"]{--ring:#bfe8ff}
+.trinket-chip[data-trinket="moonlocket"]{--ring:#c49bff}
+.trinket-chip.is-pop{animation:trinket-pop .45s ease-out}
+@keyframes trinket-pop{0%{transform:scale(1.4);box-shadow:0 0 18px #efe6d2}100%{transform:scale(1)}}
+/* Trinket floaters (renderers: 'strike' events with kind ward / fang / thorn). */
+.world-label.strike-ward{font-size:13px;letter-spacing:.8px}
+.world-label.strike-fang{font-size:11px}
+.world-label.strike-thorn{font-size:11px}
+/* Inventory tooltips: a trinket's tip carries its effect on a second line. */
+.item-slot[data-tip][data-tip*="\A"]:is(.is-selected,:hover)::after{white-space:pre;text-align:center;line-height:1.35}
+body.arena .trinket-chip{display:none}

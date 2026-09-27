@@ -2,10 +2,12 @@
 // Emits intent descriptions for the local player. Never reads a guest-supplied
 // actor id and never mutates the world. The host rechecks every command.
 
-import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-17';
-import {magicItems} from '../magic/registry.mjs?v=harvest-17';
-import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-17';
-import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-17';
+import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-18';
+import {magicItems} from '../magic/registry.mjs?v=harvest-18';
+import {FRONTIER_LINES} from '../regions.mjs?v=harvest-18';
+import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-18';
+import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-18';
+import {TRINKET_TEXT} from '../trinkets.mjs?v=harvest-18';
 
 const SPECS = Object.freeze({
   feed: {icon: '▥', label: 'Feed', activation: 'tap'},
@@ -29,6 +31,8 @@ const SPECS = Object.freeze({
   place: {icon: '✓', label: 'Place', activation: 'tap'},
   cancel: {icon: '✕', label: 'Cancel', activation: 'tap'},
   dismantle: {icon: '⌫', label: 'Dismantle', activation: 'hold'},
+  pull: {icon: '⇢', label: 'Pull', activation: 'tap'},
+  upgrade: {icon: '⇧', label: 'Upgrade', activation: 'tap'},
 });
 
 const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock']);
@@ -127,7 +131,7 @@ export function isHarvestAction(id) {
 export function usableLantern(player) {
   if (!player || player.down || player.ghost) return null;
   const light = player.equipment?.light;
-  const lights = ['torch', 'everlantern'];
+  const lights = ['torch', 'everlantern', 'gravelight'];
   const equipped = lights.includes(light?.itemId) && light.durability > 0 ? light : null;
   let carried = null;
   for (const stack of player.inventory?.slots || []) {
@@ -254,6 +258,28 @@ export function describeContext(facts) {
       enabled: !facts.busy,
       disabledReason: 'Chest in use',
     }));
+  } else if (facts.type === 'cart') {
+    // Hand cart (cart.mjs cartFacts): take or drop the handle, open it like a chest, upgrade beside a workbench.
+    list.push(make('pull', {
+      targetId: id,
+      label: facts.towing ? 'Let go' : 'Pull',
+      enabled: !!facts.towing || !facts.towedByOther,
+      disabledReason: 'Someone else is pulling it',
+      command: {type: 'cart', op: facts.towing ? 'release' : 'pull', cartId: id},
+    }));
+    list.push(make('open', {
+      targetId: id,
+      enabled: !facts.busy,
+      disabledReason: 'Someone has it open',
+    }));
+    if (facts.level < facts.maxLevel) {
+      list.push(make('upgrade', {
+        targetId: id,
+        enabled: !!facts.canUpgrade,
+        disabledReason: facts.upgradeReason || 'Needs more materials',
+        command: {type: 'cart', op: 'upgrade', cartId: id},
+      }));
+    }
   } else if (facts.type === 'gate') {
     list.push(make('toggle', {
       targetId: id,
@@ -309,9 +335,11 @@ export function effectLine(itemId) {
   const tag = rarity === 'common' ? '' : `${rarity[0].toUpperCase()}${rarity.slice(1)} · `;
   const magic = magicItems[itemId];
   if (magic) return tag + (magic.blurb || (magic.damage ? `${magic.damage} damage` : 'Magic weapon'));
+  if (Object.hasOwn(FRONTIER_LINES, itemId)) return tag + FRONTIER_LINES[itemId];
   const gear = EQUIPMENT[itemId];
   if (gear) {
     const style = weaponStyle(itemId);
+    if (TRINKET_TEXT[itemId]) return `${tag}${TRINKET_TEXT[itemId]}`;
     if (gear.damage && style?.blurb) return `${tag}${gear.damage} damage · ${style.blurb}`;
     if (gear.damage) return `${tag}${gear.damage} damage · ${STYLE_WORD[style?.style] || 'Melee'}${style?.arc ? ' · cleaves' : ''}${style?.pierce ? ' · pierces' : ''}`;
     if (ARMOR_REDUCTION[itemId]) return `${tag}Absorbs ${Math.round(ARMOR_REDUCTION[itemId] * 100)}% damage`;

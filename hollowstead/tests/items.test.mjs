@@ -259,7 +259,7 @@ test('T06 only the equipped tool, weapon, and armor change the outcome',()=>{
   assert.equal(chop('worn',1).ready,false);
   nearDurability(chop('worn',1).durability,69);
   assert.equal(chop('worn',2).ready,true);
-  assert.equal(chop('worn',2).wood,5);
+  assert.equal(chop('worn',2).wood,3); // auto-harvest yield (rhythm.mjs)
   assert.equal(chop('worn',2).hits,0);
 
   const {w,p}=camp();
@@ -431,7 +431,7 @@ test('T25 a full pack can still finish a chop, and pickup leaves the exact remai
   assert.equal(tree.hits,0);
   assert.equal(qty(p.inventory,'wood'),full);
   assert.equal(qty(p.inventory,'fiber'),0);
-  assert.equal(w.drops.filter(drop=>drop.stack.itemId==='wood').reduce((total,drop)=>total+drop.stack.quantity,0),5);
+  assert.equal(w.drops.filter(drop=>drop.stack.itemId==='wood').reduce((total,drop)=>total+drop.stack.quantity,0),3); // auto-harvest yield (rhythm.mjs)
   assert.equal(w.drops.filter(drop=>drop.stack.itemId==='fiber').reduce((total,drop)=>total+drop.stack.quantity,0),1);
 
   const other=camp();

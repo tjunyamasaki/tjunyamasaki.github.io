@@ -109,17 +109,17 @@ test('T16 field build list, exact targets, and first workbench progression',()=>
   assert.equal(qty(p.inventory,'wood'),startWood);
   hold(w,[{p,target:tree.id}],0.2);
   assert.equal(ready(tree,w),true);
-  assert.equal(floorQty(w,'wood'),5);
+  assert.equal(floorQty(w,'wood'),3); // auto-harvest yield (rhythm.mjs)
   assert.equal(floorQty(w,'fiber'),1);
   assert.equal(qty(p.inventory,'wood'),startWood);
   takePiles(w,p);
-  assert.equal(qty(p.inventory,'wood'),startWood+5);
+  assert.equal(qty(p.inventory,'wood'),startWood+3);
   assert.equal(w.drops.length,0);
   const rock=w.nodes.find(node=>node.type==='rock');
   stand(p,rock);
   hold(w,[{p,target:rock.id}],4.5);
-  assert.equal(floorQty(w,'stone'),5);
-  takePiles(w,p);
+  assert.equal(floorQty(w,'stone'),3); // auto-harvest yield (rhythm.mjs)
+  takePiles(w,p);assert.equal(w.stock(p.inventory,'wood',2),2);assert.equal(w.stock(p.inventory,'stone',2),2); // top up to the pre-rhythm totals
   assert.equal(qty(p.inventory,'stone'),7);
   const placed=act(w,p,{type:'build',recipe:'bench',x:p.x+1.6,z:p.z});
   assert.equal(placed.ok,true);
@@ -313,9 +313,9 @@ test('T20 harvest duration ignores tick size and extra input messages',()=>{
     assert.equal(w.drops.length,0);
     hold(w,[{p,target:tree.id,spams}],0.2,dt);
     assert.equal(ready(tree,w),true);
-    assert.equal(floorQty(w,'wood'),5);
+    assert.equal(floorQty(w,'wood'),3); // auto-harvest yield (rhythm.mjs)
     assert.equal(floorQty(w,'fiber'),1);
-    assert.equal(w.stats.gathered,6);
+    assert.equal(w.stats.gathered,4); // auto-harvest yield (rhythm.mjs)
     return w.time;
   }
   const times=[run(0.05,1),run(0.1,1),run(0.02,1),run(RULES.tick,12)];
@@ -426,9 +426,9 @@ test('T22 two contributors speed one yield, and a disconnect cannot keep working
   assert.equal(w.drops.length,0);
   hold(w,[{p,target:tree.id}],1);
   assert.equal(ready(tree,w),true);
-  assert.equal(floorQty(w,'wood'),5);
+  assert.equal(floorQty(w,'wood'),3); // auto-harvest yield (rhythm.mjs)
   assert.equal(floorQty(w,'fiber'),1);
-  assert.equal(w.stats.gathered,6);
+  assert.equal(w.stats.gathered,4); // auto-harvest yield (rhythm.mjs)
 
   const alone=camp();
   const other=alone.w.addPlayer('guest');
@@ -441,7 +441,7 @@ test('T22 two contributors speed one yield, and a disconnect cannot keep working
   assert.equal(ready(pine,alone.w),false);
   hold(alone.w,[{p:other,target:pine.id}],0.9);
   assert.equal(ready(pine,alone.w),true);
-  assert.equal(floorQty(alone.w,'wood'),5);
+  assert.equal(floorQty(alone.w,'wood'),3); // auto-harvest yield (rhythm.mjs)
 
   const pair=camp();
   const mate=pair.w.addPlayer('guest');
@@ -451,7 +451,7 @@ test('T22 two contributors speed one yield, and a disconnect cannot keep working
   release(pair.w,mate,both.id);
   hold(pair.w,[{p:pair.p,target:both.id,act:true},{p:mate,target:both.id,act:false}],2.2);
   assert.equal(ready(both,pair.w),true);
-  assert.equal(floorQty(pair.w,'wood'),5);
+  assert.equal(floorQty(pair.w,'wood'),3); // auto-harvest yield (rhythm.mjs)
   release(pair.w,pair.p,null);
   release(pair.w,mate,null);
   const stopped=camp();
@@ -521,7 +521,7 @@ test('T23 tool wear is time-based and a broken optional tool falls back to hands
   assert.equal(ready(log,snap.w),false);
   hold(snap.w,[{p:snap.p,target:log.id}],0.2);
   assert.equal(ready(log,snap.w),true);
-  assert.equal(floorQty(snap.w,'wood'),5);
+  assert.equal(floorQty(snap.w,'wood'),3); // auto-harvest yield (rhythm.mjs)
 });
 
 test('T24 chopped and mined yields stay on the floor until a new pickup',()=>{
@@ -531,7 +531,7 @@ test('T24 chopped and mined yields stay on the floor until a new pickup',()=>{
   stand(p,tree);
   hold(w,[{p,target:tree.id}],4);
   assert.equal(qty(p.inventory,'wood'),0);
-  assert.equal(floorQty(w,'wood'),5);
+  assert.equal(floorQty(w,'wood'),3); // auto-harvest yield (rhythm.mjs)
   assert.equal(floorQty(w,'fiber'),1);
   const wood=w.drops.find(drop=>drop.stack.itemId==='wood');
   const spot={x:wood.x,z:wood.z,quantity:wood.stack.quantity};
@@ -558,7 +558,7 @@ test('T24 chopped and mined yields stay on the floor until a new pickup',()=>{
   const before=w.drops.length;
   hold(w,[{p,target:rock.id}],4.5);
   assert.equal(qty(p.inventory,'stone'),0);
-  assert.equal(floorQty(w,'stone'),5);
+  assert.equal(floorQty(w,'stone'),3); // auto-harvest yield (rhythm.mjs)
   assert.equal(w.drops.length,before+1);
 
   const ore=w.nodes.find(node=>node.type==='ore');
@@ -566,15 +566,15 @@ test('T24 chopped and mined yields stay on the floor until a new pickup',()=>{
   w.grantEquipped(p,'pick',70);
   hold(w,[{p,target:ore.id}],3.5);
   assert.equal(qty(p.inventory,'ore'),0);
-  assert.equal(floorQty(w,'ore'),3);
-  assert.equal(floorQty(w,'stone'),7);
+  assert.equal(floorQty(w,'ore'),2); // auto-harvest yield (rhythm.mjs)
+  assert.equal(floorQty(w,'stone'),4);
 
   const grave=w.nodes.find(node=>node.type==='grave');
   assert.ok(grave);
   stand(p,grave);
   hold(w,[{p,target:grave.id}],3);
   assert.equal(qty(p.inventory,'ember'),0);
-  assert.equal(floorQty(w,'ember'),3);
+  assert.equal(floorQty(w,'ember'),2); // auto-harvest yield (rhythm.mjs)
 
   const grass=w.nodes.find(node=>node.type==='grass'&&!(node.ready>w.time));
   stand(p,grass);
@@ -596,7 +596,7 @@ test('T26 a grave rolls its wraith and gathered total once',()=>{
   hold(w,[{p,target:grave.id}],3);
   assert.equal(ready(grave,w),true);
   assert.equal(calls,1);
-  assert.equal(w.stats.gathered,before+5);
+  assert.equal(w.stats.gathered,before+3); // auto-harvest yield (rhythm.mjs)
   assert.ok(w.enemies.filter(enemy=>enemy.type==='wraith').length<=1);
   const gathered=w.stats.gathered;
   w.enemies=[];
@@ -607,9 +607,9 @@ test('T26 a grave rolls its wraith and gathered total once',()=>{
   grave.ready=0;grave.hits=NODES.grave.hits;
   hold(w,[{p,target:grave.id}],3);
   assert.equal(calls,2);
-  assert.equal(w.stats.gathered,gathered+5);
+  assert.equal(w.stats.gathered,gathered+3);
   assert.ok(w.enemies.length<=1);
-  assert.equal(floorQty(w,'ember'),6);
+  assert.equal(floorQty(w,'ember'),4); // auto-harvest yield (rhythm.mjs)
 });
 
 test('T27 revive takes three real seconds and extra packets do not speed it up',()=>{

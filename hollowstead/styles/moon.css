@@ -1,0 +1,25 @@
+/* moon HUD (src/ui/moon.mjs). */
+.moon-badge{pointer-events:auto;position:relative;flex:none;align-self:center;display:grid;place-items:center;width:18px;height:18px;min-width:0;min-height:0;margin:-4px 0 -3px;padding:0;border:1px solid #f0dfbd70;border-radius:50%;background:#1d1a26c0;box-shadow:0 1px 4px #181421;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.moon-badge[hidden]{display:none}
+.moon-badge::after{content:'';position:absolute;inset:-10px -9px}
+.moon-badge img{width:14px;height:14px;object-fit:contain;pointer-events:none}
+.moon-badge.moon-new{border-color:#8ea4d880;background:#11131fd8}
+.moon-badge.moon-new img{opacity:.72}
+.moon-badge.moon-blood{border-color:#e2585c;background:#2a1116d8;box-shadow:0 0 6px #d33b41a8}
+.moon-badge.moon-omen{animation:moon-omen 1.8s ease-in-out infinite}
+@keyframes moon-omen{50%{box-shadow:0 0 11px 2px #e4464ce0}}
+.moon-badge:focus-visible{outline:2px solid var(--orange,#edb47a);outline-offset:2px}
+
+.moon-card{position:fixed;z-index:42;padding:8px 10px 7px;border:1px solid #dac29a38;border-radius:10px;background:#221e2bee;box-shadow:0 6px 18px #0e0c1470;color:var(--cream,#f0dfbd);font:11px/1.35 Arial,Helvetica,sans-serif;pointer-events:auto;touch-action:manipulation}
+.moon-card[hidden]{display:none}
+.moon-card.moon-blood{border-color:#d2474c90;background:#2a151bee}
+.moon-card.moon-new{border-color:#8ea4d860;background:#181a28ee}
+.moon-card-head{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.moon-card-head img{width:20px;height:20px;object-fit:contain}
+.moon-card-head b{font:italic 14px/1.1 Georgia,serif;letter-spacing:.2px}
+.moon-card-head small{margin-left:auto;font:9px ui-monospace,monospace;letter-spacing:.8px;color:var(--muted,#b9ac99)}
+.moon-card p{margin:0}
+.moon-card .moon-next{display:flex;align-items:center;gap:5px;margin-top:5px;padding-top:5px;border-top:1px solid #dac29a24;color:var(--muted,#b9ac99);font-size:10px}
+.moon-card .moon-next img{width:13px;height:13px;object-fit:contain}
+
+.moon-veil{position:fixed;top:0;left:0;width:100%;height:100dvh;pointer-events:none;opacity:0;transition:opacity .8s linear;background:radial-gradient(ellipse at 50% 52%,transparent 34%,#7a101a2e 62%,#6a0c16a0 100%)}

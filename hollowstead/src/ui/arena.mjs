@@ -49,7 +49,7 @@ export function offerMarkup(offers, icon){
   return (offers || []).map((offer, i) => {
     const rarity = rarityOf(offer.itemId);
     const badge = offer.owned ? `<span class="pick-badge rank">RANK UP ${rankStars(offer.rank)}</span>` : '<span class="pick-badge">NEW</span>';
-    return `<button type="button" class="pick-card rarity-${rarity}" data-pick="${i}" aria-label="${escape(label(offer.itemId))}, ${rarity}${offer.owned ? `, rank up to ${offer.rank}` : ', new weapon'}">`
+    return `<button type="button" class="pick-card rarity-${rarity}${offer.itemId === 'kitsune-lantern' ? ' pick-kitsune' : ''}" data-pick="${i}" aria-label="${escape(label(offer.itemId))}, ${rarity}${offer.owned ? `, rank up to ${offer.rank}` : ', new weapon'}">`
       + `${badge}<span class="pick-icon">${icon(offer.itemId)}</span><b>${escape(label(offer.itemId))}</b>`
       + `<small class="pick-rarity">${rarity.toUpperCase()}</small><span class="pick-blurb">${escape(weaponBlurb(offer.itemId))}</span></button>`;
   }).join('');

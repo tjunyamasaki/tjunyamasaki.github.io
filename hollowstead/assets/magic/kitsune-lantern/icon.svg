@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <title>Nine-Tail Lantern</title>
+  <g stroke="#2b2233" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- A compact emblem retains all nine tails without tiny inventory details. -->
+    <path d="M64 102Q21 117 10 79Q37 86 63 77" fill="#aa7ee0"/>
+    <path d="M128 102Q171 117 182 79Q155 86 129 77" fill="#aa7ee0"/>
+    <path d="M68 80Q21 84 16 42Q42 52 68 59" fill="#55d9c3"/>
+    <path d="M124 80Q171 84 176 42Q150 52 124 59" fill="#55d9c3"/>
+    <path d="M78 66Q37 65 37 20Q61 34 81 42" fill="#aa7ee0"/>
+    <path d="M114 66Q155 65 155 20Q131 34 111 42" fill="#aa7ee0"/>
+    <path d="M91 62Q58 41 67 8Q85 25 100 34" fill="#55d9c3"/>
+    <path d="M101 62Q134 41 125 8Q107 25 92 34" fill="#55d9c3"/>
+    <path d="M96 59Q73 29 96 5Q119 29 96 59Z" fill="#aa7ee0"/>
+    <path d="M56 78L43 43L79 61Q97 55 113 61L149 43L138 78L152 95L143 123Q125 150 96 158Q66 150 50 124L40 98Z" fill="#fff0c9"/>
+    <path d="M135 85L143 98L134 118Q120 139 96 148L76 148L96 158Q125 150 143 123L152 95L138 78L149 43Z" fill="#dca984" stroke="none"/>
+    <path d="M55 56L61 79L74 68M137 56L132 79L118 68" fill="#ed574d" stroke-width="4"/>
+    <path d="M96 67L105 81L96 91L87 81Z" fill="#ed574d" stroke="none"/>
+    <path d="M53 90L79 101M139 90L113 101" fill="none" stroke="#ed574d" stroke-width="7"/>
+    <path d="M56 98L81 110Q64 115 56 98ZM136 98L111 110Q128 115 136 98Z" fill="#55e9cb" stroke-width="5"/>
+    <path d="M54 116L65 121M138 116L127 121" fill="none" stroke="#ed574d" stroke-width="5"/>
+    <path d="M91 118L101 118L96 124Z" fill="#2b2233" stroke-width="3"/>
+    <path d="M78 129Q96 139 116 127Q108 144 96 145Q85 143 78 129Z" fill="#2b2233" stroke-width="4"/>
+    <path d="M86 133L90 140L95 136M103 134L106 140L111 131" fill="#fff0c9" stroke="none"/>
+    <path d="M94 158Q76 145 68 157Q66 169 91 169M99 158Q117 145 124 157Q126 169 102 169" fill="#ed574d" stroke-width="5"/>
+    <path d="M91 167L82 183L94 179L99 164" fill="#ed574d" stroke-width="4"/>
+    <path d="M99 166L104 179" fill="none" stroke-width="5"/>
+    <circle cx="105" cy="181" r="7" fill="#f7bd57" stroke-width="4"/>
+    <path d="M103 182L106 185" stroke-width="3"/>
+    <circle cx="97" cy="161" r="7" fill="#ed574d" stroke-width="4"/>
+  </g>
+</svg>

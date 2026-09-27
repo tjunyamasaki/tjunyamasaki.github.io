@@ -228,6 +228,11 @@ body.arena .hotbar .weapon-slot .item-icon{width:40px;height:40px}
 .pick-badge.rank{background:#f2c14e33;color:#f6d27a}
 .pick-card.rarity-uncommon{border-color:#8fd3a088}.pick-card.rarity-rare{border-color:#79b8ffaa}.pick-card.rarity-epic{border-color:#c49bffaa;box-shadow:0 10px 26px #17111f66,0 0 16px #c49bff33}.pick-card.rarity-legendary{border-color:#f2c14ecc;box-shadow:0 10px 26px #17111f66,0 0 20px #f2c14e44}
 .pick-card.rarity-uncommon .pick-rarity{color:#8fd3a0}.pick-card.rarity-rare .pick-rarity{color:#79b8ff}.pick-card.rarity-epic .pick-rarity{color:#c49bff}.pick-card.rarity-legendary .pick-rarity{color:#f2c14e}
+.pick-card.pick-kitsune{border:2px solid #ae70ff;background:radial-gradient(ellipse at 50% 28%,#4ff1cd19,transparent 55%),linear-gradient(155deg,#34243f,#241c30);box-shadow:0 10px 26px #17111f66,inset 0 0 0 2px #24192f,0 0 22px #ae70ff2b}
+.pick-kitsune .pick-icon{filter:drop-shadow(0 4px 0 #24192f);animation:kitsune-float 2.8s ease-in-out infinite}
+.pick-kitsune .pick-badge:not(.rank){background:#ff594c;color:#24192f;border-color:#24192f}
+.pick-card.pick-kitsune:hover,.pick-card.pick-kitsune:focus-visible{border-color:#4ff1cd;box-shadow:0 10px 26px #17111f66,0 0 24px #4ff1cd33}
+@keyframes kitsune-float{0%,100%{transform:translateY(1px) rotate(-3deg)}50%{transform:translateY(-4px) rotate(3deg)}}
 .arena-replace{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:#29232ff2}
 .arena-replace p{margin:0 0 8px;font-size:13px}
 .replace-row{display:flex;justify-content:center;gap:8px}

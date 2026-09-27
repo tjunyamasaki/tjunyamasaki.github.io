@@ -7,6 +7,17 @@ export class Sound {
     if(type==='strike')return; // clean strikes and trinket moments: ui/rhythm.mjs plays its own cue at the tap, without the event delay
     if(!this.enabled)return;const source=this.theme.audio?.[type];if(source){let a=this.clips.get(type);if(!a){a=new Audio(cachedSrc(source));this.clips.set(type,a);}a.currentTime=0;a.volume=.35;void a.play().catch(()=>{});return;}
     if(!this.context||this.context.state!=='running')return;const t=this.context.currentTime;if(t-this.last<.07)return;this.last=t;
+    if(type==='foxfire'||type==='foxburst'){
+      // A small haunted shrine chime; staggered partials echo the nine tails.
+      const burst=type==='foxburst';
+      for(const [i,frequency] of (burst?[196,392,587,784]:[587,784,1175]).entries()){
+        const start=t+i*.035,duration=burst?.55:.38,osc=this.context.createOscillator(),gain=this.context.createGain();
+        osc.type=i===0&&burst?'triangle':'sine';osc.frequency.setValueAtTime(frequency,start);osc.frequency.exponentialRampToValueAtTime(frequency*(burst?.55:1.035),start+duration);
+        gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(.026/(i+1),start+.009);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+        osc.connect(gain);gain.connect(this.context.destination);osc.start(start);osc.stop(start+duration+.01);
+      }
+      return;
+    }
     if(type==='bell'){
       for(const [frequency,volume] of [[220,.035],[440,.02],[613,.013],[837,.007]]){
         const osc=this.context.createOscillator(),gain=this.context.createGain();osc.type='sine';osc.frequency.setValueAtTime(frequency,t);

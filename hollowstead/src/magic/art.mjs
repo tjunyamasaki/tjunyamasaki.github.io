@@ -20,6 +20,7 @@ export const HELD_GEAR = Object.freeze({
   stormrod: {motion: 'staff', sprite: 'held-stormrod'}, starfall: {motion: 'staff', sprite: 'held-starfall'},
   crowtotem: {motion: 'rattle', sprite: 'held-crowtotem'}, jacklantern: {motion: 'bell', handY: 1.0, sprite: 'held-jacklantern'},
   wighthorn: {motion: 'tome', handY: 1.2, sprite: 'held-wighthorn'}, censer: {motion: 'bell', handY: 1.0, sprite: 'held-censer'},
+  'kitsune-lantern': {motion: 'kitsune', handY: 1.12, handX: .59, sprite: 'kitsune-lantern'},
 });
 
 export const MAGIC_PALETTE = Object.freeze({
@@ -91,6 +92,11 @@ export function heldWeaponPose(player, time, theme={}){
   const t = clamp(age / duration);
   const active = tool ? true : age >= 0 && age < duration;
   let rotation = -.10*side, reach = 0, scale = 1, lift = 0;
+  if(spec.motion === 'kitsune'){
+    // The possessed charm floats even at rest; its cast winds up before a sharp release.
+    rotation = side*(-.08+Math.sin(time*2.8)*.075);
+    lift = .045*Math.sin(time*3.4);
+  }
   if(tool){
     const phase = (time % CHOP_PERIOD) / CHOP_PERIOD;
     rotation = side*chopAngle(phase);
@@ -109,6 +115,19 @@ export function heldWeaponPose(player, time, theme={}){
     }
     if(spec.motion === 'bow'){rotation += side*.25*fade; reach = -.15*Math.sin(t*Math.PI);}
     if(spec.motion === 'tome'){scale = 1+.25*Math.sin(t*Math.PI); rotation += Math.sin(t*14)*.2*fade;}
+    if(spec.motion === 'kitsune'){
+      if(t < .26){
+        const wind = inOut(t/.26);
+        rotation += side*.46*wind; lift += .2*wind; reach = -.12*wind; scale = 1-.08*wind;
+      }else if(t < .43){
+        const snap = ease((t-.26)/.17);
+        rotation += side*(.46-.94*snap); lift += .2-.11*snap; reach = -.12+.42*snap; scale = .92+.22*snap;
+      }else{
+        const settle = (t-.43)/.57, rest = 1-ease(settle);
+        rotation += side*(-.48*rest+Math.sin(settle*Math.PI*3)*.10*(1-settle));
+        lift += .09*rest; reach = .3*rest; scale = 1+.14*rest;
+      }
+    }
   }
   const length = Math.hypot(player.dx||0,player.dz||0)||1, k = theme.motion?.playerScale || 1;
   return {key: spec.sprite || id, x: side*(spec.handX??.48)*k+(player.dx||0)/length*reach, z: .04+(player.dz||0)/length*reach,

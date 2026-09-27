@@ -72,7 +72,7 @@ const ITEM_RARITY = Object.freeze({
   elixir:'uncommon', heartstone:'epic', stew:'uncommon', bandage:'common',
   sword:'uncommon', torch:'common', recurve:'uncommon', bonebow:'rare', broadsword:'rare', crookstaff:'rare',
   flamberge:'epic', skullstaff:'epic', tome:'legendary', bonemail:'rare', shardplate:'epic', everlantern:'legendary',
-  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic',
+  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic', 'kitsune-lantern':'epic',
   fangs:'rare', wisplantern:'rare', crowtotem:'rare', soulchain:'epic', stormrod:'epic', jacklantern:'epic', censer:'epic',
   scythe:'legendary', starfall:'legendary', wighthorn:'legendary',
   // Trinkets (trinkets.mjs): six rare, four epic. Caches and elites drop them through the pools below.

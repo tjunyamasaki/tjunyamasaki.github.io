@@ -41,7 +41,7 @@ See `docs/GAMEPLAY_PLAN.md` for the full design.
 
 **Battle arena** on the title screen (or `?arena` in the address) starts a solo run in a small walled clearing with nothing in it but creatures. It is not saved.
 
-1. Pick one of three weapons: something close, something far, something that bursts.
+1. Pick one of three weapons. The prototype always offers the **Nine-Tail Lantern** first, alongside a close and a ranged choice. Its nine homing foxfires burn foes, and the ninth bursts in an area.
 2. Survive the wave. Creatures pour in from the wall in packs; each wave brings more of them, a little stronger. Every fifth wave brings champions; every tenth, the Hollow King.
 3. When the last one falls you heal a third of your health, and pick again from three weapons. A weapon you already carry ranks up instead (★, up to five: more damage each rank). With three weapons on the hotbar, a new one replaces one you choose, or you keep yours.
 4. Kills give experience to everyone standing. Each level adds health and damage and heals you fully.

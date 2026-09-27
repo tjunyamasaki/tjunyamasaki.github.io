@@ -134,6 +134,7 @@ const rollXp=type=>LOOT_TABLES[NODES[type]?.table]?.xp||10;
 const OBSTACLE_CELL=4;
 /** Auto-aim for the Gravecraft packs, which aim along the wanderer's facing. */
 const MAGIC_AIM=Object.freeze({
+  'kitsune-lantern':{reach:11,range:11},
   'cinder-staff':{reach:11,speed:12*1.15,range:11},'widows-needle':{reach:9,speed:20*1.15,range:9},
   'spirit-fan':{reach:5.5,range:5.5},'barrow-rattle':{reach:10,range:10},'mourning-bell':{reach:5.2,range:5.2},
 });
@@ -1271,6 +1272,7 @@ export class World {
       if(owed+1e-6>=amount){covered.set(enemy.id, owed-amount);continue;}
       const prev=enemy.hp;
       enemy.hp-=amount;
+      if(hit.ownerId)enemy.lastHitBy=hit.ownerId;
       if(enemy.hp<prev)this.event('damage', enemy.x, enemy.z, String(Math.ceil(amount)));
     }
     for(const knock of knocks){

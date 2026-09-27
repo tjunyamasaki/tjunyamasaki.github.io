@@ -29,7 +29,7 @@
 const PACK = 'cinder-staff';
 import { ownerPower } from './registry.mjs?v=harvest-17';
 
-const SPEED = 12;
+const SPEED = 12 * 1.15;
 const MAX_RANGE = 11;
 const HIT_RADIUS = 0.8;
 const SPAWN_AHEAD = 0.55;

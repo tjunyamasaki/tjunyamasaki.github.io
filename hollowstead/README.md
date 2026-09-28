@@ -4,6 +4,8 @@
 
 Play at **[tjunyamasaki.github.io/hollowstead/](https://tjunyamasaki.github.io/hollowstead/)**.
 
+Creating a weapon? Start with the focused [weapon authoring guide](WEAPON_AUTHORING.md).
+
 ## Enter the woods
 
 - **Venture alone** starts immediately, without a connection service.

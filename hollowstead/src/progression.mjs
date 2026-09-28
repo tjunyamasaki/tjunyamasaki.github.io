@@ -157,6 +157,15 @@ export const HP_PER_LEVEL=8, POWER_PER_LEVEL=.04, HEARTSTONE_HP=15;
 /** In the battle arena levels are the whole of your growth, so each one is worth more. */
 export const ARENA_GROWTH=Object.freeze({hp:12, power:.06, rank:.22, maxRank:5});
 export function maxHealth(p){return 100+(p?.growth==='arena'?ARENA_GROWTH.hp:HP_PER_LEVEL)*((p?.level||1)-1)+(p?.bonusHp||0);}
+/**
+ * Weapon rank, ★1 to ★5 (the arena and the weapon lab set `p.ranks`; expeditions start at ★1).
+ * Rank adds damage (powerOf) and decides how much flourish an attack and its skill show:
+ * ★1 is plain, ★5 is the full show (src/fx).
+ */
+export function rankOf(p, itemId=p?.equipment?.weapon?.itemId){
+  const rank=Math.floor(Number(p?.ranks?.[itemId]))||1;
+  return Math.max(1, Math.min(ARENA_GROWTH.maxRank, rank));
+}
 /** Damage multiplier: level, and in the arena the rank of the weapon in hand. */
 export function powerOf(p){
   const level=1+(p?.growth==='arena'?ARENA_GROWTH.power:POWER_PER_LEVEL)*((p?.level||1)-1);

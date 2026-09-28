@@ -27,6 +27,9 @@ import {bindFeatureHud, frameFeatureHud, paintFeatureHud} from './ui/features.mj
 import {revealsCache, trinketTip} from './ui/trinkets.mjs?v=harvest-18';
 import {exploredGround} from './ui/worldmap.mjs?v=harvest-18';
 import {createUpdateChecker} from './updates.mjs?v=harvest-18';
+import {skillBlock, skillFor} from './skills.mjs?v=harvest-18';
+import {labClear, labDps, labEquip, labLevel, labRank, labResetStats, labSpawn, labStrength, labToggle} from './lab.mjs?v=harvest-18';
+import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/lab.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -43,7 +46,9 @@ let lastNotice=0,lastEvent=0,lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,
 let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:0},dirty=true;
 let stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
 let connectionText='',saveText='';
-let autoAttack=true,pickPending=null,arenaMarkup='',hotbarSig='',attackSig='',zoomBeforeArena=null;
+let autoAttack=true,pickPending=null,arenaMarkup='',hotbarSig='',attackSig='',skillSig='',zoomBeforeArena=null;
+/** Weapon lab panel state (presentation only; the lab's rules live in lab.mjs). */
+let labOpen='',labRankPick=3,labFoe='mix',labCount=10,labFormation='ahead',labSheetCache='',labBarCache='',labMeterCache='';
 /** The arena is a swarm fight: start a little wider than the exploring camera. */
 const ARENA_ZOOM=.8;
 let localActions=null,localActionWorld=null,localClient=null;
@@ -165,11 +170,12 @@ function enterGame(){
   $('front').hidden=true;$('game').hidden=false;$('end-screen').hidden=true;closeSheet();$('room-panel').hidden=true;document.body.classList.add('playing');
   linkLost=false;cancelPlacement();cancelMaintenance();
   if(world?.showcase){connectionText='Showcase';saveText='Not saved';showStatus('');}
-  else if(world?.arena){connectionText='Battle arena';saveText='Arena runs are not saved';showStatus('');}
+  else if(world?.arena){connectionText=world.arena.lab?'Weapon lab':'Battle arena';saveText=world.arena.lab?'The lab is not saved':'Arena runs are not saved';showStatus('');}
   else if(mode==='solo'){connectionText='Expedition saved locally';saveText='Saved on this browser';showStatus('Expedition saved locally');}
   else{connectionText=connectionText||'Connected to camp';saveText=mode==='guest'?'Kept by the host':'Saved on this browser';}
-  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase);announce(world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':dayAt(world.time)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
-  document.body.classList.toggle('arena',!!world?.arena);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';
+  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase);announce(world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':dayAt(world.time)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
+  document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
+  showLab(!!world?.arena?.lab);
 }
 async function goHome(){
   leaveArena();
@@ -177,7 +183,7 @@ async function goHome(){
   void checkForUpdate();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
-function setBusy(value){busy=value;for(const id of ['host','join','solo','continue','showcase','arena']){const el=$(id);if(el)el.disabled=value;}}
+function setBusy(value){busy=value;for(const id of ['host','join','solo','continue','showcase','arena','lab']){const el=$(id);if(el)el.disabled=value;}}
 function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status;world=World.restore(data);dirty=true;if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');$('home-panel').hidden=true;$('room-panel').hidden=false;$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
 async function hostCamp(){
   if(busy)return;setBusy(true);sound.unlock();storeProfile();showStatus('Opening the camp…');
@@ -239,7 +245,52 @@ function startArena(){
   if(zoomBeforeArena==null){zoomBeforeArena=renderer.zoom;renderer.setZoom(ARENA_ZOOM);}
   enterGame();
 }
+/** Weapon lab: the arena without rounds. Any weapon at any rank; foes on demand; a damage meter. */
+function startLab(){
+  sound.unlock();storeProfile();
+  world=new World((Math.random()*0xffffffff)>>>0,{lab:true});
+  const p=world.addPlayer('host',$('player-name').value,character);
+  labEquip(world,p,'starfall',labRankPick);
+  mode='solo';room='';cancelPlacement();cancelMaintenance();clearSelection();labOpen='arsenal';labSheetCache='';labBarCache='';
+  if(zoomBeforeArena==null){zoomBeforeArena=renderer.zoom;renderer.setZoom(ARENA_ZOOM);}
+  enterGame();
+}
+function showLab(open){
+  const panel=$('lab-panel');if(!panel)return;
+  panel.hidden=!open;if(!open){labOpen='';labSheetCache='';labBarCache='';labMeterCache='';return;}
+  paintLab(true);
+}
+/** Lab strip, meter and the open panel. Rebuilt only when their markup changes, so taps are never lost. */
+function paintLab(force=false){
+  const panel=$('lab-panel');if(!panel||panel.hidden||!world?.arena?.lab)return;
+  const p=me();if(!p)return;
+  const strip=labStripMarkup({open:labOpen}),meter=labMeterMarkup(world);
+  if(force||strip!==labBarCache){labBarCache=strip;$('lab-strip').innerHTML=strip;}
+  if(force||meter!==labMeterCache){labMeterCache=meter;$('lab-meter').innerHTML=meter;}
+  const sheetEl=$('lab-sheet');
+  const html=labOpen==='arsenal'?arsenalMarkup(p,{rank:labRankPick,icon}):labOpen==='foes'?foesMarkup(world,{type:labFoe,count:labCount,formation:labFormation,autoAttack}):'';
+  sheetEl.hidden=!html;
+  if(html&&(force||html!==labSheetCache)){const scroll=sheetEl.scrollTop;labSheetCache=html;sheetEl.innerHTML=`<header><b>${labOpen==='arsenal'?'Arsenal':'Foes'}</b><button type="button" data-lab="panel:close" aria-label="Close">✕</button></header><div class="lab-body">${html}</div>`;sheetEl.scrollTop=scroll;}
+}
+function labCommand(value){
+  const p=me();if(!p||!world?.arena?.lab)return;
+  const [key,arg]=value.split(':');
+  if(key==='panel'){labOpen=arg==='close'||labOpen===arg?'':arg;}
+  else if(key==='equip'){labEquip(world,p,arg,labRankPick);skillSig='';hotbarSig='';attackSig='';}
+  else if(key==='rank'){labRankPick=Number(arg)||1;labRank(world,p,labRankPick);skillSig='';hotbarSig='';toast(`Rank ${'★'.repeat(labRankPick)}`);}
+  else if(key==='level'){labLevel(world,p,(p.level||1)+Number(arg));}
+  else if(key==='strength'){labStrength(world,(world.arena.wave||1)+Number(arg));}
+  else if(key==='foe')labFoe=arg;
+  else if(key==='count')labCount=Number(arg)||1;
+  else if(key==='formation')labFormation=arg;
+  else if(key==='spawn'){const made=labSpawn(world,p,{type:labFoe,count:labCount,formation:labFormation});if(!made)toast('The lab is full · clear some foes');}
+  else if(key==='clear'){labClear(world);toast('The lab is clear');}
+  else if(key==='reset')labResetStats(world);
+  else if(key==='toggle'){if(arg==='auto'){autoAttack=!autoAttack;storeProfile();}else labToggle(world,arg);}
+  dirty=true;paintLab(true);
+}
 function leaveArena(){
+  showLab(false);document.body.classList.remove('lab');
   $('arena-pick').hidden=true;pickPending=null;arenaMarkup='';document.body.classList.remove('arena');
   if(zoomBeforeArena!=null){renderer.setZoom(zoomBeforeArena);zoomBeforeArena=null;}
 }
@@ -498,7 +549,7 @@ async function toggleFullscreen(){
   syncFullscreenUi();renderer?.resize?.();
 }
 function menuHTML(){
-  const camp=room?`Camp ${escapeHtml(room)}`:world?.arena?'Battle arena':world?.showcase?'Showcase':'Solo expedition';
+  const camp=room?`Camp ${escapeHtml(room)}`:world?.arena?.lab?'Weapon lab':world?.arena?'Battle arena':world?.showcase?'Showcase':'Solo expedition';
   const auto=world?.arena?`<div class="menu-row"><span>Auto-attack</span><button type="button" data-command="auto" aria-pressed="${autoAttack}">${autoAttack?'On':'Off'}</button></div>`:'';
   return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div>${auto}<div class="menu-row"><span>Fullscreen</span><button type="button" data-command="fullscreen">${isFullscreen()?'Exit fullscreen':'Fullscreen'}</button></div>${fullscreenNote?`<p class="muted small">${escapeHtml(fullscreenNote)}</p>`:''}<div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'&&!world?.arena&&!world?.showcase?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">${world?.arena?'Leave the arena':'Save & return to title'}</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
 }
@@ -604,7 +655,7 @@ function paintCluster(modeName,p){
   liveActions=actions;
   CONTEXT_BUTTONS.forEach((id,index)=>paintAction($(id),actions[index]||null,modeName));
   const combat=allowsCombat(modeName);
-  for(const id of ['attack','dodge']){const el=$(id);el.classList.toggle('is-off',!combat);el.tabIndex=combat?0:-1;el.setAttribute('aria-hidden',combat?'false':'true');}
+  for(const id of ['attack','dodge','skill']){const el=$(id);if(!el)continue;el.classList.toggle('is-off',!combat);el.tabIndex=combat?0:-1;el.setAttribute('aria-hidden',combat?'false':'true');}
   const light=p&&showsLantern(modeName)?usableLantern(p):null;
   const lantern=$('lantern-button');
   lantern.classList.toggle('is-off',!light);lantern.tabIndex=light?0:-1;lantern.setAttribute('aria-hidden',light?'false':'true');
@@ -643,8 +694,27 @@ function paintDodge(p){
   const label=`Dodge, ${charges} of ${DASH.charges}`;
   if(el.getAttribute('aria-label')!==label)el.setAttribute('aria-label',label);
 }
+/** The skill button: the skill of the weapon in hand, its recharge ring, and whether the stamina is there. */
+function paintSkill(p){
+  const el=$('skill');if(!el||!p)return;
+  const info=skillFor(p),block=skillBlock(world,p),sig=`${info?.itemId}|${info?.name}`;
+  if(sig!==skillSig){
+    skillSig=sig;
+    el.innerHTML=`<span class="skill-glyph" aria-hidden="true">✦</span><small>${escapeHtml(info?.name||'Skill')}</small>`;
+    el.setAttribute('aria-label',info?`Skill: ${info.name}. ${info.blurb}`:'Skill');el.title=info?`${info.name} (Q) · ${info.blurb}`:'';
+  }
+  const cd=block==='cooldown'?clamp((p.skillCd||0)/(p.skillMax||info?.cooldown||1),0,1):0;
+  el.style.setProperty('--cd',cd.toFixed(3));el.style.setProperty('--fuel',clamp((p.stamina||0)/100,0,1).toFixed(3));
+  el.classList.toggle('ready',!block);el.classList.toggle('weary',block==='stamina');el.classList.toggle('cooling',block==='cooldown');
+}
 function paintArenaClock(){
   const a=world.arena,left=waveLeft(world);
+  if(a.lab){
+    $('region-name').textContent=`WEAPON LAB · ${left} FOES`;$('day-number').textContent=`WAVE ${String(Math.max(1,a.wave)).padStart(2,'0')}`;
+    const track=$('day-track');if(track.dataset.stops!=='lab'){track.dataset.stops='lab';track.style.background='linear-gradient(90deg,#6a4cc8,#f2c14e)';}
+    $('day-progress').style.left=`${clamp(labDps(world)/Math.max(1,a.stats?.peak||1),0,1)*100}%`;
+    return;
+  }
   $('region-name').textContent=a.phase==='fight'?`${left} LEFT`:a.phase==='pick'?'CHOOSE A WEAPON':a.phase==='countdown'?`GET READY · ${Math.max(1,Math.ceil(a.timer))}`:'WAVE CLEARED';
   $('day-number').textContent=`WAVE ${String(Math.max(1,a.wave)).padStart(2,'0')}`;
   const track=$('day-track');if(track.dataset.stops!=='arena'){track.dataset.stops='arena';track.style.background='linear-gradient(90deg,#c6855d,#e0523f)';}
@@ -691,7 +761,7 @@ function ui(){
     paintHotbar(p);paintAttack(p);paintArenaPick(p);paintFeatureHud(featureContext(p));
     $('party').innerHTML=world.players.filter(q=>q.id!==localId).map(q=>`<div class="party-row"><span class="party-dot" style="background:${CHARACTERS.find(c=>c.id===q.character)?.color}"></span><b>${escapeHtml(q.name)}</b><span>${!q.online?'away':q.down?'needs help!':q.ghost?'returns at dawn':''}</span></div>`).join('');
     if(p.noticeAt&&p.noticeAt!==lastNotice){toast(p.notice);lastNotice=p.noticeAt;}
-    for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(ev.type==='rare'&&distance(p,ev)<14)toast(`Found ${ev.text} · ${rarityOf(ev.itemId)}`);if(distance(p,ev)<20||ev.type==='phase')sound.play(ev.type);}}
+    for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(ev.type==='rare'&&distance(p,ev)<14)toast(`Found ${ev.text} · ${rarityOf(ev.itemId)}`);if(distance(p,ev)<20||ev.type==='phase')sound.play(ev.type,ev);}}
     $('downed').hidden=!p.down&&!p.ghost;
     if(p.down||p.ghost){$('downed-text').textContent=world.arena&&world.players.filter(q=>q.online).length<2?'The swarm has you.':p.charm?'Use your one last-chance charm, or let a teammate hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds until your supplies drop.`:'Your supplies are on the ground. You return at dawn if the camp survives.';$('use-charm').hidden=!p.charm;if(sheet)closeSheet();cancelPlacement();cancelMaintenance();inventoryPanel?.cancelDrag();}
     const boss=world.enemies.find(e=>e.type==='king');$('boss-bar').hidden=!boss;document.body.classList.toggle('boss',!!boss);if(boss)$('boss-bar').querySelector('em').style.width=`${boss.hp/boss.maxHp*100}%`;
@@ -701,6 +771,7 @@ function ui(){
       else{if(!placement.anchored){placement.x=Math.round((p.x+p.dx*3)*2)/2;placement.z=Math.round((p.z+p.dz*3)*2)/2;}const why=world.canBuild(p,placement.key,placement.x,placement.z,placement.stationId);placement.valid=!why;placement.reason=why||'';}
     }
     if(world?.showcase)paintShowcase();
+    if(world?.arena?.lab)paintLab();
     if(sheet==='catalog'&&catalog.source==='station'){const station=world.buildings.find(b=>b.id===catalog.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(maintenance&&maintenanceTarget&&!world.buildings.some(b=>b.id===maintenanceTarget&&b.hp>0))maintenanceTarget=null;
     paintCluster(currentMode(),p);drawMap($('minimap'));
@@ -718,7 +789,7 @@ function aimEntity(){
 function setupControls(){
   $('characters').innerHTML=CHARACTERS.map(c=>`<button class="character" type="button" data-character="${c.id}" aria-label="${c.name}, ${c.detail}" aria-pressed="${c.id===character}">${portrait(c.id)}<small>${c.name}</small></button>`).join('');
   $('characters').onclick=e=>{const b=e.target.closest('[data-character]');if(!b)return;character=b.dataset.character;for(const el of $('characters').children)el.setAttribute('aria-pressed',el===b);if(mode==='front')world.players[0].character=character;storeProfile();};
-  $('host').onclick=hostCamp;$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('arena').onclick=()=>{if(!busy)startArena();};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
+  $('host').onclick=hostCamp;$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   $('hotbar-inventory').onclick=toggleInventory;$('hotbar-build').onclick=toggleFieldBuild;
@@ -744,6 +815,7 @@ function setupControls(){
     const button=event.target.closest('button');if(!button||button.classList.contains('is-off'))return;
     event.preventDefault();try{button.setPointerCapture?.(event.pointerId);}catch{}sound?.unlock();
     if(button.id==='attack'){if(!allowsCombat(currentMode()))return;hold.attack=true;captured={pointerId:event.pointerId,kind:'attack'};void send({type:'attack'});return;}
+    if(button.id==='skill'){if(!allowsCombat(currentMode()))return;void send({type:'skill'},{quiet:true});return;}
     if(button.id==='dodge'){const actor=me();if(!actor||(actor.dashCharges??0)<1||(!world.arena&&actor.stamina<DASH.stamina)||actor.down||actor.ghost)return;void send({type:'dash'},{quiet:true});return;}
     if(button.id==='lantern-button'){if(usableLantern(me()))void send({type:'lanternToggle'});return;}
     const action=liveActions.find(entry=>entry.id===button.dataset.action);
@@ -809,7 +881,7 @@ function setupControls(){
     if(cmd==='zoom-in')renderer.setZoom(renderer.zoom+.15);if(cmd==='zoom-out')renderer.setZoom(renderer.zoom-.15);
     if(cmd==='maintain'){closeSheet();maintenance=true;maintenanceTarget=null;selected=null;dirty=true;}
   };
-  $('new-expedition').onclick=()=>{if(world?.arena){$('end-screen').hidden=true;lastEnd='';startArena();return;}if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World();for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();lastEnd='';$('end-screen').hidden=true;network.broadcast();save();}else solo();};
+  $('new-expedition').onclick=()=>{if(world?.arena){$('end-screen').hidden=true;lastEnd='';if(world.arena.lab)startLab();else startArena();return;}if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World();for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();lastEnd='';$('end-screen').hidden=true;network.broadcast();save();}else solo();};
   $('end-home').onclick=goHome;$('endless').onclick=()=>{world.status='playing';world.endless=true;world.bossSpawned=true;lastEnd='';$('end-screen').hidden=true;save();network?.broadcast();};
   window.addEventListener('keydown',event=>{
     if(['INPUT','TEXTAREA'].includes(event.target.tagName)||$('game').hidden||!$('end-screen').hidden)return;
@@ -850,6 +922,8 @@ function setupControls(){
       if(primary.activation==='hold'&&primary.enabled)beginContextHold(primary,'key');else void runAction(primary);return;
     }
     if(named==='attack'&&allowsCombat(modeName)){hold.attack=true;void send({type:'attack'});return;}
+    if(named==='skill'&&allowsCombat(modeName)){void send({type:'skill'},{quiet:true});return;}
+    if(world?.arena?.lab&&(key==='n'||key==='x')){labCommand(key==='n'?'spawn':'clear');return;}
     if(named==='dodge'&&allowsCombat(modeName)){void send({type:'dash'});return;}
     if(named?.startsWith('action-')&&(modeName==='normal'||modeName==='placement'||modeName==='maintenance')){
       const action=liveActions[Number(named.slice(7))-1];if(!action)return;
@@ -888,7 +962,7 @@ function frame(now){
     attack:allowsCombat(modeName)&&(hold.attack||keys.has(' ')||autoSwing(modeName)),
     target:selected,
   };
-  if(playing)paintDodge(me());
+  if(playing){paintDodge(me());paintSkill(me());}
   if(mode==='host'||mode==='solo'){world.input(localId,input);if(playing){acc+=dt;let steps=0;while(acc>=RULES.tick&&steps++<4){world.tick();acc-=RULES.tick;}}else acc=0;localClient?.tick();}
   if(networkTime>.075){networkTime=0;if(mode==='guest'&&playing)network?.input(input);if(mode==='host')network?.broadcast();}
   if(saveTime>10){saveTime=0;save();}if(pingTime>3){pingTime=0;network?.ping();}
@@ -918,6 +992,10 @@ async function init(){
     if(tool?.dataset.showcaseTool==='remove'){showcaseTool=showcaseTool==='remove'?'':'remove';if(showcaseTool)cancelPlacement();if(showcaseTool&&showcaseListOpen)closeShowcaseList();else{showcaseMarkupCache='';paintShowcase();}return;}
     if(spawn){const value=spawn.dataset.showcaseSpawn,split=value.indexOf(':');armShowcase(value.slice(0,split),value.slice(split+1));}
   });
+  const labPanel=$('lab-panel');
+  labPanel?.addEventListener('pointerdown',event=>event.stopPropagation());
+  labPanel?.addEventListener('pointerup',event=>event.stopPropagation());
+  labPanel?.addEventListener('click',event=>{event.stopPropagation();const button=event.target.closest('[data-lab]');if(button){sound?.unlock();labCommand(button.dataset.lab);}});
   $('front-fullscreen')?.addEventListener('click',()=>void toggleFullscreen());
   document.addEventListener('fullscreenchange',onFullscreenChange);
   document.addEventListener('webkitfullscreenchange',onFullscreenChange);
@@ -926,8 +1004,9 @@ async function init(){
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void checkForUpdate();});
   setInterval(()=>void checkForUpdate(),60000);
   $('loading').hidden=true;$('front').hidden=false;requestAnimationFrame(frame);
-  if(params.has('dev')||params.has('showcase')||params.has('arena'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,setTime(t){world.time=t;},get network(){return network;}};
+  if(params.has('dev')||params.has('showcase')||params.has('arena')||params.has('lab'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,startLab,labCommand,setTime(t){world.time=t;},get network(){return network;}};
   if(params.has('showcase'))startShowcase();
+  else if(params.has('lab'))startLab();
   else if(params.has('arena'))startArena();
 }
 init().catch(error=>{$('load-status').textContent=`The woods could not be loaded. ${error.message} Try reloading in a browser with WebGL enabled.`;$('loading').querySelector('p').textContent='The lantern went out.';console.error(error);});

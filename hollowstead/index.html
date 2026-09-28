@@ -9,10 +9,10 @@
   <meta name="theme-color" content="#292532"><meta name="description" content="Gather by day. Keep the fire alive at night. A Halloween co-op survival expedition for 1–4 players.">
   <title>Hollowstead — A little light. A long night.</title>
   <link rel="icon" type="image/svg+xml" href="./themes/harvest/sprites/pumpkin.svg"><link rel="stylesheet" href="./style.css?v=harvest-18">
-  <link rel="stylesheet" href="./styles/moon.css?v=harvest-18"><link rel="stylesheet" href="./styles/frontier.css?v=harvest-18"><link rel="stylesheet" href="./styles/cart.css?v=harvest-18"><link rel="stylesheet" href="./styles/rhythm.css?v=harvest-18"><link rel="stylesheet" href="./styles/trinkets.css?v=harvest-18">
+  <link rel="stylesheet" href="./styles/moon.css?v=harvest-18"><link rel="stylesheet" href="./styles/frontier.css?v=harvest-18"><link rel="stylesheet" href="./styles/cart.css?v=harvest-18"><link rel="stylesheet" href="./styles/rhythm.css?v=harvest-18"><link rel="stylesheet" href="./styles/trinkets.css?v=harvest-18"><link rel="stylesheet" href="./styles/lab.css?v=harvest-18">
 </head>
 <body>
-  <canvas id="world" aria-label="Hollowstead survival world"></canvas><div class="vignette" aria-hidden="true"></div><div id="world-labels" aria-hidden="true"></div>
+  <canvas id="world" aria-label="Hollowstead survival world"></canvas><div id="fx-flash" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div id="world-labels" aria-hidden="true"></div>
   <div id="loading"><span class="flame-mark">♧</span><p>Lighting the way…</p><small id="load-status">Waking the Hollow Harvest</small></div>
   <main id="front" hidden>
     <header class="front-header"><a href="../links/" aria-label="Back to games">← GAMES</a><span>THE HOLLOW HARVEST · 01</span><div class="front-tools"><button id="front-fullscreen" class="text-button" type="button">FULLSCREEN</button><button id="front-sound" class="text-button" aria-label="Toggle sound">SOUND ON</button></div></header>
@@ -24,7 +24,7 @@
       <label class="name-field"><span>YOUR NAME</span><input id="player-name" maxlength="18" value="Wanderer" autocomplete="nickname" aria-label="Your name"></label>
       <button id="host" class="primary wide">Gather your friends <span>↗</span></button>
       <div class="join-row"><input id="room-input" placeholder="CAMP CODE" maxlength="5" autocomplete="off" autocapitalize="characters" aria-label="Camp code"><button id="join">Join camp →</button></div>
-      <div class="front-secondary"><button id="solo" class="text-button">Venture alone</button><button id="arena" class="text-button">Battle arena</button><button id="showcase" class="text-button">Showcase</button><button id="continue" class="text-button" hidden>Continue expedition ↗</button></div>
+      <div class="front-secondary"><button id="solo" class="text-button">Venture alone</button><button id="arena" class="text-button">Battle arena</button><button id="lab" class="text-button">Weapon lab</button><button id="showcase" class="text-button">Showcase</button><button id="continue" class="text-button" hidden>Continue expedition ↗</button></div>
       <label id="saved-option" class="saved-option" hidden><input type="checkbox" id="host-save"> Host my saved expedition</label>
       <p class="status" id="front-status" role="status"></p>
     </section>
@@ -58,12 +58,14 @@
         <button type="button" id="dodge" class="round small-round" aria-label="Dodge, 2 of 2" data-charges="2">↝<small>Dodge</small><span class="dodge-count" aria-hidden="true">2</span></button>
         <button type="button" id="context-3" class="round context-extra is-off" tabindex="-1" aria-hidden="true"></button>
         <button type="button" id="lantern-button" class="round lantern-round is-off" tabindex="-1" aria-hidden="true" aria-label="Lantern"><svg class="fuel-arc" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15"></circle></svg><span>♧</span><small>Light</small></button>
+        <button type="button" id="skill" class="round skill-round is-off" tabindex="-1" aria-label="Skill">✦<small>Skill</small></button>
         <button type="button" id="attack" class="round attack" aria-label="Attack, hold to repeat">⚔<small>Attack</small></button>
         <button type="button" id="context-0" class="round interact is-off" tabindex="-1" aria-hidden="true"></button>
         <div class="stamina-track" aria-hidden="true"><i id="stamina-bar"></i></div>
       </div>
     </div>
     <aside id="showcase-panel" hidden aria-label="Showcase spawns"></aside>
+    <aside id="lab-panel" hidden aria-label="Weapon lab"><div id="lab-strip" class="lab-strip" role="toolbar" aria-label="Weapon lab tools"></div><div id="lab-meter" class="lab-meter" aria-live="off"></div><section id="lab-sheet" class="lab-sheet" hidden></section></aside>
     <nav class="hotbar" aria-label="Game actions"><div id="weapon-bar" class="weapon-bar" role="group" aria-label="Weapons"><button type="button" class="weapon-slot" data-slot="0" aria-label="Weapon slot 1"></button><button type="button" class="weapon-slot" data-slot="1" aria-label="Weapon slot 2"></button><button type="button" class="weapon-slot" data-slot="2" aria-label="Weapon slot 3"></button></div><button type="button" id="hotbar-inventory" aria-label="Inventory"><span aria-hidden="true">▣</span><small>Pack <kbd>I</kbd></small></button><button type="button" id="hotbar-build" aria-label="Build"><span aria-hidden="true">⌂</span><small>Build <kbd>B</kbd></small></button></nav>
     <section id="arena-pick" hidden role="dialog" aria-modal="true" aria-labelledby="arena-pick-title"><button type="button" id="arena-menu" class="text-button arena-menu">Menu</button><div class="pick-card-wrap"><p class="eyebrow" id="arena-pick-kicker">THE ARENA</p><h2 id="arena-pick-title">Choose a weapon</h2><div id="arena-offers" class="arena-offers"></div><div id="arena-replace" class="arena-replace" hidden></div></div></section>
     <div id="downed" hidden><h2>A light is fading.</h2><p id="downed-text"></p><button id="use-charm" class="primary" type="button">Use your last charm</button></div>

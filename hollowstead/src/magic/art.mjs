@@ -171,10 +171,21 @@ export function heldWeaponPose(player, time, theme={}){
       }
     }
   }
+  // Skill stance (skills.mjs stamps player.skillCast): blades whirl once overhead, everything else
+  // is raised high and trembles with the power it lets go. Layered over whatever the weapon was doing.
+  const skill = player.skillCast, skillAge = !tool && skill?.itemId === id ? time-skill.at : Infinity;
+  let skilling = false;
+  if(skillAge >= 0 && skillAge < .8){
+    const u = skillAge/.8, rise = Math.sin(Math.PI*clamp(u*1.15));
+    skilling = true;
+    if(melee) rotation = side*(-.2+Math.PI*2*ease(clamp(u/.55)))+(u > .55 ? side*-.2*(1-ease((u-.55)/.45)) : 0);
+    else rotation += side*-.35*rise+Math.sin(u*46)*.07*(1-u);
+    lift += .5*rise; scale *= 1+.32*rise; reach = melee ? .25*rise : reach;
+  }
   const length = Math.hypot(player.dx||0,player.dz||0)||1, k = theme.motion?.playerScale || 1;
   return {key: spec.sprite || id, x: side*(spec.handX??.48)*k+(player.dx||0)/length*reach, z: .04+(player.dz||0)/length*reach,
     y: (spec.handY??1.12)*k+Math.sin(time*2.4)*.025+lift+(active&&!melee&&!tool?Math.sin(t*Math.PI)*.12:0),
-    rotation, side, scale: scale*(spec.heldScale??1), active};
+    rotation, side, scale: scale*(spec.heldScale??1), active: active || skilling, skilling};
 }
 
 export function skeletonFrame(entity, lead=0, def=skeletonSprite){

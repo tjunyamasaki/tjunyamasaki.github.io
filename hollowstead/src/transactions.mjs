@@ -6,7 +6,7 @@ export const TRANSACTION_PROTOCOL=1;
 const outcome=code=>({ok:code==='ok',code});
 // Gameplay ping and automatic eat are not world actions. Legacy inventory
 // packets stay excluded: their replacements require revisions.
-const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','dash','lantern','repair','dismantle','upgrade','hotbar','arenaPick','cart','strike']);
+const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','skill','dash','lantern','repair','dismantle','upgrade','hotbar','arenaPick','cart','strike']);
 function validWorldAction(cmd){
   if(typeof cmd.type!=='string')return false;
   if(['move','build'].includes(cmd.type)&&(!Number.isFinite(cmd.x)||!Number.isFinite(cmd.z)))return false;

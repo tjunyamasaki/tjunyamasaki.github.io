@@ -28,6 +28,7 @@ const PROJECTILE_KEYS={arrow:'arrow',bolt:'mbolt',wisp:'wisp',seed:'pumpseed'};
 import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-18';
 import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-18';
 import {MagicMesh} from './magic/effects-three.mjs?v=harvest-18';
+import {WeaponFx} from './fx/index.mjs?v=harvest-18';
 import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-18';
 import {RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-18';
 import {
@@ -106,7 +107,7 @@ class CombatLayer {
 }
 export class Renderer {
   constructor(canvas,theme){
-    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);
+    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);
     this.scene.fog=new THREE.FogExp2(theme.palette.background,.009);this.camera=new THREE.OrthographicCamera(-15,15,15,-15,.1,180);
     this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.setPixelRatio(Math.min(devicePixelRatio,1.6));this.gl.outputColorSpace=THREE.SRGBColorSpace;
     this.objects=new Map();this.textures=new Map();this.materials=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
@@ -209,7 +210,8 @@ export class Renderer {
     return best;
   }
   float(text,x,z,color='#f8dfb3',opts={}){if(!text)return;const el=document.createElement('div');el.className=opts.className||'world-label';el.textContent=text;el.style.color=color;document.getElementById('world-labels').append(el);this.floaters.push({el,x,z,life:0,alwaysVisible:!!opts.alwaysVisible});while(this.floaters.length>MAX_FLOATERS){const old=this.floaters.shift();old.el.remove();}}
-  effect(event){
+  effect(event,world=null){
+    this.weaponFx.event(event,this.clock,world);
     if(event.type==='hit')for(const o of this.objects.values())if(Math.hypot(o.x-event.x,o.z-event.z)<.2)o.hitUntil=this.clock+.22;
     if(['loot','damage','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
     if(event.type==='hurt')this.float(event.text,event.x,event.z,'#e53935',{className:'world-label player-hurt',alwaysVisible:true});
@@ -225,7 +227,7 @@ export class Renderer {
     if(event.type==='quake'||event.type==='splat'){const mat=new THREE.MeshBasicMaterial({color:event.type==='quake'?0xff8a5c:0x9fdc6a,transparent:true,depthWrite:false,side:THREE.DoubleSide});const arc=Math.min(Math.PI*2,(event.arc||360)*Math.PI/180);const geo=arc<Math.PI*1.99?new THREE.RingGeometry(.72,1,36,1,-(event.angle||0)-arc/2,arc):new THREE.RingGeometry(.8,1,48);const mesh=new THREE.Mesh(geo,mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||1.5});}
     if(['slash','cleave'].includes(event.type)){const arc=Math.min(Math.PI*1.9,(event.arc||120)*Math.PI/180),range=event.range||2.5,phi=Math.atan2(event.dz||0,event.dx||1);const geo=new THREE.RingGeometry(range*.5,range*.98,28,1,-phi-arc/2,arc);geo.setDrawRange(0,0);const mat=new THREE.MeshBasicMaterial({color:event.type==='cleave'?0xffe0b0:0xfff4e2,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(geo,mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.5,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,fixed:true,sweep:28});}
     if(['chain','lash'].includes(event.type)){const pts=event.type==='chain'?(event.points||[]).map(([x,z])=>new THREE.Vector3(x,.9,z)):[new THREE.Vector3(event.x,.9,event.z),new THREE.Vector3(event.x+(event.dx||0)*(event.range||4),.9,event.z+(event.dz||0)*(event.range||4))];if(pts.length>1){const bent=[];for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];for(let k=0;k<6;k++){const t=k/6;bent.push(new THREE.Vector3(a.x+(b.x-a.x)*t+(k?(Math.random()-.5)*.35:0),.9+(k?(Math.random()-.5)*.3:0),a.z+(b.z-a.z)*t+(k?(Math.random()-.5)*.35:0)));}}bent.push(pts[pts.length-1]);const mesh=new THREE.Line(new THREE.BufferGeometry().setFromPoints(bent),new THREE.LineBasicMaterial({color:event.type==='chain'?0xbfe8ff:0xc49bff,transparent:true,depthWrite:false}));this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,fixed:true});}}
-    if(['starfall','mark','frost','freeze','summon','poof','rend','portal'].includes(event.type)){const color={starfall:0xf2c14e,mark:0xf2c14e,frost:0xbfe8ff,freeze:0xe2f6ff,summon:0x9fd8a8,poof:0x9fd8a8,rend:0xd0504a,portal:0xb784ff}[event.type];const mat=new THREE.MeshBasicMaterial({color,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||({freeze:.9,summon:1.1,poof:.8,rend:1}[event.type]||1)});}
+    if(['frost','freeze','summon','poof','rend','portal'].includes(event.type)){const color={starfall:0xf2c14e,mark:0xf2c14e,frost:0xbfe8ff,freeze:0xe2f6ff,summon:0x9fd8a8,poof:0x9fd8a8,rend:0xd0504a,portal:0xb784ff}[event.type];const mat=new THREE.MeshBasicMaterial({color,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||({freeze:.9,summon:1.1,poof:.8,rend:1}[event.type]||1)});}
     if(['nova','burst'].includes(event.type)){const mat=new THREE.MeshBasicMaterial({color:event.type==='nova'?0xf4a64a:0x7fd6c4,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||2});}
     if(!event.magicPack&&['hit','kill','hurt','build','craft','impact','bolt'].includes(event.type)){
       const mat=new THREE.MeshBasicMaterial({color:event.type==='hurt'?0xd97773:event.type==='bolt'?0xa7e5d8:0xf4c486,transparent:true,depthWrite:false});const mesh=new THREE.Mesh(new THREE.RingGeometry(.06,.2,10),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z});
@@ -247,8 +249,16 @@ export class Renderer {
     o.sprite.position.set(o.x,pose.y,o.z);o.sprite.scale.set(pose.side*o.def.size[0]*pose.scale,o.def.size[1]*pose.scale,1);
     o.sprite.visible=body.sprite.visible;o.shadow.visible=false;o.sprite.material.opacity=body.sprite.material.opacity;
     o.sprite.material.rotation=pose.rotation;o.sprite.renderOrder=2;
-    o.sprite.material.color.copy(body.sprite.material.color).lerp(new THREE.Color('#ffffff'),.25);
+    // A weapon mid-skill (skills.mjs) burns brighter than the wielder.
+    o.sprite.material.color.copy(body.sprite.material.color).lerp(new THREE.Color('#ffffff'),pose.skilling?.7:.25);
     return id;
+  }
+  /** A brief full-screen wash on the biggest weapon moments (src/fx). A DOM layer, so both renderers share it. */
+  paintFlash(weapon){
+    const level=weapon?Math.round(weapon.flash*100)/100:0;
+    if(level===this.flashLevel)return;this.flashLevel=level;
+    const el=document.getElementById('fx-flash');if(!el)return;
+    el.style.opacity=String(level);if(level>0)el.style.setProperty('--flash',weapon.flashColor||'#fff3cf');
   }
   /** Hostile orbs, shards and lobbed spores. Extrapolated between 20 Hz ticks so bullets glide. */
   paintShots(world,dt){
@@ -273,13 +283,17 @@ export class Renderer {
     this.afterimages=this.afterimages.filter(a=>{a.life+=dt;a.sprite.material.opacity=a.life<0?0:Math.max(0,.55*(1-a.life/.3));if(a.life>.3){this.scene.remove(a.sprite);a.sprite.material.dispose();return false;}return true;});
   }
   render(world,localId,dt,{target=null,placement=null,demo=false}={}){
-    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;const terrainKey=`${world.seed}:${world.arena?'arena':'world'}`;if(this.terrainKey!==terrainKey){this.terrainKey=terrainKey;this.terrain(world.seed,world);for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
+    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;const terrainKey=`${world.seed}:${world.arena?'arena':'world'}`;if(this.terrainKey!==terrainKey){this.terrainKey=terrainKey;this.terrain(world.seed,world);this.weaponFx.reset();for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
     const p=world.player(localId)||world.players[0]||{x:0,z:2};const fx=demo?0:p.x,fz=demo?-1:p.z;
-    this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);this.camera.position.set(this.focus.x,28,this.focus.z+27);this.camera.lookAt(this.focus.x,0,this.focus.z);this.camera.updateMatrixWorld();
-    const frame=frameLighting(world, this.theme, world.player(localId)||null);this.view=frame;this.paintField(frame);
+    this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);
+    // Weapon effects first: their camera kick and their light on the night ground belong to this frame.
+    const weapon=demo?null:this.weaponFx.build(world,this.magicFrame,this.clock,dt,this.focus);
+    const kick=weapon?.shake>0?weapon.shake*.32:0,kx=kick?(Math.sin(this.clock*71)+Math.sin(this.clock*43))*kick*.5:0,kz=kick?(Math.sin(this.clock*59+1)+Math.sin(this.clock*31))*kick*.5:0;
+    this.camera.position.set(this.focus.x+kx,28,this.focus.z+27+kz);this.camera.lookAt(this.focus.x+kx,0,this.focus.z+kz);this.camera.updateMatrixWorld();
+    const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;this.paintField(frame);this.paintFlash(weapon);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
     this.paintPlaza(world,frame);this.scenery.update(world,frame,dt,this.focus);this.combat.begin();
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).map(e=>({e,key:e.kind==='star'?'star':'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme)];
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme)];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
@@ -336,10 +350,11 @@ export class Renderer {
     const goalFade=p.goal?Math.max(this.reveal(p.goal.x, p.goal.z), distance(p, p.goal)<8?.28:0):0;
     this.pathMarker.visible=!!p.goal&&goalFade>0.04;if(p.goal){this.pathMarker.position.set(p.goal.x,.03,p.goal.z);this.pathMarker.material.opacity=.7*goalFade;}
     if(placement){if(!this.ghost||this.ghost.key!==placement.key){if(this.ghost)this.remove(this.ghost);this.ghost=this.sprite(placement.key,'preview');}this.ghost.sprite.position.set(placement.x,0,placement.z);this.ghost.sprite.material.color.set(placement.valid?'#c8e5a6':'#dd7471');this.ghost.sprite.material.opacity=.7;this.ghost.shadow.visible=false;this.ghost.sprite.visible=true;}else if(this.ghost){this.remove(this.ghost);this.ghost=null;}
-    for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2)this.effect(ev);this.lastEvent=ev.id;}
+    for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2)this.effect(ev,world);this.lastEvent=ev.id;}
     this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);if(e.sweep)e.mesh.geometry.setDrawRange(0,6*Math.ceil(e.sweep*Math.min(1,e.life/.1)));if(!e.fixed)e.mesh.scale.setScalar(e.radius?.3+Math.min(1,e.life*3)*e.radius:1+e.life*(e.type==='impact'?12:4));e.mesh.material.opacity=Math.max(0,1-e.life*(e.sweep?3.2:2))*fade*(e.sweep?.55:1);if(e.life>.5){this.scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();return false;}return true;});
     this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*(f.alwaysVisible?1:this.reveal(f.x, f.z)));if(f.life>1.8){f.el.remove();return false;}return true;});
-    this.magicMesh.update(buildMagicEffects(world,this.magicFrame,this.theme));
+    const magic=buildMagicEffects(world,this.magicFrame,this.theme);if(weapon?.normal.length)magic.push(...weapon.normal);
+    this.magicMesh.update(magic);this.glowMesh.update(weapon?.glow||[]);this.groundFxMesh.update(weapon?.groundNormal||[]);this.groundGlowMesh.update(weapon?.groundGlow||[]);
     this.gl.render(this.scene,this.camera);
   }
 }

@@ -169,15 +169,26 @@ export function buildMagicEffects(world, frame, theme={}){
 export function drawMagicCanvas(ctx, commands, project){
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
   for(const cmd of commands){
+    // Glow commands add light (src/fx); soft ones fade to nothing at the edge.
+    ctx.globalCompositeOperation=cmd.glow?'lighter':'source-over';
     ctx.globalAlpha=cmd.alpha;ctx.fillStyle=ctx.strokeStyle=cmd.color;
     if(cmd.kind==='orb'){
       const [x,y,z]=cmd.center,p=project(x,z,y),edge=project(x+cmd.radius,z,y),r=Math.abs(edge.x-p.x);
-      ctx.beginPath();ctx.ellipse(p.x,p.y,r,r*(cmd.ground?.72:1),0,0,TAU);ctx.fill();
+      if(!(r>.2))continue;
+      if(cmd.soft){
+        ctx.save();ctx.translate(p.x,p.y);ctx.scale(1,cmd.ground?.72:1);
+        const g=ctx.createRadialGradient(0,0,0,0,0,r);g.addColorStop(0,cmd.color);g.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,TAU);ctx.fill();ctx.restore();
+      }else{ctx.beginPath();ctx.ellipse(p.x,p.y,r,r*(cmd.ground?.72:1),0,0,TAU);ctx.fill();}
     }else{
       ctx.beginPath();
       cmd.points.forEach(([x,y,z],i)=>{const p=project(x,z,y);if(i)ctx.lineTo(p.x,p.y);else ctx.moveTo(p.x,p.y);});
       if(cmd.fill){ctx.closePath();ctx.fill();}
-      else{const [x,y,z]=cmd.points[0],a=project(x,z,y),b=project(x+cmd.width,z,y);ctx.lineWidth=Math.max(.6,Math.abs(b.x-a.x));ctx.stroke();}
+      else{
+        const [x,y,z]=cmd.points[0],a=project(x,z,y),b=project(x+cmd.width,z,y),w=Math.max(.6,Math.abs(b.x-a.x));
+        if(cmd.soft){ctx.globalAlpha=cmd.alpha*.35;ctx.lineWidth=w;ctx.stroke();ctx.globalAlpha=cmd.alpha;ctx.lineWidth=Math.max(.6,w*.4);ctx.stroke();}
+        else{ctx.lineWidth=w*(cmd.taper?1-cmd.taper*.5:1);ctx.stroke();}
+      }
     }
   }
   ctx.restore();

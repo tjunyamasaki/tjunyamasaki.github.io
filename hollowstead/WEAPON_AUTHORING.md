@@ -12,6 +12,8 @@ All paths below are relative to `hollowstead/`. This is a task guide, not a prer
 - [ ] Sprite roles **or** `src/magic/effects.mjs`: visible attacks in both renderers.
 - [ ] `src/progression.mjs` → `ITEM_RARITY`: classify the item.
 - [ ] If requested, `src/arena.mjs` → `STARTERS`: guarantee the first pick; `POOLS`/`RECIPES` only for expedition access.
+- [ ] `src/skill-book.mjs` → `SKILL_BOOK`: the weapon's skill (every weapon has one; see section 7).
+- [ ] `src/fx/kit.mjs` → `HUES`: the weapon's colours, used by its rank flourish and skill effects.
 
 The sections below explain these steps. Read the alternative route only for a normal arsenal weapon.
 
@@ -134,6 +136,16 @@ node --test hollowstead/tests/battle.test.mjs
 Use the first for magic contracts, the second for arena/aim/arsenal changes. They do not automatically verify a new mechanic; add focused behavioral cases when needed, not copied assertions for every constant. Avoid full-suite runs, balance simulations, new build tools, or UI redesigns for a small prototype. Report the weapon ID, how to obtain it, and validation performed. Follow the session's commit/push instructions.
 
 Known test maintenance: `magic.test.mjs` currently hardcodes five packs, six sprites, and PNG-only assets. Those assertions predate the Nine-Tail Lantern and its SVGs. A failure there needs updated asset expectations when test work is in scope, not a new weapon-registration workaround. Do not claim the suite passed without running it.
+
+## 7. Skill, rank flourish and effects
+
+Every weapon has an auto attack (everything above) and a **skill**: the ✦ button or Q. A skill needs at least 40 stamina, drains the whole bar (a fuller bar deals more, from 70% to 100%), and recharges on its own cooldown (`p.skillCd`). Rank (★1–★5, `rankOf` in `src/progression.mjs`) adds 22% damage per rank and decides how much flourish both moves show.
+
+- **Script the skill** in `SKILL_BOOK` in [src/skill-book.mjs](src/skill-book.mjs): `{name, blurb, cooldown, reach, pose, cast(k)}`. `cast` schedules beats with `k.beat(delay, spec)`; `k.dmg(m)` is m ordinary hits (level, rank and stamina included), `k.target(range)` picks the mark, `k.foes`, `k.scatter` and `k.turn` help place things. Beat kinds, all host-stepped in [src/skills.mjs](src/skills.mjs): `blast`, `arc`, `line` (fire once), `wave` (travels, hits each foe once), `pulse` (repeats; fixed, `follow`ing the wielder or drifting with `v`), `dash`, `blink`, `shots` (engine projectiles), `bolt` (sky lightning that chains), `summon`, `heal` and `call` (a named function in `SKILL_CALLS`). Shared hit effects: `dmg`, `falloff`, `push` (negative pulls; `pushDir` 'along' or 'side'), `stun`, `freeze`, `slow`, `root`, `dot`, `leech`. A lasting beat can queue an `end` beat. `track` makes a pending beat follow a foe.
+- Beats live on `world.beats`, a snapshotted list. Keep them plain data; the script runs once, on the host, when the skill fires.
+- **Draw it** in [src/fx/skills.mjs](src/fx/skills.mjs): an `EVENTS['fx:<fx>']` painter for the moment a beat fires (its `'fx'` event), and a `BEATS[<fx>]` painter with `pending` (before it fires) and/or `lasting` (while a wave or pulse runs). Starfall's painters live in [src/fx/starfall.mjs](src/fx/starfall.mjs) as the worked example. Painters get a `Painter` from [src/fx/kit.mjs](src/fx/kit.mjs) (bloom, pool, shock, mark, sigil, rays, sparks, motes, debris, lightning, crescent, star...) and `tier(rank)`, which says what a rank buys: ★1 the plain shape, ★2 glow and trails, ★3 sparks, rays and a second ring, ★4 sigils, pillars, debris and a camera kick, ★5 prismatic extras and a screen flash. Additive light goes through `glow`; anything at ground height is drawn under the sprites automatically.
+- **Auto-attack flourish** comes from events: melee `slash`/`cleave`, `nova`, `burst`, `chain`, `lash`, `rend`, `frost`, `summon` and hits (`damage` events carry `by`) are dressed up from ★2 in [src/fx/flair.mjs](src/fx/flair.mjs); projectiles glow when they carry `rank`; magic packs get a cast flourish from `player.magicCast`. Include `rank` and `itemId` in a new attack's events so it joins in.
+- **Try it** in the weapon lab (`?lab`): any weapon, any rank, foes on demand, a damage meter, and **Free skills** to replay a skill without waiting.
 
 ## Alternative: reuse the normal arsenal
 

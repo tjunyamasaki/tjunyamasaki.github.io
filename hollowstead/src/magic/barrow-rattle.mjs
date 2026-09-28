@@ -333,6 +333,26 @@ export function use(world, player){
   return summon
 }
 
+/**
+ * Raise one skeleton at a spot for the Barrow Legion skill (skills.mjs): no cap, cooldown or wear.
+ * The caller decides how many may stand at once.
+ */
+export function raiseSkeleton(world, player, x, z){
+  if(!world || !player || typeof x !== 'number' || typeof z !== 'number') return null
+  if(!Array.isArray(world.magicSummons)) world.magicSummons = []
+  const power = ownerPower(world, player)
+  const summon = {
+    id: mintId(world), ownerId: player.id == null ? 'player' : player.id, x, z,
+    hp: Math.round(SKELETON_HP * power), maxHp: Math.round(SKELETON_HP * power), power, age: 0,
+    facing: (Number(player.dx) || 0) < 0 ? -1 : 1, anim: 'idle', sprite: framePath('idle', 0), type: 'skeleton',
+    damage: SKELETON_DAMAGE, range: RANGE, swinging: false, swingT: 0, didHit: false, nextSwing: 0,
+  }
+  world.magicSummons.push(summon)
+  return summon
+}
+/** Living skeletons of one owner (the Barrow Legion skill mends and counts them). */
+export function ownedSkeletons(world, ownerId){ return owned(world, ownerId) }
+
 export function step(world, dt){
   if(!world || typeof world !== 'object' || !Array.isArray(world.magicSummons) || world.magicSummons.length === 0) return
   if(typeof dt !== 'number' || !Number.isFinite(dt) || dt <= 0) return

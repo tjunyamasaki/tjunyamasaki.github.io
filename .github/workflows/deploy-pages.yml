@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [master, feat/progression-and-generation]
+    branches: [master, feat/battle-improv]
   workflow_dispatch:
 
 permissions:

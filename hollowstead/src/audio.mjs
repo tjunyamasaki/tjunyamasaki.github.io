@@ -3,8 +3,46 @@ import {cachedSrc} from './assets.mjs?v=harvest-18';
 export class Sound {
   constructor(theme){this.theme=theme;this.enabled=true;this.context=null;this.last=0;this.clips=new Map();}
   unlock(){if(!this.enabled)return;try{this.context??=new (window.AudioContext||window.webkitAudioContext)();void this.context.resume();}catch{}}
-  play(type){
-    if(type==='strike')return; // clean strikes and trinket moments: ui/rhythm.mjs plays its own cue at the tap, without the event delay
+  /** One synthesized partial: a pitch sweep with a quick attack and an exponential tail. */
+  sweep(from,to,duration,wave='sine',volume=.05,delay=0){
+    const t=this.context.currentTime+delay,osc=this.context.createOscillator(),gain=this.context.createGain();
+    osc.type=wave;osc.frequency.setValueAtTime(from,t);osc.frequency.exponentialRampToValueAtTime(Math.max(20,to),t+duration);
+    gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(volume,t+.012);gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
+    osc.connect(gain);gain.connect(this.context.destination);osc.start(t);osc.stop(t+duration+.02);
+  }
+  /** Weapon skills and their big moments (src/skills.mjs, src/fx). Rare, so they skip the shared throttle. */
+  weapon(type,ev={}){
+    const rank=Math.max(1,Math.min(5,ev.rank||1));
+    if(type==='skill'){
+      this.sweep(220,660,.45,'sawtooth',.028);this.sweep(330,990,.5,'triangle',.03,.03);this.sweep(660,1760,.35,'sine',.02,.08);
+      if(rank>=3)this.sweep(1320,2640,.3,'sine',.012,.16);
+      return true;
+    }
+    if(type==='starfall'||type==='mark')return false;
+    const fx=type==='fx'?ev.fx:type;
+    const BOOM=['meteor','heartstar','smash','slam','eruption','graveburst','soulburst','maw','foxspirit','boneburst','gale','fireball','pumpkin','shatter','frostnova','hornblast','firering','vial','web'];
+    if(BOOM.includes(fx)){
+      const big=fx==='heartstar'||fx==='smash'||fx==='maw'||fx==='foxspirit';
+      this.sweep(big?120:150,big?32:45,big?.8:.4,'sine',big?.09:.055);this.sweep(big?80:110,40,big?.6:.3,'triangle',.04);
+      if(fx==='meteor'||fx==='heartstar')for(let i=0;i<Math.min(4,rank);i++)this.sweep(1480+i*420,2200+i*300,.25,'sine',.012,.02+i*.03);
+      if(fx==='frostnova'||fx==='shatter')this.sweep(2600,1800,.3,'triangle',.015,.02);
+      return true;
+    }
+    if(fx==='skybolt'){this.sweep(1800,120,.2,'sawtooth',.03);this.sweep(90,40,.35,'triangle',.05,.02);return true;}
+    if(fx==='toll'){for(const [f,v] of [[196,.04],[392,.022],[587,.014]])this.sweep(f,f*.985,1.1,'sine',v);return true;}
+    if(['spin','cut','xslash','reap','moonwave','lance','charge','lanceshot','flock','chains','tempest','cyclone'].includes(fx)){
+      if(ev.end)return true;
+      this.sweep(900,280,.18,'sawtooth',.02);this.sweep(420,160,.2,'triangle',.02,.01);return true;
+    }
+    return false;
+  }
+  play(type,ev){
+    if(type==='strike')return;
+    if(this.enabled&&this.context&&this.context.state==='running'&&!this.theme.audio?.[type]&&(type==='skill'||type==='fx'||type==='starfall')){
+      if(type==='starfall'){const t=this.context.currentTime;if(t-(this.lastStar||0)<.12)return;this.lastStar=t;const r=Math.max(1,Math.min(5,ev?.rank||1));this.sweep(140,45,.45,'sine',.05);for(let i=0;i<Math.min(3,r);i++)this.sweep(1760+i*520,2400+i*380,.22,'sine',.011,.02+i*.035);return;}
+      if(this.weapon(type,ev))return;
+      return;
+    } // clean strikes and trinket moments: ui/rhythm.mjs plays its own cue at the tap, without the event delay
     if(!this.enabled)return;const source=this.theme.audio?.[type];if(source){let a=this.clips.get(type);if(!a){a=new Audio(cachedSrc(source));this.clips.set(type,a);}a.currentTime=0;a.volume=.35;void a.play().catch(()=>{});return;}
     if(!this.context||this.context.state!=='running')return;const t=this.context.currentTime;if(t-this.last<.07)return;this.last=t;
     if(type==='foxfire'||type==='foxburst'){

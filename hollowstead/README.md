@@ -12,6 +12,7 @@ Creating a weapon? Start with the focused [weapon authoring guide](WEAPON_AUTHOR
 - **Gather your friends** opens a waiting camp. Share its invite link or five-character code, then select **Enter the woods**. Friends can join an expedition already underway.
 - **Continue expedition** resumes the last save on this browser. Select **Host my saved expedition** before opening a camp to resume it with friends.
 - **Battle arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
+- **Weapon lab** is the arena without rounds, for trying and balancing weapons. See [Weapon lab](#weapon-lab).
 
 The host keeps the shared save and must keep the game tab open. Switching away pauses the expedition for everyone. Returning to the title closes that camp. Reopen the saved expedition and share its new code to continue. A guest rejoining from the same browser tab keeps their equipment and supplies. A different tab joins as a new wanderer.
 
@@ -21,7 +22,7 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 2. Place a workbench from **Build**. It does not need another station. Open the workbench to craft an axe and a pick, then tap **Equip**. Moon iron and haunted graves need a worn pick. Spare tools in your pack do nothing until worn. Cauldrons, soul lanterns, and wards are built from the workbench, not the field list.
 3. Cook at a burning fire. Grow pumpkins in farm plots, make bandages at a workbench, and build a cauldron for stew. Eat from your pack: open it and tap Eat on the stack you want.
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
-5. Fight with the weapon in your hand. Every weapon aims itself at the best foe in reach, so you can run one way and fight the other. Hold **Attack** to swing. Keep up to three weapons on the **hotbar** and tap one to swap mid-fight. Every creature telegraphs its blow on the ground; **Dodge** out of it, or dodge at the last moment to pass through untouched. Dodge holds two charges. Each charge has its own cooldown, and the next one starts only after the previous charge returns. Repair walls, rearm traps, and use wards to help defend the camp.
+5. Fight with the weapon in your hand. Every weapon aims itself at the best foe in reach, so you can run one way and fight the other. Hold **Attack** to swing. Every weapon also has a **skill** (the ✦ button beside Attack): it drains your whole stamina bar, hits much harder than a swing, and recharges on its own timer. It needs at least 40 stamina, and a full bar makes it strongest. Keep up to three weapons on the **hotbar** and tap one to swap mid-fight. Every creature telegraphs its blow on the ground; **Dodge** out of it, or dodge at the last moment to pass through untouched. Dodge holds two charges. Each charge has its own cooldown, and the next one starts only after the previous charge returns. Repair walls, rearm traps, and use wards to help defend the camp.
 6. Hold **Revive** beside a fallen friend for about three seconds. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable. Open **Build**, then **Maintain camp**, to repair a damaged structure or hold **Dismantle**. The Heartfire cannot be dismantled, and a chest someone else has open cannot either.
 7. Awaken the Heartfire with soul embers. A blood moon brings the Hollow King, stronger each time; tap the moon by the clock to see tonight's moon and the next.
 
@@ -45,10 +46,19 @@ See `docs/GAMEPLAY_PLAN.md` for the full design.
 
 1. Pick one of three weapons. The prototype always offers the **Nine-Tail Lantern** first, alongside a close and a ranged choice. Its nine homing foxfires burn foes, and the ninth bursts in an area.
 2. Survive the wave. Creatures pour in from the wall in packs; each wave brings more of them, a little stronger. Every fifth wave brings champions; every tenth, the Hollow King.
-3. When the last one falls you heal a third of your health, and pick again from three weapons. A weapon you already carry ranks up instead (★, up to five: more damage each rank). With three weapons on the hotbar, a new one replaces one you choose, or you keep yours.
+3. When the last one falls you heal a third of your health, and pick again from three weapons. A weapon you already carry ranks up instead (★, up to five). Each rank adds damage and more flourish to both the attack and the skill: ★1 is the plain move; by ★5 stars fall on comet tails braided with colour, blows throw sparks, light pillars and prismatic shockwaves, and the biggest moments shake the camera. With three weapons on the hotbar, a new one replaces one you choose, or you keep yours.
 4. Kills give experience to everyone standing. Each level adds health and damage and heals you fully.
 
-The arena keeps only health and level: no hunger, courage, stamina, weapon wear or loot. **Auto-attack** (on by default, in the arena menu) swings whenever a foe is in reach. When you fall, the run ends; **Fight again** starts a new one.
+The arena keeps only health and level: no hunger, courage, weapon wear or loot. Attacks and dodges cost no stamina there; skills still drain it. **Auto-attack** (on by default, in the arena menu) swings whenever a foe is in reach. When you fall, the run ends; **Fight again** starts a new one.
+
+## Weapon lab
+
+**Weapon lab** on the title screen (or `?lab` in the address) opens the arena clearing with no rounds, for testing and balancing weapons. It is solo and never saved.
+
+- **Arsenal** lists every weapon in the game. Pick a rank (★1–★5) and tap a weapon to put it in the hotbar slot you are holding; your level has its own stepper. The panel shows the weapon's skill and cooldown.
+- **Foes** chooses what to spawn (a mix, or one kind), how many, how strong (the arena wave it is drawn from) and where: ahead of you, around you, or from the wall. **Spawn** (N) and **Clear** (X) work at any time.
+- Switches: **Invulnerable**, **Foes stand still** (training dummies that never strike back), **Free skills** (no cooldown or stamina, for trying looks quickly) and **Auto-attack**.
+- The meter shows damage per second (averaged over five seconds), total damage, the peak, kills and foes alive. It counts every point of health foes lose, whatever dealt it; **Reset meter** starts it over.
 
 ## Shared chests
 
@@ -62,6 +72,7 @@ Only one wanderer can open a chest at a time. The same panel shows your pack, wo
 | Context action | The large circle. Its name follows what you are standing at: Gather, Chop, Feed, Cook, Open, Place, and so on. | E, hold when the action says to hold |
 | More actions | The smaller circles beside it. A campfire can show Feed, Cook, Awaken, and Repair at once. | 1–4 |
 | Attack | Hold Attack. Aims itself. The expedition does not swing for you. In the battle arena, Auto-attack in the menu can. | Hold Space |
+| Skill | The ✦ button left of Attack. Drains all stamina (needs 40); its ring shows the recharge. | Q |
 | Swap weapon | Tap a weapon on the hotbar | R or Tab cycles |
 | Dodge | Two charges. A quick dash, invulnerable for a moment. Each charge cools on its own, and the next cooldown starts when the previous charge returns. With the stick still, you leap away from the nearest foe. | Shift |
 | Inventory / Build | Bottom bar | I / B |

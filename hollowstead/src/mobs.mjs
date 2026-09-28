@@ -400,6 +400,8 @@ export function stepMobs(world, dt, obstacles){
 
   for(const e of foes){
     const def = ENEMIES[e.type]; if(!def) continue;
+    // Weapon lab dummies: they stand, take hits and get knocked about, and never strike back.
+    if(world.arena?.dummies){e.vx = e.vz = 0; e.act = 0; e.windup = 0; e.slowed = Math.max(0, (e.slowed || 0)-dt); continue;}
     const move = moveOf(e.type);
     e.cooldown = (e.cooldown || 0)-dt; e.slowed = Math.max(0, (e.slowed || 0)-dt);
     const sx = e.x, sz = e.z;

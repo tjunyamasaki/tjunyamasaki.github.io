@@ -105,7 +105,7 @@ export function escapeStep({dragging = false, detailsOpen = false, panel = null,
 export function keyboardAction(key) {
   const map = {
     i: 'inventory', b: 'build', m: 'map', f: 'lantern', e: 'primary',
-    ' ': 'attack', shift: 'dodge', enter: 'confirm', escape: 'escape',
+    ' ': 'attack', q: 'skill', shift: 'dodge', enter: 'confirm', escape: 'escape',
     '1': 'action-1', '2': 'action-2', '3': 'action-3', '4': 'action-4',
     r: 'weapon-next', tab: 'weapon-next',
   };

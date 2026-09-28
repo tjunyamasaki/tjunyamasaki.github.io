@@ -4,7 +4,7 @@
 // presentation, and plain arrays on the world (allies, zones, projectiles) for anything that
 // lives longer than one swing. Numbers come from WEAPON_STYLES in progression.mjs.
 import {RULES} from './content.mjs?v=harvest-18';
-import {ALLIES, maxHealth, powerOf} from './progression.mjs?v=harvest-18';
+import {ALLIES, maxHealth, powerOf, rankOf} from './progression.mjs?v=harvest-18';
 import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 
 const dist = (a, b) => Math.hypot((a.x||0)-(b.x||0), (a.z||0)-(b.z||0));
@@ -32,6 +32,15 @@ export function applyDot(e, dps, seconds, by, kind = 'bleed'){
   if(e.dot && e.dot.dps*e.dot.remaining > dps*seconds) return;
   e.dot = {dps, remaining: seconds, by, kind};
 }
+/** Shove a hostile away from a point (a blast centre), through the same collision as walking. Bosses barely budge. */
+export function knockFrom(w, e, cx, cz, amount, obstacles = w.frameObstacles || w.obstacles()){
+  if(!(Math.abs(amount) > 1e-3)) return;
+  const dx = e.x-cx, dz = e.z-cz, d = Math.hypot(dx, dz);
+  const ux = d > 1e-3 ? dx/d : 1, uz = d > 1e-3 ? dz/d : 0;
+  let push = amount*(bossy(e) ? .3 : e.type === 'brute' ? .7 : 1);
+  if(push < 0) push = -Math.min(-push, Math.max(0, d-.7)); // a pull stops short of the centre
+  for(let i = 0; i < 3; i++) w.move(e, ux*push/.15, uz*push/.15, .05, obstacles);
+}
 export function stun(e, seconds){
   const s = bossy(e) ? seconds*.5 : seconds;
   e.stunned = Math.max(e.stunned||0, s); e.windup = 0;
@@ -48,7 +57,7 @@ const combo = (w, p, {style, damage, weapon}) => {
     applyDot(target, damage*style.bleed, style.bleedSeconds, p.id);
     const d = Math.max(.1, dist(target, p)), step = Math.min(style.lunge, Math.max(0, d-1));
     p.x += (target.x-p.x)/d*step; p.z += (target.z-p.z)/d*step;
-    w.event('rend', target.x, target.z, '', {dx: p.dx, dz: p.dz});
+    w.event('rend', target.x, target.z, '', {dx: p.dx, dz: p.dz, rank: rankOf(p), itemId: 'fangs', player: p.id});
   }
   w.strike(p, target, amount, .2);
   w.wearEquipped(p, 'weapon', 1);
@@ -63,7 +72,7 @@ const lash = (w, p, {style, damage}) => {
     const d = Math.max(.1, dist(e, p)), pull = Math.min(style.pull*(bossy(e) ? .35 : 1), Math.max(0, d-1.3));
     e.x -= (e.x-p.x)/d*pull; e.z -= (e.z-p.z)/d*pull;
   }
-  w.event('lash', p.x, p.z, '', {dx: f.x, dz: f.z, range: style.range});
+  w.event('lash', p.x, p.z, '', {dx: f.x, dz: f.z, range: style.range, rank: rankOf(p), itemId: 'soulchain', player: p.id});
   if(hits) w.wearEquipped(p, 'weapon', 1);
 };
 
@@ -75,7 +84,7 @@ const reap = (w, p, {style, damage}) => {
     if(dot < Math.cos(style.arc*Math.PI/360)) continue;
     w.strike(p, e, damage, .45); hits++;
   }
-  w.event('cleave', p.x, p.z, '', {dx: f.x, dz: f.z, arc: style.arc, range: style.range});
+  w.event('cleave', p.x, p.z, '', {dx: f.x, dz: f.z, arc: style.arc, range: style.range, rank: rankOf(p), itemId: p.equipment?.weapon?.itemId, player: p.id});
   if(hits){
     const heal = Math.round(Math.min(hits, style.leechCap)*style.leech*maxHealth(p));
     const before = p.hp; p.hp = Math.min(maxHealth(p), p.hp+heal);
@@ -93,7 +102,7 @@ const wisps = (w, p, {style, damage}) => {
     const spread = (i-(style.count-1)/2)*.65, a = Math.atan2(f.z, f.x)+spread;
     w.projectiles.push({id: w.nextId('pr'), kind: 'wisp', owner: p.id, x: p.x+Math.cos(a)*.6, z: p.z+Math.sin(a)*.6,
       vx: Math.cos(a)*style.speed, vz: Math.sin(a)*style.speed, damage, range: style.range, traveled: 0, pierce: 0,
-      splash: 0, slow: 0, hit: [], age: 0, aim: a, homing: target?.id || null, turn: style.turn});
+      splash: 0, slow: 0, hit: [], age: 0, aim: a, homing: target?.id || null, turn: style.turn, rank: rankOf(p), itemId: 'wisplantern'});
   }
   w.wearEquipped(p, 'weapon', 1);
 };
@@ -101,7 +110,7 @@ const wisps = (w, p, {style, damage}) => {
 const chain = (w, p, {style, damage}) => {
   let target = aimTarget(w, p, style.range);
   const points = [[p.x, p.z]];
-  if(!target){const f = facing(p); points.push([p.x+f.x*style.range*.6, p.z+f.z*style.range*.6]); w.event('chain', p.x, p.z, '', {points}); w.wearEquipped(p, 'weapon', 1); return;}
+  if(!target){const f = facing(p); points.push([p.x+f.x*style.range*.6, p.z+f.z*style.range*.6]); w.event('chain', p.x, p.z, '', {points, rank: rankOf(p), itemId: 'stormrod', player: p.id}); w.wearEquipped(p, 'weapon', 1); return;}
   const hit = new Set(); let amount = damage;
   for(let jump = 0; target && jump <= style.jumps; jump++){
     hit.add(target.id); points.push([target.x, target.z]);
@@ -111,30 +120,41 @@ const chain = (w, p, {style, damage}) => {
     const from = target;
     target = hostiles(w).filter(e => !hit.has(e.id) && dist(e, from) < style.jump).sort((a, b) => dist(a, from)-dist(b, from))[0];
   }
-  w.event('chain', p.x, p.z, '', {points});
+  w.event('chain', p.x, p.z, '', {points, rank: rankOf(p), itemId: 'stormrod', player: p.id});
   w.wearEquipped(p, 'weapon', 1);
 };
 
 const meteor = (w, p, {style, damage}) => {
   const target = aimTarget(w, p, style.range), f = facing(p);
   const x = target ? target.x : p.x+f.x*6, z = target ? target.z : p.z+f.z*6;
-  (w.zones ||= []).push({id: w.nextId('zn'), kind: 'star', owner: p.id, x, z, age: 0, delay: style.delay, radius: style.radius, damage});
-  w.event('mark', x, z, '', {radius: style.radius});
+  const rank = rankOf(p), seq = p.starSeq = ((p.starSeq||0)+1)%1000;
+  (w.zones ||= []).push({id: w.nextId('zn'), kind: 'star', owner: p.id, x, z, age: 0, delay: style.delay, radius: style.radius, damage, rank, seq, ...skyPath(w.rng, seq)});
+  w.event('mark', x, z, '', {radius: style.radius, rank, itemId: 'starfall', player: p.id});
   w.wearEquipped(p, 'weapon', 1);
 };
+/**
+ * Where a falling star starts: each one from its own patch of sky, alternating sides and jittered,
+ * so a volley reads as a shower rather than a column. `bend` curves the fall (src/fx/starfall.mjs
+ * draws the quadratic arc from these numbers; the host only needs the landing point and the delay).
+ */
+export function skyPath(rng, seq, scale = 1){
+  const side = seq%2 ? 1 : -1, round = n => Math.round(n*100)/100;
+  const spread = side*(1.8+rng()*3.2)*scale, back = -(1.2+rng()*2.4)*scale;
+  return {ox: round(spread), oz: round(back), oh: round((8.5+rng()*3.5)*scale), bend: round(side*(1.1+rng()*1.9)*scale)};
+}
 
 // ------------------------------------------------------------------ summons
-function summon(w, p, type, x, z, damage){
+export function summon(w, p, type, x, z, damage){
   const def = ALLIES[type], power = powerOf(p);
   const hp = Math.round(def.hp*(def.scales ? power : 1));
   const ally = {id: w.nextId('al'), type, owner: p.id, x, z, hp, maxHp: hp, damage, age: 0, life: def.life,
     cooldown: .3, facing: (p.dx||1) < 0 ? -1 : 1, anim: 'idle', swing: 0, spawn: 0};
   clampToMap(ally, w);
   (w.allies ||= []).push(ally);
-  w.event('summon', ally.x, ally.z, '', {kind: type});
+  w.event('summon', ally.x, ally.z, '', {kind: type, rank: rankOf(p), itemId: p.equipment?.weapon?.itemId, player: p.id});
   return ally;
 }
-const mine = (w, p, type) => (w.allies||[]).filter(a => a.owner === p.id && a.type === type && a.hp > 0);
+export const mine = (w, p, type) => (w.allies||[]).filter(a => a.owner === p.id && a.type === type && a.hp > 0);
 
 const crows = (w, p, {style, damage}) => {
   const flock = mine(w, p, 'crow');
@@ -170,7 +190,7 @@ const frost = (w, p, {style, damage}) => {
   const x = target ? target.x : p.x+f.x*4, z = target ? target.z : p.z+f.z*4;
   (w.zones ||= []).push({id: w.nextId('zn'), kind: 'frost', owner: p.id, x, z, age: 0, life: style.life,
     radius: style.radius, dps: damage, freezeAfter: style.freezeAfter, freeze: style.freeze, exposed: {}, frozen: []});
-  w.event('frost', x, z, '', {radius: style.radius});
+  w.event('frost', x, z, '', {radius: style.radius, rank: rankOf(p), itemId: 'censer', player: p.id});
   w.wearEquipped(p, 'weapon', 1);
 };
 
@@ -189,8 +209,8 @@ export function stepArsenal(w, dt, obstacles){
       const owner = w.player(zone.owner);
       if(zone.kind === 'star' && !zone.done && zone.age >= zone.delay){
         zone.done = true;
-        for(const e of foes) if(e.hp > 0){const d = dist(e, zone); if(d < zone.radius) w.strike(owner, e, zone.damage*(1-.4*d/zone.radius), .7);}
-        w.event('starfall', zone.x, zone.z, '', {radius: zone.radius});
+        for(const e of foes) if(e.hp > 0){const d = dist(e, zone); if(d < zone.radius){w.strike(owner, e, zone.damage*(1-.4*d/zone.radius), 0); knockFrom(w, e, zone.x, zone.z, .7*(1-.5*d/zone.radius), obstacles);}}
+        w.event('starfall', zone.x, zone.z, '', {radius: zone.radius, rank: zone.rank||1, seq: zone.seq||0, player: zone.owner, itemId: 'starfall'});
       }
       if(zone.kind === 'frost'){
         for(const e of foes){

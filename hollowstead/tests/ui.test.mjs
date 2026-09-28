@@ -37,7 +37,7 @@ test('escape closes drag, details, panel, then placement, before the menu', () =
   assert.equal(escapeStep({}), 'open-menu');
 });
 
-test('keyboard map keeps inventory controls and drops C, Q, and G', () => {
+test('keyboard map keeps inventory controls, gives Q to the weapon skill and drops C and G', () => {
   assert.equal(keyboardAction('i'), 'inventory');
   assert.equal(keyboardAction('b'), 'build');
   assert.equal(keyboardAction('m'), 'map');
@@ -48,7 +48,7 @@ test('keyboard map keeps inventory controls and drops C, Q, and G', () => {
   assert.equal(keyboardAction('1'), 'action-1');
   assert.equal(keyboardAction('4'), 'action-4');
   assert.equal(keyboardAction('c'), null);
-  assert.equal(keyboardAction('q'), null);
+  assert.equal(keyboardAction('q'), 'skill');
   assert.equal(keyboardAction('g'), null);
 });
 

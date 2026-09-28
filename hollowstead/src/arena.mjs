@@ -147,7 +147,7 @@ function edgeSpot(world){
   return best;
 }
 
-function spawnPack(world, types){
+export function spawnPack(world, types){
   const spot = edgeSpot(world); if(!spot) return 0;
   world.event('portal', spot.x, spot.z, '', {radius: 1.4+types.length*.12});
   let made = 0;

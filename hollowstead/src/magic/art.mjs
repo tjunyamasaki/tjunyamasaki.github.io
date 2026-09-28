@@ -22,6 +22,7 @@ export const HELD_GEAR = Object.freeze({
   wighthorn: {motion: 'tome', handY: 1.2, sprite: 'held-wighthorn'}, censer: {motion: 'bell', handY: 1.0, sprite: 'held-censer'},
   'kitsune-lantern': {motion: 'kitsune', handY: 1.12, handX: .59, sprite: 'kitsune-lantern'},
   plaguebeak: {motion: 'plague', handY: 1.08, handX: .55, sprite: 'plaguebeak'},
+  gloomgrasp: {motion: 'grasp', handY: 1.1, handX: .55, sprite: 'gloomgrasp'},
 });
 
 export const MAGIC_PALETTE = Object.freeze({
@@ -103,6 +104,12 @@ export function heldWeaponPose(player, time, theme={}){
     rotation = side*(-.12+Math.sin(time*2.1)*.05);
     lift = .03*Math.sin(time*4.2);
   }
+  if(spec.motion === 'grasp'){
+    // The eye-clutching hand breathes: a slow hover and a faint heartbeat pulse.
+    rotation = side*(-.06+Math.sin(time*1.8)*.05);
+    lift = .04*Math.sin(time*2.6);
+    scale = 1+.025*Math.max(0, Math.sin(time*5.2))**4;
+  }
   if(tool){
     const phase = (time % CHOP_PERIOD) / CHOP_PERIOD;
     rotation = side*chopAngle(phase);
@@ -147,6 +154,20 @@ export function heldWeaponPose(player, time, theme={}){
         rotation += side*(-.8*rest+Math.sin(settle*Math.PI*4)*.12*(1-settle));
         lift += -.04*rest+Math.abs(Math.sin(settle*Math.PI*2))*.05*(1-settle);
         reach = .46*rest; scale = 1+.1*rest;
+      }
+    }
+    if(spec.motion === 'grasp'){
+      // Raise the scepter high, drive it down at the ground, then hold it, trembling, while the hands squeeze.
+      if(t < .25){
+        const wind = inOut(t/.25);
+        rotation += side*.5*wind; lift += .28*wind; reach = -.1*wind;
+      }else if(t < .4){
+        const slam = ease((t-.25)/.15);
+        rotation += side*(.5-1.1*slam); lift += .28-.42*slam; reach = -.1+.4*slam; scale = 1+.12*slam;
+      }else{
+        const settle = (t-.4)/.6, rest = 1-ease(settle);
+        rotation += side*(-.6*rest)+Math.sin(settle*40)*.05*rest;
+        lift += -.14*rest; reach = .3*rest; scale = 1+.12*rest;
       }
     }
   }

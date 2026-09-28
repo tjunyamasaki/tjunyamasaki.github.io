@@ -238,6 +238,12 @@ body.arena .hotbar .weapon-slot .item-icon{width:40px;height:40px}
 .pick-plague .pick-badge:not(.rank){background:#c8ff5c;color:#24192f;border-color:#24192f}
 .pick-plague b{color:#e8f7c9}
 .pick-card.pick-plague:hover,.pick-card.pick-plague:focus-visible{border-color:#e0ab4a;box-shadow:0 10px 26px #17111f66,0 0 26px #c8ff5c3d}
+.pick-card.pick-gloom{border:2px solid #8a5cff;background:radial-gradient(ellipse at 50% 30%,#ff4fd814,transparent 55%),radial-gradient(ellipse at 50% 100%,#8a5cff2a,transparent 60%),linear-gradient(160deg,#241a33,#130e1c);box-shadow:0 10px 26px #0a0610aa,inset 0 0 0 2px #0f0a16,0 0 22px #8a5cff38}
+.pick-gloom .pick-icon{filter:drop-shadow(0 4px 0 #0f0a16) drop-shadow(0 0 8px #8a5cff66);transform-origin:50% 90%;animation:gloom-grip 2.4s ease-in-out infinite}
+.pick-gloom .pick-badge:not(.rank){background:#ff4fd8;color:#0f0a16;border-color:#0f0a16}
+.pick-gloom b{color:#e4d6ff}
+.pick-card.pick-gloom:hover,.pick-card.pick-gloom:focus-visible{border-color:#ff4fd8;box-shadow:0 10px 26px #0a0610aa,0 0 28px #ff4fd83d}
+@keyframes gloom-grip{0%,100%{transform:translateY(3px) scale(.96)}40%{transform:translateY(-3px) scale(1.03)}52%{transform:translateY(-1px) scale(.93,1.02)}60%{transform:translateY(-2px) scale(1.01)}}
 @keyframes plague-peck{0%,58%,100%{transform:translateY(0) rotate(-2deg)}66%{transform:translateY(-3px) rotate(-7deg)}72%{transform:translateY(1px) rotate(6deg)}80%{transform:translateY(-1px) rotate(-1deg)}88%{transform:translateY(0) rotate(3deg)}}
 .arena-replace{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:#29232ff2}
 .arena-replace p{margin:0 0 8px;font-size:13px}

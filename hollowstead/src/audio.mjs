@@ -18,6 +18,18 @@ export class Sound {
       }
       return;
     }
+    if(type==='gloomcast'||type==='gloomgrab'){
+      // A low swell as the shadow spreads; a crunching squeeze when a hand closes.
+      const grab=type==='gloomgrab';
+      const notes=grab?[[140,'square',.09,.03],[70,'sawtooth',.26,.035],[330,'triangle',.12,.012]]:[[55,'sine',.5,.04],[82,'triangle',.45,.02],[247,'sine',.3,.008]];
+      for(const [i,[frequency,wave,duration,volume]] of notes.entries()){
+        const start=t+i*(grab?.03:.05),osc=this.context.createOscillator(),gain=this.context.createGain();
+        osc.type=wave;osc.frequency.setValueAtTime(frequency,start);osc.frequency.exponentialRampToValueAtTime(frequency*(grab?.45:1.5),start+duration);
+        gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(volume,start+(grab?.006:.06));gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+        osc.connect(gain);gain.connect(this.context.destination);osc.start(start);osc.stop(start+duration+.01);
+      }
+      return;
+    }
     if(type==='plaguevial'||type==='plaguebreak'){
       const shatter=type==='plaguebreak';
       const notes=shatter?[[2093,'sine',.12,.02],[2637,'sine',.1,.014],[3136,'sine',.08,.01],[92,'sawtooth',.42,.03]]:[[420,'square',.07,.018],[980,'sine',.12,.02]];

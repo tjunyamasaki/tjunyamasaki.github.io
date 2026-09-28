@@ -1,6 +1,6 @@
 import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label, nodeAwake} from './content.mjs?v=harvest-18';
 import {
-  CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2,
+  CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2, SPILL_LIFETIME_SECONDS,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createChest, createContainer,
   containerId, duplicateUids, emptyEquipment, equipmentSlotFor, findStack, isMaterial,
   itemDefinition, makeStack, planConsume, planEquip, planInsert, planMove, planTake, planUnequip,
@@ -15,10 +15,11 @@ import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule}
 import {
   CACHE_GUARDS, CACHE_LAYOUT, DASH, DISCOVER_XP, ELITE, GATHER_XP, HEARTSTONE_HP, LIGHT_ITEMS, MAX_LEVEL, NODE_POOLS, REGIONS, RESIDENTS, ROAM, SHARE_RADIUS,
   ARMOR_REDUCTION, LOOT_TABLES, NIGHT_CAP, eliteChance, enemyScale, enemyXp, isBossNight, isCache, maxHealth, nightRoster, pickWeighted, powerOf, rarityRank, regionAt, rollLoot,
-  rankOf, tierAt, waveSize, weaponStyle, xpToNext,
+  keepsKnockback, rankOf, tierAt, waveSize, weaponStyle, xpToNext,
 } from './progression.mjs?v=harvest-18';
 import {stepSkills, useSkill} from './skills.mjs?v=harvest-18';
 import {creditKill, mendWeapon, syncMastery, warnWear} from './mastery.mjs?v=harvest-18';
+import {stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
 import {stepMobs} from './mobs.mjs?v=harvest-18';
@@ -30,7 +31,7 @@ import {cartAction, cartLabel, cartSlots, cartSpeed, stepCarts} from './cart.mjs
 import {harvestLoot, rhythmStep, rhythmStrike} from './rhythm.mjs?v=harvest-18';
 import {trinketEvent, trinketSpeed} from './trinkets.mjs?v=harvest-18';
 import {generateNodes, walkableAt, landNear} from './worldgen.mjs?v=harvest-18';
-import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, readPendingKnock, restoreMagicFields} from './magic/registry.mjs?v=harvest-18';
+import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, restoreMagicFields} from './magic/registry.mjs?v=harvest-18';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot((a.x||0)-(b.x||0),(a.z||0)-(b.z||0));
@@ -248,10 +249,10 @@ export class World {
     if(p.recovery){const found=findStack(p.recovery, uid);if(found)return {kind:'recovery', container:p.recovery, slot:found.slot, stack:found.stack};}
     return null;
   }
-  placeDrop(stack,x,z){
+  placeDrop(stack,x,z,life=DROP_LIFETIME_SECONDS){
     const made=makeStack(stack.uid, stack.itemId, stack.quantity, stack.durability);
     if(!made.ok)return null;
-    const drop={id:this.nextId('d'), stack:made.stack, x, z, until:this.time+DROP_LIFETIME_SECONDS};
+    const drop={id:this.nextId('d'), stack:made.stack, x, z, until:this.time+life};
     this.drops.push(drop);return drop;
   }
   dropNew(itemId,count,x,z){
@@ -266,9 +267,10 @@ export class World {
       left-=quantity;
     }
   }
+  /** A whole container spilled (a fallen wanderer, a broken chest): it lies a full day and night. */
   dropContainer(container,x,z){
     if(!container?.slots)return;
-    for(const stack of container.slots)if(stack)this.placeDrop(stack, x, z);
+    for(const stack of container.slots)if(stack)this.placeDrop(stack, x, z, SPILL_LIFETIME_SECONDS);
     for(let i=0;i<container.slots.length;i++)container.slots[i]=null;
     container.revision++;
   }
@@ -276,7 +278,7 @@ export class World {
     this.dropContainer(p.inventory, p.x, p.z);
     for(const slot of EQUIPMENT_SLOTS){
       if(!p.equipment[slot])continue;
-      this.placeDrop(p.equipment[slot], p.x, p.z);
+      this.placeDrop(p.equipment[slot], p.x, p.z, SPILL_LIFETIME_SECONDS);
       p.equipment[slot]=null;
     }
     if(p.recovery)this.dropContainer(p.recovery, p.x, p.z);
@@ -339,7 +341,8 @@ export class World {
     // Transfers always read current host durability rather than a client copy.
     if(worn.removed)p.equipmentRevision++;
     if(slot==='light'&&!(p.equipment.light?.durability>0))p.lantern=false;
-    if(worn.removed&&slot==='weapon')this.autoSwap(p, current.itemId);
+    // A weapon does not crumble at zero: it stays, broken, and the hand moves to a working one.
+    if(slot==='weapon'&&current.durability>0&&(worn.removed||!(worn.stack?.durability>0)))this.autoSwap(p, current.itemId);
   }
   /**
    * Weapon hotbar. Slots hold uids of weapons the wanderer carries or wears; the worn one is the
@@ -387,8 +390,12 @@ export class World {
     for(let k=1;k<=HOTBAR_SLOTS;k++){
       const i=(p.hotbarIndex+k)%HOTBAR_SLOTS;
       if(!p.hotbar[i]||p.hotbar[i]===p.equipment.weapon?.uid)continue;
-      if(this.selectHotbar(p,i).ok){this.tell(p,`${label(brokenId)} broke · switched to ${label(p.equipment.weapon.itemId)}`);return true;}
+      // Skip other broken weapons on the hotbar.
+      const spare=p.inventory?.slots?.find(stack=>stack?.uid===p.hotbar[i]);
+      if(spare&&!(spare.durability>0))continue;
+      if(this.selectHotbar(p,i).ok){this.tell(p,`${label(brokenId)} broke · switched to ${label(p.equipment.weapon.itemId)}. Mend it at the Heartfire`);return true;}
     }
+    this.tell(p,`${label(brokenId)} broke. Mend it at the Heartfire with a soul ember`);
     return false;
   }
   collapseRecovery(p){if(p.recovery&&!p.recovery.slots.some(Boolean))p.recovery=null;}
@@ -1107,14 +1114,15 @@ export class World {
     if(special){special(this,p,{style,damage,weapon,hostile});return;}
     if(style.style==='melee'){
       const hits=style.arc>0?hostile.filter(entry=>{const d=distance(entry,p);if(d>=range)return false;if(d<.6)return true;const dot=((entry.x-p.x)*p.dx+(entry.z-p.z)*p.dz)/d;return dot>=Math.cos(style.arc*Math.PI/360);}):(target?[target]:[]);
-      for(const enemy of hits)this.strike(p, enemy, damage, .32);
+      const push=keepsKnockback(armed?weapon.itemId:'fist')?.32:0;
+      for(const enemy of hits)this.strike(p, enemy, damage, push);
       if(armed&&hits.length)this.wearEquipped(p,'weapon',1);
       this.event(style.arc>0?'cleave':'slash',p.x,p.z,'',{dx:p.dx,dz:p.dz,arc:style.arc||120,range,rank:rankOf(p),itemId:armed?weapon.itemId:'fist',player:p.id});
       return;
     }
     if(style.style==='nova'){
       const hits=hostile.filter(entry=>distance(entry,p)<style.range);
-      for(const enemy of hits)this.strike(p, enemy, damage*(1-distance(enemy,p)/style.range*.35), .6);
+      for(const enemy of hits)this.strike(p, enemy, damage*(1-distance(enemy,p)/style.range*.35), 0);
       this.event('nova',p.x,p.z,'',{radius:style.range,rank:rankOf(p),itemId:weapon.itemId,player:p.id});
       this.wearEquipped(p,'weapon',1);
       return;
@@ -1149,9 +1157,9 @@ export class World {
         const reach=enemy.type==='king'?1.3:enemy.type==='golem'||enemy.type==='brute'?1:.75;
         if(gap(enemy)>reach)continue;
         shot.hit.push(enemy.id);
-        this.strike(owner, enemy, shot.damage, shot.kind==='bolt'?.3:.18);
+        this.strike(owner, enemy, shot.damage, keepsKnockback(shot.itemId)?(shot.kind==='bolt'?.3:.18):0);
         if(shot.slow)enemy.slowed=Math.max(enemy.slowed||0,shot.slow);
-        if(shot.splash){for(const other of hostile)if(other!==enemy&&other.hp>0&&Math.hypot(other.x-shot.x,other.z-shot.z)<shot.splash)this.strike(owner, other, shot.damage*.55, .2);this.event('burst',shot.x,shot.z,'',{radius:shot.splash,rank:shot.rank||1,itemId:shot.itemId,player:shot.owner});shot.done=true;}
+        if(shot.splash){for(const other of hostile)if(other!==enemy&&other.hp>0&&Math.hypot(other.x-shot.x,other.z-shot.z)<shot.splash)this.strike(owner, other, shot.damage*.55, 0);this.event('burst',shot.x,shot.z,'',{radius:shot.splash,rank:shot.rank||1,itemId:shot.itemId,player:shot.owner});shot.done=true;}
         else if(shot.hit.length>shot.pierce)shot.done=true;
       }
       if(!shot.done&&(shot.traveled>=shot.range||Math.hypot(shot.x,shot.z)>this.radius))shot.done=true;
@@ -1203,17 +1211,13 @@ export class World {
       }
       const prev=before.get(enemy.id);
       const hpDropped=!!(prev&&enemy.hp<prev.hp-1e-6);
-      const moved=!!(prev&&Math.hypot(enemy.x-prev.x, enemy.z-prev.z)>1e-3);
       if(enemy.pendingHit!=null){
         const hit=readPendingHit(enemy);
         if(!hpDropped&&hit>0){enemy.hp-=hit;this.event('damage', enemy.x, enemy.z, String(Math.ceil(hit)));}
         delete enemy.pendingHit;
       }
-      if(enemy.pendingKnock!=null){
-        const knock=readPendingKnock(enemy);
-        if(!moved&&knock)this.move(enemy, knock.dx/Math.max(dt, 0.05), knock.dz/Math.max(dt, 0.05), dt, obstacles);
-        delete enemy.pendingKnock;
-      }
+      // Magic weapons do not knock foes back (KNOCKBACK_WEAPONS): a queued shove is dropped.
+      if(enemy.pendingKnock!=null)delete enemy.pendingKnock;
       if(enemy.pendingBurn!=null){
         const burn=readPendingBurn(enemy);
         if(burn)enemy.burn=burn;
@@ -1252,7 +1256,7 @@ export class World {
   }
   consumeMagicQueues(dt, obstacles, before=new Map()){
     const hits=this.takeMagicQueue('pendingHit');
-    const knocks=this.takeMagicQueue('pendingKnock');
+    this.takeMagicQueue('pendingKnock'); // drained and dropped: magic weapons do not knock back
     const burns=this.takeMagicQueue('pendingBurn');
     const roots=this.takeMagicQueue('pendingRoot');
     const step=Math.max(dt, 0.05);
@@ -1283,13 +1287,6 @@ export class World {
       const prev=enemy.hp;
       enemy.hp-=amount;
       if(enemy.hp<prev)this.event('damage', enemy.x, enemy.z, String(Math.ceil(amount)));
-    }
-    for(const knock of knocks){
-      const enemy=this.enemies.find(entry=>entry.id===knock?.targetId);
-      if(!enemy||isMagicAlly(enemy))continue;
-      const dx=Number(knock.dx)||0, dz=Number(knock.dz)||0;
-      if(!dx&&!dz)continue;
-      this.move(enemy, dx/step, dz/step, step, obstacles);
     }
     for(const burn of burns){
       const enemy=this.enemies.find(entry=>entry.id===burn?.targetId);
@@ -1503,7 +1500,7 @@ export class World {
     const before=phaseAt(this.time),oldDay=dayAt(this.time);this.time+=dt;phase=phaseAt(this.time);
     if(before!==phase){const survived=dayAt(this.time)-1;this.event('phase',0,0,phase==='day'?(survived>0?`Dawn. ${survived} ${survived===1?'night':'nights'} survived.`:'Dawn. You made it.'):phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='day')this.best.day=Math.max(this.best.day||1,dayAt(this.time));if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);this.enemies=this.enemies.filter(e=>e.type==='king'||e.home||isMagicAlly(e));this.hostile=[];}}
     if(!this.showcase&&dayAt(this.time)!==oldDay&&this.bossSlain&&!this.endless){this.status='victory';this.event('announce',0,0,'The curse is broken. Your fire still burns.');return;}
-    stepNight(this,dt,before,phase);
+    stepNight(this,dt,before,phase);stepSunburn(this,dt,phase);
     this.maintainGuards();this.roam(dt);
     for(const n of this.nodes)if(n.ready&&n.ready<this.time){n.ready=0;n.hits=NODES[n.type].hits;}
     }
@@ -1565,7 +1562,14 @@ export class World {
       if(b.type==='ward'&&b.cooldown<=0){const enemy=this.enemies.find(enemy=>!isMagicAlly(enemy)&&distance(enemy,b)<6);if(enemy){enemy.hp-=18;b.cooldown=2;this.event('bolt',enemy.x,enemy.z,'18',{sx:b.x,sz:b.z});}}
     }
     stepMobs(this, dt, obstacles);
-    for(const e of this.enemies.filter(e=>e.hp<=0)){if(this.arena){if(!isMagicAlly(e)){this.kills++;if(this.arena.lab)labKill(this,e);else arenaKill(this,e);}this.event('kill',e.x,e.z);continue;}const loot=ENEMIES[e.type]?.loot;if(loot)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));if(!isMagicAlly(e)){this.kills++;if(!this.showcase){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}this.event('kill',e.x,e.z);if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,'The Hollow King falls. His treasure spills across the grass.');}}
+    for(const e of this.enemies.filter(e=>e.hp<=0)){if(this.arena){if(!isMagicAlly(e)){this.kills++;if(this.arena.lab)labKill(this,e);else arenaKill(this,e);}this.event('kill',e.x,e.z);continue;}
+      // The sun did most of the work (sunburn.mjs): no loot, experience or mastery, just ash.
+      const burnt=sunTook(e);
+      const loot=ENEMIES[e.type]?.loot;if(loot&&!burnt)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));
+      if(!isMagicAlly(e)){this.kills++;if(!this.showcase&&!burnt){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}
+      this.event('kill',e.x,e.z);if(burnt)this.event('ashes',e.x,e.z,'',{creature:e.type,king:e.type==='king'});
+      if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,burnt?'The Hollow King burns away in the daylight, and takes his treasure with him.':'The Hollow King falls. His treasure spills across the grass.');}
+    }
     this.enemies=this.enemies.filter(e=>e.hp>0);
     for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth'&&!this.showcase)this.status='defeat';}
     this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.stack?.quantity>0&&(d.flight||d.until>this.time));

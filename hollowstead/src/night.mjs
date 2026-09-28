@@ -7,8 +7,8 @@
 //   waxing  the usual defence: the night's waves come for the Heartfire.
 //   new     no raid: a darker night for exploring and night-only gathering.
 //   blood   the Hollow King comes, with an extra, bigger wave.
-// Whatever the moon, creatures hunt wanderers out in the dark at a random pace (stepHunters),
-// except someone resting by the Heartfire under a new moon.
+// Day and night, creatures hunt wanderers outside the Heartfire's light at a random pace
+// (stepHunters), twice as often at night, except someone resting by the Heartfire under a new moon.
 
 import {RULES, STRUCTURES, dayAt} from './content.mjs?v=harvest-18';
 import {NIGHT_CAP, REGIONS, RESIDENTS, nightRoster, pickWeighted, regionAt, waveSize} from './progression.mjs?v=harvest-18';
@@ -29,26 +29,27 @@ export const MOONS = Object.freeze({
  * (`firstChance` rises by `firstStep` a night, sure by `firstBy`); after that its chance grows by
  * `step` for every night without one and it is certain once `pity` nights have passed.
  * `newShare` is the chance of a new moon on any other night. Over 200 nights this lands near
- * 57% waxing, 30% new and 13% blood (tests/night-moon.test.mjs).
+ * 60% new (no raid), 30% waxing (waves) and 10% blood (tests/night-moon.test.mjs).
  */
-export const MOON_RULES = Object.freeze({waxingUntil:2, bloodFrom:4, firstChance:.2, firstStep:.1, firstBy:8, step:.025, pity:9, newShare:.345});
+export const MOON_RULES = Object.freeze({waxingUntil:2, bloodFrom:4, firstChance:.2, firstStep:.1, firstBy:8, step:.015, pity:13, newShare:.67});
 
 /** Blood moon waves: one more than a waxing night, each `bloodSize` times bigger (the crowd still stops at NIGHT_CAP). */
 export const BLOOD_WAVE_FRACTIONS = Object.freeze([0, .26, .52, .78]);
 export const BLOOD = Object.freeze({size:1.35});
 
 /**
- * Ambient hunters. `mean` is the average gap in seconds between groups for a wanderer by region
- * tier (meadow, middle ring, outer ring); each night shortens it (`perDay`, up to `dayMax` times as
- * often). Near the fire on a waxing or blood night they come `home` times less often; under a
- * blood moon they come `blood` times as often out in the wilds. Groups spawn `near`-`far` from the
+ * Ambient hunters, by day and by night. `mean` is the average gap in seconds between groups for a
+ * wanderer by region tier (meadow, middle ring, outer ring); each day shortens it (`perDay`, up to
+ * `dayMax` times as often). At night they come `night` times as often. Near the fire they come
+ * `home` times less often (and not at all on a new-moon night); under a blood moon they come
+ * `blood` times as often out in the wilds. Groups spawn `near`-`far` from the
  * wanderer, preferably behind, and never within the Heartfire's light plus `fireGap`.
  * `cap` is how many may hunt one wanderer at once: base + perTier*tier + perDay*day, at most max.
  * Brutes and golems join a group only from night `heavyFrom[tier]`.
  * Hunters farther than `despawn` from every wanderer fade back into the dark.
  */
 export const HUNT = Object.freeze({
-  mean:Object.freeze([34, 24, 16]), perDay:.1, dayMax:2.6, minMean:4, home:3, blood:1.25,
+  mean:Object.freeze([34, 24, 16]), perDay:.1, dayMax:2.6, minMean:4, home:3, blood:1.25, night:2,
   near:14, far:20, fireGap:2, homeGap:4, crowd:30,
   cap:Object.freeze({base:2, perTier:1, perDay:1/3, max:9}), heavyFrom:Object.freeze([6, 6, 4]), despawn:44, sweep:.5,
 });
@@ -152,7 +153,7 @@ export function stepNight(world, dt, before, phase){
   if(phase==='dusk'&&night.told!==night.day&&(world.time%RULES.cycle)-RULES.day>=4.2){night.told=night.day;if(!world.showcase)world.event('announce',0,0,duskLine(night),{moon:night.moon});}
   if(before!==phase&&phase==='night'){if(!world.showcase)startNight(world, night);armNextWave(world);}
   if(phase==='night'&&world.time>=world.nextSpawn){if(!world.showcase&&night.moon!=='new'&&world.invaders().length<NIGHT_CAP)spawnWave(world);armNextWave(world);}
-  if(phase==='night')stepHunters(world, dt, night);
+  stepHunters(world, dt, night, phase==='night');
 }
 
 function duskLine(night){
@@ -211,21 +212,21 @@ function onLand(world, x, z, hearth){
 /** Safe-light radius of the Heartfire at its level (as lighting.structureLightRadius, fuel aside). */
 export function hearthReach(hearth){return hearth?(STRUCTURES.hearth.light||8)+Math.max(0,(Number(hearth.level)||1)-1)*HEARTH_STEP:0;}
 
-/** Groups per second hunting this wanderer tonight (0 when none may come). */
-export function huntRate(world, p, night=tonight(world), hearth=world.buildings.find(b=>b.type==='hearth')){
-  const day=night.day,tier=REGIONS[regionAt(p.x,p.z)]?.tier??0;
+/** Groups per second hunting this wanderer (0 when none may come). `dark`: it is night; the moon only matters then. */
+export function huntRate(world, p, night=tonight(world), hearth=world.buildings.find(b=>b.type==='hearth'), dark=true){
+  const day=night.day,tier=REGIONS[regionAt(p.x,p.z)]?.tier??0,moon=dark?night.moon:'waxing';
   const home=!!hearth&&Math.hypot(p.x-hearth.x,p.z-hearth.z)<hearthReach(hearth)+HUNT.homeGap;
-  if(home&&night.moon==='new')return 0;
+  if(home&&moon==='new')return 0;
   let mean=(HUNT.mean[tier]??HUNT.mean[HUNT.mean.length-1])/Math.min(HUNT.dayMax,1+HUNT.perDay*(day-1));
-  if(home)mean*=HUNT.home;else if(night.moon==='blood')mean/=HUNT.blood;
-  return 1/Math.max(HUNT.minMean,mean);
+  if(home)mean*=HUNT.home;else if(moon==='blood')mean/=HUNT.blood;
+  return (dark?HUNT.night:1)/Math.max(HUNT.minMean,mean);
 }
 
 /** Most hunters one wanderer draws at once. */
 export function huntCap(day, tier){return Math.min(HUNT.cap.max, HUNT.cap.base+HUNT.cap.perTier*tier+Math.floor(HUNT.cap.perDay*day));}
 
 /** A Poisson clock per wanderer: each tick spends rate*dt of a random budget; a group comes when it runs out. */
-function stepHunters(world, dt, night){
+function stepHunters(world, dt, night, dark){
   if(world.showcase||!world.ambient)return;
   night.sweep=(night.sweep||0)+dt;
   if(night.sweep>=HUNT.sweep){night.sweep=0;sweepHunters(world);}
@@ -234,7 +235,7 @@ function stepHunters(world, dt, night){
     if(!p.online||p.down||p.ghost)continue;
     let budget=night.hunt[p.id];
     if(!Number.isFinite(budget))budget=-Math.log(1-world.spawnRng());
-    budget-=huntRate(world, p, night, hearth)*dt;
+    budget-=huntRate(world, p, night, hearth, dark)*dt;
     if(budget>0){night.hunt[p.id]=budget;continue;}
     night.hunt[p.id]=-Math.log(1-world.spawnRng());
     sendHunters(world, p, night, hearth);

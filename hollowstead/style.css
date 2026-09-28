@@ -212,6 +212,8 @@
 .hotbar .weapon-slot.worn{border-color:#e0523f99}
 .hotbar .weapon-slot.worn .wear em{background:#e0523f;animation:worn-pulse 1.2s ease-in-out infinite}
 @keyframes worn-pulse{50%{opacity:.45}}
+.hotbar .weapon-slot.broken .item-icon{filter:grayscale(1) brightness(.6);opacity:.7}
+.hotbar .weapon-slot .broken-tag{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%) rotate(-12deg);margin:0;font-size:7px;font-weight:700;letter-spacing:.5px;color:#fff1e6;background:#b8332acc;text-align:center;pointer-events:none}
 @media (prefers-reduced-motion:reduce){.hotbar .weapon-slot.worn .wear em{animation:none}}
 #action-cluster #attack.armed .item-icon{width:32px;height:32px;object-fit:contain;pointer-events:none;margin-top:-2px}
 #action-cluster #attack.armed small{margin-top:0}

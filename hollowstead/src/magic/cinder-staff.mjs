@@ -34,7 +34,7 @@ const MAX_RANGE = 11;
 const HIT_RADIUS = 0.8;
 const SPAWN_AHEAD = 0.55;
 // Balance (battle update): 23 on impact, then 4 a second for 3 seconds.
-const BURN_DPS = 4;
+const BURN_DPS = 2;
 const BURN_DURATION = 3;
 const FRAME_COUNT = 4;
 const FRAME_FPS = 12;
@@ -95,9 +95,9 @@ export const magicPack = {
     name: 'Cinder Staff',
     kind: 'weapon',
     slot: 'weapon',
-    damage: 23,
+    damage: 12,
     durability: 150,
-    cooldown: 0.8,
+    cooldown: 1.04,
     stamina: 6,
     icon: 'cinder-staff',
     blurb: 'A crooked staff. Its ember throws a firebolt that burns the first hostile it hits.',

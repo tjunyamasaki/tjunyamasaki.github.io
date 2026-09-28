@@ -2,7 +2,6 @@
 // bounded command list; no particles, animation clocks or random rolls affect damage.
 import {MAGIC_PALETTE, GRAVECRAFT} from './art.mjs?v=harvest-18';
 import {BELL, waveRadius} from './mourning-bell.mjs?v=harvest-18';
-import {appendKitsuneEffects} from './kitsune-effects.mjs?v=harvest-18';
 import {appendPlagueEffects} from './plague-effects.mjs?v=harvest-18';
 import {appendShadowEffects} from './shadow-effects.mjs?v=harvest-18';
 
@@ -50,7 +49,7 @@ export function buildMagicEffects(world, frame, theme={}){
     }
   };
 
-  budget-=appendKitsuneEffects(world,frame,{path,orb},max,theme);
+  // The Nine-Tail Lantern's foxfires, tails and bursts are drawn by src/fx/kitsune.mjs.
   budget-=appendPlagueEffects(world,frame,{path,orb},Math.max(0,budget),theme);
   budget-=appendShadowEffects(world,frame,{path,orb},Math.max(0,budget),theme);
   entries(world.magicBolts,(e,age)=>{

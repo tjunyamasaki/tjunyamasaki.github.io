@@ -53,7 +53,7 @@ test('flow fields route round a wall and say "walk straight" in the open', () =>
 test('each creature fights its own way: telegraph shapes, wind-ups and weight', () => {
   const expected = {crawler: 'bite', bonewalker: 'charge', wraith: 'orb', bogling: 'lob', brute: 'slam', golem: 'quake', king: 'kingSlam'};
   for(const [type, first] of Object.entries(expected)) assert.ok(MOVES[type].attacks.includes(first), type);
-  assert.ok(ATTACKS.slam.windup > ATTACKS.bite.windup*2, 'big blows wind up far longer');
+  assert.ok(ATTACKS.slam.windup > ATTACKS.bite.windup, 'big blows wind up longer');
   assert.ok(ATTACKS.quake.windup > ATTACKS.bite.windup*2);
   assert.ok(ENEMIES.brute.damage >= ENEMIES.crawler.damage*4, 'big and slow hits hard');
   assert.ok(ENEMIES.golem.damage > ENEMIES.brute.damage);

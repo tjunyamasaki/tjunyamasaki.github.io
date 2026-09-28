@@ -64,7 +64,10 @@ export function storageSlotCount(building){
   if(building?.type==='cart')return CART_SLOT_COUNTS[Math.min(CART_SLOT_COUNTS.length, Math.max(1, building.level|0))-1];
   return 0;
 }
-export const DROP_LIFETIME_SECONDS = RULES.cycle;
+/** Loose items on the ground vanish after this long. */
+export const DROP_LIFETIME_SECONDS = 90;
+/** A fallen wanderer's spilled pack, or a broken chest's contents, lie a whole day and night (they return at dawn). */
+export const SPILL_LIFETIME_SECONDS = RULES.cycle;
 export const CHEST_LEASE_SECONDS = 12;
 export const CHEST_RENEW_SECONDS = 3;
 export const DISMANTLE_HOLD_SECONDS = 0.8;
@@ -243,14 +246,15 @@ export function itemDefinition(itemId){
     const item=magicItems[itemId];
     return Object.freeze({
       itemId, kind:'equipment', stackLimit:1, supplyUnits:0, equipmentSlot:'weapon',
-      maxDurability:item.durability, use:null, retainsAtZeroDurability:false,
+      maxDurability:item.durability, use:null, retainsAtZeroDurability:true,
     });
   }
   if(Object.hasOwn(EQUIPMENT, itemId)){
     return Object.freeze({
       itemId, kind:'equipment', stackLimit:1, supplyUnits:0, equipmentSlot:equipmentSlotFor(itemId),
       maxDurability:EQUIPMENT[itemId].durability, use:null,
-      retainsAtZeroDurability:itemId==='torch'||itemId==='everlantern',
+      // Broken gear crumbles; a broken weapon stays (useless until mended at the Heartfire).
+      retainsAtZeroDurability:equipmentSlotFor(itemId)==='weapon'||itemId==='everlantern',
     });
   }
   if(Object.hasOwn(ITEMS, itemId)){

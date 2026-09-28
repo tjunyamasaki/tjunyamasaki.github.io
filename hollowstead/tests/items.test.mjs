@@ -374,9 +374,13 @@ test('T08 moving the lit lantern turns it off and keeps its fuel',()=>{
   assert.equal(w.transferAll(p,p.equipment.light.uid,chest.store,{grow:true}),true);
   assert.equal(p.lantern,false);
   assert.equal(stackOf(chest.store,'torch').durability,12.5);
+  // Broken gear crumbles (an empty lantern too); a broken weapon stays, to be mended at the Heartfire.
   const emptyTorch=wearStack(makeStack('spent-torch','torch',1,1).stack,1);
-  assert.equal(emptyTorch.removed,false);
-  assert.equal(emptyTorch.stack.durability,0);
+  assert.equal(emptyTorch.removed,true);
+  assert.equal(emptyTorch.stack,null);
+  const brokenBlade=wearStack(makeStack('spent-sword','sword',1,1).stack,1);
+  assert.equal(brokenBlade.removed,false);
+  assert.equal(brokenBlade.stack.durability,0);
   const broken=wearStack(makeStack('spent-axe','axe',1,1).stack,1);
   assert.equal(broken.stack,null);
   assert.equal(broken.removed,true);

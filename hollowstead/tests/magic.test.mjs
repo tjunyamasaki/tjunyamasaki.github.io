@@ -9,6 +9,7 @@ import {BELL} from '../src/magic/mourning-bell.mjs?v=harvest-18';
 import {MagicClock, heldWeaponPose} from '../src/magic/art.mjs?v=harvest-18';
 import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from '../src/magic/effects.mjs?v=harvest-18';
 import {clearShowcaseWorld} from '../src/showcase.mjs';
+import {WeaponFx} from '../src/fx/index.mjs?v=harvest-18';
 
 await loadMagicModules();
 
@@ -36,7 +37,7 @@ test('Mourning Bell waits for its wave, hits each hostile once, and preserves al
   advance(world,BELL.delay-.01);
   assert.equal(near.hp,100);
   advance(world,.2);
-  assert.equal(near.hp,TOLLED);assert.ok(near.x>1);assert.equal(edge.hp,100);
+  assert.equal(near.hp,TOLLED);assert.equal(near.x,1,'the bell does not knock back');assert.equal(edge.hp,100);
   for(let i=0;i<30;i++)advance(world,.05);
   assert.equal(near.hp,TOLLED);assert.equal(edge.hp,TOLLED);assert.equal(outside.hp,100);
   assert.equal(ally.hp,100);assert.equal(guest.hp,100);assert.equal(accidentalPlayer.hp,100);
@@ -46,7 +47,7 @@ test('Mourning Bell waits for its wave, hits each hostile once, and preserves al
 
 test('bell cooldown, broken equipment, and large ticks cannot duplicate hits',()=>{
   const {world,p}=setup('mourning-bell',1);const target=foe(world,'enemy',3);
-  world.attack(p);assert.equal(p.equipment.weapon,null);
+  world.attack(p);assert.equal(p.equipment.weapon.durability,0,'a broken weapon stays in hand');
   assert.equal(world.magicWaves.length,1);
   advance(world,2);assert.equal(target.hp,TOLLED);assert.equal(world.magicWaves.length,0);
   const second=setup();second.world.attack(second.p);second.world.attack(second.p);
@@ -67,12 +68,19 @@ test('network/save round trips preserve travelling rings and their already-hit t
   assert.equal(guest.enemies.find(e=>e.id==='far').hp,TOLLED);
 });
 
+function foxCommands(world,p){
+  const fx=new WeaponFx(),frame={time:world.time+.025,lead:.025};
+  const built=fx.build(world,frame,1,1/60,{x:p.x,z:p.z});
+  const tails=fx.tails(world,p,{x:p.x,z:p.z,y:0},1,frame.time);
+  return [...built.normal,...built.glow,...tails.normal,...tails.glow];
+}
 test('both renderers receive finite, bounded effects without mutating the host world',()=>{
   for(const id of Object.keys(magicItems)){
     const {world,p}=setup(id,magicItems[id].durability);foe(world,'target',2);
     world.attack(p);advance(world,.15);
     const before=JSON.stringify(world.snapshot());
-    const commands=buildMagicEffects(world,{time:world.time+.025,lead:.025});
+    // The Nine-Tail Lantern is drawn by src/fx (its tails and foxfires), not the pack effects.
+    const commands=id==='kitsune-lantern'?foxCommands(world,p):buildMagicEffects(world,{time:world.time+.025,lead:.025});
     assert.ok(commands.length>0,id);
     assert.ok(commands.length<500,id);
     for(const c of commands){

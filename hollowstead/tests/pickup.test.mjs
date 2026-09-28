@@ -328,14 +328,16 @@ test('flight sampling follows the render clock and a mid-flight snapshot keeps m
   assert.equal(home.y,0);
 });
 
-test('floor piles vanish after one day and night cycle',()=>{
+test('floor piles vanish after 90 seconds; a spilled pack lies a whole cycle',()=>{
   const {w,p}=camp();
   w.ambient=false;w.enemies=[];
   const drop=w.placeDrop(w.mintStack('wood',1),p.x+8,p.z+8);
-  assert.equal(DROP_LIFETIME_SECONDS,RULES.cycle);
-  assert.equal(drop.until,w.time+RULES.cycle);
+  assert.equal(DROP_LIFETIME_SECONDS,90);
+  assert.equal(drop.until,w.time+90);
+  w.give(p,'stone',2);w.dropContainer(p.inventory,p.x+6,p.z);
+  assert.ok(w.drops.filter(entry=>entry.stack.itemId==='stone').every(entry=>entry.until===w.time+RULES.cycle));
   const id=drop.id;
-  sim(w,RULES.cycle-RULES.tick);
+  sim(w,90-RULES.tick);
   assert.equal(w.drops.some(entry=>entry.id===id),true);
   sim(w,RULES.tick*2);
   assert.equal(w.drops.some(entry=>entry.id===id),false);

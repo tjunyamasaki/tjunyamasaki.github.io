@@ -58,14 +58,27 @@ export const HUES = Object.freeze({
   censer: H('#ffffff', '#dcf4ff', '#8fd2ff', '#16283a', '#b9f3ff'),
   gloomgrasp: H('#f5deff', '#b774ff', '#6a1fd0', '#10051c', '#ff5ad8'),
   plaguebeak: H('#f6ffd9', '#bdf262', '#6fb82a', '#18280a', '#e9ff8a'),
-  'kitsune-lantern': H('#fff1d1', '#ff6a58', '#4ff1cd', '#24192f', '#ae70ff'),
   'barrow-rattle': H('#f6fff8', '#dcf2e2', '#7fd6c4', '#1c2824', '#fff0c0'),
   'cinder-staff': H('#fff2cc', '#ffb24e', '#ff5a1a', '#2a1008', '#ffe08a'),
   'widows-needle': H('#fcf2ff', '#dcc2ea', '#b46ccc', '#1c1024', '#ff7aa8'),
   'spirit-fan': H('#f2fffb', '#aef2de', '#4fd0b0', '#10302a', '#fff0b8'),
   'mourning-bell': H('#fff8e2', '#ecc87e', '#bb8f56', '#281e10', '#7fd6c4'),
 });
-export const hue = itemId => HUES[itemId] || HUES.default;
+/**
+ * The kitsune's colours: one is rolled each time the Nine-Tail Lantern is equipped (FOX_LOOKS in
+ * magic/kitsune-lantern.mjs) and everything it makes is drawn in it. `fur` is the tails' body,
+ * `ink` their outline (a dark of the same hue, so the whole look stays one colour).
+ */
+const F = (core, main, glow, deep, alt, fur, ink) => Object.freeze({core, main, glow, deep, alt, fur, ink});
+export const FOX = Object.freeze({
+  gold: F('#fff6d2', '#ffbf2a', '#ffa114', '#c26f06', '#ffe27a', '#ffd04d', '#4a2604'),
+  red: F('#ffe3d9', '#ff4a36', '#ff2a18', '#a8121a', '#ff9474', '#ff6a4f', '#3d080c'),
+  violet: F('#f4e6ff', '#a65cff', '#8f3dff', '#5320b0', '#d4a6ff', '#b97cff', '#1e0b3c'),
+});
+/** A wielder's kitsune colours (from the player, or a look id); red until the host has rolled one. */
+export const foxLook = who => FOX[typeof who === 'string' ? who : who?.kitsuneLook?.hue] || FOX.red;
+/** Colours for an item; the kitsune's depend on the wielder's look. */
+export const hue = (itemId, look) => itemId === 'kitsune-lantern' ? foxLook(look) : HUES[itemId] || HUES.default;
 export const INK = '#2b2233';
 
 /**

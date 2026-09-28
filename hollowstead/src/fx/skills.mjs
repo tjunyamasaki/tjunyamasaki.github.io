@@ -3,6 +3,7 @@
 // when it fires (EVENTS, from its 'fx' event). Rank (tier) layers on the show: ★1 is the bare
 // shape of the move, each rank adds glow, sparks, rays, sigils, debris and, at ★5, the extras.
 import {INK, TAU, at, bump, clamp01, easeIn, easeInOut, easeOut, easeOut2, fade, hue, lerp, rnd, tier} from './kit.mjs?v=harvest-18';
+import {paintFoxLeap, paintFoxPounce, paintFoxRing} from './kitsune.mjs?v=harvest-18';
 import {paintImpact, paintMark, paintStar} from './starfall.mjs?v=harvest-18';
 
 const facingOf = e => Math.atan2(e.dz || 0, e.dx || 1);
@@ -314,20 +315,9 @@ export const SKILL_EVENTS = {
       if(k < 1) d.path([at(ev.x+Math.cos(a)*v*age, ev.z+Math.sin(a)*v*age, .5+2*age-6*age*age, -.06, 0), at(ev.x+Math.cos(a)*v*age, ev.z+Math.sin(a)*v*age, .5+2*age-6*age*age, .06, .12)], .06, '#d9ffe8', fade(k), {glow: true});
     }
   }},
-  'fx:foxring': {life: () => .6, paint(d, ev, age, seed){
-    const h = hue('kitsune-lantern'), T = tier(ev.rank), k = age/.6;
-    d.shock(ev.x, ev.z, .5+1.8*easeOut(k), .07, (ev.v || 0)%2 ? h.alt : h.main, fade(k));
-    if(T.r >= 3) d.sigil(ev.x, ev.z, 1.3, h.glow, fade(k), {spin: age*4, sides: 9});
-  }},
-  'fx:foxspirit': {life: () => 1.2, kick: kickOf(1.3, '#ffd0c0'), paint(d, ev, age, seed){
-    const h = hue('kitsune-lantern'), T = burst(d, ev.x, ev.z, ev.r || 3.4, age, ev.rank, seed, h, {life: .8, y: 1, sparks: 1.4});
-    const k = age/1.2;
-    foxHead(d, ev.x, ev.z, 1.6+age*2, 1.1+.5*easeOut(age/.2), h, fade(k), Math.sin(age*6)*.1);
-    for(let i = 0; i < 9; i++){
-      const a = i/9*TAU+age*2, r = (ev.r || 3.4)*easeOut(age/.5);
-      d.twinkle(ev.x+Math.cos(a)*r, ev.z+Math.sin(a)*r, .6, .16, i%2 ? h.glow : h.main, fade(k), age*5);
-    }
-  }},
+  // Kitsune Parade: drawn in the wielder's kitsune colour (src/fx/kitsune.mjs).
+  'fx:foxring': {life: () => .7, paint(d, ev, age){paintFoxRing(d, ev, age);}},
+  'fx:foxspirit': {life: () => 1.4, kick: kickOf(1.3, '#fff0d8'), paint(d, ev, age, seed){paintFoxPounce(d, ev, age, seed);}},
   'fx:boneburst': {life: () => 1.1, kick: kickOf(1), paint(d, ev, age, seed){
     const h = hue('barrow-rattle'), T = tier(ev.rank), r = ev.r || 3.6;
     burst(d, ev.x, ev.z, r, age, ev.rank, seed, h, {life: .6, y: .5});
@@ -507,13 +497,7 @@ export const SKILL_BEATS = {
     d.bloom(b.x, b.z, .9, .5+grow*.8, h.glow, .6*k);
     d.orb(b.x, b.z, .9, .18+grow*.15, '#ffffff', k, {glow: true});
   }},
-  foxspirit: {pending(d, b, tt, clock){
-    const k = 1-(b.at-tt)/.6;
-    if(k < 0) return;
-    const h = hue('kitsune-lantern');
-    d.sigil(b.x, b.z, (b.r || 3.4)*(1.2-.3*k), h.glow, k, {spin: clock*2, sides: 9});
-    foxHead(d, b.x, b.z, 4-2.4*easeIn(k), .5+.6*k, h, k*.8, 0);
-  }},
+  foxspirit: {pending(d, b, tt, clock){paintFoxLeap(d, b, tt, clock);}},
   lanceshot: {lasting(d, b, t, clock, lead){
     const h = hue('bonebow'), T = tier(b.rank), x = b.x+b.dx*(b.v || 30)*lead, z = b.z+b.dz*(b.v || 30)*lead;
     const x0 = b.x0 ?? x, z0 = b.z0 ?? z, back = Math.min(6, Math.hypot(x-x0, z-z0));
@@ -637,15 +621,6 @@ function crow(d, x, z, y, s, a, h, alpha, flap){
 function feather(d, x, z, y, spin, alpha){
   const c = Math.cos(spin)*.18, s = Math.sin(spin)*.18;
   d.path([at(x, z, y, -c, -s), at(x, z, y, c, s)], .08, '#1a1024', alpha, {taper: .8});
-}
-function foxHead(d, x, z, y, size, h, alpha, tilt){
-  const ca = Math.cos(tilt), sa = Math.sin(tilt);
-  const p = (u, v) => at(x, z, y, (u*ca-v*sa)*size, (u*sa+v*ca)*size);
-  d.bloom(x, z, y, size*1.3, h.main, .35*alpha);
-  for(const s of [-1, 1]) d.path([p(s*.82, .34), p(s*.89, 1.32), p(s*.08, .63)], 0, h.main, alpha, {fill: true, glow: true});
-  d.path([p(-.78, .48), p(0, .81), p(.78, .48), p(.68, -.12), p(0, -.89), p(-.68, -.12)], 0, '#fff1d1', alpha*.9, {fill: true, glow: true});
-  d.path([p(-.62, .28), p(-.2, .04)], size*.14, '#ff594c', alpha, {glow: true});
-  d.path([p(.62, .28), p(.2, .04)], size*.14, '#ff594c', alpha, {glow: true});
 }
 function skull(d, x, z, y, r, h, alpha){
   d.orb(x, z, y, r, '#e9fff2', alpha);

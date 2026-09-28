@@ -123,7 +123,7 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(SUPPLY_CAPACITY, 120);
   assert.equal(CHEST_SLOT_COUNT, 24);
   assert.equal(STACK_LIMIT, 64);
-  assert.equal(DROP_LIFETIME_SECONDS, RULES.cycle);
+  assert.equal(DROP_LIFETIME_SECONDS, 90);
   assert.deepEqual(splitStackQuantities(45), [45]);
   assert.deepEqual(splitStackQuantities(130), [64, 64, 2]);
   assert.equal(splitStackQuantities(0), null);

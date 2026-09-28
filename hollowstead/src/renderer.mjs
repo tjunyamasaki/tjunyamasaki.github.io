@@ -28,7 +28,7 @@ const PROJECTILE_KEYS={arrow:'arrow',bolt:'mbolt',wisp:'wisp',seed:'pumpseed'};
 import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-18';
 import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-18';
 import {MagicMesh} from './magic/effects-three.mjs?v=harvest-18';
-import {WeaponFx} from './fx/index.mjs?v=harvest-18';
+import {WeaponFx, dropBlink} from './fx/index.mjs?v=harvest-18';
 import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-18';
 import {RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-18';
 import {
@@ -107,7 +107,7 @@ class CombatLayer {
 }
 export class Renderer {
   constructor(canvas,theme){
-    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);
+    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.tailMeshes=new Map();this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);
     this.scene.fog=new THREE.FogExp2(theme.palette.background,.009);this.camera=new THREE.OrthographicCamera(-15,15,15,-15,.1,180);
     this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.setPixelRatio(Math.min(devicePixelRatio,1.6));this.gl.outputColorSpace=THREE.SRGBColorSpace;
     this.objects=new Map();this.textures=new Map();this.materials=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
@@ -225,7 +225,7 @@ export class Renderer {
     if(event.type==='strike')this.float(event.text,event.x,event.z,STRIKE_COLORS[event.kind]||STRIKE_COLORS.clean,{className:`world-label strike-label strike-${event.kind||'clean'}`,alwaysVisible:event.player===this.localId}); // rhythm.mjs / trinkets.mjs
     if(event.type==='dash'){const body=this.objects.get('player'+event.player);if(body){for(let i=0;i<4;i++){const ghost=new THREE.Sprite(body.sprite.material.clone());ghost.center.copy(body.sprite.center);ghost.scale.copy(body.sprite.scale);const t=i/4;ghost.position.set(event.x+(event.dx||0)*DASH.distance*t,body.sprite.position.y,event.z+(event.dz||0)*DASH.distance*t);ghost.material.color.set('#9fd0ff');ghost.material.opacity=0;ghost.renderOrder=1;this.scene.add(ghost);this.afterimages.push({sprite:ghost,life:-t*DASH.time});}}}
     if(event.type==='quake'||event.type==='splat'){const mat=new THREE.MeshBasicMaterial({color:event.type==='quake'?0xff8a5c:0x9fdc6a,transparent:true,depthWrite:false,side:THREE.DoubleSide});const arc=Math.min(Math.PI*2,(event.arc||360)*Math.PI/180);const geo=arc<Math.PI*1.99?new THREE.RingGeometry(.72,1,36,1,-(event.angle||0)-arc/2,arc):new THREE.RingGeometry(.8,1,48);const mesh=new THREE.Mesh(geo,mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||1.5});}
-    if(['slash','cleave'].includes(event.type)){const arc=Math.min(Math.PI*1.9,(event.arc||120)*Math.PI/180),range=event.range||2.5,phi=Math.atan2(event.dz||0,event.dx||1);const geo=new THREE.RingGeometry(range*.5,range*.98,28,1,-phi-arc/2,arc);geo.setDrawRange(0,0);const mat=new THREE.MeshBasicMaterial({color:event.type==='cleave'?0xffe0b0:0xfff4e2,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(geo,mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.5,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,fixed:true,sweep:28});}
+    // Melee swings show no hitbox arc: the weapon's swing pose is the attack, plus rank flair (src/fx) from ★2.
     if(['chain','lash'].includes(event.type)){const pts=event.type==='chain'?(event.points||[]).map(([x,z])=>new THREE.Vector3(x,.9,z)):[new THREE.Vector3(event.x,.9,event.z),new THREE.Vector3(event.x+(event.dx||0)*(event.range||4),.9,event.z+(event.dz||0)*(event.range||4))];if(pts.length>1){const bent=[];for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];for(let k=0;k<6;k++){const t=k/6;bent.push(new THREE.Vector3(a.x+(b.x-a.x)*t+(k?(Math.random()-.5)*.35:0),.9+(k?(Math.random()-.5)*.3:0),a.z+(b.z-a.z)*t+(k?(Math.random()-.5)*.35:0)));}}bent.push(pts[pts.length-1]);const mesh=new THREE.Line(new THREE.BufferGeometry().setFromPoints(bent),new THREE.LineBasicMaterial({color:event.type==='chain'?0xbfe8ff:0xc49bff,transparent:true,depthWrite:false}));this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,fixed:true});}}
     if(['frost','freeze','summon','poof','rend','portal'].includes(event.type)){const color={starfall:0xf2c14e,mark:0xf2c14e,frost:0xbfe8ff,freeze:0xe2f6ff,summon:0x9fd8a8,poof:0x9fd8a8,rend:0xd0504a,portal:0xb784ff}[event.type];const mat=new THREE.MeshBasicMaterial({color,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||({freeze:.9,summon:1.1,poof:.8,rend:1}[event.type]||1)});}
     if(['nova','burst'].includes(event.type)){const mat=new THREE.MeshBasicMaterial({color:event.type==='nova'?0xf4a64a:0x7fd6c4,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||2});}
@@ -253,6 +253,26 @@ export class Renderer {
     o.sprite.material.color.copy(body.sprite.material.color).lerp(new THREE.Color('#ffffff'),pose.skilling?.7:.25);
     return id;
   }
+  /**
+   * The kitsune's tails (src/fx/kitsune.mjs): painted each frame into a mesh of their own, placed just
+   * behind the wielder's sprite so they sort behind it and in front of whatever stands further back.
+   * Their glow and ground light join the frame's shared lists.
+   */
+  syncKitsuneTails(player, body, world, frameFx){
+    const rig=frameFx&&!player.down?this.weaponFx.tails(world,player,{x:body.x,z:body.z,y:body.sprite.position.y},this.clock,this.magicFrame.time):null;
+    if(!rig)return;
+    let set=this.tailMeshes.get(player.id);
+    if(!set){set={paint:new MagicMesh(this.scene,{order:0,capacity:16384}),light:new MagicMesh(this.scene,{order:0,additive:true,capacity:8192})};this.tailMeshes.set(player.id,set);}
+    // Both sit just behind the body: the painted tails first, then their light, then the sprite.
+    set.paint.update(rig.normal,{x:body.x,y:0,z:body.z-.08});
+    set.light.update(rig.glow,{x:body.x,y:0,z:body.z-.07});
+    // Dim with the wielder at night, but the spirit keeps a little of its own light.
+    set.paint.material.color.copy(body.sprite.material.color).multiplyScalar(.7).addScalar(.3);
+    set.paint.mesh.visible=body.sprite.visible&&set.paint.count>0;set.light.mesh.visible=body.sprite.visible&&set.light.count>0;
+    frameFx.groundGlow.push(...rig.groundGlow);frameFx.groundNormal.push(...rig.groundNormal);
+  }
+
+
   /** A brief full-screen wash on the biggest weapon moments (src/fx). A DOM layer, so both renderers share it. */
   paintFlash(weapon){
     const level=weapon?Math.round(weapon.flash*100)/100:0;
@@ -287,7 +307,7 @@ export class Renderer {
     const p=world.player(localId)||world.players[0]||{x:0,z:2};const fx=demo?0:p.x,fz=demo?-1:p.z;
     this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);
     // Weapon effects first: their camera kick and their light on the night ground belong to this frame.
-    const weapon=demo?null:this.weaponFx.build(world,this.magicFrame,this.clock,dt,this.focus);
+    const weapon=demo?null:this.weaponFx.build(world,this.magicFrame,this.clock,dt,this.focus);for(const set of this.tailMeshes.values()){set.paint.mesh.visible=false;set.light.mesh.visible=false;}
     const kick=weapon?.shake>0?weapon.shake*.32:0,kx=kick?(Math.sin(this.clock*71)+Math.sin(this.clock*43))*kick*.5:0,kz=kick?(Math.sin(this.clock*59+1)+Math.sin(this.clock*31))*kick*.5:0;
     this.camera.position.set(this.focus.x+kx,28,this.focus.z+27+kz);this.camera.lookAt(this.focus.x+kx,0,this.focus.z+kz);this.camera.updateMatrixWorld();
     const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;this.paintField(frame);this.paintFlash(weapon);
@@ -329,10 +349,10 @@ export class Renderer {
       if(kind==='enemy'&&e.stunned>0)o.sprite.material.color.lerp(new THREE.Color('#bfe8ff'), .65);
       if(kind==='enemy'&&this.textures.has('glow-'+key)){if(!o.eyes){const gdef=this.theme.sprites['glow-'+key],tex=this.textures.get('glow-'+key).clone();tex.needsUpdate=true;tex.repeat.set(1/(gdef.columns||1),1/(gdef.rows||1));o.eyes=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));o.eyes.center.copy(o.sprite.center);this.scene.add(o.eyes);}o.eyes.material.map.offset.copy(o.sprite.material.map.offset);o.eyes.scale.copy(o.sprite.scale);o.eyes.position.set(o.sprite.position.x,o.sprite.position.y+.03,o.sprite.position.z+.03);o.eyes.material.rotation=o.sprite.material.rotation;o.eyes.visible=o.sprite.visible;o.eyes.material.opacity=glowStrength(frame.darkness,e,this.clock);}
       if(kind==='building'&&key==='farm'&&e.growth>=100&&display>0.55)o.sprite.material.color.lerp(new THREE.Color('#efd394'), .45);
-      if(kind!=='zone')o.sprite.material.opacity=e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
+      if(kind!=='zone')o.sprite.material.opacity=kind==='drop'?dropBlink(e,world.time,this.clock):e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
       const fade=labelOpacity(display, frame.darkness, frame.lighting);
       if(kind==='building'&&STRUCTURES[key].light){const lit=key==='lantern'||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
-      if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);}
+      if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);this.syncKitsuneTails(e,o,world,weapon);}
       // Night-only finds (regions.mjs) glow in the dark so they can be found from afar.
       if(kind==='node'){const hue=nightGlow(e);if(hue){this.glow(o,1.1);o.glow.material.color.set(hue);o.glow.material.opacity=(.16+.42*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));}}
       if(kind==='building'&&key==='gate'&&e.open)o.sprite.scale.x*=.35;

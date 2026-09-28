@@ -82,7 +82,7 @@ const reap = (w, p, {style, damage}) => {
     const d = dist(e, p); if(d >= style.range) continue;
     const dot = d < .6 ? 1 : ((e.x-p.x)*f.x + (e.z-p.z)*f.z)/d;
     if(dot < Math.cos(style.arc*Math.PI/360)) continue;
-    w.strike(p, e, damage, .45); hits++;
+    w.strike(p, e, damage, 0); hits++;
   }
   w.event('cleave', p.x, p.z, '', {dx: f.x, dz: f.z, arc: style.arc, range: style.range, rank: rankOf(p), itemId: p.equipment?.weapon?.itemId, player: p.id});
   if(hits){
@@ -114,7 +114,7 @@ const chain = (w, p, {style, damage}) => {
   const hit = new Set(); let amount = damage;
   for(let jump = 0; target && jump <= style.jumps; jump++){
     hit.add(target.id); points.push([target.x, target.z]);
-    w.strike(p, target, amount, .15);
+    w.strike(p, target, amount, 0);
     if(style.shock) target.stunned = Math.max(target.stunned||0, style.shock);
     amount *= style.falloff;
     const from = target;
@@ -209,7 +209,7 @@ export function stepArsenal(w, dt, obstacles){
       const owner = w.player(zone.owner);
       if(zone.kind === 'star' && !zone.done && zone.age >= zone.delay){
         zone.done = true;
-        for(const e of foes) if(e.hp > 0){const d = dist(e, zone); if(d < zone.radius){w.strike(owner, e, zone.damage*(1-.4*d/zone.radius), 0); knockFrom(w, e, zone.x, zone.z, .7*(1-.5*d/zone.radius), obstacles);}}
+        for(const e of foes) if(e.hp > 0){const d = dist(e, zone); if(d < zone.radius) w.strike(owner, e, zone.damage*(1-.4*d/zone.radius), 0);}
         w.event('starfall', zone.x, zone.z, '', {radius: zone.radius, rank: zone.rank||1, seq: zone.seq||0, player: zone.owner, itemId: 'starfall'});
       }
       if(zone.kind === 'frost'){
@@ -278,8 +278,6 @@ function stepAllies(w, dt, obstacles, foes){
 function allyStrike(w, a, e, amount){
   const dealt = Math.max(1, Math.round(amount));
   e.hp -= dealt; e.lastHitBy = a.owner;
-  const d = Math.max(.1, dist(e, a)), k = bossy(e) ? .08 : .2;
-  e.x += (e.x-a.x)/d*k; e.z += (e.z-a.z)/d*k;
   if(e.home && !e.aggro) e.aggro = true;
   w.event('damage', e.x, e.z, String(dealt));
 }

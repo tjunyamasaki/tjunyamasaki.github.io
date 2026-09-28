@@ -38,7 +38,7 @@ function huntFor(w, seconds, dt=.05){
   return {groups, spawns};
 }
 
-test('the moon is fixed by the seed and the night, and lands near 58/30/12 over 200 nights', () => {
+test('the moon is fixed by the seed and the night, and lands near 60/30/10 new/waxing/blood over 200 nights', () => {
   const tally={waxing:0, new:0, blood:0};
   const sequences=SEEDS.map(seed=>moons(seed));
   for(const [i, seed] of SEEDS.entries()){
@@ -50,13 +50,13 @@ test('the moon is fixed by the seed and the night, and lands near 58/30/12 over 
   assert.ok(sequences.some((s, i) => i && s.join() !== sequences[0].join()), 'seeds give different skies');
   const total=SEEDS.length*200;
   const share=k=>tally[k]/total;
-  assert.ok(share('waxing')>.5&&share('waxing')<.66, `waxing ${share('waxing')}`);
-  assert.ok(share('new')>.23&&share('new')<.37, `new ${share('new')}`);
-  assert.ok(share('blood')>.08&&share('blood')<.17, `blood ${share('blood')}`);
+  assert.ok(share('new')>.52&&share('new')<.68, `new ${share('new')}`);
+  assert.ok(share('waxing')>.23&&share('waxing')<.37, `waxing ${share('waxing')}`);
+  assert.ok(share('blood')>.06&&share('blood')<.14, `blood ${share('blood')}`);
   assert.deepEqual(Object.keys(MOONS).sort(), ['blood', 'new', 'waxing']);
 });
 
-test('nights 1-2 are waxing; no blood moon before night 4 or twice running; one comes at least every nine nights', () => {
+test('nights 1-2 are waxing; no blood moon before night 4 or twice running; one comes at least every MOON_RULES.pity nights', () => {
   for(let seed=0;seed<60;seed++){
     const sky=moons(seed*7919+13, 200);
     assert.equal(sky[0], 'waxing');assert.equal(sky[1], 'waxing');

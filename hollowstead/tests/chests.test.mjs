@@ -5,7 +5,8 @@ import {World} from '../src/engine.mjs';
 import {ITEMS,EQUIPMENT} from '../src/content.mjs';
 import {createActionSession} from '../src/transactions.mjs';
 import {collectLocations,duplicateUids,containerId,countItem,totalQuantity} from '../src/inventory.mjs';
-import {CHEST_LEASE_SECONDS, STACK_LIMIT} from '../src/contracts.mjs';
+import {CHEST_LEASE_SECONDS, EQUIPMENT_SLOT_ITEMS, STACK_LIMIT} from '../src/contracts.mjs';
+const WEAPON_IDS=new Set(EQUIPMENT_SLOT_ITEMS.weapon);
 import {migrateV1Save,remapWorldClock,validateV2World} from '../src/serialization.mjs';
 
 function camp(){
@@ -66,12 +67,14 @@ test('T10 every item transfers in both directions preserving UID and worn durabi
   const {w,p,chest,open,transfer}=camp(),session=open(p).sessionId;
   for(const itemId of [...Object.keys(ITEMS),...Object.keys(EQUIPMENT)]){
     w.clearPack(p);w.give(p,itemId,1);const stack=p.inventory.slots.find(Boolean),uid=stack.uid;
-    if(EQUIPMENT[itemId])stack.durability=itemId==='torch'?0:3.25;
+    // A broken weapon (0) is kept and transfers; other gear crumbles at 0, so it moves worn.
+    const worn=EQUIPMENT[itemId]&&WEAPON_IDS.has(itemId)?0:3.25;
+    if(EQUIPMENT[itemId])stack.durability=worn;
     assert.equal(transfer(p,session,p.inventory,chest.store,uid).ok,true,itemId);
     assert.equal(transfer(p,session,chest.store,p.inventory,uid).ok,true,itemId);
     const returned=p.inventory.slots.find(s=>s?.uid===uid);
     assert.equal(returned.itemId,itemId);
-    if(EQUIPMENT[itemId])assert.equal(returned.durability,itemId==='torch'?0:3.25);
+    if(EQUIPMENT[itemId])assert.equal(returned.durability,worn);
     assert.deepEqual(duplicateUids(collectLocations(w)),[]);
   }
 });

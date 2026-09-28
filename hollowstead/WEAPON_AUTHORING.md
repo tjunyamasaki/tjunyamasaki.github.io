@@ -84,7 +84,7 @@ if (enemy.home && !enemy.aggro) enemy.aggro = true;
 
 The engine applies damage, displays numbers, and assigns `lastHitBy` from `ownerId`. Always pass `ownerId` (a module that subtracts HP itself, like the barrow skeletons or cinder bolts, sets `enemy.lastHitBy` instead): the kill credits weapon mastery on expeditions (`src/mastery.mjs`) and trinket kill effects. Optional queues:
 
-- `pendingKnock`: `{targetId, dx, dz}`; a displacement, not velocity. Reduce boss displacement as the reference does.
+- `pendingKnock`: `{targetId, dx, dz}`. Currently dropped by the engine: area and magic weapons do not knock foes back. Only the weapons in `KNOCKBACK_WEAPONS` (`src/progression.mjs`: fists, spear, sword, fangs and the bows) push, in their auto attacks and skills; pulls (negative skill `push`) still work for every weapon.
 - `pendingBurn`: `{targetId, dps, remaining}`; seconds, refreshed/replaced rather than stacked. The burn has no independent owner field; establish kill credit on the initial hit. Use the existing `arsenal.mjs` `applyDot` pattern if separate DoT ownership is essential.
 - `pendingRoot`: `{targetId, remaining}`; seconds of immobilization.
 

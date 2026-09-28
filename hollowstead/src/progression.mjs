@@ -213,32 +213,36 @@ export const LIGHT_ITEMS = Object.freeze(['torch','everlantern','gravelight']);
 export const EVERLANTERN_RADIUS_SCALE=1.45;
 
 /** How each non-magic weapon attacks. Damage comes from EQUIPMENT[id].damage. */
+/**
+ * Attack styles. Uncommon and rare weapons were too strong: their base damage (content.mjs) is half
+ * what it was and their cooldowns 30% longer than before.
+ */
 export const WEAPON_STYLES = Object.freeze({
   fist:{style:'melee', damage:9, range:2, arc:0, cooldown:.65, stamina:7},
   // crafted
   spear:{style:'melee', range:3.3, arc:0, cooldown:.55, stamina:7},
-  sword:{style:'melee', range:3.3, arc:0, cooldown:.55, stamina:7},
-  recurve:{style:'arrow', range:13, speed:18*1.15, cooldown:.6, stamina:6, pierce:0},
-  bonebow:{style:'arrow', range:15, speed:21*1.15, cooldown:.75, stamina:7, pierce:2},
-  broadsword:{style:'melee', range:3.2, arc:110, cooldown:.7, stamina:10},
-  crookstaff:{style:'bolt', range:11, speed:12*1.15, cooldown:.95, stamina:9, splash:1.7},
+  sword:{style:'melee', range:3.3, arc:0, cooldown:.72, stamina:7},
+  recurve:{style:'arrow', range:13, speed:18*1.15, cooldown:.78, stamina:6, pierce:0},
+  bonebow:{style:'arrow', range:15, speed:21*1.15, cooldown:.98, stamina:7, pierce:2},
+  broadsword:{style:'melee', range:3.2, arc:110, cooldown:.91, stamina:10},
+  crookstaff:{style:'bolt', range:11, speed:12*1.15, cooldown:1.24, stamina:9, splash:1.7},
   // loot only
   flamberge:{style:'melee', range:3.6, arc:150, cooldown:.8, stamina:12},
   skullstaff:{style:'bolt', range:12, speed:12*1.15, cooldown:1.05, stamina:11, splash:2.3, slow:2},
   tome:{style:'nova', range:4.6, cooldown:1.5, stamina:18},
-  fangs:{style:'combo', range:2.6, cooldown:.3, stamina:4, window:1.2, every:4, rend:2.5, bleed:.5, bleedSeconds:3, lunge:.8,
+  fangs:{style:'combo', range:2.6, cooldown:.39, stamina:4, window:1.2, every:4, rend:2.5, bleed:.5, bleedSeconds:3, lunge:.8,
     blurb:'Twin daggers. Every fourth cut rends: a lunge, heavy damage and a bleed'},
   soulchain:{style:'lash', range:5.5, width:.85, pull:1.6, cooldown:.85, stamina:10,
     blurb:'Lashes everything in a long line and drags it toward you'},
   scythe:{style:'reap', range:3.9, arc:240, cooldown:.9, stamina:13, leech:.03, leechCap:3,
     blurb:'A huge reaping arc. Each foe struck heals you'},
-  wisplantern:{style:'wisps', count:3, seek:11, range:14, speed:9*1.15, turn:7, cooldown:1.05, stamina:9,
+  wisplantern:{style:'wisps', count:3, seek:11, range:14, speed:9*1.15, turn:7, cooldown:1.37, stamina:9,
     blurb:'Frees three homing wisps that seek separate foes'},
   stormrod:{style:'chain', range:9, jumps:3, jump:4.5, falloff:.75, shock:.25, cooldown:1.05, stamina:11,
     blurb:'Lightning that leaps to three more foes and jolts them'},
   starfall:{style:'meteor', range:12, delay:.7, radius:2.6, cooldown:1.6, stamina:16,
     blurb:'Calls a star down on the nearest foe. Huge blast'},
-  crowtotem:{style:'crows', count:3, cap:6, sight:9, cooldown:1.6, stamina:10,
+  crowtotem:{style:'crows', count:3, cap:6, sight:9, cooldown:2.08, stamina:10,
     blurb:'Calls three carrion crows that fly to your foes (up to six)'},
   jacklantern:{style:'sentry', cap:2, sight:8, cooldown:2.2, stamina:12,
     blurb:'Plants a pumpkin sentry that spits burning seeds (up to two)'},
@@ -254,6 +258,13 @@ export const ALLIES = Object.freeze({
   wight:{name:'Grave Knight', hp:300, life:40, speed:3.2*1.15, sight:10, leash:18, range:1.9, arc:140, period:1.2, follow:1.6, taunt:7, guard:.7, scales:true},
 });
 export function weaponStyle(itemId){return WEAPON_STYLES[itemId]||null;}
+/**
+ * Weapons whose blows still knock foes back: bare hands, the plain single-target blades and the bows.
+ * Area and magic weapons (cleaves, novas, bursts, stars, bells, fans, summons...) only hurt; pulls
+ * (the soulchain, gathering skills) still pull. Covers auto attacks and skills.
+ */
+export const KNOCKBACK_WEAPONS = Object.freeze(['fist', 'spear', 'sword', 'fangs', 'recurve', 'bonebow']);
+export const keepsKnockback = itemId=>KNOCKBACK_WEAPONS.includes(itemId||'fist');
 
 // ------------------------------------------------------------------ difficulty
 // Quantity over toughness: each day adds more creatures faster than it adds health to each one.

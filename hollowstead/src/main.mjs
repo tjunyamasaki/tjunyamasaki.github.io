@@ -683,11 +683,12 @@ function paintHotbar(p){
     const slot=slots[i];if(!slot)return;
     const m=slot.mastery,rank=m?m.rank:slot.rank;
     el.classList.toggle('active',slot.active);el.classList.toggle('empty',!slot.itemId);el.classList.toggle('mastered',!!m);
-    el.classList.toggle('worn',slot.condition!=null&&slot.condition<=MEND.warnAt);
+    el.classList.toggle('worn',slot.condition!=null&&slot.condition<=MEND.warnAt);el.classList.toggle('broken',slot.condition===0);
     el.innerHTML=slot.itemId?`${icon(slot.itemId)}`
       +(m&&m.to!=null?`<span class="mastery" aria-hidden="true"><em style="width:${(m.progress*100).toFixed(1)}%"></em></span>`:'')
       +((world.arena||m)&&rank>1?`<small class="rank">${rankStars(rank)}</small>`:'')
       +(slot.condition!=null?`<span class="wear" aria-hidden="true"><em style="width:${(slot.condition*100).toFixed(1)}%"></em></span>`:'')
+      +(slot.condition===0?'<small class="broken-tag" aria-hidden="true">BROKEN</small>':'')
       :'<span aria-hidden="true">+</span>';
     const about=slot.itemId?weaponAbout(slot.name,m,slot.condition):'';
     el.setAttribute('aria-label',slot.itemId?`${slot.name}${slot.active?', in hand':''}${about?`. ${about}`:''}`:`Empty weapon slot ${i+1}`);
@@ -698,7 +699,8 @@ function paintHotbar(p){
 function weaponAbout(name,m,condition){
   const parts=[];
   if(m)parts.push(m.to==null?`Mastery ${rankStars(m.rank)} (max)`:`Mastery ${rankStars(m.rank)} · ${Math.floor(m.points)} / ${m.to} to ${rankStars(m.rank+1)}`);
-  if(condition!=null)parts.push(`Condition ${Math.ceil(condition*100)}%`);
+  if(condition===0)parts.push('Broken: mend it at the Heartfire');
+  else if(condition!=null)parts.push(`Condition ${Math.ceil(condition*100)}%`);
   return parts.join(' · ');
 }
 /** The attack button shows what you are holding. */

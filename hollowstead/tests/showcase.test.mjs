@@ -186,7 +186,7 @@ test('present magic weapons hit hostiles once and a placed skeleton can be remov
   const fanX = crawler.x;
   world.attack(player);
   assert.equal(crawler.hp, beforeFan - magicItems['spirit-fan'].damage);
-  assert.ok(crawler.x > fanX);
+  assert.equal(crawler.x, fanX, 'the fan does not knock back');
   assert.equal(world.magicSweeps.length, 1);
 
   player.cooldown = 0;

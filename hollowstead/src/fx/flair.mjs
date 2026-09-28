@@ -7,6 +7,7 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
 const PRISM = ['#ffe48e', '#ff9ad6', '#b58cff', '#7fd6ff', '#9ff5c8'];
 const GOLD = '#f2c14e';
 const EMBER = {core: '#fff0c8', main: '#ffb04a', glow: '#ff6a1f'};
+const SUN = {core: '#fff6d6', main: '#ffb347', glow: '#ff7a1a', deep: '#c2410c'};
 const ranked = ev => (ev.rank || 1) >= 2;
 
 function sweep(d, ev, age, seed){
@@ -169,6 +170,17 @@ export const FLAIR_EVENTS = {
       d.light(x, z, 2.4*fade(hit));
     }
   }},
+  /** A creature the daylight burnt away: a flare, then ash and cinders drifting up. */
+  ashes: {life: ev => ev.king ? 2.4 : 1.2, kick: ev => ev.king ? {shake: .35, flash: .2, color: '#ffd9a0'} : null, paint(d, ev, age, seed){
+    const big = ev.king ? 2.2 : ev.creature === 'brute' || ev.creature === 'golem' ? 1.4 : 1, life = ev.king ? 2.4 : 1.2, k = age/life;
+    if(age < .35){d.bloom(ev.x, ev.z, .8*big, 1.1*big, SUN.glow, .9*fade(age/.35)); d.bloom(ev.x, ev.z, .8*big, .5*big, SUN.core, fade(age/.3));}
+    d.shock(ev.x, ev.z, .3+1.4*big*easeOut(age/.5), .06, SUN.main, fade(age/.5), SUN.core);
+    d.stain(ev.x, ev.z, .55*big, '#2a1f24', .5*fade(k, .7));
+    d.sparks(ev.x, ev.z, .6*big, Math.round(10*big), age, SUN.main, 1, seed, {speed: 2.5*big, up: 3, gravity: 5, life: .8});
+    d.motes(ev.x, ev.z, Math.round(10*big), age, .5*big, '#6d5a63', .8*fade(k), seed+2, {rise: 1.8*big, life: life*.9, size: .08});
+    d.motes(ev.x, ev.z, Math.round(6*big), age, .4*big, SUN.main, .9*fade(k), seed+4, {rise: 2.2*big, life: life*.7, size: .05});
+    d.light(ev.x, ev.z, 2*big*fade(k));
+  }},
   /** Hit sparks in the attacker's colours: resolved from the wielder when the event arrives. */
   damage: {life: () => .4, resolve(ev, world){
     if(!ev.by || !world?.player) return null;
@@ -231,4 +243,40 @@ export function paintFrozen(d, e, time){
   d.path([...pts, pts[0]], .05, '#8fd2ff', .9*k, {glow: true});
   d.path([at(e.x, e.z, .05, -.2*s, .3*s), at(e.x, e.z, .05, .1*s, 1.2*s)], .05, '#ffffff', .8*k, {glow: true});
   d.bloom(e.x, e.z, .8*s, .9*s, h.glow, .25*k);
+}
+
+/**
+ * A creature burning in daylight at the Heartfire: tongues of flame licking up its body, a hot glow
+ * and cinders. Loops on the clock; `e.sunburn` comes from the host (sunburn.mjs).
+ */
+export function paintSunburn(d, e, clock){
+  if(!e.sunburn || !(e.hp > 0) || !d.near(e.x, e.z)) return;
+  const seed = typeof e.id === 'string' ? [...e.id].reduce((h, c) => (h*31+c.charCodeAt(0))|0, 7) : 7;
+  const big = e.type === 'king' ? 2.1 : e.type === 'golem' || e.type === 'brute' ? 1.45 : 1;
+  const x = e.x, z = e.z, span = .42*big;
+  d.pool(x, z, .9*big, SUN.glow, .32+.1*Math.sin(clock*9+seed));
+  d.bloom(x, z, .6*big, .8*big, SUN.glow, .4+.12*Math.sin(clock*13+seed));
+  // Tongues: tallest in the middle, each with its own width, rhythm and lean.
+  const flame = (u, y0, h, wide, sway, tone) => {
+    d.path([at(x, z, y0, u-wide, 0), at(x, z, y0, u-wide*.55, h*.45), at(x, z, y0, u+sway, h), at(x, z, y0, u+wide*.55, h*.45), at(x, z, y0, u+wide, 0)], 0, tone, .88, {fill: true});
+    d.path([at(x, z, y0, u-wide*.45, 0), at(x, z, y0, u+sway*.7, h*.62), at(x, z, y0, u+wide*.45, 0)], 0, SUN.main, .95, {fill: true});
+    d.path([at(x, z, y0, u-wide*.18, 0), at(x, z, y0, u+sway*.5, h*.3), at(x, z, y0, u+wide*.18, 0)], 0, SUN.core, .9, {glow: true, fill: true});
+  };
+  const n = 6;
+  for(let i = 0; i < n; i++){
+    const c = (i+.5)/n*2-1, phase = (clock*(1.5+rnd(seed, i)*1.1)+rnd(seed, i+9))%1;
+    const u = c*span+(rnd(seed, i+4)-.5)*.08*big, lick = .6+.4*Math.sin(phase*Math.PI);
+    const h = (.45+.55*(1-Math.abs(c)))*(.75+.5*rnd(seed, i+3))*big*lick;
+    flame(u, .1, h, (.1+.07*rnd(seed, i+6))*big, Math.sin(clock*(9+i)+i*1.7)*.12*big, i%2 ? SUN.glow : SUN.deep);
+  }
+  // Licks higher on the body, coming and going.
+  for(let i = 0; i < 2; i++){
+    const phase = (clock*1.3+i*.5+rnd(seed, i+20))%1;
+    if(phase > .7) continue;
+    const u = (i ? .2 : -.18)*big, y0 = (.45+.25*rnd(seed, i+21))*big;
+    flame(u, y0, .45*big*Math.sin(phase/.7*Math.PI), .09*big, Math.sin(clock*10+i)*.08, SUN.glow);
+  }
+  d.motes(x, z, 4, clock, .3*big, '#5b4b55', .55, seed+11, {rise: 2.2*big, life: 1.2, size: .12, y: .9*big});
+  d.motes(x, z, 5, clock, .35*big, SUN.main, .9, seed, {rise: 1.6*big, life: .8, size: .05});
+  d.light(x, z, 1.4*big);
 }

@@ -83,6 +83,8 @@ export function swingAngle(t){
 export function heldWeaponPose(player, time, theme={}){
   const tool = player.action === 'gather' && TOOL_GEAR[player.gatherTool] ? player.gatherTool : null;
   const id = tool || player.equipment?.weapon?.itemId;
+  // The Nine-Tail Lantern is not held: the kitsune shows itself as tails (src/fx/kitsune.mjs).
+  if(id === 'kitsune-lantern') return null;
   const base = tool ? TOOL_GEAR[tool] : (GRAVECRAFT[id] || HELD_GEAR[id]);
   if(!base) return null;
   const spec = {...base, ...theme.magic?.weapons?.[id]};

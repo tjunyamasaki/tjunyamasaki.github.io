@@ -7,7 +7,7 @@
 // Presentation lives in src/fx: every beat that fires raises an 'fx' event, and pending beats are
 // drawn from their own age, with more flourish the higher the weapon's rank.
 import {EQUIPMENT} from './content.mjs?v=harvest-18';
-import {WEAPON_STYLES, maxHealth, powerOf, rankOf} from './progression.mjs?v=harvest-18';
+import {WEAPON_STYLES, keepsKnockback, maxHealth, powerOf, rankOf} from './progression.mjs?v=harvest-18';
 import {isMagicAlly, magicItems} from './magic/registry.mjs?v=harvest-18';
 import {applyDot, knockFrom, stun} from './arsenal.mjs?v=harvest-18';
 import {SKILL_BOOK, SKILL_CALLS} from './skill-book.mjs?v=harvest-18';
@@ -137,7 +137,8 @@ function hit(world, owner, e, b, cx, cz, obstacles, reach = b.r){
     const fall = b.falloff && reach > 0 ? 1-b.falloff*Math.min(1, d/reach) : 1;
     world.strike(owner, e, b.dmg*fall, 0);
   }
-  if(b.push){
+  // Only the plain blades, bows and fists still knock back; every weapon may still pull (push < 0).
+  if(b.push && (b.push < 0 || keepsKnockback(b.itemId))){
     if(b.pushDir === 'along'){knockFrom(world, e, e.x-(b.dx||0), e.z-(b.dz||0), b.push, obstacles);}
     else if(b.pushDir === 'side'){
       // Split the crowd: shove to whichever side of the line it stands on.

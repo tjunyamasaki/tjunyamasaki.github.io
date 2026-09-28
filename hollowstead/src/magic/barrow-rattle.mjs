@@ -42,10 +42,10 @@ import { ownerPower } from './registry.mjs?v=harvest-18'
 const ROOT = 'assets/magic/barrow-rattle'
 const CAP = 4
 // Balance (Long Night): sturdier, harder-hitting skeletons that hostiles now fight back.
-const COOLDOWN = 1.5
+const COOLDOWN = 1.95
 const LIFE = 24
 const SKELETON_HP = 60
-const SKELETON_DAMAGE = 18
+const SKELETON_DAMAGE = 9
 const RANGE = 1.25
 const SPEED = 3.5 * 1.15
 const CATCHUP = 4.4 * 1.15
@@ -66,7 +66,7 @@ export const magicPack = {
     name: 'Barrow Rattle',
     kind: 'weapon',
     slot: 'weapon',
-    damage: 4,
+    damage: 2,
     durability: 110,
     cooldown: COOLDOWN,
     stamina: 8,
@@ -222,11 +222,6 @@ function strike(world, summon, target){
   target.hp -= amount
   // Credit the kill to the skeleton's master (weapon mastery, trinkets).
   if(summon.ownerId) target.lastHitBy = summon.ownerId
-  const dx = (typeof target.x === 'number' ? target.x : summon.x) - summon.x
-  const dz = (typeof target.z === 'number' ? target.z : summon.z) - summon.z
-  const span = Math.hypot(dx, dz) || 1
-  if(typeof target.x === 'number') target.x += dx / span * 0.32
-  if(typeof target.z === 'number') target.z += dz / span * 0.32
   emit(world, 'damage', target.x, target.z, amount)
   if(summon.pendingHit) delete summon.pendingHit
 }

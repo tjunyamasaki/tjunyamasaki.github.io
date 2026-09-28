@@ -45,8 +45,8 @@ const CONE = 35 * Math.PI / 180;
 const CONE_COS = Math.cos(CONE / 2);
 const ROOT = 2.5;
 // Balance (Long Night): a 26 point pin, then 12 more bleeding out across the root.
-const IMPACT = 26;
-const BLEED = 12;
+const IMPACT = 13;
+const BLEED = 6;
 const DART_SPEED = 20 * 1.15;
 const FRAME_FPS = 12;
 const FRAME_COUNT = 4;
@@ -112,7 +112,7 @@ export const magicPack = {
     slot: 'weapon',
     damage: IMPACT,
     durability: 140,
-    cooldown: 1.0,
+    cooldown: 1.3,
     stamina: 6,
     blurb: 'A pale bone needle wrapped in grave-silk. The dart pins the nearest foe ahead.',
   },

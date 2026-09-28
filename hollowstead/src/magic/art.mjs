@@ -21,6 +21,7 @@ export const HELD_GEAR = Object.freeze({
   crowtotem: {motion: 'rattle', sprite: 'held-crowtotem'}, jacklantern: {motion: 'bell', handY: 1.0, sprite: 'held-jacklantern'},
   wighthorn: {motion: 'tome', handY: 1.2, sprite: 'held-wighthorn'}, censer: {motion: 'bell', handY: 1.0, sprite: 'held-censer'},
   'kitsune-lantern': {motion: 'kitsune', handY: 1.12, handX: .59, sprite: 'kitsune-lantern'},
+  plaguebeak: {motion: 'plague', handY: 1.08, handX: .55, sprite: 'plaguebeak'},
 });
 
 export const MAGIC_PALETTE = Object.freeze({
@@ -97,6 +98,11 @@ export function heldWeaponPose(player, time, theme={}){
     rotation = side*(-.08+Math.sin(time*2.8)*.075);
     lift = .045*Math.sin(time*3.4);
   }
+  if(spec.motion === 'plague'){
+    // Leans like a walking stick at rest; the beak sways as if sniffing the air.
+    rotation = side*(-.12+Math.sin(time*2.1)*.05);
+    lift = .03*Math.sin(time*4.2);
+  }
   if(tool){
     const phase = (time % CHOP_PERIOD) / CHOP_PERIOD;
     rotation = side*chopAngle(phase);
@@ -126,6 +132,21 @@ export function heldWeaponPose(player, time, theme={}){
         const settle = (t-.43)/.57, rest = 1-ease(settle);
         rotation += side*(-.48*rest+Math.sin(settle*Math.PI*3)*.10*(1-settle));
         lift += .09*rest; reach = .3*rest; scale = 1+.14*rest;
+      }
+    }
+    if(spec.motion === 'plague'){
+      // Rear back, peck forward to spit the vial, then two little bird-like nods.
+      if(t < .24){
+        const wind = inOut(t/.24);
+        rotation += side*.55*wind; lift += .16*wind; reach = -.14*wind; scale = 1-.06*wind;
+      }else if(t < .38){
+        const snap = ease((t-.24)/.14);
+        rotation += side*(.55-1.35*snap); lift += .16-.2*snap; reach = -.14+.6*snap; scale = .94+.16*snap;
+      }else{
+        const settle = (t-.38)/.62, rest = 1-ease(settle);
+        rotation += side*(-.8*rest+Math.sin(settle*Math.PI*4)*.12*(1-settle));
+        lift += -.04*rest+Math.abs(Math.sin(settle*Math.PI*2))*.05*(1-settle);
+        reach = .46*rest; scale = 1+.1*rest;
       }
     }
   }

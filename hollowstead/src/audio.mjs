@@ -18,6 +18,17 @@ export class Sound {
       }
       return;
     }
+    if(type==='plaguevial'||type==='plaguebreak'){
+      const shatter=type==='plaguebreak';
+      const notes=shatter?[[2093,'sine',.12,.02],[2637,'sine',.1,.014],[3136,'sine',.08,.01],[92,'sawtooth',.42,.03]]:[[420,'square',.07,.018],[980,'sine',.12,.02]];
+      for(const [i,[frequency,wave,duration,volume]] of notes.entries()){
+        const start=t+i*(shatter?.025:.04),osc=this.context.createOscillator(),gain=this.context.createGain();
+        osc.type=wave;osc.frequency.setValueAtTime(frequency,start);osc.frequency.exponentialRampToValueAtTime(frequency*(wave==='sawtooth'?.5:shatter?.7:1.35),start+duration);
+        gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(volume,start+.008);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+        osc.connect(gain);gain.connect(this.context.destination);osc.start(start);osc.stop(start+duration+.01);
+      }
+      return;
+    }
     if(type==='bell'){
       for(const [frequency,volume] of [[220,.035],[440,.02],[613,.013],[837,.007]]){
         const osc=this.context.createOscillator(),gain=this.context.createGain();osc.type='sine';osc.frequency.setValueAtTime(frequency,t);

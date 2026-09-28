@@ -1,6 +1,7 @@
 import { registerMagicModule } from './registry.mjs?v=harvest-18';
 
 const SPECS = [
+  'plaguebeak.mjs',
   'kitsune-lantern.mjs',
   'barrow-rattle.mjs',
   'cinder-staff.mjs',

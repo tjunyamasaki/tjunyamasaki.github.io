@@ -3,6 +3,7 @@
 import {MAGIC_PALETTE, GRAVECRAFT} from './art.mjs?v=harvest-18';
 import {BELL, waveRadius} from './mourning-bell.mjs?v=harvest-18';
 import {appendKitsuneEffects} from './kitsune-effects.mjs?v=harvest-18';
+import {appendPlagueEffects} from './plague-effects.mjs?v=harvest-18';
 
 const TAU=Math.PI*2;
 const clamp=n=>Math.max(0,Math.min(1,n));
@@ -10,7 +11,7 @@ const point=(x,z,y=.08)=>[x,y,z];
 const ease=n=>1-(1-clamp(n))**3;
 const known = e => GRAVECRAFT[e?.packId || String(e?.id||'').split(':')[0]];
 
-export function usesMagicEffects(entity){return entity?.packId==='kitsune-lantern' || (!!known(entity) && entity.type!=='skeleton');}
+export function usesMagicEffects(entity){return entity?.packId==='kitsune-lantern' || entity?.packId==='plaguebeak' || (!!known(entity) && entity.type!=='skeleton');}
 
 export function buildMagicEffects(world, frame, theme={}){
   const palette={...MAGIC_PALETTE,...theme.magic?.palette}, commands=[];
@@ -43,12 +44,13 @@ export function buildMagicEffects(world, frame, theme={}){
     if(!Array.isArray(list))return;
     for(let i=list.length-1;i>=0&&budget>0;i--){
       const e=list[i];
-      if(!e || e.packId==='kitsune-lantern' || !Number.isFinite(e.x) || !Number.isFinite(e.z))continue;
+      if(!e || e.packId==='kitsune-lantern' || e.packId==='plaguebeak' || !Number.isFinite(e.x) || !Number.isFinite(e.z))continue;
       budget--; visit(e,(e.age||0)+frame.lead);
     }
   };
 
   budget-=appendKitsuneEffects(world,frame,{path,orb},max,theme);
+  budget-=appendPlagueEffects(world,frame,{path,orb},Math.max(0,budget),theme);
   entries(world.magicBolts,(e,age)=>{
     if(e.packId!=='cinder-staff')return;
     const speed=Math.hypot(e.vx||0,e.vz||0)||1,dx=e.vx/speed,dz=e.vz/speed;

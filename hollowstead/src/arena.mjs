@@ -18,8 +18,8 @@ export const ARENA = Object.freeze({
   spawnClear: 8,       // never closer than this to a wanderer
   xp: 1.6,             // levels are the arena's main growth, so kills teach faster
 });
-/** The prototype's first card is always the Nine-Tail Lantern, alongside close and ranged choices. */
-export const STARTERS = Object.freeze([['kitsune-lantern'], ['spear', 'sword', 'broadsword'], ['recurve', 'bonebow', 'crookstaff']]);
+/** The prototype's first card is always the Plaguebeak Cane, alongside close and ranged choices. */
+export const STARTERS = Object.freeze([['plaguebeak'], ['spear', 'sword', 'broadsword'], ['recurve', 'bonebow', 'crookstaff']]);
 
 /** Creature strength by wave: numbers grow faster than toughness. */
 export function arenaScale(wave){

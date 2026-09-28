@@ -13,6 +13,7 @@ const SPECS = Object.freeze({
   feed: {icon: '▥', label: 'Feed', activation: 'tap'},
   cook: {icon: '◕', label: 'Cook', activation: 'tap'},
   awaken: {icon: '✦', label: 'Awaken', activation: 'tap'},
+  mend: {icon: '✺', label: 'Mend', activation: 'tap'},
   repair: {icon: '✚', label: 'Repair', activation: 'tap'},
   craft: {icon: '⚒', label: 'Craft', activation: 'tap'},
   build: {icon: '⌂', label: 'Build', activation: 'tap'},
@@ -36,6 +37,8 @@ const SPECS = Object.freeze({
 });
 
 const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock']);
+/** Context buttons the action cluster can show at once (main.mjs CONTEXT_BUTTONS). */
+const CONTEXT_SLOTS = 4;
 
 function make(id, extra = {}) {
   const spec = SPECS[id];
@@ -235,6 +238,16 @@ export function describeContext(facts) {
         command: buildingCommand('awaken', id),
       }));
     }
+    // Mend the weapon in hand with a soul ember (mastery.mjs mendPlan); shown only when it is worn.
+    if (facts.type === 'hearth' && facts.mend?.itemId) {
+      list.push(make('mend', {
+        targetId: id,
+        label: `Mend +${Math.max(1, Math.round((facts.mend.boost || 0) * 100))}%`,
+        enabled: !!facts.mend.ok,
+        disabledReason: facts.mend.reason || 'Needs 1 soul ember',
+        command: buildingCommand('mend', id),
+      }));
+    }
   } else if (facts.type === 'bench') {
     list.push(make('craft', {
       targetId: id,
@@ -318,7 +331,12 @@ export function describeContext(facts) {
     }));
   }
   if (repair) list.push(repair);
-  return list;
+  // The cluster has four buttons: when a building offers more, greyed-out ones give way first.
+  for (let i = 1; i < list.length && list.length > CONTEXT_SLOTS;) {
+    if (list[i].enabled) i++;
+    else list.splice(i, 1);
+  }
+  return list.slice(0, CONTEXT_SLOTS);
 }
 
 export function clusterFor(mode, {context = null, placement = null, maintenance = null} = {}) {

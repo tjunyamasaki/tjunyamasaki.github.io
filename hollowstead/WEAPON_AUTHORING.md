@@ -82,7 +82,7 @@ Target living enemies with finite positions, excluding `isMagicAlly(enemy)` and 
 if (enemy.home && !enemy.aggro) enemy.aggro = true;
 ```
 
-The engine applies damage, displays numbers, and assigns `lastHitBy` from `ownerId`. Optional queues:
+The engine applies damage, displays numbers, and assigns `lastHitBy` from `ownerId`. Always pass `ownerId` (a module that subtracts HP itself, like the barrow skeletons or cinder bolts, sets `enemy.lastHitBy` instead): the kill credits weapon mastery on expeditions (`src/mastery.mjs`) and trinket kill effects. Optional queues:
 
 - `pendingKnock`: `{targetId, dx, dz}`; a displacement, not velocity. Reduce boss displacement as the reference does.
 - `pendingBurn`: `{targetId, dps, remaining}`; seconds, refreshed/replaced rather than stacked. The burn has no independent owner field; establish kill credit on the initial hit. Use the existing `arsenal.mjs` `applyDot` pattern if separate DoT ownership is essential.
@@ -139,7 +139,7 @@ Known test maintenance: `magic.test.mjs` currently hardcodes five packs, six spr
 
 ## 7. Skill, rank flourish and effects
 
-Every weapon has an auto attack (everything above) and a **skill**: the ✦ button or Q. A skill needs at least 40 stamina, drains the whole bar (a fuller bar deals more, from 70% to 100%), and recharges on its own cooldown (`p.skillCd`). Rank (★1–★5, `rankOf` in `src/progression.mjs`) adds 22% damage per rank and decides how much flourish both moves show.
+Every weapon has an auto attack (everything above) and a **skill**: the ✦ button or Q. A skill needs at least 40 stamina, drains the whole bar (a fuller bar deals more, from 70% to 100%), and recharges on its own cooldown (`p.skillCd`). Rank (★1–★5, `rankOf` in `src/progression.mjs`) adds damage (22% per rank in the arena, 8% on an expedition, where it is earned by kills: `MASTERY`, `src/mastery.mjs`) and decides how much flourish both moves show. A new weapon needs nothing extra for mastery as long as its hits carry `ownerId`.
 
 - **Script the skill** in `SKILL_BOOK` in [src/skill-book.mjs](src/skill-book.mjs): `{name, blurb, cooldown, reach, pose, cast(k)}`. `cast` schedules beats with `k.beat(delay, spec)`; `k.dmg(m)` is m ordinary hits (level, rank and stamina included), `k.target(range)` picks the mark, `k.foes`, `k.scatter` and `k.turn` help place things. Beat kinds, all host-stepped in [src/skills.mjs](src/skills.mjs): `blast`, `arc`, `line` (fire once), `wave` (travels, hits each foe once), `pulse` (repeats; fixed, `follow`ing the wielder or drifting with `v`), `dash`, `blink`, `shots` (engine projectiles), `bolt` (sky lightning that chains), `summon`, `heal` and `call` (a named function in `SKILL_CALLS`). Shared hit effects: `dmg`, `falloff`, `push` (negative pulls; `pushDir` 'along' or 'side'), `stun`, `freeze`, `slow`, `root`, `dot`, `leech`. A lasting beat can queue an `end` beat. `track` makes a pending beat follow a foe.
 - Beats live on `world.beats`, a snapshotted list. Keep them plain data; the script runs once, on the host, when the skill fires.

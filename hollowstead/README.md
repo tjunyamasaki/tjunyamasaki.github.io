@@ -23,8 +23,10 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 3. Cook at a burning fire. Grow pumpkins in farm plots, make bandages at a workbench, and build a cauldron for stew. Eat from your pack: open it and tap Eat on the stack you want.
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
 5. Fight with the weapon in your hand. Every weapon aims itself at the best foe in reach, so you can run one way and fight the other. Hold **Attack** to swing. Every weapon also has a **skill** (the ✦ button beside Attack): it drains your whole stamina bar, hits much harder than a swing, and recharges on its own timer. It needs at least 40 stamina, and a full bar makes it strongest. Keep up to three weapons on the **hotbar** and tap one to swap mid-fight. Every creature telegraphs its blow on the ground; **Dodge** out of it, or dodge at the last moment to pass through untouched. Dodge holds two charges. Each charge has its own cooldown, and the next one starts only after the previous charge returns. Repair walls, rearm traps, and use wards to help defend the camp.
+   **Mastery.** Every kill with a weapon in hand teaches you that weapon: tougher foes teach more, elites twice as much. Enough kills rank it up (★1 to ★5, like the arena): each rank hits a little harder and makes its attack and skill flashier. Mastery belongs to you, not the item, so when a weapon breaks the next one of its kind keeps its rank. The hotbar shows each weapon's stars, a gold bar toward the next rank, and an orange bar for its condition.
+   **Mending.** Weapons wear with use and break at zero. Stand at the Heartfire with the weapon in hand and tap **Mend**: a soul ember gives back half its condition. You get a warning when a weapon drops to a quarter.
 6. Hold **Revive** beside a fallen friend for about three seconds. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable. Open **Build**, then **Maintain camp**, to repair a damaged structure or hold **Dismantle**. The Heartfire cannot be dismantled, and a chest someone else has open cannot either.
-7. Awaken the Heartfire with soul embers. A blood moon brings the Hollow King, stronger each time; tap the moon by the clock to see tonight's moon and the next.
+7. Awaken the Heartfire with soul embers (the same embers mend weapons, so choose). A blood moon brings the Hollow King, stronger each time; tap the moon by the clock to see tonight's moon and the next.
 
 Losing the Heartfire ends the expedition. If everyone falls and has spent their charm, the expedition also ends.
 
@@ -70,7 +72,7 @@ Only one wanderer can open a chest at a time. The same panel shows your pack, wo
 | --- | --- | --- |
 | Move | Left stick, or tap the ground | WASD / arrows |
 | Context action | The large circle. Its name follows what you are standing at: Gather, Chop, Feed, Cook, Open, Place, and so on. | E, hold when the action says to hold |
-| More actions | The smaller circles beside it. A campfire can show Feed, Cook, Awaken, and Repair at once. | 1–4 |
+| More actions | The smaller circles beside it. The Heartfire can show Feed, Cook, Awaken, Mend, and Repair; when all five apply, a greyed-out one gives way. | 1–4 |
 | Attack | Hold Attack. Aims itself. The expedition does not swing for you. In the battle arena, Auto-attack in the menu can. | Hold Space |
 | Skill | The ✦ button left of Attack. Drains all stamina (needs 40); its ring shows the recharge. | Q |
 | Swap weapon | Tap a weapon on the hotbar | R or Tab cycles |

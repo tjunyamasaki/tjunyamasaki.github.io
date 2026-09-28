@@ -208,8 +208,8 @@ function flyBolt(world, bolt, dt) {
     bolt.x = hit.x;
     bolt.z = hit.z;
     const amount = bolt.damage > 0 ? bolt.damage : DAMAGE;
-    harmHostile(world, hit.enemy, amount);
-    attachBurn(world, hit.enemy.id, bolt.power || 1);
+    harmHostile(world, hit.enemy, amount, bolt.ownerId);
+    attachBurn(world, hit.enemy.id, bolt.power || 1, bolt.ownerId);
     spawnPuff(world, hit.x, hit.z, 0);
     return false;
   }
@@ -241,7 +241,7 @@ function stepBurns(world, dt) {
     while (burn.tick + 1e-8 >= 1 && enemy.hp > 0) {
       burn.tick -= 1;
       if (burn.tick < 1e-8) burn.tick = 0;
-      harmHostile(world, enemy, burn.dps);
+      harmHostile(world, enemy, burn.dps, burn.ownerId);
     }
     if (!(enemy.hp > 0) || burn.remaining <= 1e-6) burns.splice(i, 1);
   }
@@ -347,23 +347,26 @@ function closestOnSegment(px, pz, x0, z0, x1, z1) {
   return { t, x, z, d: Math.hypot(px - x, pz - z) };
 }
 
-function harmHostile(world, enemy, amount) {
+function harmHostile(world, enemy, amount, ownerId = null) {
   if (!enemy || !(enemy.hp > 0) || !(amount > 0)) return;
   enemy.hp -= amount;
+  // Credit the kill to the caster (weapon mastery, trinkets).
+  if (ownerId) enemy.lastHitBy = ownerId;
   const shown = Math.round(amount);
   emit(world, 'damage', enemy.x, enemy.z, String(shown > 0 ? shown : amount));
 }
 
-function attachBurn(world, targetId, power = 1) {
+function attachBurn(world, targetId, power = 1, ownerId = null) {
   if (targetId == null) return null;
   if (!Array.isArray(world.magicBurns)) world.magicBurns = [];
   const existing = world.magicBurns.find(burn => burn && burn.packId === PACK && burn.targetId === targetId);
   if (existing) {
     existing.remaining = BURN_DURATION;
     existing.dps = BURN_DPS * power;
+    if (ownerId) existing.ownerId = ownerId;
     return existing;
   }
-  const burn = { targetId, remaining: BURN_DURATION, dps: BURN_DPS * power, tick: 0, packId: PACK };
+  const burn = { targetId, remaining: BURN_DURATION, dps: BURN_DPS * power, tick: 0, packId: PACK, ...(ownerId ? { ownerId } : {}) };
   world.magicBurns.push(burn);
   return burn;
 }

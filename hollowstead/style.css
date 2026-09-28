@@ -202,6 +202,17 @@
 .hotbar .weapon-slot.empty{opacity:.55;border-style:dashed}
 .hotbar .weapon-slot.empty>span{font-size:16px;color:var(--muted)}
 .hotbar .weapon-slot .rank{position:absolute;left:0;right:0;bottom:1px;margin:0;font-size:7px;letter-spacing:-.5px;color:#f2c14e;text-shadow:0 1px 2px #120f16;text-align:center;pointer-events:none}
+/* Expedition weapons: mastery (gold, top) and condition (orange, bottom). */
+.hotbar .weapon-slot .mastery,.hotbar .weapon-slot .wear{position:absolute;left:7px;right:7px;margin:0;border-radius:2px;overflow:hidden;pointer-events:none}
+.hotbar .weapon-slot .mastery{top:3px;height:2px;background:#f2c14e2e}
+.hotbar .weapon-slot .mastery em{display:block;height:100%;background:#f2c14e;box-shadow:0 0 4px #f2c14eaa}
+.hotbar .weapon-slot .wear{bottom:3px;height:3px;background:#bcb39933}
+.hotbar .weapon-slot .wear em{display:block;height:100%;background:var(--orange)}
+.hotbar .weapon-slot.mastered .rank{top:5px;bottom:auto}
+.hotbar .weapon-slot.worn{border-color:#e0523f99}
+.hotbar .weapon-slot.worn .wear em{background:#e0523f;animation:worn-pulse 1.2s ease-in-out infinite}
+@keyframes worn-pulse{50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.hotbar .weapon-slot.worn .wear em{animation:none}}
 #action-cluster #attack.armed .item-icon{width:32px;height:32px;object-fit:contain;pointer-events:none;margin-top:-2px}
 #action-cluster #attack.armed small{margin-top:0}
 #action-cluster #dodge{position:relative}

@@ -158,7 +158,8 @@ export const HP_PER_LEVEL=8, POWER_PER_LEVEL=.04, HEARTSTONE_HP=15;
 export const ARENA_GROWTH=Object.freeze({hp:12, power:.06, rank:.22, maxRank:5});
 export function maxHealth(p){return 100+(p?.growth==='arena'?ARENA_GROWTH.hp:HP_PER_LEVEL)*((p?.level||1)-1)+(p?.bonusHp||0);}
 /**
- * Weapon rank, ★1 to ★5 (the arena and the weapon lab set `p.ranks`; expeditions start at ★1).
+ * Weapon rank, ★1 to ★5, kept in `p.ranks` by weapon type. The arena ranks a weapon up with cards,
+ * the weapon lab sets it by hand, and on an expedition kills with a weapon raise it (MASTERY).
  * Rank adds damage (powerOf) and decides how much flourish an attack and its skill show:
  * ★1 is plain, ★5 is the full show (src/fx).
  */
@@ -166,14 +167,37 @@ export function rankOf(p, itemId=p?.equipment?.weapon?.itemId){
   const rank=Math.floor(Number(p?.ranks?.[itemId]))||1;
   return Math.max(1, Math.min(ARENA_GROWTH.maxRank, rank));
 }
-/** Damage multiplier: level, and in the arena the rank of the weapon in hand. */
+/**
+ * Weapon mastery on an expedition. Every kill with a weapon in hand adds points to that weapon type
+ * (tougher foes teach more: a point per 10 xp, at least 1, twice for elites); `steps[i]` is the total
+ * that reaches rank i+1. Mastery belongs to the wanderer, so a broken weapon's rank carries over to
+ * the next one of its kind. Here levels already add power, so each rank adds less than in the arena.
+ */
+export const MASTERY=Object.freeze({steps:Object.freeze([0, 25, 80, 180, 360]), rank:.08, perXp:10, elite:2, most:30});
+/** Mastery points a kill is worth. */
+export function masteryPoints(enemy){
+  const base=Math.max(1, Math.min(MASTERY.most, Math.round(enemyXp(enemy?.type)/MASTERY.perXp)));
+  return base*(enemy?.elite?MASTERY.elite:1);
+}
+/** Where a wanderer stands with a weapon type: points, rank, and progress toward the next rank (null at ★5). */
+export function masteryOf(p, itemId){
+  const points=Math.max(0, Number(p?.mastery?.[itemId])||0), steps=MASTERY.steps;
+  let rank=1;
+  for(let i=1;i<steps.length;i++)if(points>=steps[i])rank=i+1;
+  const from=steps[rank-1], to=steps[rank]??null;
+  return {points, rank, from, to, progress:to==null?1:Math.max(0, Math.min(1, (points-from)/(to-from)))};
+}
+/** Damage multiplier: level, and the rank of the weapon in hand (arena ranks count for more). */
 export function powerOf(p){
-  const level=1+(p?.growth==='arena'?ARENA_GROWTH.power:POWER_PER_LEVEL)*((p?.level||1)-1);
+  const arena=p?.growth==='arena';
+  const level=1+(arena?ARENA_GROWTH.power:POWER_PER_LEVEL)*((p?.level||1)-1);
   const rank=p?.ranks?.[p?.equipment?.weapon?.itemId]||1;
   // `might`: a temporary multiplier other rules set on the wanderer (trinkets.mjs).
   const might=p?.might>0?p.might:1;
-  return level*(1+ARENA_GROWTH.rank*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might;
+  return level*(1+(arena?ARENA_GROWTH.rank:MASTERY.rank)*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might;
 }
+/** Mending at the Heartfire: what it costs and how much of a weapon's condition it gives back. */
+export const MEND=Object.freeze({cost:Object.freeze({ember:1}), share:.5, warnAt:.25});
 
 // ------------------------------------------------------------------ gear
 export const ARMOR_REDUCTION = Object.freeze({armor:.45, bonemail:.55, shardplate:.65});

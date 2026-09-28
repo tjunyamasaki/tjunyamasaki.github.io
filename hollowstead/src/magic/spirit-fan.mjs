@@ -121,7 +121,7 @@ export function use(world, player) {
     const knock = knockFrom(player, facing, mob);
     if (!knock) continue;
     seen.add(mob.id);
-    queue(world, 'pendingHit', {targetId: mob.id, amount: Math.round(DAMAGE * power)});
+    queue(world, 'pendingHit', {targetId: mob.id, amount: Math.round(DAMAGE * power), ownerId: player.id});
     if (mob.windup > 0 && mob.type !== 'king') mob.windup = 0;
     queue(world, 'pendingKnock', {targetId: mob.id, dx: knock.dx, dz: knock.dz});
   }

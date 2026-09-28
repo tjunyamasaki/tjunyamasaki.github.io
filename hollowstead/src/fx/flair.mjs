@@ -1,10 +1,12 @@
 // Rank flair for auto attacks. ★1 keeps each weapon's plain look (the renderers' own slashes,
 // rings and sprites); from ★2 up these painters layer glow, sparks, rays and extras on top, in
-// the weapon's colours. Presentation only.
+// the weapon's colours. Also the rank-up and Heartfire mending moments. Presentation only.
 import {INK, TAU, at, bump, clamp01, easeOut, easeOut2, fade, hue, rnd, tier} from './kit.mjs?v=harvest-18';
 import {rankOf} from '../progression.mjs?v=harvest-18';
 
 const PRISM = ['#ffe48e', '#ff9ad6', '#b58cff', '#7fd6ff', '#9ff5c8'];
+const GOLD = '#f2c14e';
+const EMBER = {core: '#fff0c8', main: '#ffb04a', glow: '#ff6a1f'};
 const ranked = ev => (ev.rank || 1) >= 2;
 
 function sweep(d, ev, age, seed){
@@ -89,6 +91,83 @@ export const FLAIR_EVENTS = {
     d.sigil(ev.x, ev.z, 1.1, h.main, fade(k), {spin: age*3, sides: 5});
     if(T.r >= 3) d.motes(ev.x, ev.z, T.motes, age, .8, h.glow, .9, seed, {rise: 2});
     if(T.r >= 4) d.beam(ev.x, ev.z, 0, 4, .7*(1-k), h.glow, .45*fade(k));
+  }},
+  /**
+   * A weapon ranked up. Its stars spiral up from the wielder's feet on a pillar of its light, meet
+   * over the head in one big star, then circle there a moment as a crown of the new rank.
+   */
+  rankup: {life: () => 2, kick: ev => ({shake: .14, flash: ev.mastery ? .18 : .08, color: '#ffe7a8'}), paint(d, ev, age, seed){
+    const h = hue(ev.itemId), rank = Math.max(1, Math.min(5, ev.rank || 1)), k = age/2, x = ev.x, z = ev.z;
+    const rise = easeOut(age/.85), CROWN = 2.55;
+    // Ground: a painted gold ring punched out, a shock, the weapon's sigil, light pooled underfoot.
+    if(age < .7){d.mark(x, z, .3+1.5*easeOut(age/.35), .09, GOLD, fade(age/.7), {halo: .45}); d.shock(x, z, .4+2.6*easeOut(age/.6), .08, GOLD, fade(age/.6), '#fff6d8');}
+    if(age < .45) d.groundRays(x, z, 12, .5, 2.4*easeOut(age/.2), .1, GOLD, 1-age/.45, seed, 0);
+    d.sigil(x, z, 1.05, h.main, .9*fade(k, 1.4)*easeOut(age/.15), {spin: age*1.4, sides: 5, width: .06});
+    d.pool(x, z, 1.8, GOLD, .5*fade(k));
+    // The pillar.
+    const top = 3.4*easeOut(age/.4), pillar = fade((age-.2)/1.2);
+    d.beam(x, z, 0, top, 1.1, h.glow, .55*pillar);
+    d.beam(x, z, 0, top, .45, GOLD, .7*pillar);
+    d.beam(x, z, 0, top*1.05, .14, '#fff8e0', .95*pillar);
+    // The stars climb and close in, each trailing light.
+    if(age < .95) for(let i = 0; i < rank; i++){
+      const spot = t => {const q = easeOut(t/.85), a = i/rank*TAU+t*5.2; return [x+Math.cos(a)*(1.25-1.2*q), .35+(CROWN-.35)*q, z+Math.sin(a)*(1.25-1.2*q)*.62];};
+      const [sx, sy, sz] = spot(age), [tx, ty, tz] = spot(Math.max(0, age-.12));
+      d.streak([tx, ty, tz], [sx, sy, sz], .22, h.glow, .8);
+      d.bloom(sx, sz, sy, .45, GOLD, .55);
+      d.star(sx, sz, sy, .36, GOLD, 1, {spin: age*5+i, ink: .05});
+      d.star(sx, sz, sy, .16, '#fff8e0', 1, {spin: age*5+i, glow: true});
+    }
+    // They meet: one big star bursts over the head.
+    const pop = (age-.85)/.5;
+    if(pop > 0 && pop < 1){
+      const r = .75*easeOut(pop/.25)*(1-.45*pop);
+      d.bloom(x, z, CROWN, 1.6*fade(pop), GOLD, .8*fade(pop));
+      d.star(x, z, CROWN, r, GOLD, fade(pop, 2), {spin: pop*1.2, ink: .06});
+      d.star(x, z, CROWN, r*.45, '#fff8e0', fade(pop, 2), {spin: pop*1.2, glow: true});
+      d.rays(x, z, CROWN, 14, 2, .1, GOLD, fade(pop), seed, pop*.6);
+      d.sparks(x, z, CROWN, 18, age-.85, GOLD, 1, seed, {speed: 4, up: 2.5, gravity: 6, life: .8});
+      if(rank >= 5) for(let i = 0; i < 5; i++) d.twinkle(x+Math.cos(i*1.26+pop)*1.3*easeOut(pop), z+Math.sin(i*1.26+pop)*.8*easeOut(pop), CROWN+.2, .16, PRISM[i], fade(pop), pop*9+i);
+    }
+    // The crown: the new rank's stars circling overhead.
+    const crown = (age-1)/1;
+    if(crown > 0 && crown < 1) for(let i = 0; i < rank; i++){
+      const a = i/rank*TAU+age*2.4, cx = x+Math.cos(a)*.6, cz = z+Math.sin(a)*.35, cy = CROWN+.1+Math.sin(age*4+i)*.05;
+      d.star(cx, cz, cy, .21*easeOut(crown/.15), GOLD, fade(crown, 1.3), {spin: age*3, ink: .035});
+      d.bloom(cx, cz, cy, .3, GOLD, .5*fade(crown));
+    }
+    d.motes(x, z, 12, age, 1, h.alt, .9*fade(k), seed+7, {rise: 2.6, life: 1.4, size: .09});
+    d.light(x, z, 3.2*fade(k));
+  }},
+  /** Mending at the Heartfire: embers arc from the fire into the weapon, which flares like metal in a forge. */
+  mend: {life: () => 1.3, kick: () => ({shake: .06}), paint(d, ev, age, seed){
+    const h = hue(ev.itemId), hx = ev.hx ?? ev.x, hz = ev.hz ?? ev.z, x = ev.x, z = ev.z, FLY = .5;
+    const arcAt = (s, i) => {
+      const lift = Math.sin(s*Math.PI)*(1.3+rnd(seed, i)*.9), side = (rnd(seed, i+20)-.5)*1.6*Math.sin(s*Math.PI);
+      return [hx+(x-hx)*s+side, 1.4+(1-1.4)*s+lift, hz+(z-hz)*s];
+    };
+    // A flare out of the fire as it gives.
+    if(age < .5){d.bloom(hx, hz, 1.4, 1.2, EMBER.glow, .7*fade(age/.5)); d.sparks(hx, hz, 1.4, 10, age, EMBER.main, 1, seed+5, {speed: 2.5, up: 4, gravity: 6, life: .5});}
+    for(let i = 0; i < 14; i++){
+      const t = (age-i*.03)/FLY;
+      if(t <= 0 || t >= 1) continue;
+      const s = easeOut2(t), [px, py, pz] = arcAt(s, i), [bx, by, bz] = arcAt(Math.max(0, s-.16), i);
+      d.streak([bx, by, bz], [px, py, pz], .2, EMBER.glow, .9);
+      d.orb(px, pz, py, .12, EMBER.main, 1);
+      d.orb(px, pz, py, .06, EMBER.core, 1, {glow: true});
+    }
+    // The weapon takes the heat: a white-hot flare in its colours, a ring of hammer sparks.
+    const hit = (age-FLY)/.8;
+    if(hit > 0 && hit < 1){
+      d.bloom(x, z, 1, .6+.7*bump(hit*1.6), h.core, fade(hit));
+      d.bloom(x, z, 1, 1.4, EMBER.glow, .55*fade(hit));
+      d.mark(x, z, .3+1.1*easeOut(hit/.5), .07, EMBER.main, fade(hit/.7), {halo: .5});
+      d.shock(x, z, .3+1.8*easeOut(hit/.6), .06, EMBER.glow, fade(hit/.6), EMBER.core);
+      d.twinkle(x+.25, z, 1.25, .35*bump(hit*2), '#fff8e0', 1, hit*6);
+      d.sparks(x, z, 1, 16, age-FLY, EMBER.main, 1, seed, {speed: 3.5, up: 3.5, gravity: 9, life: .6});
+      d.motes(x, z, 8, age-FLY, .6, h.alt, .85*fade(hit), seed+3, {rise: 1.8, life: .7});
+      d.light(x, z, 2.4*fade(hit));
+    }
   }},
   /** Hit sparks in the attacker's colours: resolved from the wielder when the event arrives. */
   damage: {life: () => .4, resolve(ev, world){

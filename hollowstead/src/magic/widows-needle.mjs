@@ -313,7 +313,7 @@ function tryPin(world, dart) {
   const mob = findHostile(world, dart.targetId);
   if (!mob) return false;
   const killing = mob.hp <= IMPACT * (dart.power || 1);
-  offer(world, mob, Math.round(IMPACT * (dart.power || 1)));
+  offer(world, mob, Math.round(IMPACT * (dart.power || 1)), dart.ownerId);
   if (killing) return true;
   if (!Array.isArray(world.magicRoots)) world.magicRoots = [];
   let root = world.magicRoots.find(entry => entry && entry.packId === PACK && entry.targetId === mob.id);
@@ -333,6 +333,7 @@ function tryPin(world, dart) {
   root.fresh = true;
   root.bleedSent = 0;
   root.power = dart.power || 1;
+  if (dart.ownerId) root.ownerId = dart.ownerId;
   root.remaining = ROOT;
   root.pinX = mob.x;
   root.pinZ = mob.z;
@@ -372,7 +373,7 @@ function advanceRoot(world, root, dt) {
   const due = root.age >= ROOT - 1e-8 ? BLEED : Math.floor(BLEED * (elapsed / ROOT) + 1e-9);
   const slice = due - (Number(root.bleedSent) || 0);
   root.bleedSent = due;
-  if (slice > 0) offer(world, mob, slice * (root.power || 1));
+  if (slice > 0) offer(world, mob, slice * (root.power || 1), root.ownerId);
   root.frame = Math.floor(root.age * 8) % FRAME_COUNT;
   if (root.age >= ROOT - 1e-8) {
     release(mob);
@@ -401,7 +402,7 @@ function release(mob) {
   delete mob.magicRootZ;
 }
 
-function offer(world, mob, amount) {
+function offer(world, mob, amount, ownerId = null) {
   if (!mob || mob.id == null || !(amount > 0)) return;
   if (playerIds(world).has(mob.id)) return;
   const prev = mob.pendingHit;
@@ -410,7 +411,8 @@ function offer(world, mob, amount) {
   else if (prev && typeof prev === 'object' && typeof prev.amount === 'number') total += prev.amount;
   const hit = { targetId: mob.id, amount: total };
   mob.pendingHit = hit;
-  const queued = { targetId: mob.id, amount };
+  // ownerId credits the kill to the caster (weapon mastery, trinkets).
+  const queued = ownerId ? { targetId: mob.id, amount, ownerId } : { targetId: mob.id, amount };
   const current = world.pendingHit;
   if (Array.isArray(current)) current.push(queued);
   else if (current == null) world.pendingHit = [queued];

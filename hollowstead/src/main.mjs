@@ -20,7 +20,8 @@ import {loadMagicModules} from './magic/load.mjs?v=harvest-18';
 import {installMagicSprites,isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {waveLeft} from './arena.mjs?v=harvest-18';
 import {hotbarView,offerMarkup,rankStars,replaceMarkup} from './ui/arena.mjs?v=harvest-18';
-import {DASH} from './progression.mjs?v=harvest-18';
+import {DASH, MEND} from './progression.mjs?v=harvest-18';
+import {conditionOf, masteryView, mendPlan} from './mastery.mjs?v=harvest-18';
 import {clampShowcaseMobCount, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-18';
 import {cachedSrc} from './assets.mjs?v=harvest-18';
 import {bindFeatureHud, frameFeatureHud, paintFeatureHud} from './ui/features.mjs?v=harvest-18';
@@ -330,7 +331,7 @@ function contextFacts(p){
   const base={kind:target.kind,id:entity.id,type:entity.type,wood:world.available(p,'wood'),stone:world.available(p,'stone'),seeds:world.available(p,'seed')};
   if(target.kind==='building'){
     const lock=world.chestSessions.get(entity.id);
-    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,phase:phaseAt(world.time),hunger:p.hunger,canAwaken:entity.type==='hearth'&&entity.level<3&&world.canPay(p,world.upgradeCost()),busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{})};
+    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,phase:phaseAt(world.time),hunger:p.hunger,canAwaken:entity.type==='hearth'&&entity.level<3&&world.canPay(p,world.upgradeCost()),mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{})};
   }
   if(target.kind==='node'){const node=NODES[entity.type];return {...base,required:!!node?.required,toolReady:!(node?.tool)||world.hasTool(p,node.tool),toolLabel:node?.tool?label(node.tool).toLowerCase():''};}
   return base;
@@ -474,11 +475,16 @@ function ensurePanel(){
   inventoryPanel=createInventoryPanel($('sheet-content'),{onSlot:(key,empty)=>void onSlot(key,empty),onSelect:selectKey,onMove:(from,to)=>void moveKeys(from,to),onOperate:op=>void operate(op),onQuantity,onShift,onPackSort:()=>void sortPack(),onChestOrganize:op=>void organizeChest(op),onActivate:activateSelection,onDragChange(){endContextHold();hold.attack=false;stick={x:0,z:0};}});
   sheetMarkup='';
 }
+/** Hover text for an item: trinkets say what they do, weapons their mastery. */
+function itemTip(stack){
+  const m=masteryView(world,me(),stack.itemId);
+  return m?`${label(stack.itemId)}\n${weaponAbout('',m,null)}`:trinketTip(stack.itemId);
+}
 function makeCell(key,stack,kind,index,mark=''){
   const equipped=kind==='socket'&&!!stack;
   const name=stack?label(stack.itemId):mark;
   const maxDurability=stack?stackMaxDurability(stack.itemId):null;
-  return {key,stack,mark,maxDurability,equipped,accept:kind!=='recovery',selected:!!(stack&&selection?.uid===stack.uid),tip:stack?trinketTip(stack.itemId):'',iconHTML:stack?icon(stack.itemId):'',aria:slotLabel({empty:!stack,name,quantity:stack?.quantity||0,durability:stack?.durability??null,maxDurability,equipped,index,kind:kind==='socket'?'socket':kind})};
+  return {key,stack,mark,maxDurability,equipped,accept:kind!=='recovery',selected:!!(stack&&selection?.uid===stack.uid),tip:stack?itemTip(stack):'',iconHTML:stack?icon(stack.itemId):'',aria:slotLabel({empty:!stack,name,quantity:stack?.quantity||0,durability:stack?.durability??null,maxDurability,equipped,index,kind:kind==='socket'?'socket':kind})};
 }
 function inventoryView(p){
   const chest=chestBuilding();
@@ -664,18 +670,36 @@ function paintCluster(modeName,p){
   $('hotbar-inventory').classList.toggle('active',sheet==='inventory'||sheet==='chest');
   $('hotbar-build').classList.toggle('active',sheet==='catalog'&&catalog.source==='field');
 }
-/** Weapon hotbar buttons: icons, which is in hand, arena ranks. Repainted only when something changed. */
+/**
+ * Weapon hotbar buttons: icons, which is in hand, and ranks. On an expedition each also shows its
+ * mastery (stars and a gold bar toward the next rank) and its condition (the orange bar).
+ * Repainted only when something changed.
+ */
 function paintHotbar(p){
-  const slots=hotbarView(p);
-  const sig=slots.map(slot=>`${slot.itemId||''}:${slot.active?1:0}:${slot.rank}`).join('|')+(world.arena?'a':'');
+  const slots=hotbarView(p).map(slot=>({...slot,mastery:slot.itemId?masteryView(world,p,slot.itemId):null,condition:slot.stack&&!world.arena?conditionOf(slot.stack):null}));
+  const sig=slots.map(slot=>`${slot.itemId||''}:${slot.active?1:0}:${slot.rank}:${slot.mastery?Math.floor(slot.mastery.progress*40):''}:${slot.condition==null?'':Math.ceil(slot.condition*40)}`).join('|')+(world.arena?'a':'');
   if(sig===hotbarSig)return;hotbarSig=sig;
   document.querySelectorAll('#weapon-bar .weapon-slot').forEach((el,i)=>{
     const slot=slots[i];if(!slot)return;
-    el.classList.toggle('active',slot.active);el.classList.toggle('empty',!slot.itemId);
-    el.innerHTML=slot.itemId?`${icon(slot.itemId)}${world.arena&&slot.rank>1?`<small class="rank">${rankStars(slot.rank)}</small>`:''}`:'<span aria-hidden="true">+</span>';
-    el.setAttribute('aria-label',slot.itemId?`${slot.name}${slot.active?', in hand':''}`:`Empty weapon slot ${i+1}`);
-    el.setAttribute('aria-pressed',String(slot.active));el.title=slot.name||'Empty slot';
+    const m=slot.mastery,rank=m?m.rank:slot.rank;
+    el.classList.toggle('active',slot.active);el.classList.toggle('empty',!slot.itemId);el.classList.toggle('mastered',!!m);
+    el.classList.toggle('worn',slot.condition!=null&&slot.condition<=MEND.warnAt);
+    el.innerHTML=slot.itemId?`${icon(slot.itemId)}`
+      +(m&&m.to!=null?`<span class="mastery" aria-hidden="true"><em style="width:${(m.progress*100).toFixed(1)}%"></em></span>`:'')
+      +((world.arena||m)&&rank>1?`<small class="rank">${rankStars(rank)}</small>`:'')
+      +(slot.condition!=null?`<span class="wear" aria-hidden="true"><em style="width:${(slot.condition*100).toFixed(1)}%"></em></span>`:'')
+      :'<span aria-hidden="true">+</span>';
+    const about=slot.itemId?weaponAbout(slot.name,m,slot.condition):'';
+    el.setAttribute('aria-label',slot.itemId?`${slot.name}${slot.active?', in hand':''}${about?`. ${about}`:''}`:`Empty weapon slot ${i+1}`);
+    el.setAttribute('aria-pressed',String(slot.active));el.title=slot.itemId?`${slot.name}${about?`\n${about}`:''}`:'Empty slot';
   });
+}
+/** Mastery and condition in words, for titles and screen readers. */
+function weaponAbout(name,m,condition){
+  const parts=[];
+  if(m)parts.push(m.to==null?`Mastery ${rankStars(m.rank)} (max)`:`Mastery ${rankStars(m.rank)} · ${Math.floor(m.points)} / ${m.to} to ${rankStars(m.rank+1)}`);
+  if(condition!=null)parts.push(`Condition ${Math.ceil(condition*100)}%`);
+  return parts.join(' · ');
 }
 /** The attack button shows what you are holding. */
 function paintAttack(p){

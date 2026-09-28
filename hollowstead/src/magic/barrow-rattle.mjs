@@ -220,6 +220,8 @@ function strike(world, summon, target){
     return
   }
   target.hp -= amount
+  // Credit the kill to the skeleton's master (weapon mastery, trinkets).
+  if(summon.ownerId) target.lastHitBy = summon.ownerId
   const dx = (typeof target.x === 'number' ? target.x : summon.x) - summon.x
   const dz = (typeof target.z === 'number' ? target.z : summon.z) - summon.z
   const span = Math.hypot(dx, dz) || 1

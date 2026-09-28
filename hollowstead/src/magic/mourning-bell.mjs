@@ -45,7 +45,7 @@ export function step(world, dt){
         // Only the travelling front deals damage. The fading echoes are cosmetic.
         if(!Number.isFinite(span) || span>outer || (before>=BELL.delay && span<Math.max(0,inner-.3))) continue;
         wave.hitIds.push(enemy.id);
-        (world.pendingHit ||= []).push({targetId: enemy.id, amount: Math.round(BELL.damage*(wave.power||1))});
+        (world.pendingHit ||= []).push({targetId: enemy.id, amount: Math.round(BELL.damage*(wave.power||1)), ownerId: wave.ownerId});
         (world.pendingKnock ||= []).push({targetId: enemy.id, dx:(span?dx/span:1)*BELL.push, dz:(span?dz/span:0)*BELL.push});
       }
     }

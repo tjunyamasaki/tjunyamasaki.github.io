@@ -146,7 +146,7 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(RECIPE_CONTEXTS.fieldBuild.stationType, null);
   assert.equal(RECIPE_CONTEXTS.fireCook.label, 'Cooking');
   assert.equal(RECIPE_CONTEXTS.cauldronCook.stationType, 'pot');
-  assert.deepEqual(CONTEXT_ACTIONS.hearth, ['feed', 'cook', 'awaken', 'repair']);
+  assert.deepEqual(CONTEXT_ACTIONS.hearth, ['feed', 'cook', 'awaken', 'mend', 'repair']);
   assert.deepEqual(CONTEXT_ACTIONS.bench, ['craft', 'build', 'repair']);
   assert.deepEqual(CONTEXT_ACTIONS.chest, ['open', 'repair']);
 

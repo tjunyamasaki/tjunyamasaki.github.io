@@ -37,7 +37,7 @@ export function hotbarView(player){
   return (player?.hotbar || [null, null, null]).map((uid, index) => {
     const stack = uid ? stacks.find(s => s.uid === uid) || null : null;
     return {
-      index, uid, itemId: stack?.itemId || null, name: stack ? label(stack.itemId) : '',
+      index, uid, stack, itemId: stack?.itemId || null, name: stack ? label(stack.itemId) : '',
       active: !!(stack && worn && worn.uid === stack.uid),
       rank: stack ? (player?.ranks?.[stack.itemId] || 0) : 0,
       rarity: stack ? rarityOf(stack.itemId) : 'common',

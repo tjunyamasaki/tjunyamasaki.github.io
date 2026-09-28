@@ -18,6 +18,7 @@ import {
   rankOf, tierAt, waveSize, weaponStyle, xpToNext,
 } from './progression.mjs?v=harvest-18';
 import {stepSkills, useSkill} from './skills.mjs?v=harvest-18';
+import {creditKill, mendWeapon, syncMastery, warnWear} from './mastery.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
 import {stepMobs} from './mobs.mjs?v=harvest-18';
@@ -333,6 +334,7 @@ export class World {
     if(this.arena)return; // Arena weapons never wear out.
     const worn=wearStack(current, amount);
     p.equipment[slot]=worn.stack;
+    if(slot==='weapon')warnWear(this, p, current, worn.stack);
     // Ownership revisions track socket changes, not continuously burning fuel.
     // Transfers always read current host durability rather than a client copy.
     if(worn.removed)p.equipmentRevision++;
@@ -743,6 +745,7 @@ export class World {
     if(actionId==='dismantle')return this.beginDismantle(p, targetId, true);
     if(actionId==='repair')return this.action(p.id,{type:'repair',target:targetId});
     if(actionId==='awaken')return this.performUpgrade(p, targetId);
+    if(actionId==='mend'){if(p.cooldown>.05)return {ok:false,code:'cooldown'};return mendWeapon(this, p, building);}
     if(actionId==='cook'||actionId==='craft'||actionId==='build'||actionId==='open')return {ok:true,code:'ok'};
     return this.interact(p, targetId);
   }
@@ -1269,14 +1272,16 @@ export class World {
     }
     for(const hit of hits){
       const enemy=this.enemies.find(entry=>entry.id===hit?.targetId);
-      if(!enemy||isMagicAlly(enemy)||!(enemy.hp>0))continue;
+      if(!enemy||isMagicAlly(enemy))continue;
+      // Credit the caster, also when the hit already landed (and killed) through the creature's own pendingHit.
+      if(hit.ownerId&&(enemy.hp>0||covered.has(enemy.id)))enemy.lastHitBy=hit.ownerId;
+      if(!(enemy.hp>0))continue;
       const amount=Number(hit.amount??hit.damage??0);
       if(!(amount>0))continue;
       const owed=covered.get(enemy.id)||0;
       if(owed+1e-6>=amount){covered.set(enemy.id, owed-amount);continue;}
       const prev=enemy.hp;
       enemy.hp-=amount;
-      if(hit.ownerId)enemy.lastHitBy=hit.ownerId;
       if(enemy.hp<prev)this.event('damage', enemy.x, enemy.z, String(Math.ceil(amount)));
     }
     for(const knock of knocks){
@@ -1560,7 +1565,7 @@ export class World {
       if(b.type==='ward'&&b.cooldown<=0){const enemy=this.enemies.find(enemy=>!isMagicAlly(enemy)&&distance(enemy,b)<6);if(enemy){enemy.hp-=18;b.cooldown=2;this.event('bolt',enemy.x,enemy.z,'18',{sx:b.x,sz:b.z});}}
     }
     stepMobs(this, dt, obstacles);
-    for(const e of this.enemies.filter(e=>e.hp<=0)){if(this.arena){if(!isMagicAlly(e)){this.kills++;if(this.arena.lab)labKill(this,e);else arenaKill(this,e);}this.event('kill',e.x,e.z);continue;}const loot=ENEMIES[e.type]?.loot;if(loot)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));if(!isMagicAlly(e)){this.kills++;if(!this.showcase){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});}this.event('kill',e.x,e.z);if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,'The Hollow King falls. His treasure spills across the grass.');}}
+    for(const e of this.enemies.filter(e=>e.hp<=0)){if(this.arena){if(!isMagicAlly(e)){this.kills++;if(this.arena.lab)labKill(this,e);else arenaKill(this,e);}this.event('kill',e.x,e.z);continue;}const loot=ENEMIES[e.type]?.loot;if(loot)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));if(!isMagicAlly(e)){this.kills++;if(!this.showcase){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}this.event('kill',e.x,e.z);if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,'The Hollow King falls. His treasure spills across the grass.');}}
     this.enemies=this.enemies.filter(e=>e.hp>0);
     for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth'&&!this.showcase)this.status='defeat';}
     this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.stack?.quantity>0&&(d.flight||d.until>this.time));
@@ -1605,7 +1610,7 @@ export class World {
     for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','radius','night'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     if(world.arena){world.nodes=[];}if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||!world.arena)world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
-    for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);}
+    for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);}
     world.version=SAVE_VERSION_V2;world.clock=CLOCK_V2;
     for(const change of data.nodeChanges||[]){const at=world.nodes[Number(String(change.id).slice(1))],node=at?.id===change.id?at:world.nodes.find(entry=>entry.id===change.id);if(node){node.hits=change.hits;node.ready=change.ready;}}
     if(typeof data.worldId==='string')world.networkId=data.worldId;

@@ -9,6 +9,7 @@ import {FOXFIRE} from './magic/kitsune-lantern.mjs?v=harvest-18';
 import {ownedSkeletons, raiseSkeleton} from './magic/barrow-rattle.mjs?v=harvest-18';
 import {RITE, beginRite} from './magic/pallbearer.mjs?v=harvest-18';
 import {gripAll} from './magic/gloomgrasp.mjs?v=harvest-18';
+import {finalChapter} from './grimoire.mjs?v=harvest-18';
 import {isMagicAlly, ownerPower} from './magic/registry.mjs?v=harvest-18';
 
 const TAU = Math.PI*2;
@@ -103,11 +104,14 @@ export const SKILL_BOOK = Object.freeze({
         end: {kind: 'blast', fx: 'graveburst', r: 3.8, dmg: k.dmg(3.2), push: 1.2, falloff: .3}});
     }},
 
-  tome: {name: 'Ashen Apocalypse', cooldown: 13, reach: 6, pose: 1,
-    blurb: 'Three rings of fire roll out from you, each wider than the last, and leave foes burning.',
+  tome: {name: 'Final Chapter', cooldown: 13, reach: 8, pose: 1.4,
+    blurb: 'The book tears out every page: they ring your mark in a burning spell circle, collapse into it, and fly home to a full book.',
     cast(k){
-      [[0, 3.2, 1], [.32, 5, .8], [.64, 6.8, .7]].forEach(([t, r, m], i) =>
-        k.beat(t, {kind: 'blast', fx: 'firering', follow: true, r, dmg: k.dmg(m), push: .6+i*.2, dot: {dps: k.dmg(.08), s: 3, kind: 'burn'}, ring: i}));
+      const t = k.target(8, 5), x = round(t.x), z = round(t.z);
+      // The grimoire's own pages (src/grimoire.mjs) make the circle; the beats below are its fire.
+      k.beat(0, {kind: 'call', fn: 'finalchapter', fx: 'ashcircle', x, z, r: 3.2, n: 12, hold: 1});
+      k.beat(.4, {kind: 'pulse', fx: 'ashring', x, z, r: 3.2, every: .3, life: .95, dmg: k.dmg(.25), slow: 1, quiet: true});
+      k.beat(1.55, {kind: 'blast', fx: 'ashcollapse', x, z, r: 3.5, dmg: k.dmg(2.2), push: -1.6, falloff: .2, dot: {dps: k.dmg(.08), s: 3, kind: 'burn'}});
     }},
 
   wisplantern: {name: 'Wisp Parade', cooldown: 10, reach: 14, pose: .8,
@@ -341,4 +345,6 @@ export const SKILL_CALLS = Object.freeze({
   lastrites(world, b, owner){return beginRite(world, owner, b);},
   /** Abyssal Grip: the scepter's own hands rise under every foe near the mark (src/magic/gloomgrasp.mjs). */
   gloomhands(world, b, owner){return gripAll(world, owner, b);},
+  /** Final Chapter: the grimoire's pages ring the mark and hang there (src/grimoire.mjs). */
+  finalchapter(world, b, owner){return finalChapter(world, owner, b);},
 });

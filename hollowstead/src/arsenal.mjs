@@ -7,6 +7,7 @@ import {RULES} from './content.mjs?v=harvest-18';
 import {ALLIES, REFINE, maxHealth, powerOf, rankOf} from './progression.mjs?v=harvest-18';
 import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {splitMarks} from './refine.mjs?v=harvest-18';
+import {grimoire, stepGrimoire} from './grimoire.mjs?v=harvest-18';
 
 const dist = (a, b) => Math.hypot((a.x||0)-(b.x||0), (a.z||0)-(b.z||0));
 const hostiles = w => w.enemies.filter(e => !isMagicAlly(e) && e.hp > 0);
@@ -205,7 +206,7 @@ const frost = (w, p, {style, damage}) => {
   w.wearEquipped(p, 'weapon', 1);
 };
 
-export const ARSENAL = Object.freeze({combo, lash, reap, wisps, chain, meteor, crows, sentry, wight, frost});
+export const ARSENAL = Object.freeze({combo, lash, reap, wisps, chain, meteor, crows, sentry, wight, frost, grimoire});
 
 // ------------------------------------------------------------------ per tick
 /** Damage over time, stars, frost clouds, and the allies' own little lives. */
@@ -236,6 +237,7 @@ export function stepArsenal(w, dt, obstacles){
     w.zones = w.zones.filter(zone => !zone.done);
   }
   stepAllies(w, dt, obstacles, foes);
+  stepGrimoire(w, dt);
 }
 
 function stepAllies(w, dt, obstacles, foes){

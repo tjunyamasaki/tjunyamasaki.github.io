@@ -18,7 +18,7 @@ const BLURBS = Object.freeze({
   crookstaff: 'Moonshard bolts that burst on impact.',
   flamberge: 'A huge 150° cleave with long reach.',
   skullstaff: 'A big bursting bolt that slows what it hits.',
-  tome: 'A ring of fire around you. Made for swarms.',
+  tome: 'Burning pages circle you and fly out like boomerangs. Kills tear more.',
 });
 export function weaponBlurb(itemId){
   return BLURBS[itemId] || weaponStyle(itemId)?.blurb || magicItems[itemId]?.blurb || RECIPES[itemId]?.desc || '';

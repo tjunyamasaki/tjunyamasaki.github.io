@@ -202,16 +202,6 @@ export const SKILL_EVENTS = {
       if(k > 0 && k < 1) d.bloom(ev.x+Math.cos(a)*r, ev.z+Math.sin(a)*r, .6+k*2.4, .3*(1-k)+.1, h.main, fade(k));
     }
   }},
-  'fx:firering': {life: () => .9, kick: ev => ({shake: tier(ev.rank).shake*(.4+.3*(ev.v || 0)), flash: (ev.v || 0) === 2 ? tier(ev.rank).flash : 0, color: '#ffc080'}), paint(d, ev, age, seed){
-    const h = hue('tome'), T = tier(ev.rank), k = age/.55, r = (ev.r || 4)*easeOut(k);
-    if(k < 1){
-      d.ring(ev.x, ev.z, r, (.9+.1*T.r)*(1-k*.5), h.glow, .5*(1-k), {soft: true});
-      d.ring(ev.x, ev.z, r, .14*(1-k)+.04, h.core, 1-k);
-      fireTongues(d, ev.x, ev.z, r, age, h, seed, 10+T.r*3+(ev.v || 0)*4, .55);
-    }
-    if(T.r >= 3) d.motes(ev.x, ev.z, T.motes, age, ev.r || 4, h.alt, .9*fade(age/.9), seed);
-    d.stain(ev.x, ev.z, (ev.r || 4)*.9, h.deep, .18*fade(age/.9));
-  }},
   'fx:skybolt': {life: () => .55, kick: kickOf(.7, '#dff4ff'), paint(d, ev, age, seed){
     const h = hue('stormrod'), T = tier(ev.rank), k = age/.55;
     const [tx, tz] = ev.pts?.[0] || [ev.x, ev.z];

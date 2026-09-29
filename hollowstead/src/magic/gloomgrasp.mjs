@@ -10,7 +10,7 @@ import {isMagicAlly, ownerPower} from './registry.mjs?v=harvest-18';
 
 const PACK = 'gloomgrasp';
 export const GRASP = Object.freeze({
-  hands: 3, damage: 12, cooldown: 1.4, range: 8, fallback: 3.5, max: 6,
+  hands: 3, damage: 14, cooldown: 1.4, range: 8, fallback: 3.5, max: 8,
   stagger: .08, grabAt: .42,           // a new hand rises for grabAt seconds before it closes
   hold: 1.9, sink: .35,                // how long a grip lasts after its last squeeze; how long a hand takes to sink
   squeezeIn: .16,                      // a squeeze loosens the fingers for this long before it clenches
@@ -44,22 +44,21 @@ export function use(world, player){
   const dx = length > 1e-6 ? player.dx/length : 0, dz = length > 1e-6 ? player.dz/length : 1;
   const power = ownerPower(world, player);
   const mine = (world.magicPuffs || []).filter(h => h.packId === PACK && h.ownerId === player.id);
-  const holding = new Map(mine.filter(holds).map(h => [h.targetId, h]));
-  // Foes already in your grip come first: the weapon rewards squeezing the same ones.
-  const targets = hostiles(world).filter(e => Math.hypot(e.x-player.x, e.z-player.z) <= GRASP.range)
-    .sort((a, b) => score(a, player, dx, dz, holding)-score(b, player, dx, dz, holding)).slice(0, GRASP.hands);
+  const holding = mine.filter(holds);
+  // Every grip you hold squeezes; then up to `hands` new hands rise under foes not yet held.
+  holding.forEach((hand, i) => {if(!(hand.squeezeAt > hand.age)) hand.squeezeAt = hand.age+GRASP.squeezeIn+i*.04;});
+  const held = new Set(holding.map(h => h.targetId));
+  const targets = hostiles(world).filter(e => !held.has(e.id) && Math.hypot(e.x-player.x, e.z-player.z) <= GRASP.range)
+    .sort((a, b) => score(a, player, dx, dz)-score(b, player, dx, dz)).slice(0, GRASP.hands);
 
-  let live = mine.length, i = 0, fx = dx, fz = dz;
-  for(const e of targets){
-    const hand = holding.get(e.id);
-    if(hand){if(!(hand.squeezeAt > hand.age)) hand.squeezeAt = hand.age+GRASP.squeezeIn+i*.05;}
-    else if(live < GRASP.max){rise(world, player, e.x, e.z, e.id, i*GRASP.stagger, power); live++;}
-    else continue;
+  let live = mine.length, fx = dx, fz = dz;
+  targets.forEach((e, i) => {
+    if(live >= GRASP.max) return;
+    rise(world, player, e.x, e.z, e.id, i*GRASP.stagger, power); live++;
     if(i === 0){const l = Math.hypot(e.x-player.x, e.z-player.z); if(l > 1e-6){fx = (e.x-player.x)/l; fz = (e.z-player.z)/l;}}
-    i++;
-  }
+  });
   // Nothing in reach: a hand still claws up in front of you (and grabs whatever walks in).
-  if(!targets.length) rise(world, player, player.x+dx*GRASP.fallback, player.z+dz*GRASP.fallback, null, 0, power);
+  if(!targets.length && !holding.length) rise(world, player, player.x+dx*GRASP.fallback, player.z+dz*GRASP.fallback, null, 0, power);
 
   const cast = {id: world.nextId('gloomcast'), packId: PACK, ownerId: player.id,
     x: player.x, z: player.z, dx: fx, dz: fz, age: 0, life: GRASP.castLife};
@@ -191,7 +190,7 @@ function hostiles(world){
     !players.has(e.id) && !isMagicAlly(e) && Number.isFinite(e.x) && Number.isFinite(e.z));
 }
 
-function score(enemy, origin, dx, dz, holding){
+function score(enemy, origin, dx, dz){
   const x = enemy.x-origin.x, z = enemy.z-origin.z, distance = Math.hypot(x, z);
-  return distance*(1.2-.2*(distance > 1e-6 ? (x*dx+z*dz)/distance : 1))-(holding.has(enemy.id) ? 100 : 0);
+  return distance*(1.2-.2*(distance > 1e-6 ? (x*dx+z*dz)/distance : 1));
 }

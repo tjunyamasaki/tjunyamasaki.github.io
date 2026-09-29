@@ -10,7 +10,7 @@ const point=(x,z,y=.08)=>[x,y,z];
 const ease=n=>1-(1-clamp(n))**3;
 const known = e => GRAVECRAFT[e?.packId || String(e?.id||'').split(':')[0]];
 
-export function usesMagicEffects(entity){return entity?.packId==='kitsune-lantern' || entity?.packId==='plaguebeak' || entity?.packId==='gloomgrasp' || (!!known(entity) && entity.type!=='skeleton');}
+export function usesMagicEffects(entity){return entity?.packId==='kitsune-lantern' || entity?.packId==='tome' || entity?.packId==='plaguebeak' || entity?.packId==='gloomgrasp' || (!!known(entity) && entity.type!=='skeleton');}
 
 export function buildMagicEffects(world, frame, theme={}){
   const palette={...MAGIC_PALETTE,...theme.magic?.palette}, commands=[];

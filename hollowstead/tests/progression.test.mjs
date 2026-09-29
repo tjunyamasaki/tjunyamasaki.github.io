@@ -105,7 +105,7 @@ test('bows fire arrows that travel and hit; bonebows pierce',()=>{
   assert.ok(a.hp<ha&&b.hp<hb);
 });
 
-test('staff bolts burst on impact; broadswords cleave; the grimoire burns everything close',()=>{
+test('staff bolts burst on impact; broadswords cleave; the grimoire\'s pages sear and fly',()=>{
   const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'crookstaff');
   const a=w.spawnEnemy('crawler',6,0,{elite:false}),b=w.spawnEnemy('crawler',6.8,0.6,{elite:false});
   const ha=a.hp,hb=b.hp;w.attack(p);sim(w,1);
@@ -115,9 +115,10 @@ test('staff bolts burst on impact; broadswords cleave; the grimoire burns everyt
   const hc=c.hp,hd=d.hp,hbehind=behind.hp;w.attack(p);
   assert.ok(c.hp<hc&&d.hp<hd);assert.equal(behind.hp,hbehind);
   w.enemies=[];arm(w,p,'tome');p.cooldown=0;p.stamina=100;
-  const ring=[[3,0],[-3,0],[0,3]].map(([x,z])=>w.spawnEnemy('crawler',x,z,{elite:false}));
-  const before=ring.map(e=>e.hp);w.attack(p);
-  ring.forEach((e,i)=>assert.ok(e.hp<before[i]));
+  // Orbiting pages sear what stands beside you; a throw cuts what stands ahead.
+  const pages=[[0,1.3],[4.5,0]].map(([x,z])=>w.spawnEnemy('crawler',x,z,{elite:false}));
+  const before=pages.map(e=>e.hp);w.attack(p);sim(w,1);
+  pages.forEach((e,i)=>assert.ok(e.hp<before[i]));
   for(const id of Object.keys(WEAPON_STYLES))if(id!=='fist')assert.equal(equipmentSlotFor(id),'weapon',id);
 });
 

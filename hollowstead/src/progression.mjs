@@ -280,7 +280,8 @@ export const WEAPON_STYLES = Object.freeze({
   // loot only
   flamberge:{style:'melee', range:3.6, arc:150, cooldown:.8, stamina:12},
   skullstaff:{style:'bolt', range:12, speed:12*1.15, cooldown:1.05, stamina:11, splash:2.3, slow:2},
-  tome:{style:'nova', range:4.6, cooldown:1.5, stamina:18},
+  tome:{style:'grimoire', range:6.5, cooldown:1.5, stamina:18,
+    blurb:'Burning pages circle you and sear what they pass. Attack to fling them out and back; kills and throws tear more, and a full book throws a Chapter'},
   fangs:{style:'combo', range:2.6, cooldown:.39, stamina:4, window:1.2, every:4, rend:2.5, bleed:.5, bleedSeconds:3, lunge:.8,
     blurb:'Twin daggers. Every fourth cut rends: a lunge, heavy damage and a bleed'},
   soulchain:{style:'lash', range:5.5, width:.85, pull:1.6, cooldown:.85, stamina:10,

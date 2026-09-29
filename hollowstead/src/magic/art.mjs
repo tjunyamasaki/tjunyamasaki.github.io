@@ -81,7 +81,7 @@ export function swingAngle(t){
 }
 
 /** Weapons not drawn in the hand: their src/fx rig draws them (WEAPON_FX `rig`). */
-export const UNHELD = new Set(['kitsune-lantern', 'pallbearer']);
+export const UNHELD = new Set(['kitsune-lantern', 'pallbearer', 'moon-maw']);
 
 export function heldWeaponPose(player, time, theme={}){
   const tool = player.action === 'gather' && TOOL_GEAR[player.gatherTool] ? player.gatherTool : null;

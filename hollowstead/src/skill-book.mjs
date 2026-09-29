@@ -8,6 +8,7 @@ import {mine, skyPath, summon} from './arsenal.mjs?v=harvest-18';
 import {FOXFIRE} from './magic/kitsune-lantern.mjs?v=harvest-18';
 import {ownedSkeletons, raiseSkeleton} from './magic/barrow-rattle.mjs?v=harvest-18';
 import {RITE, beginRite} from './magic/pallbearer.mjs?v=harvest-18';
+import {MAW, beginFeast} from './magic/moon-maw.mjs?v=harvest-18';
 import {isMagicAlly, ownerPower} from './magic/registry.mjs?v=harvest-18';
 
 const TAU = Math.PI*2;
@@ -245,6 +246,13 @@ export const SKILL_BOOK = Object.freeze({
         k.beat(t, {kind: 'blast', fx: 'toll', follow: true, r, dmg: k.dmg(m), push, stun: st, toll: i}));
     }},
 
+  'moon-maw': {name: 'Home for Supper', cooldown: 13, reach: MAW.reach, pose: .65,
+    blurb: 'Feed your stored teeth to a giant returning maw. Move to aim its homeward bite; catching it snaps its jaws shut around you.',
+    cast(k){
+      const t = k.target(MAW.reach, 6);
+      k.beat(0, {kind: 'call', fn: 'moonfeast', fx: 'moonfeast', tx: round(t.x), tz: round(t.z), bite: k.dmg(1), snap: k.dmg(2.5)});
+    }},
+
   pallbearer: {name: 'Last Rites', cooldown: 13, reach: RITE.reach, pose: .7,
     blurb: 'Whirl the coffin to a scream and hurl it: it bursts open where it lands, stunning everything, and the chain drags you in after it.',
     cast(k){
@@ -256,6 +264,8 @@ export const SKILL_BOOK = Object.freeze({
 
 // ------------------------------------------------------------------ special beats
 export const SKILL_CALLS = Object.freeze({
+  /** The giant crescent keeps the ordinary throw's movement and catch rules. */
+  moonfeast(world, b, owner){return beginFeast(world, owner, b);},
   /** Soul Prison: strike every foe in reach, drag it toward the knot and bind it. */
   gather(world, b, owner, obstacles, {hit, hostiles, dist}){
     const foes = hostiles(world).filter(e => dist(e, owner) <= b.r).sort((a, c) => dist(a, owner)-dist(c, owner)).slice(0, b.n || 10);

@@ -142,6 +142,7 @@ const MAGIC_AIM=Object.freeze({
   'cinder-staff':{reach:11,speed:12*1.15,range:11},'widows-needle':{reach:9,speed:20*1.15,range:9},
   'spirit-fan':{reach:5.5,range:5.5},'barrow-rattle':{reach:10,range:10},'mourning-bell':{reach:5.2,range:5.2},
   'pallbearer':{reach:3.1,range:3.1},
+  'moon-maw':{reach:8.5,range:8.5},
 });
 /**
  * Guests only draw creatures and shots, so the network copy rounds every number to centimetres and

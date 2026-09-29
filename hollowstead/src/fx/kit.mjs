@@ -64,6 +64,7 @@ export const HUES = Object.freeze({
   'spirit-fan': H('#f2fffb', '#aef2de', '#4fd0b0', '#10302a', '#fff0b8'),
   'mourning-bell': H('#fff8e2', '#ecc87e', '#bb8f56', '#281e10', '#7fd6c4'),
   pallbearer: H('#f5f7ff', '#b8c4ff', '#7f8cff', '#1a1838', '#ff8fd0'),
+  'moon-maw': H('#d8fff1', '#42d6b8', '#45bdab', '#173d40', '#b490f5'),
 });
 /**
  * The kitsune's colours: one is rolled each time the Nine-Tail Lantern is equipped (FOX_LOOKS in

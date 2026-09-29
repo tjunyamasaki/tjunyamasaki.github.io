@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224" fill="none">
+  <title>Moon-Maw</title>
+  <desc>A hungry crescent of ivory jawbone with a turquoise slit eye, hooked teeth, and a trailing spirit ribbon.</desc>
+  <g stroke="#2b2233" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M62 154C37 169 39 193 78 193C115 193 128 208 119 215C157 204 128 176 95 182C69 188 59 175 77 162Z" fill="#173d40"/>
+    <path d="M61 154C44 175 62 181 87 177C129 168 166 190 157 207C149 186 119 188 94 193C64 199 37 183 48 164Z" fill="#42d6b8"/>
+    <path d="M85 181C104 177 135 181 143 190" stroke="#d8fff1" stroke-width="3"/>
+    <path d="M181 27C137 6 72 19 43 62C9 112 29 169 76 188C111 202 155 190 183 164C143 175 108 147 110 112C111 77 143 53 181 27Z" fill="#b9b39a"/>
+    <path d="M166 30C128 17 77 30 52 66C24 106 39 157 80 176C108 189 139 182 159 173C121 165 99 141 101 108C104 71 135 47 166 30Z" fill="#f1dfb4" stroke-width="3"/>
+    <path d="M142 33C99 36 67 57 55 91C42 128 61 156 88 165" stroke="#42d6b8" stroke-width="9"/>
+    <path d="M134 34C94 41 69 61 60 86" stroke="#d8fff1" stroke-width="3"/>
+    <path d="M142 54L157 60L128 79L131 65Z" fill="#f1dfb4" stroke-width="4"/>
+    <path d="M118 76L136 89L110 98L110 86Z" fill="#f1dfb4" stroke-width="4"/>
+    <path d="M109 109L131 120L111 130L104 120Z" fill="#f1dfb4" stroke-width="4"/>
+    <path d="M117 141L140 143L132 159L120 153Z" fill="#f1dfb4" stroke-width="4"/>
+    <path d="M143 160L164 150L159 171Z" fill="#f1dfb4" stroke-width="4"/>
+    <path d="M118 79L127 86M110 112L120 119M124 144L131 146" stroke="#fff0ce" stroke-width="3"/>
+    <ellipse cx="65" cy="111" rx="19" ry="23" fill="#173d40"/>
+    <ellipse cx="67" cy="109" rx="13" ry="17" fill="#42d6b8" stroke-width="3"/>
+    <path d="M68 96L71 109L65 123L63 109Z" fill="#2b2233" stroke-width="2"/>
+    <path d="M59 103L62 100" stroke="#d8fff1" stroke-width="4"/>
+    <path d="M76 52L82 65L91 67M40 144L55 141L59 150M92 171L96 159L105 161" stroke-width="3"/>
+    <path d="M88 81L92 86M82 143L88 147" stroke-width="3"/>
+    <path d="M173 88L182 81L185 91L178 104Z" fill="#b490f5" stroke-width="4"/>
+    <path d="M190 117L199 111L202 121L195 133Z" fill="#42d6b8" stroke-width="4"/>
+    <path d="M151 107L158 101L161 111L154 121Z" fill="#f1dfb4" stroke-width="4"/>
+    <path d="M178 90L179 86M195 119L196 116" stroke="#d8fff1" stroke-width="2"/>
+  </g>
+</svg>

@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [master, feat/battle-improv]
+    branches: [master, feat/moon-maw]
   workflow_dispatch:
 
 permissions:

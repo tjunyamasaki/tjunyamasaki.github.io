@@ -45,6 +45,20 @@ export class Sound {
     } // clean strikes and trinket moments: ui/rhythm.mjs plays its own cue at the tap, without the event delay
     if(!this.enabled)return;const source=this.theme.audio?.[type];if(source){let a=this.clips.get(type);if(!a){a=new Audio(cachedSrc(source));this.clips.set(type,a);}a.currentTime=0;a.volume=.35;void a.play().catch(()=>{});return;}
     if(!this.context||this.context.state!=='running')return;const t=this.context.currentTime;if(t-this.last<.07)return;this.last=t;
+    if(type==='mooncast'||type==='mooncatch'||type==='moonsnap'){
+      // Hollow bone whistle on the throw, a rising three-tooth catch, a low jaw-clack at supper.
+      if(type==='mooncast'){
+        this.sweep(ev?.feast?260:640,ev?.feast?940:220,ev?.feast?.45:.28,'triangle',.025);
+        this.sweep(1300,460,.16,'sine',.012,.05);return;
+      }
+      if(type==='mooncatch'){
+        const f=392*Math.pow(2,Math.max(0,Math.min(3,ev?.teeth||0))/6);
+        this.sweep(f,f*1.01,.22,'sine',.02);this.sweep(f*1.5,f*1.5,.25,'triangle',.009,.04);
+        if(ev?.teeth===3)this.sweep(f*2,f*2,.38,'sine',.012,.08);return;
+      }
+      this.sweep(125,35,.55,'sine',.075);this.sweep(660,110,.15,'square',.013);
+      this.sweep(880,440,.4,'triangle',.018,.07);return;
+    }
     if(type==='foxfire'||type==='foxburst'){
       // A small haunted shrine chime; staggered partials echo the nine tails.
       const burst=type==='foxburst';

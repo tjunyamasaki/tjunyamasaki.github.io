@@ -71,6 +71,8 @@ export class Sound {
       if(type==='coffinland'){this.sweep(160,40,.35,'sine',.07);this.sweep(420,120,.2,'triangle',.02);return;}
       return;
     }
+    if(type==='gloomsqueeze'){const g=Math.max(1,ev?.grip|0);this.sweep(120+g*30,50,.22,'sawtooth',.03+.01*g);this.sweep(420,180,.1,'square',.012,.02);return;}
+    if(type==='gloomcrush'){this.sweep(90,28,.55,'sine',.08);this.sweep(260,60,.3,'sawtooth',.03);for(let i=0;i<4;i++)this.sweep(1400-i*180,500,.06,'square',.006,.03+i*.03);return;}
     if(type==='gloomcast'||type==='gloomgrab'){
       // A low swell as the shadow spreads; a crunching squeeze when a hand closes.
       const grab=type==='gloomgrab';

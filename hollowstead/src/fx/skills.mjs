@@ -289,24 +289,6 @@ export const SKILL_EVENTS = {
       }
     }
   }},
-  'fx:maw': {life: () => 1.2, kick: kickOf(1.3, '#d9b8ff'), paint(d, ev, age, seed){
-    const h = hue('gloomgrasp'), T = tier(ev.rank), r = ev.r || 4.4, k = age/1.2;
-    d.stain(ev.x, ev.z, r, '#0c0414', .8*fade(k, .8));
-    // A ring of hands closing in.
-    for(let i = 0; i < 8+T.r; i++){
-      const a = i/(8+T.r)*TAU+seed*.01, close = easeOut(age/.25), rr = r*(1-.7*close);
-      hand(d, ev.x+Math.cos(a)*rr, ev.z+Math.sin(a)*rr, a+Math.PI, 1.3*bump(k*.9), h, fade(k));
-    }
-    // The maw: two jaws snapping shut in the middle.
-    const bite = easeOut(age/.18), open = (1-bite)*1.2+.1;
-    for(const s of [-1, 1]){
-      const pts = [];
-      for(let i = 0; i <= 10; i++){const u = i/10*2-1; pts.push(at(ev.x, ev.z, 1+s*open*.5, u*1.6, s*(open*(1-u*u)+.1)));}
-      d.path(pts, .16, h.main, fade(k), {glow: true});
-      for(let i = 1; i < 10; i += 2){const p = pts[i]; d.path([p, [p[0], p[1]-s*.28, p[2]+s*.2]], .08, '#f2e6ff', fade(k), {taper: .9});}
-    }
-    burst(d, ev.x, ev.z, 2, age, ev.rank, seed, h, {life: .5, y: 1, ground: false});
-  }},
   'fx:vial': {life: () => .9, kick: kickOf(.5), paint(d, ev, age, seed){
     const h = hue('plaguebeak'), T = burst(d, ev.x, ev.z, ev.r || 2.2, age, ev.rank, seed, h, {life: .55, y: .4, rays: false});
     for(let i = 0; i < 5+T.r; i++){
@@ -416,17 +398,6 @@ export const SKILL_BEATS = {
       d.streak([x+Math.cos(a)*r, .8, z+Math.sin(a)*r], [x, 1.3, z], .12, h.main, .5*k, .3);
     }
     if(T.r >= 4) d.light(x, z, 3.5*k);
-  }},
-  abyss: {lasting(d, b, t, clock){
-    const h = hue('gloomgrasp'), T = tier(b.rank), k = easeOut(t/.4), r = (b.r || 4.4)*k;
-    d.stain(b.x, b.z, r, '#0c0414', .75);
-    d.ring(b.x, b.z, r, .1, h.main, .8, {glow: true});
-    if(T.r >= 2) d.pool(b.x, b.z, r, h.glow, .25);
-    if(T.r >= 3) d.sigil(b.x, b.z, r*.7, h.alt, .5, {spin: -clock, sides: 7});
-    for(let i = 0; i < 6+T.r; i++){
-      const a = rnd(3, i)*TAU+clock*.3, rr = r*(.3+.6*rnd(4, i));
-      d.bloom(b.x+Math.cos(a)*rr, b.z+Math.sin(a)*rr, .2+((clock*1.5+rnd(5, i))%1)*1.2, .15, h.main, .6);
-    }
   }},
   miasma: {lasting(d, b, t, clock){
     const h = hue('plaguebeak'), T = tier(b.rank), k = clamp01(t/.3)*clamp01((b.life-t)/.5);
@@ -597,16 +568,6 @@ function crystal(d, x, z, size, h, alpha, spin, y = .05){
   d.path(pts, 0, '#e8f8ff', alpha*.9, {fill: true});
   d.path([...pts, pts[0]], .04, '#5a8ab0', alpha);
   d.path([pts[0], pts[2]], .05, h.core, alpha, {glow: true});
-}
-function hand(d, x, z, facing, height, h, alpha){
-  if(!(height > .05)) return;
-  const pts = [at(x, z, .05, -.25, 0), at(x, z, .05, .25, 0), at(x, z, .05, .2, height*.7), at(x, z, .05, -.22, height*.7)];
-  d.path(pts, 0, '#1a0a26', alpha, {fill: true});
-  for(let f = 0; f < 4; f++){
-    const u = -.18+f*.12, bend = Math.sin(facing+f)*.08;
-    d.path([at(x, z, .05, u, height*.68), at(x, z, .05, u+bend, height*.95), at(x, z, .05, u+bend*2, height*1.05)], .06, '#2a1238', alpha);
-  }
-  d.path([at(x, z, .05, -.2, height*.72), at(x, z, .05, .2, height*.72)], .05, h.main, alpha, {glow: true});
 }
 function crow(d, x, z, y, s, a, h, alpha, flap){
   const w = Math.sin(flap)*.5;

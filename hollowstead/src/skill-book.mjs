@@ -8,6 +8,7 @@ import {mine, skyPath, summon} from './arsenal.mjs?v=harvest-18';
 import {FOXFIRE} from './magic/kitsune-lantern.mjs?v=harvest-18';
 import {ownedSkeletons, raiseSkeleton} from './magic/barrow-rattle.mjs?v=harvest-18';
 import {RITE, beginRite} from './magic/pallbearer.mjs?v=harvest-18';
+import {gripAll} from './magic/gloomgrasp.mjs?v=harvest-18';
 import {isMagicAlly, ownerPower} from './magic/registry.mjs?v=harvest-18';
 
 const TAU = Math.PI*2;
@@ -177,12 +178,13 @@ export const SKILL_BOOK = Object.freeze({
     }},
 
   // ------------------------------------------------------------------ the magic packs
-  gloomgrasp: {name: 'Abyssal Maw', cooldown: 12, reach: 9, pose: 1.2,
-    blurb: 'Your shadow pools wide beneath your foes; a ring of hands and a great maw rise and crush everything in it.',
+  gloomgrasp: {name: 'Abyssal Grip', cooldown: 12, reach: 9, pose: 1.3,
+    blurb: 'Hands rise under every foe near the mark, already squeezing; a colossal hand rises in the middle, and when it clenches every hand crushes at once.',
     cast(k){
-      const t = k.target(9, 5);
-      k.beat(0, {kind: 'pulse', fx: 'abyss', x: round(t.x), z: round(t.z), r: 4.4, every: .25, life: 1.1, dmg: 0, slow: 1,
-        end: {kind: 'blast', fx: 'maw', r: 4.4, dmg: k.dmg(3), root: 1.8, push: -1.2, falloff: .15}});
+      const t = k.target(9, 5), x = round(t.x), z = round(t.z);
+      // The scepter's own hands (src/magic/gloomgrasp.mjs), set to crush the moment the colossus clenches.
+      k.beat(0, {kind: 'call', fn: 'gloomhands', fx: 'gloomflood', x, z, r: 4.2, n: 8, crush: 1.15, mult: .5, power: round(k.strength)});
+      k.beat(1.15, {kind: 'blast', fx: 'gloomfist', x, z, r: 4.2, dmg: k.dmg(1), push: -1.4, root: 1.2, falloff: .2});
     }},
 
   plaguebeak: {name: 'Pestilence', cooldown: 12, reach: 9, pose: .9,
@@ -337,4 +339,6 @@ export const SKILL_CALLS = Object.freeze({
   },
   /** Last Rites: the flail's own module whirls, hurls, slams and yanks (src/magic/pallbearer.mjs). */
   lastrites(world, b, owner){return beginRite(world, owner, b);},
+  /** Abyssal Grip: the scepter's own hands rise under every foe near the mark (src/magic/gloomgrasp.mjs). */
+  gloomhands(world, b, owner){return gripAll(world, owner, b);},
 });

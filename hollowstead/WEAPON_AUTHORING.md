@@ -54,7 +54,7 @@ Taken auto attacks (weapon: pattern):
 | wighthorn | summoned Grave Knight |
 | barrow-rattle | skeleton summons (up to four) |
 | censer | freezing frost cloud |
-| gloomgrasp | shadow pool with hands that crush and hold |
+| gloomgrasp | shadow hands grab and hold (root); recasting squeezes the held foe: grab → squeeze → crush, the crush bursts into the foes around |
 | plaguebeak | lobbed vial → lingering miasma cloud |
 | kitsune-lantern | 3/6/9 homing foxfire volleys from idle tails |
 | widows-needle | pinning dart (root) |
@@ -62,7 +62,7 @@ Taken auto attacks (weapon: pattern):
 | mourning-bell | delayed expanding ring |
 | pallbearer | coffin on a chain with rope physics: heaves build momentum, damage scales with speed, a dodge whips it |
 
-Taken skills: leap slam + stun; line lunge + thorn roots; spinning crescents + wave; leap smash + ground split; fire cyclone on you; blink between foes; pull-then-push reaps; chain-bind + burst; fanned volleys + arrow rain; piercing lance; seeking salvo; drifting drain orb; triple fire rings; wisp swarm; lightning storm; constellation star shower; flock sweep; bomb barrage; horn push + knight charge; freeze + shatter; maw from shadow; miasma vials; foxfire rings + pounce; bone eruption + more summons; fireball rain; web pin + needle rain; cyclone → gale; triple toll; whirl-up, hurl, slam, and the chain yanks you in (pallbearer).
+Taken skills: leap slam + stun; line lunge + thorn roots; spinning crescents + wave; leap smash + ground split; fire cyclone on you; blink between foes; pull-then-push reaps; chain-bind + burst; fanned volleys + arrow rain; piercing lance; seeking salvo; drifting drain orb; triple fire rings; wisp swarm; lightning storm; constellation star shower; flock sweep; bomb barrage; horn push + knight charge; freeze + shatter; hands under every foe + a colossal hand whose clench crushes them all (gloomgrasp); miasma vials; foxfire rings + pounce; bone eruption + more summons; fireball rain; web pin + needle rain; cyclone → gale; triple toll; whirl-up, hurl, slam, and the chain yanks you in (pallbearer).
 
 Fresh ground (pick one, or invent): a held tether or beam that drags or links foes, blades orbiting the wielder, a boomerang with a return path, ricochets off foes and walls, marks that stack and detonate, hold-to-charge and release, a trail on the ground that hurts or closes shapes, a gravity well, echoes that repeat your last attack, a decoy or mirror, swapping places with a projectile, reflecting enemy shots, stance switching, timing windows, grow-with-kills, foe-triggered traps, throwing one foe into others, spending health for power.
 

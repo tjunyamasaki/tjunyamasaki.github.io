@@ -7,6 +7,7 @@ import {SKILL_BEATS, SKILL_EVENTS, paintSkillCast} from './skills.mjs?v=harvest-
 import {FLAIR_EVENTS, paintFrostZone, paintFrozen, paintMagicCast, paintProjectile, paintSunburn} from './flair.mjs?v=harvest-18';
 import {KITSUNE_FX} from './kitsune.mjs?v=harvest-18';
 import {PALLBEARER_FX} from './pallbearer.mjs?v=harvest-18';
+import {GLOOM_FX} from './gloomgrasp.mjs?v=harvest-18';
 import {magicItems} from '../magic/registry.mjs?v=harvest-18';
 import {rankOf} from '../progression.mjs?v=harvest-18';
 
@@ -23,7 +24,7 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
  *                      behind the body); `keep` is handed back to its list painters as ctx.rig(ownerId).
  * Starfall predates this and is wired in by hand below.
  */
-export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX];
+export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX];
 const FX_BY_ID = new Map(WEAPON_FX.map(fx => [fx.id, fx]));
 
 const EVENTS = Object.assign({...FLAIR_EVENTS, ...STARFALL_EVENTS, ...SKILL_EVENTS}, ...WEAPON_FX.map(fx => fx.events || {}));

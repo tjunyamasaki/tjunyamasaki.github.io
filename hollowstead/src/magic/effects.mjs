@@ -3,7 +3,6 @@
 import {MAGIC_PALETTE, GRAVECRAFT} from './art.mjs?v=harvest-18';
 import {BELL, waveRadius} from './mourning-bell.mjs?v=harvest-18';
 import {appendPlagueEffects} from './plague-effects.mjs?v=harvest-18';
-import {appendShadowEffects} from './shadow-effects.mjs?v=harvest-18';
 
 const TAU=Math.PI*2;
 const clamp=n=>Math.max(0,Math.min(1,n));
@@ -49,9 +48,8 @@ export function buildMagicEffects(world, frame, theme={}){
     }
   };
 
-  // The Nine-Tail Lantern's foxfires, tails and bursts are drawn by src/fx/kitsune.mjs.
+  // The Nine-Tail Lantern and the Gloomgrasp Scepter are drawn by src/fx (kitsune.mjs, gloomgrasp.mjs).
   budget-=appendPlagueEffects(world,frame,{path,orb},Math.max(0,budget),theme);
-  budget-=appendShadowEffects(world,frame,{path,orb},Math.max(0,budget),theme);
   entries(world.magicBolts,(e,age)=>{
     if(e.packId!=='cinder-staff')return;
     const speed=Math.hypot(e.vx||0,e.vz||0)||1,dx=e.vx/speed,dz=e.vz/speed;

@@ -16,7 +16,7 @@ import {rankOf as rankOfPlayer} from '../progression.mjs?v=harvest-18';
 export const PACK = 'kitsune-lantern';
 /** The kitsune's rank for a wielder (1 without one). */
 export const foxRank = p => p && typeof p === 'object' ? rankOfPlayer(p, PACK) : 1;
-const TAIL_STEPS = 10;
+const TAIL_STEPS = 24;
 /** Tails shown at each rank. */
 export const foxTailCount = rank => [3, 3, 4, 4, 5][Math.max(1, Math.min(5, rank|0))-1];
 /** How bright the tail tips burn before each volley: three, six, then nine foxfires. */
@@ -99,18 +99,19 @@ function tongue(d, x, z, y, h, w, P, color, phase){
 function layTails(n, {side, clock, sway, drag, whip, spread, length, width, seed}){
   const tails = [];
   for(let i = 0; i < n; i++){
-    // A bushy tail: it rises from the lower back, swells, then curls out to a fine tip.
-    const s = n > 1 ? i/(n-1)*2-1 : 0, base = Math.PI/2-side*.15+s*spread, L = length*(1+.14*(1-Math.abs(s)));
-    const curl = s*.28-side*.08, hook = -s*1.5, line = [], widths = [];
-    let u = -side*.14+s*.1, v = .05;
+    // A ribbon of spirit fire shaped like a sine wave: an S that ripples from the root to the tip.
+    const s = n > 1 ? i/(n-1)*2-1 : 0, L = length*(1+.12*(1-Math.abs(s)));
+    const dir0 = Math.PI/2-side*.15+s*spread, turn = drag-side*whip*1.25+s*.18;
+    const amp = L*(.1+.22*sway), phase = clock*2.6+i*1.35+seed;
+    const line = [], widths = [];
+    let cu = -side*.14+s*.08, cv = .05;
     for(let k = 0; k <= TAIL_STEPS; k++){
-      const t = k/TAIL_STEPS, fluff = 1+.09*Math.sin(t*17+clock*3.1+i*2.3)*t*(1-t)*4;
-      line.push([u, v]);
-      widths.push(width*Math.sin(Math.PI*(.1+.9*t))**.5*(1-.12*t)*fluff);
-      const wave = Math.sin(clock*2.3+i*1.9+seed-t*2.7)*sway*(.35+t);
-      // Outer tails bend out, then the last third hooks back in: the kitsune's flame-shaped curl.
-      const ang = base+curl*t+hook*Math.max(0, t-.62)**2*2.2+wave+drag*t-side*whip*t*1.25;
-      u += Math.cos(ang)*L/TAIL_STEPS; v += Math.sin(ang)*L/TAIL_STEPS;
+      const t = k/TAIL_STEPS, dir = dir0+turn*t;
+      // The spine bends smoothly with running and casting; the S rides across it, still at the root.
+      const offset = amp*Math.sin(t*TAU*.95-phase)*t**.8;
+      line.push([cu-Math.sin(dir)*offset, cv+Math.cos(dir)*offset]);
+      widths.push(width*Math.sin(Math.PI*(.06+.94*t))**.65*(1-.1*t));
+      cu += Math.cos(dir)*L/TAIL_STEPS; cv += Math.sin(dir)*L/TAIL_STEPS;
     }
     tails.push({line, widths, s, i});
   }
@@ -153,22 +154,24 @@ export function paintFoxTails(d, world, p, anchor, motion, clock, time){
   const spirit = parade > 0 ? layTails(9, {...opts, spread: 1.4, length: opts.length*1.28, width: opts.width*.72, clock: clock*1.3}) : null;
   if(spirit){
     for(const tail of spirit){
-      strip(d, x, z, y, tail.line, tail.widths, P.main, .3*parade, {grow: .02});
-      strip(d, x, z, y, tail.line, tail.widths, P.glow, .28*parade, {glow: true, soft: true, scale: 1.3});
-      strip(d, x, z, y, tail.line, tail.widths, P.alt, .35*parade, {from: .78, scale: .7});
+      strip(d, x, z, y, tail.line, tail.widths, P.main, .32*parade);
+      strip(d, x, z, y, tail.line, tail.widths, P.glow, .3*parade, {glow: true, soft: true, scale: 1.4});
+      strip(d, x, z, y, tail.line, tail.widths, P.core, .4*parade, {scale: .3, from: .08, to: .9});
     }
   }
+  // Painted like the foxfires: an ink edge, the colour, a lighter band and a bright core, with a
+  // soft light around it (from ★2). Bands of the same few colours, no fur.
   for(const tail of tails){
     const {line, widths} = tail;
-    strip(d, x, z, y, line, widths, P.ink, .92, {grow: .045});
-    strip(d, x, z, y, line, widths, P.deep, 1);
-    strip(d, x, z, y, line, widths, P.fur, 1, {scale: .8, shift: .18});
-    strip(d, x, z, y, line, widths, P.alt, .5, {scale: .28, shift: .45, from: .08, to: .62});
-    strip(d, x, z, y, line, widths, P.core, 1, {from: .8});
+    if(T.r >= 2) strip(d, x, z, y, line, widths, P.glow, .3+.2*charge, {glow: true, soft: true, scale: 1.7});
+    strip(d, x, z, y, line, widths, P.ink, .85, {grow: .04});
+    strip(d, x, z, y, line, widths, P.main, 1);
+    strip(d, x, z, y, line, widths, P.alt, 1, {scale: .62, from: .03, to: .96});
+    strip(d, x, z, y, line, widths, P.core, 1, {scale: .28, from: .06, to: .9});
     // ★5: spirit fire running up the tail, root to tip.
     if(T.r >= 5){
       const run = (clock*.75+tail.i*.23)%1;
-      strip(d, x, z, y, line, widths, P.alt, .45*bump(run*1.2), {from: Math.max(0, run-.14), to: Math.min(1, run+.08), scale: .6, glow: true});
+      strip(d, x, z, y, line, widths, P.core, .6*bump(run*1.2), {from: Math.max(0, run-.12), to: Math.min(1, run+.06), scale: .7, glow: true});
     }
   }
   // Foxfire burning on the tips: bigger and hotter as the volley builds to nine.

@@ -31,6 +31,8 @@ export const ITEMS = {
   heartstone:{name:'Heartstone',icon:'heartstone',boost:'vigor'},
   // Frontier: night-only finds from the middle ring that open the outer regions.
   glowbloom:{name:'Glowcap bloom',icon:'glowbloom'},wispdust:{name:'Wisp essence',icon:'wispdust'},
+  // Refinement: only creatures drop it. Spent at a workbench to roll weapon modifiers (refine.mjs).
+  ichor:{name:'Dread ichor',icon:'ichor'},
 };
 export const EQUIPMENT = {
   axe:{name:'Woodcutter’s axe',icon:'axe',durability:70},pick:{name:'Flint pick',icon:'pick',durability:70},

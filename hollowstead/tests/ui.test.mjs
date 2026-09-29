@@ -83,8 +83,8 @@ test('context buttons are direct and ordered', () => {
   const full = describeContext({kind: 'building', type: 'hearth', id: 'h', hp: 20, maxHp: 20, fuel: 10, level: 3, wood: 2, canAwaken: false});
   assert.deepEqual(full.map(action => action.id), ['feed', 'cook']);
   const bench = describeContext({kind: 'building', type: 'bench', id: 'b', hp: 1, maxHp: 2, wood: 0});
-  assert.deepEqual(bench.map(action => action.id), ['craft', 'build', 'repair']);
-  assert.equal(bench[2].enabled, false);
+  assert.deepEqual(bench.map(action => action.id), ['craft', 'build', 'refine', 'repair']);
+  assert.equal(bench[3].enabled, false);
   const pot = describeContext({kind: 'building', type: 'pot', id: 'p', hp: 2, maxHp: 2, wood: 1});
   assert.deepEqual(pot.map(action => action.id), ['cook']);
   assert.equal(pot[0].panel.stationType, 'pot');

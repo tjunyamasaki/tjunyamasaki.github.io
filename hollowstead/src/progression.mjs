@@ -78,6 +78,8 @@ const ITEM_RARITY = Object.freeze({
   // Trinkets (trinkets.mjs): six rare, four epic. Caches and elites drop them through the pools below.
   nightfang:'rare', emberheart:'rare', crowseye:'rare', harvestcharm:'rare', wispfeather:'rare', gravedust:'rare',
   frostanklet:'epic', boneward:'epic', moonlocket:'epic', thornknot:'epic',
+  // Refinement currency: only creatures drop it (LOOT_TABLES below, REFINE).
+  ichor:'uncommon',
 });
 export const rarityOf = itemId=>ITEM_RARITY[itemId]||'common';
 export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
@@ -112,13 +114,14 @@ export const LOOT_TABLES = Object.freeze({
   ]},
   // Hostiles: bonus drops on top of ENEMIES[type].loot. Elites add +1 luck.
   // Swarm creatures drop little each: there are many more of them.
-  crawler:{xp:4, rolls:[{chance:.3, entries:[['fiber',[1,2],3],['meat',[1,1],2]]},{chance:.025, entries:[['uncommon',1,1]]}]},
-  wraith:{xp:8, rolls:[{chance:.06, entries:[['uncommon',1,4],['rare',1,1]]}]},
-  brute:{xp:34, rolls:[{chance:.26, entries:[['uncommon',1,3],['rare',1,2],['epic',1,.3]]}]},
-  bonewalker:{xp:11, rolls:[{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]}]},
-  bogling:{xp:10, rolls:[{chance:.08, entries:[['uncommon',1,3],['elixir',[1,1],2]]}]},
-  golem:{xp:52, rolls:[{chance:.34, entries:[['rare',1,3],['epic',1,1]]}]},
-  king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]}]},
+  // Dread ichor (refinement) comes only from creatures: a little from the swarm, more from the big ones.
+  crawler:{xp:4, rolls:[{chance:.3, entries:[['fiber',[1,2],3],['meat',[1,1],2]]},{chance:.025, entries:[['uncommon',1,1]]},{chance:.14, entries:[['ichor',[1,1],1]]}]},
+  wraith:{xp:8, rolls:[{chance:.06, entries:[['uncommon',1,4],['rare',1,1]]},{chance:.35, entries:[['ichor',[1,1],1]]}]},
+  brute:{xp:34, rolls:[{chance:.26, entries:[['uncommon',1,3],['rare',1,2],['epic',1,.3]]},{entries:[['ichor',[2,3],1]]}]},
+  bonewalker:{xp:11, rolls:[{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.35, entries:[['ichor',[1,1],1]]}]},
+  bogling:{xp:10, rolls:[{chance:.08, entries:[['uncommon',1,3],['elixir',[1,1],2]]},{chance:.4, entries:[['ichor',[1,1],1]]}]},
+  golem:{xp:52, rolls:[{chance:.34, entries:[['rare',1,3],['epic',1,1]]},{entries:[['ichor',[3,4],1]]}]},
+  king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]},{entries:[['ichor',[10,14],1]]}]},
 });
 
 function between(rng,[lo,hi]){return lo+Math.floor(rng()*(hi-lo+1));}
@@ -194,8 +197,56 @@ export function powerOf(p){
   const rank=p?.ranks?.[p?.equipment?.weapon?.itemId]||1;
   // `might`: a temporary multiplier other rules set on the wanderer (trinkets.mjs).
   const might=p?.might>0?p.might:1;
-  return level*(1+(arena?ARENA_GROWTH.rank:MASTERY.rank)*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might;
+  // Honed: the weapon in hand's refinement (REFINE below).
+  const honed=1+refineStat(p,'honed');
+  return level*(1+(arena?ARENA_GROWTH.rank:MASTERY.rank)*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might*honed;
 }
+// ------------------------------------------------------------------ refinement
+/**
+ * Refinement: up to three modifiers on each weapon type, rolled at a workbench with Dread ichor,
+ * which only creatures drop. Each modifier is rolled with a rarity (the loot rarities, `weights`
+ * is the chance of each, common first) and the rarity picks its strength from `values`. `min` keeps
+ * a modifier out of the lower rarities; `only` limits it to weapons that shoot ('shots') or swing
+ * ('melee'); `needs` rolls it only beside another (Cruel beside Keen). `weight` favours a pick. Like mastery it belongs to the wanderer, kept in `p.refine[itemId]` as
+ * [{mod, tier}], so a broken weapon's successor keeps it. src/refine.mjs rolls and applies them.
+ * Filling slot n costs cost[weapon rarity] x n ichor; rerolling a slot costs twice the base.
+ */
+export const REFINE=Object.freeze({
+  slots:3,
+  weights:Object.freeze([46,28,16,8,2]),
+  cost:Object.freeze({common:3, uncommon:4, rare:5, epic:6, legendary:8}),
+  rerollCost:2,
+  crit:1.5,        // a critical hit's multiplier before Cruel
+  leechCap:3,      // most health one hit can give back (Thirsting)
+  splitShare:.5,   // damage of each extra whole shot (Split)
+  mods:Object.freeze({
+    keen:{name:'Keen', text:'+{v}% critical chance', values:[5,8,12,18,30]},
+    cruel:{name:'Cruel', text:'+{v}% critical damage', values:[25,35,50,70,100], needs:'keen'},
+    honed:{name:'Honed', text:'+{v}% damage', values:[4,6,9,13,20]},
+    swift:{name:'Swift', text:'{v}% faster attacks', values:[4,6,9,12,18]},
+    fervent:{name:'Fervent', text:'Skill recharges {v}% faster', values:[6,9,12,16,24]},
+    thirst:{name:'Thirsting', text:'{v}% of damage dealt heals you', values:[1.5,2,3,4,6]},
+    bane:{name:'Bane', text:'+{v}% damage to elders and the Hollow King', values:[10,15,25,35,50]},
+    tempered:{name:'Tempered', text:'{v}% less wear', values:[15,25,35,50,70]},
+    reach:{name:'Long', text:'+{v}% reach', values:[8,12,16,22,30], only:'melee'},
+    split:{name:'Split', text:'+{v} {shot}', values:[0,0,0,1,2], min:3, only:'shots', count:true, weight:3},
+  }),
+});
+/**
+ * A refinement stat of the weapon in hand (or `itemId`): percentages as fractions (Honed 20 → .2),
+ * counts as counts (Split). 0 when unrefined or broken.
+ */
+export function refineStat(p, key, itemId){
+  const weapon=p?.equipment?.weapon;
+  const id=itemId===undefined?(weapon&&weapon.durability>0?weapon.itemId:null):itemId;
+  const list=id&&p?.refine?.[id];
+  if(!Array.isArray(list))return 0;
+  const mod=REFINE.mods[key];if(!mod)return 0;
+  let total=0;
+  for(const entry of list)if(entry?.mod===key)total+=mod.values[Math.max(0,Math.min(4,entry.tier|0))]||0;
+  return mod.count?total:total/100;
+}
+
 /** Mending at the Heartfire: what it costs and how much of a weapon's condition it gives back. */
 export const MEND=Object.freeze({cost:Object.freeze({ember:1}), share:.5, warnAt:.25});
 

@@ -15,10 +15,11 @@ import {contextActionIds, gatherRate, harvestProfile, stationLabel, stationRule}
 import {
   CACHE_GUARDS, CACHE_LAYOUT, DASH, DISCOVER_XP, ELITE, GATHER_XP, HEARTSTONE_HP, LIGHT_ITEMS, MAX_LEVEL, NODE_POOLS, REGIONS, RESIDENTS, ROAM, SHARE_RADIUS,
   ARMOR_REDUCTION, LOOT_TABLES, NIGHT_CAP, eliteChance, enemyScale, enemyXp, isBossNight, isCache, maxHealth, nightRoster, pickWeighted, powerOf, rarityRank, regionAt, rollLoot,
-  keepsKnockback, rankOf, tierAt, waveSize, weaponStyle, xpToNext,
+  keepsKnockback, rankOf, tierAt, waveSize, weaponStyle, xpToNext, REFINE, refineStat,
 } from './progression.mjs?v=harvest-18';
 import {stepSkills, useSkill} from './skills.mjs?v=harvest-18';
 import {creditKill, mendWeapon, syncMastery, warnWear} from './mastery.mjs?v=harvest-18';
+import {refineHit as refinedHit, refineWeapon, refinedStyle, sanitizeRefine, splitBefore, splitMagic, splitMarks} from './refine.mjs?v=harvest-18';
 import {stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
@@ -335,6 +336,8 @@ export class World {
     const current=p.equipment[slot];
     if(!current||!(amount>0))return;
     if(this.arena)return; // Arena weapons never wear out.
+    // Tempered (refine.mjs): a refined weapon wears more slowly.
+    if(slot==='weapon'){const tempered=refineStat(p,'tempered',current.itemId);if(tempered>0)amount*=1-tempered;}
     const worn=wearStack(current, amount);
     p.equipment[slot]=worn.stack;
     if(slot==='weapon')warnWear(this, p, current, worn.stack);
@@ -611,7 +614,7 @@ export class World {
     if(this.status!=='playing')return {ok:false,code:'unavailable'};
     if(p.down||p.ghost){if(cmd.type==='interact'&&p.charm>0){p.charm--;this.revivePlayer(p);this.event('heal',p.x,p.z,'Last charm');return {ok:true,code:'ok'};}return {ok:false,code:'unavailable'};}
     if(Object.hasOwn(INTENTS,cmd.type))return inventoryIntent(this,p,cmd);
-    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill'].includes(cmd.type))return {ok:false,code:'cooldown'};
+    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill','refine'].includes(cmd.type))return {ok:false,code:'cooldown'};
     switch(cmd.type){
       case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){const gx=clamp(cmd.x,-this.radius+1,this.radius-1),gz=clamp(cmd.z,-this.radius+1,this.radius-1),land=this.walkable(gx,gz)?null:this.landNear(gx,gz,6);p.goal={x:land?land.x:gx,z:land?land.z:gz,target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
       case 'craft':return this.performCraft(p, cmd.recipe, cmd.stationId);
@@ -633,6 +636,7 @@ export class World {
       case 'interact':return this.interact(p, cmd.target)||{ok:false,code:'rejected'};
       case 'attack':this.attack(p);break;
       case 'skill':return useSkill(this, p);
+      case 'refine':return refineWeapon(this, p, cmd);
       case 'dash':return this.dodge(p);
       case 'hotbar':return this.selectHotbar(p, cmd.slot);
       case 'arenaPick':return this.arena?arenaPick(this, p, cmd.choice, cmd.replace):{ok:false,code:'unavailable'};
@@ -754,7 +758,7 @@ export class World {
     if(actionId==='repair')return this.action(p.id,{type:'repair',target:targetId});
     if(actionId==='awaken')return this.performUpgrade(p, targetId);
     if(actionId==='mend'){if(p.cooldown>.05)return {ok:false,code:'cooldown'};return mendWeapon(this, p, building);}
-    if(actionId==='cook'||actionId==='craft'||actionId==='build'||actionId==='open')return {ok:true,code:'ok'};
+    if(actionId==='cook'||actionId==='craft'||actionId==='build'||actionId==='open'||actionId==='refine')return {ok:true,code:'ok'};
     return this.interact(p, targetId);
   }
   beginDismantle(p, targetId, holding){
@@ -1057,7 +1061,7 @@ export class World {
     const weapon=p?.equipment?.weapon;
     const itemId=weapon&&weapon.durability>0?weapon.itemId:'fist';
     if(Object.hasOwn(MAGIC_AIM,itemId))return MAGIC_AIM[itemId];
-    const style=weaponStyle(itemId)||weaponStyle('fist');
+    const style=refinedStyle(weaponStyle(itemId)||weaponStyle('fist'),p,itemId);
     const range=style.range??style.sight??2;
     switch(style.style){
       case 'melee':case 'combo':return {reach:range+1.3,range};
@@ -1101,7 +1105,7 @@ export class World {
     const locked=this.autoAim(p, aim);
     if(magic)return this.attackMagic(p, weapon, magic);
     const armed=!!(weapon&&weapon.durability>0&&equipmentSlotFor(weapon.itemId)==='weapon');
-    const style=(armed&&weaponStyle(weapon.itemId))||weaponStyle('fist');
+    const style=refinedStyle((armed&&weaponStyle(weapon.itemId))||weaponStyle('fist'),p,armed?weapon.itemId:'fist');
     const stamina=this.arena?0:(style.stamina??7);
     if(p.stamina<stamina){this.tell(p,'Catch your breath');return;}
     const hostile=this.enemies.filter(entry=>!isMagicAlly(entry)&&entry.hp>0);
@@ -1130,18 +1134,35 @@ export class World {
     }
     // arrows and bolts
     const len=Math.hypot(p.dx,p.dz)||1;
-    this.projectiles.push({id:this.nextId('pr'),kind:style.style,owner:p.id,x:p.x+p.dx/len*.2,z:p.z+p.dz/len*.2,vx:p.dx/len*style.speed,vz:p.dz/len*style.speed,
-      damage,range:style.range,traveled:0,pierce:style.pierce||0,splash:style.splash||0,slow:style.slow||0,hit:[],age:0,aim:Math.atan2(p.dz/len,p.dx/len),rank:rankOf(p),itemId:weapon.itemId});
+    const shoot=(ux,uz,amount)=>this.projectiles.push({id:this.nextId('pr'),kind:style.style,owner:p.id,x:p.x+ux*.2,z:p.z+uz*.2,vx:ux*style.speed,vz:uz*style.speed,
+      damage:amount,range:style.range,traveled:0,pierce:style.pierce||0,splash:style.splash||0,slow:style.slow||0,hit:[],age:0,aim:Math.atan2(uz,ux),rank:rankOf(p),itemId:weapon.itemId});
+    shoot(p.dx/len,p.dz/len,damage);
+    // Split (refine.mjs): each extra arrow or bolt flies at the next foe; with none, beside the first.
+    if(style.extra>0){
+      const marks=splitMarks(this,p,locked?[locked.id]:[],style.range);
+      for(let i=0;i<style.extra;i++){
+        // With no other foe the extras hug the first line (they still hit its mark) or fan out when shooting at nothing.
+        const foe=marks[i],turn=(i%2?-1:1)*(locked?.035:.14)*(1+(i>>1));
+        let ux=p.dx/len,uz=p.dz/len;
+        if(foe){const d=Math.max(.05,distance(foe,p));ux=(foe.x-p.x)/d;uz=(foe.z-p.z)/d;}
+        else{const a=Math.atan2(uz,ux)+turn;ux=Math.cos(a);uz=Math.sin(a);}
+        shoot(ux,uz,damage*REFINE.splitShare);
+      }
+    }
     this.wearEquipped(p,'weapon',1);
   }
   /** One hit from a wanderer. Knockback, floating number, credit for the kill. */
   strike(p, enemy, amount, push=.32){
-    const dealt=Math.max(1,Math.round(amount));
+    // Refinement (refine.mjs): Bane, critical hits and Thirsting, for refined wanderers only.
+    const refined=refinedHit(this,p,enemy,amount);
+    const dealt=Math.max(1,Math.round(refined.amount));
     enemy.hp-=dealt;enemy.lastHitBy=p?.id||enemy.lastHitBy;
     if(p&&push>0){const span=Math.max(.1,distance(enemy,p));const k=enemy.type==='king'||enemy.type==='golem'?.3:1;enemy.x+=(enemy.x-p.x)/span*push*k;enemy.z+=(enemy.z-p.z)/span*push*k;}
     if(enemy.home&&!enemy.aggro)enemy.aggro=true;
-    this.event('damage',enemy.x,enemy.z,String(dealt),p?{by:p.id}:{});
+    this.event('damage',enemy.x,enemy.z,String(dealt),p?{by:p.id,...(refined.crit?{crit:true}:{})}:{});
   }
+  /** Refinement on a hit by a wanderer (or their id) that a module lands itself: {amount, crit}. */
+  refineHit(owner, enemy, amount){return refinedHit(this, owner, enemy, amount);}
   stepProjectiles(dt){
     if(!this.projectiles.length)return;
     const hostile=this.enemies.filter(e=>!isMagicAlly(e)&&e.hp>0);
@@ -1177,15 +1198,19 @@ export class World {
     const staminaBefore=p.stamina;
     const cooldownBefore=p.cooldown;
     p.rest=false;
+    const splitIds=splitBefore(this,p);
     const result=magic.use(this, p);
     if(this.arena&&p.equipment.weapon?.uid===weapon.uid)p.equipment.weapon.durability=Math.max(p.equipment.weapon.durability,durabilityBefore);
     else if(this.arena&&!p.equipment.weapon){weapon.durability=durabilityBefore;p.equipment.weapon=weapon;}
     const worn=p.equipment.weapon;
     const acted=result!=null||p.cooldown!==cooldownBefore||p.action==='attack'||worn!==weapon||(worn&&worn.durability!==durabilityBefore);
     if(!acted)return;
+    splitMagic(this,p,splitIds);
     if(stamina>0&&p.stamina===staminaBefore)p.stamina=Math.max(0, p.stamina-stamina);
     if(worn&&worn.uid===weapon.uid&&worn.durability===durabilityBefore)this.wearEquipped(p,'weapon', profile?.durabilityCost??1);
     if(p.cooldown===cooldownBefore)p.cooldown=profile?.cooldown??0.55;
+    // Swift (refine.mjs): a refined weapon swings sooner.
+    const swift=refineStat(p,'swift',weapon.itemId);if(swift>0)p.cooldown/=1+swift;
     if(p.action!=='attack'){p.action='attack';p.actionUntil=Math.max(p.actionUntil||0, this.time+.32);}
     // Replicated casting pose. Renderers interpolate this stamp, never combat.
     p.magicCast={itemId:weapon.itemId,at:this.time,x:p.x,z:p.z,dx:p.dx,dz:p.dz};
@@ -1283,11 +1308,18 @@ export class World {
       if(!(enemy.hp>0))continue;
       const amount=Number(hit.amount??hit.damage??0);
       if(!(amount>0))continue;
+      // Refinement (refine.mjs): Bane and critical hits add on top of what the module queued.
+      const refined=hit.ownerId?refinedHit(this,hit.ownerId,enemy,amount):{amount,crit:false};
+      const extra=refined.crit?{crit:true}:{};
       const owed=covered.get(enemy.id)||0;
-      if(owed+1e-6>=amount){covered.set(enemy.id, owed-amount);continue;}
+      if(owed+1e-6>=amount){
+        covered.set(enemy.id, owed-amount);
+        if(refined.amount>amount){enemy.hp-=refined.amount-amount;if(refined.crit)this.event('damage', enemy.x, enemy.z, String(Math.ceil(refined.amount)), extra);}
+        continue;
+      }
       const prev=enemy.hp;
-      enemy.hp-=amount;
-      if(enemy.hp<prev)this.event('damage', enemy.x, enemy.z, String(Math.ceil(amount)));
+      enemy.hp-=refined.amount;
+      if(enemy.hp<prev)this.event('damage', enemy.x, enemy.z, String(Math.ceil(refined.amount)), extra);
     }
     for(const burn of burns){
       const enemy=this.enemies.find(entry=>entry.id===burn?.targetId);
@@ -1615,7 +1647,7 @@ export class World {
     for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','radius','night'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     if(world.arena){world.nodes=[];}if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||!world.arena)world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
-    for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);}
+    for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);sanitizeRefine(p);}
     world.version=SAVE_VERSION_V2;world.clock=CLOCK_V2;
     for(const change of data.nodeChanges||[]){const at=world.nodes[Number(String(change.id).slice(1))],node=at?.id===change.id?at:world.nodes.find(entry=>entry.id===change.id);if(node){node.hits=change.hits;node.ready=change.ready;}}
     if(typeof data.worldId==='string')world.networkId=data.worldId;

@@ -213,7 +213,9 @@ export class Renderer {
   effect(event,world=null){
     this.weaponFx.event(event,this.clock,world);
     if(event.type==='hit')for(const o of this.objects.values())if(Math.hypot(o.x-event.x,o.z-event.z)<.2)o.hitUntil=this.clock+.22;
-    if(['loot','damage','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
+    if(event.type==='damage'&&event.crit)this.float(`${event.text}!`,event.x,event.z,'#ffd35a',{className:'world-label crit-label'});
+    else if(['loot','damage','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
+    if(event.type==='refine')this.float(`◆ ${event.text}`,event.x,event.z,RARITY_COLORS[event.rarity]||'#fbe1ad',{className:'world-label refine-label',alwaysVisible:event.player===this.localId});
     if(event.type==='hurt')this.float(event.text,event.x,event.z,'#e53935',{className:'world-label player-hurt',alwaysVisible:true});
     if(event.type==='rare')this.float(`✦ ${event.text}`,event.x,event.z,RARITY_COLORS[rarityOf(event.itemId)]);
     if(event.type==='levelup')this.float(`LEVEL UP · ${event.text}`,event.x,event.z,'#f2c14e');

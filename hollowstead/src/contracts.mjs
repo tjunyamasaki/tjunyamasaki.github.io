@@ -138,7 +138,7 @@ export const MODE_PRECEDENCE = Object.freeze([
 export const CONTEXT_ACTIONS = Object.freeze({
   hearth: Object.freeze(['feed', 'cook', 'awaken', 'mend', 'repair']),
   fire: Object.freeze(['feed', 'cook', 'repair']),
-  bench: Object.freeze(['craft', 'build', 'repair']),
+  bench: Object.freeze(['craft', 'build', 'refine', 'repair']),
   pot: Object.freeze(['cook', 'repair']),
   chest: Object.freeze(['open', 'repair']),
   cart: Object.freeze(['pull', 'open', 'upgrade', 'repair']),

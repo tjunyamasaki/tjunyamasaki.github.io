@@ -21,9 +21,9 @@ def target(t):
 
 
 def registry():
-    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery
+    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine
     reg = {}
-    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery):
+    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine):
         for key, spec in getattr(mod, "SPRITES", getattr(mod, "NODES", {})).items():
             reg[key] = spec
     return reg
@@ -75,8 +75,8 @@ def main():
         im = lib.render_png(svg)
         thumbs.append((k, im, tuple(c // 2 for c in reg[k].get("cell", (512, 768))) if isinstance(reg[k], dict) else (256, 384)))
         print("built", k, im.size)
-    import longnight, arsenal, frontier, scenery
-    icons = {**longnight.ICONS, **arsenal.ICONS, **getattr(frontier, "ICONS", {}), **getattr(scenery, "ICONS", {})}
+    import longnight, arsenal, frontier, scenery, refine
+    icons = {**longnight.ICONS, **arsenal.ICONS, **getattr(frontier, "ICONS", {}), **getattr(scenery, "ICONS", {}), **refine.ICONS}
     wide = {**longnight.WIDE, **arsenal.WIDE, **getattr(frontier, "WIDE", {}), **getattr(scenery, "WIDE", {})}
     for k, fn in icons.items():
         if a.only and k not in keys:

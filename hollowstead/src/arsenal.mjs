@@ -4,8 +4,9 @@
 // presentation, and plain arrays on the world (allies, zones, projectiles) for anything that
 // lives longer than one swing. Numbers come from WEAPON_STYLES in progression.mjs.
 import {RULES} from './content.mjs?v=harvest-18';
-import {ALLIES, maxHealth, powerOf, rankOf} from './progression.mjs?v=harvest-18';
+import {ALLIES, REFINE, maxHealth, powerOf, rankOf} from './progression.mjs?v=harvest-18';
 import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
+import {splitMarks} from './refine.mjs?v=harvest-18';
 
 const dist = (a, b) => Math.hypot((a.x||0)-(b.x||0), (a.z||0)-(b.z||0));
 const hostiles = w => w.enemies.filter(e => !isMagicAlly(e) && e.hp > 0);
@@ -127,9 +128,19 @@ const chain = (w, p, {style, damage}) => {
 const meteor = (w, p, {style, damage}) => {
   const target = aimTarget(w, p, style.range), f = facing(p);
   const x = target ? target.x : p.x+f.x*6, z = target ? target.z : p.z+f.z*6;
-  const rank = rankOf(p), seq = p.starSeq = ((p.starSeq||0)+1)%1000;
-  (w.zones ||= []).push({id: w.nextId('zn'), kind: 'star', owner: p.id, x, z, age: 0, delay: style.delay, radius: style.radius, damage, rank, seq, ...skyPath(w.rng, seq)});
-  w.event('mark', x, z, '', {radius: style.radius, rank, itemId: 'starfall', player: p.id});
+  const rank = rankOf(p);
+  const fall = (x, z, amount, delay) => {
+    const seq = p.starSeq = ((p.starSeq||0)+1)%1000;
+    (w.zones ||= []).push({id: w.nextId('zn'), kind: 'star', owner: p.id, x, z, age: 0, delay, radius: style.radius, damage: amount, rank, seq, ...skyPath(w.rng, seq)});
+    w.event('mark', x, z, '', {radius: style.radius, rank, itemId: 'starfall', player: p.id});
+  };
+  fall(x, z, damage, style.delay);
+  // Split (refine.mjs): more stars, each on the next foe, else just beside the first.
+  const marks = style.extra > 0 ? splitMarks(w, p, target ? [target.id] : [], style.range) : [];
+  for(let i = 0; i < (style.extra||0); i++){
+    const foe = marks[i], a = Math.atan2(f.z, f.x)+Math.PI/2+i*2.1, off = style.radius*.9;
+    fall(foe ? foe.x : x+Math.cos(a)*off, foe ? foe.z : z+Math.sin(a)*off, damage*REFINE.splitShare, style.delay+.14*(i+1));
+  }
   w.wearEquipped(p, 'weapon', 1);
 };
 /**
@@ -276,10 +287,12 @@ function stepAllies(w, dt, obstacles, foes){
 }
 
 function allyStrike(w, a, e, amount){
-  const dealt = Math.max(1, Math.round(amount));
+  // Summons carry their master's refinement (refine.mjs): critical hits, Bane, Thirsting.
+  const refined = typeof w.refineHit === 'function' ? w.refineHit(a.owner, e, amount) : {amount, crit: false};
+  const dealt = Math.max(1, Math.round(refined.amount));
   e.hp -= dealt; e.lastHitBy = a.owner;
   if(e.home && !e.aggro) e.aggro = true;
-  w.event('damage', e.x, e.z, String(dealt));
+  w.event('damage', e.x, e.z, String(dealt), refined.crit ? {crit: true} : {});
 }
 
 /** What a hostile hunts: a taunting knight close by, else the nearest wanderer or ally. */

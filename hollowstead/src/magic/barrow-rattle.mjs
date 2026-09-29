@@ -214,15 +214,19 @@ function emit(world, type, x, z, text){
 }
 
 function strike(world, summon, target){
-  const amount = Math.round(SKELETON_DAMAGE * (summon.power || 1))
+  let amount = Math.round(SKELETON_DAMAGE * (summon.power || 1))
   if(typeof target.hp !== 'number'){
     summon.pendingHit = {targetId: target.id, amount}
     return
   }
+  // The master's refinement (src/refine.mjs): critical hits, Bane, Thirsting.
+  const refined = summon.ownerId && typeof world.refineHit === 'function' ? world.refineHit(summon.ownerId, target, amount) : {amount, crit: false}
+  amount = Math.round(refined.amount)
   target.hp -= amount
   // Credit the kill to the skeleton's master (weapon mastery, trinkets).
   if(summon.ownerId) target.lastHitBy = summon.ownerId
-  emit(world, 'damage', target.x, target.z, amount)
+  if(refined.crit && typeof world.event === 'function') world.event('damage', target.x, target.z, String(amount), {crit: true})
+  else emit(world, 'damage', target.x, target.z, amount)
   if(summon.pendingHit) delete summon.pendingHit
 }
 

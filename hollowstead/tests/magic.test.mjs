@@ -6,7 +6,7 @@ import {makeStack} from '../src/inventory.mjs';
 import {loadMagicModules} from '../src/magic/load.mjs?v=harvest-18';
 import {collectMagicSprites, magicItems, magicVisuals} from '../src/magic/registry.mjs?v=harvest-18';
 import {BELL} from '../src/magic/mourning-bell.mjs?v=harvest-18';
-import {MagicClock, heldWeaponPose} from '../src/magic/art.mjs?v=harvest-18';
+import {GRAVECRAFT, MagicClock, heldWeaponPose} from '../src/magic/art.mjs?v=harvest-18';
 import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from '../src/magic/effects.mjs?v=harvest-18';
 import {clearShowcaseWorld} from '../src/showcase.mjs';
 import {WEAPON_FX, WeaponFx} from '../src/fx/index.mjs?v=harvest-18';
@@ -107,11 +107,18 @@ test('casting poses use replicated time, interpolate between snapshots, and sett
   world.time+=.05;assert.equal(clock.sample(world,15.01).lead,0);
 });
 
-test('all five items and the skeleton atlas resolve to real transparent project assets',async()=>{
-  assert.equal(Object.keys(magicItems).length,5);
-  const sprites=collectMagicSprites();assert.equal(sprites.length,6);
+test('all five Gravecraft items and the skeleton atlas resolve to real transparent project assets',async()=>{
+  // The five Gravecraft weapons and the skeleton atlas are PNGs; the weapons added since draw hand-written SVGs.
+  const gravecraft=Object.keys(GRAVECRAFT);assert.equal(gravecraft.length,5);
+  for(const id of gravecraft)assert.ok(magicItems[id],id);
+  const sprites=collectMagicSprites();assert.equal(sprites.length,Object.keys(magicItems).length+1);
   for(const [key,def] of sprites){
     const url=new URL(def.src);await access(url);
+    if(!GRAVECRAFT[key]&&key!=='gravecraft-skeleton'){
+      assert.match(url.pathname,/\.svg$/,key);assert.match(await readFile(url,'utf8'),/<svg[\s>]/,key);
+      if(def.icon)await access(new URL(def.icon));
+      continue;
+    }
     const png=await readFile(url);assert.equal(png.toString('ascii',1,4),'PNG',key);assert.equal(png[25],6,key);
     assert.equal(png.readUInt32BE(16)%(def.columns||1),0,key);
     assert.equal(png.readUInt32BE(20)%(def.rows||1),0,key);

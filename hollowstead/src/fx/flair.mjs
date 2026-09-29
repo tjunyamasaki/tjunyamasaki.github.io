@@ -183,12 +183,21 @@ export const FLAIR_EVENTS = {
   }},
   /** Hit sparks in the attacker's colours: resolved from the wielder when the event arrives. */
   damage: {life: () => .4, resolve(ev, world){
+    // A critical hit (refine.mjs, Keen) always gets a gold burst, whatever the rank.
+    if(ev.crit) return ev;
     if(!ev.by || !world?.player) return null;
     const p = world.player(ev.by), itemId = p?.equipment?.weapon?.itemId;
     if(!p || !itemId) return null;
     const rank = rankOf(p, itemId);
     return rank >= 2 ? {...ev, itemId, rank} : null;
   }, paint(d, ev, age, seed){
+    if(ev.crit){
+      const k = age/.4;
+      d.bloom(ev.x, ev.z, .9, .6, '#fff1b8', .9*fade(k*1.5));
+      d.shock(ev.x, ev.z, .25+.8*easeOut(k), .05, '#ffc94a', fade(k), '#fff1b8');
+      d.sparks(ev.x, ev.z, .9, 7, age, '#ffc94a', 1, seed, {speed: 4, up: 2.6, life: .35, len: .07});
+      return;
+    }
     const h = hue(ev.itemId), T = tier(ev.rank), k = age/.4;
     d.bloom(ev.x, ev.z, .9, .35+.07*T.r, h.core, .8*fade(k*1.6));
     d.sparks(ev.x, ev.z, .9, 2+T.r, age, h.main, 1, seed, {speed: 3, up: 2.2, life: .3, len: .05});

@@ -349,11 +349,15 @@ function closestOnSegment(px, pz, x0, z0, x1, z1) {
 
 function harmHostile(world, enemy, amount, ownerId = null) {
   if (!enemy || !(enemy.hp > 0) || !(amount > 0)) return;
+  // The caster's refinement (src/refine.mjs): critical hits, Bane, Thirsting.
+  const refined = ownerId && typeof world.refineHit === 'function' ? world.refineHit(ownerId, enemy, amount) : { amount, crit: false };
+  amount = refined.amount;
   enemy.hp -= amount;
   // Credit the kill to the caster (weapon mastery, trinkets).
   if (ownerId) enemy.lastHitBy = ownerId;
   const shown = Math.round(amount);
-  emit(world, 'damage', enemy.x, enemy.z, String(shown > 0 ? shown : amount));
+  if (refined.crit && typeof world.event === 'function') world.event('damage', enemy.x, enemy.z, String(shown), { crit: true });
+  else emit(world, 'damage', enemy.x, enemy.z, String(shown > 0 ? shown : amount));
 }
 
 function attachBurn(world, targetId, power = 1, ownerId = null) {

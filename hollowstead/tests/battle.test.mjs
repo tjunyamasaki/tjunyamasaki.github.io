@@ -313,6 +313,8 @@ test('arena weapons never wear out and cost no stamina; levels are worth more', 
   const e = w.spawnEnemy('brute', 1.5, 0, {elite: false}); e.hp = e.maxHp = 1e5;
   p.stamina = 0;
   for(let i = 0; i < 30; i++){p.cooldown = 0; w.attack(p);}
+  // The first arena offer is a magic weapon (STARTERS): its hits land as the world steps, not inside attack().
+  for(let i = 0; i < 30; i++){p.stamina = 0; w.tick(T);}
   assert.equal(p.equipment.weapon.durability, full);
   assert.ok(e.hp < 1e5, 'swings with an empty stamina bar');
   p.level = 5;

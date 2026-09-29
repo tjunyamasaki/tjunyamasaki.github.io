@@ -1,5 +1,5 @@
 import {World,clamp,distance,biome,EXPLORE_CELL,EXPLORE_SIZE} from './engine.mjs?v=harvest-18';
-import {RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-18';
+import {RARITIES,RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-18';
 import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,nodeAwake} from './content.mjs?v=harvest-18';
 import {Renderer,loadTheme} from './renderer.mjs?v=harvest-18';
 import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-18';
@@ -31,6 +31,8 @@ import {createUpdateChecker} from './updates.mjs?v=harvest-18';
 import {skillBlock, skillFor} from './skills.mjs?v=harvest-18';
 import {labClear, labDps, labEquip, labLevel, labRank, labResetStats, labSpawn, labStrength, labToggle} from './lab.mjs?v=harvest-18';
 import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/lab.mjs?v=harvest-18';
+import {REFINE_CURRENCY, carriedWeapons, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
+import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -56,6 +58,8 @@ let localActions=null,localActionWorld=null,localClient=null;
 let chestSession=null,chestOpening=false,chestToken=0,chestRenewAt=0,chestRenewing=false;
 let catalog={source:'field',stationId:null,stationType:null,tab:'build'};
 let catalogPending='';
+// The workbench's Refine panel (src/ui/refine.mjs): which bench, which weapon type, the slot being rolled.
+let refining={stationId:null,itemId:null,pending:-1,fresh:-1};
 let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,pendingOp=null,actionPending=false;
 let liveActions=[],holdKind=null,holdTarget=null,holdSource=null,dismantleStarted=0,ringFrame=0,captured=null;
 const checkForUpdate=createUpdateChecker({canReload:()=>mode==='front'&&!busy&&!network&&!document.hidden});
@@ -353,6 +357,14 @@ function closeSheet(){
 }
 function openFieldBuild(){catalog={source:'field',stationId:null,stationType:null,tab:'build'};category='all';openSheet('catalog');}
 function openStationCatalog(panel){catalog={source:'station',stationId:panel.stationId,stationType:panel.stationType,tab:panel.tab};category='all';openSheet('catalog');}
+function openRefine(stationId){const p=me();refining={stationId,itemId:p?.equipment?.weapon?.itemId||carriedWeapons(p)[0]||null,pending:-1,fresh:-1};openSheet('refine');}
+/** Roll (or reroll) a slot of the weapon type shown in the Refine panel. */
+async function refineSlot(slot){
+  const p=me();if(!p||refining.pending>=0||!refining.itemId||!Number.isInteger(slot))return;
+  const itemId=refining.itemId;refining.pending=slot;refining.fresh=-1;dirty=true;renderSheet();
+  const result=await send({type:'refine',stationId:refining.stationId,itemId,slot});
+  refining.pending=-1;if(result?.ok&&refining.itemId===itemId){refining.fresh=slot;setTimeout(()=>{if(refining.fresh===slot){refining.fresh=-1;dirty=true;}},1600);}dirty=true;renderSheet();
+}
 function toggleInventory(){if(sheet==='inventory'||sheet==='chest')closeSheet();else openSheet('inventory');}
 function toggleFieldBuild(){if(sheet==='catalog'&&catalog.source==='field')closeSheet();else openFieldBuild();}
 async function runAction(action){
@@ -361,7 +373,7 @@ async function runAction(action){
   if(action.id==='cancel'){if(placement)cancelPlacement();else cancelMaintenance();dirty=true;return;}
   if(action.id==='place'){await confirmPlace();return;}
   if(action.id==='open'){await openChest(action.targetId);return;}
-  if(action.panel){const result=await send(action.command);if(result?.ok)openStationCatalog(action.panel);return;}
+  if(action.panel){const result=await send(action.command);if(result?.ok){if(action.panel.sheet==='refine')openRefine(action.panel.stationId);else openStationCatalog(action.panel);}return;}
   if(action.command)await send(action.command);
 }
 async function confirmPlace(){
@@ -477,8 +489,9 @@ function ensurePanel(){
 }
 /** Hover text for an item: trinkets say what they do, weapons their mastery. */
 function itemTip(stack){
-  const m=masteryView(world,me(),stack.itemId);
-  return m?`${label(stack.itemId)}\n${weaponAbout('',m,null)}`:trinketTip(stack.itemId);
+  const p=me(),m=masteryView(world,p,stack.itemId),mods=refineLines(p,stack.itemId);
+  if(m||mods.length)return [label(stack.itemId),m?weaponAbout('',m,null):'',...mods].filter(Boolean).join('\n');
+  return trinketTip(stack.itemId);
 }
 function makeCell(key,stack,kind,index,mark=''){
   const equipped=kind==='socket'&&!!stack;
@@ -523,6 +536,7 @@ function guideHTML(){
     ['Explore for treasure','The hollow is vast. Beyond the meadow lie the Autumn Woods and the Graveyard; farther still the Hollow Mire, the Moonshard Crags and the Barrow Fields. Crates, iron-bound chests, moonlit coffers and hollow reliquaries hide out there: hold Open beside one. Better caches sit farther from camp, and guardians watch them. Caches refill after a few days.'],
     ['Brave the frontier','The outer regions punish the unprepared, and every wanderer needs their own answer. The Hollow Mire’s spore fog drains courage, then health: wear a glowcap mask, made from blooms that sprout in the Autumn Woods only after dark. The Moonshard Crags are pitch dark even by day: only your own lit grave lantern, fed by wisp essence that drifts over the Graveyard at night, holds the dark back. The Barrow Fields’ grave-chill slows you: a bone-lined barrow cloak keeps it out. Masks and cloaks wear only inside their region.'],
     ['Grow stronger','Kills, caches, gathering and new regions give experience. Each level adds health and damage. Loot comes in five rarities: common, uncommon, rare, epic and legendary. Bows fire arrows at the nearest foe, staffs throw bursting bolts, broadswords cleave, and the Grimoire of Ash burns everything around you. Heartstones raise your health for good.'],
+    ['Refine your weapons','Creatures drop Dread ichor, and only creatures: briarlings now and then, wraiths, bonewalkers and boglings more often, gravekeepers, golems and the Hollow King by the handful. Stand at a workbench and press Refine: each weapon holds three modifiers, each rolled with a rarity from common to legendary, from sharper crits and faster swings to an extra arrow or star. Reroll any of them with more ichor. Like mastery, refinement is yours, not the item’s.'],
     ['Outlast the night','Every night is harder than the last, with more creatures and elder champions. Guard the Heartfire: losing it ends the expedition. How many nights can you survive?'],
     ['Read the moon','Tap the moon beside the clock to see tonight’s moon and the next. Under a waxing moon the woods raid your fire in waves. A new moon brings no raid but a darker night: the time to gather what only grows in the dark. A rare blood moon brings the Hollow King, stronger each time he returns, and more waves than any other night. Whatever the moon, creatures stalk anyone who wanders far from the fire after dark, more often deeper in the hollow.'],
   ];
@@ -597,6 +611,13 @@ function renderSheet(){
       return {id,name:label(resultId),desc:recipe.desc,icon:icon(resultId),action:model.action,reason:world.recipeReason(p,id,catalog.stationId)||'',costs:Object.entries(recipe.cost).map(([itemId,need])=>({have:world.available(p,itemId),need,name:label(itemId),short:world.available(p,itemId)<need}))};
     });
     replaceContent(catalogMarkup({recipes,maintain:model.maintain,pendingId:catalogPending}));
+  }else if(sheet==='refine'){
+    title='Refine';kicker='WORKBENCH · WEAPON MODIFIERS';
+    const weapons=carriedWeapons(p);
+    if(!weapons.includes(refining.itemId))refining.itemId=weapons[0]||null;
+    setTabs(refineTabs(weapons.map(itemId=>({itemId,name:label(itemId),count:refinesOf(p,itemId).length})),refining.itemId));
+    const view=refining.itemId?refineView(p,refining.itemId,{have:world.available(p,REFINE_CURRENCY),canPay:cost=>world.canPay(p,cost)}):null;
+    replaceContent(refineMarkup(view,{icons:{weapon:view?icon(view.itemId):'',ichor:icon(REFINE_CURRENCY)},pending:refining.pending,fresh:refining.fresh}));
   }else if(sheet==='inventory'||sheet==='chest'){
     const cart=sheet==='chest'&&chestBuilding()?.type==='cart';
     title=sheet==='chest'?(cart?'Hand cart':'Chest'):'Inventory';
@@ -677,7 +698,8 @@ function paintCluster(modeName,p){
  */
 function paintHotbar(p){
   const slots=hotbarView(p).map(slot=>({...slot,mastery:slot.itemId?masteryView(world,p,slot.itemId):null,condition:slot.stack&&!world.arena?conditionOf(slot.stack):null}));
-  const sig=slots.map(slot=>`${slot.itemId||''}:${slot.active?1:0}:${slot.rank}:${slot.mastery?Math.floor(slot.mastery.progress*40):''}:${slot.condition==null?'':Math.ceil(slot.condition*40)}`).join('|')+(world.arena?'a':'');
+  const refined=itemId=>refinesOf(p,itemId).map(entry=>`${entry.mod}${entry.tier}`).join(',');
+  const sig=slots.map(slot=>`${slot.itemId||''}:${slot.active?1:0}:${slot.rank}:${slot.mastery?Math.floor(slot.mastery.progress*40):''}:${slot.condition==null?'':Math.ceil(slot.condition*40)}:${slot.itemId?refined(slot.itemId):''}`).join('|')+(world.arena?'a':'');
   if(sig===hotbarSig)return;hotbarSig=sig;
   document.querySelectorAll('#weapon-bar .weapon-slot').forEach((el,i)=>{
     const slot=slots[i];if(!slot)return;
@@ -689,11 +711,17 @@ function paintHotbar(p){
       +((world.arena||m)&&rank>1?`<small class="rank">${rankStars(rank)}</small>`:'')
       +(slot.condition!=null?`<span class="wear" aria-hidden="true"><em style="width:${(slot.condition*100).toFixed(1)}%"></em></span>`:'')
       +(slot.condition===0?'<small class="broken-tag" aria-hidden="true">BROKEN</small>':'')
+      +refineGems(p,slot.itemId)
       :'<span aria-hidden="true">+</span>';
-    const about=slot.itemId?weaponAbout(slot.name,m,slot.condition):'';
+    const about=slot.itemId?[weaponAbout(slot.name,m,slot.condition),...refineLines(p,slot.itemId)].filter(Boolean).join(' · '):'';
     el.setAttribute('aria-label',slot.itemId?`${slot.name}${slot.active?', in hand':''}${about?`. ${about}`:''}`:`Empty weapon slot ${i+1}`);
     el.setAttribute('aria-pressed',String(slot.active));el.title=slot.itemId?`${slot.name}${about?`\n${about}`:''}`:'Empty slot';
   });
+}
+/** One gem per refinement on a hotbar weapon, in its rarity's colour (src/refine.mjs). */
+function refineGems(p,itemId){
+  const list=refinesOf(p,itemId);if(!list.length)return '';
+  return `<span class="refine-gems" aria-hidden="true">${list.map(entry=>`<i class="rarity-${RARITIES[entry.tier]||'common'}"></i>`).join('')}</span>`;
 }
 /** Mastery and condition in words, for titles and screen readers. */
 function weaponAbout(name,m,condition){
@@ -799,6 +827,7 @@ function ui(){
     if(world?.showcase)paintShowcase();
     if(world?.arena?.lab)paintLab();
     if(sheet==='catalog'&&catalog.source==='station'){const station=world.buildings.find(b=>b.id===catalog.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
+    if(sheet==='refine'){const station=world.buildings.find(b=>b.id===refining.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(maintenance&&maintenanceTarget&&!world.buildings.some(b=>b.id===maintenanceTarget&&b.hp>0))maintenanceTarget=null;
     paintCluster(currentMode(),p);drawMap($('minimap'));
     if(['victory','defeat'].includes(world.status)&&lastEnd!==world.status){lastEnd=world.status;resetInput();endContextHold();cancelPlacement();cancelMaintenance();closeSheet();save();$('end-screen').hidden=false;const won=world.status==='victory';if(world.arena){const top=Math.max(...world.players.map(q=>q.level||1)),a=world.arena;$('end-kicker').textContent='THE ARENA FALLS SILENT';$('end-title').textContent=`Fallen on wave ${Math.max(1,a.wave)}.`;$('end-text').textContent=a.best?`You cleared ${a.best} ${a.best===1?'wave':'waves'} and reached level ${top}. Every run starts over; the swarm grows every wave.`:'The first wave took you. Keep moving, and dodge through the glowing warnings.';$('end-stats').innerHTML=`<span><b>${a.best||0}</b>WAVES</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=true;$('new-expedition').hidden=false;$('new-expedition').innerHTML='Fight again <span>→</span>';}else{$('new-expedition').innerHTML='Another expedition →';$('end-kicker').textContent=won?'THE CURSE IS BROKEN':'THE EXPEDITION ENDS';$('end-title').textContent=won?'Morning, at last.':'The last light.';$('end-text').textContent=won?'Five nights in the hollow. One fire kept alive. You made a home where nothing was meant to live.':world.buildings.some(b=>b.type==='hearth')?'The woods claimed every wanderer. A stronger camp and a friend’s helping hand can turn the next night.':'The Heartfire was destroyed. Walls, traps and a well-fed fire will help your next camp endure.';const top=Math.max(...world.players.map(q=>q.level||1));$('end-text').textContent+=world.best?.loot?` Best find: ${label(world.best.loot)}.`:'';$('end-stats').innerHTML=`<span><b>${Math.max(0,dayAt(world.time)-1)}</b>NIGHTS</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=!won||mode==='guest';$('new-expedition').hidden=mode==='guest';}}
@@ -885,12 +914,15 @@ function setupControls(){
     selected=null;void send({type:'move',x:point.x,z:point.z});
   });
   $('sheet-tabs').onclick=event=>{
+    const weapon=event.target.closest('[data-refine-weapon]');
+    if(weapon){refining={...refining,itemId:weapon.dataset.refineWeapon,fresh:-1};dirty=true;renderSheet();return;}
     const tab=event.target.closest('[data-tab]');const chip=event.target.closest('[data-category]');
     if(tab){catalog={...catalog,tab:tab.dataset.tab};category='all';dirty=true;renderSheet();}
     if(chip){category=chip.dataset.category;dirty=true;renderSheet();}
   };
   $('sheet-content').onclick=event=>{
     const button=event.target.closest('button');if(!button)return;
+    if(button.dataset.refineSlot!=null){void refineSlot(Number(button.dataset.refineSlot));return;}
     if(button.dataset.recipe){
       if(catalogPending)return;
       const recipe=RECIPES[button.dataset.recipe];if(!recipe)return;

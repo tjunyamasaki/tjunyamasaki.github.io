@@ -45,6 +45,9 @@ export class Sound {
     } // clean strikes and trinket moments: ui/rhythm.mjs plays its own cue at the tap, without the event delay
     if(!this.enabled)return;const source=this.theme.audio?.[type];if(source){let a=this.clips.get(type);if(!a){a=new Audio(cachedSrc(source));this.clips.set(type,a);}a.currentTime=0;a.volume=.35;void a.play().catch(()=>{});return;}
     if(!this.context||this.context.state!=='running')return;const t=this.context.currentTime;if(t-this.last<.07)return;this.last=t;
+    // Refinement (src/refine.mjs): a hammer on the bench, then one chime per step of rarity; a critical hit rings sharp.
+    if(type==='refine'){const tier=Math.max(0,Math.min(4,ev?.tier|0));this.sweep(240,90,.12,'triangle',.05);for(let i=0;i<=tier;i++)this.sweep(660*1.26**i,880*1.26**i,.26,'sine',.014+.004*i,.1+i*.07);return;}
+    if(type==='damage'&&ev?.crit){this.sweep(1500,2200,.08,'square',.01);this.sweep(320,110,.12,'triangle',.05);return;}
     if(type==='foxfire'||type==='foxburst'){
       // A small haunted shrine chime; staggered partials echo the nine tails.
       const burst=type==='foxburst';

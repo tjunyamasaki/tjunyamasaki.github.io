@@ -7,7 +7,7 @@
 // Presentation lives in src/fx: every beat that fires raises an 'fx' event, and pending beats are
 // drawn from their own age, with more flourish the higher the weapon's rank.
 import {EQUIPMENT} from './content.mjs?v=harvest-18';
-import {WEAPON_STYLES, keepsKnockback, maxHealth, powerOf, rankOf} from './progression.mjs?v=harvest-18';
+import {WEAPON_STYLES, keepsKnockback, maxHealth, powerOf, rankOf, refineStat} from './progression.mjs?v=harvest-18';
 import {isMagicAlly, magicItems} from './magic/registry.mjs?v=harvest-18';
 import {applyDot, knockFrom, stun} from './arsenal.mjs?v=harvest-18';
 import {SKILL_BOOK, SKILL_CALLS} from './skill-book.mjs?v=harvest-18';
@@ -73,7 +73,9 @@ export function useSkill(world, p){
   const ctx = context(world, p, itemId, def, rank, free ? 1 : skillStrength(p.stamina), cast);
   def.cast(ctx);
   if(!free) p.stamina = 0;
-  p.skillCd = free ? 0 : def.cooldown; p.skillMax = def.cooldown;
+  // Fervent (refine.mjs): a refined weapon's skill recharges sooner.
+  const recharge = def.cooldown/(1+refineStat(p, 'fervent', itemId));
+  p.skillCd = free ? 0 : recharge; p.skillMax = recharge;
   p.cooldown = Math.max(p.cooldown || 0, def.lock ?? SKILL.lock);
   p.rest = false; p.goal = null; p.action = 'attack'; p.actionUntil = world.time+(def.pose ?? .55); p.aimUntil = world.time+(def.pose ?? .55);
   // Replicated stamp: the held weapon strikes its skill pose and src/fx draws the cast flourish.

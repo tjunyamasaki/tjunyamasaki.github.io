@@ -34,6 +34,7 @@ const SPECS = Object.freeze({
   dismantle: {icon: '⌫', label: 'Dismantle', activation: 'hold'},
   pull: {icon: '⇢', label: 'Pull', activation: 'tap'},
   upgrade: {icon: '⇧', label: 'Upgrade', activation: 'tap'},
+  refine: {icon: '◈', label: 'Refine', activation: 'tap'},
 });
 
 const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock']);
@@ -258,6 +259,12 @@ export function describeContext(facts) {
       targetId: id,
       command: buildingCommand('build', id),
       panel: {tab: 'build', stationType: 'bench', stationId: id},
+    }));
+    // Weapon refinement (src/refine.mjs): opens its own panel rather than the recipe catalog.
+    list.push(make('refine', {
+      targetId: id,
+      command: buildingCommand('refine', id),
+      panel: {sheet: 'refine', stationType: 'bench', stationId: id},
     }));
   } else if (facts.type === 'pot') {
     list.push(make('cook', {

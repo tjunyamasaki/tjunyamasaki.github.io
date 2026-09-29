@@ -44,7 +44,7 @@ test('flow fields route round a wall and say "walk straight" in the open', () =>
   for(let i = -5; i <= 5; i++) tree(w, 'wall'+i, i, 4);
   const field = buildField(w, w.obstacles(), 0, 0);
   assert.equal(field.ok, true);
-  assert.equal(fieldStep(field, 6, 6), null, 'open diagonal walks straight');
+  assert.equal(fieldStep(field, 6, -6), null, 'open diagonal walks straight');
   const step = fieldStep(field, 0, 7);
   assert.ok(step, 'behind the wall the field gives a detour');
   assert.ok(Math.abs(step.x) > .5, 'the detour heads sideways round the wall');

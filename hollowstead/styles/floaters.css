@@ -1,0 +1,26 @@
+/* Damage numbers (src/floaters.mjs): chunky outlined digits that pop in, arc to one side and fade.
+   --size comes from the blow; tiers colour chip (t0) to huge (t3); crits are gold with a starburst. */
+.world-label.dmg{--o:#1b0f16;--glow:#f5b16a55;font:900 var(--size,18px)/1 "Arial Black","Segoe UI Black","Helvetica Neue",Arial,sans-serif;letter-spacing:-.02em;color:#fff4e2;font-variant-numeric:tabular-nums;z-index:1;
+  text-shadow:0 2px 0 var(--o),2px 0 0 var(--o),-2px 0 0 var(--o),0 -2px 0 var(--o),1.5px 1.5px 0 var(--o),-1.5px 1.5px 0 var(--o),1.5px -1.5px 0 var(--o),-1.5px -1.5px 0 var(--o),0 4px 1px #0009,0 0 14px var(--glow)}
+.world-label.dmg b{display:block;font-weight:900}
+.dmg-pop{position:relative;display:inline-flex;flex-direction:column;align-items:center;animation:dmg-pop .34s cubic-bezier(.2,1.5,.4,1) both;transform-origin:50% 70%}
+@keyframes dmg-pop{0%{transform:scale(.25);filter:brightness(2.6)}38%{transform:scale(1.42);filter:brightness(1.6)}62%{transform:scale(.93)}100%{transform:scale(1);filter:none}}
+.world-label.dmg.dmg-t1{color:#ffe3a8;--glow:#ffa94d88}
+.world-label.dmg.dmg-t2{color:#ffb14f;--glow:#ff7a2eaa;--o:#2a0f08}
+.world-label.dmg.dmg-t3{color:#ff6d3d;--glow:#ff3b1fcc;--o:#2b0605}
+.dmg-t3 .dmg-pop{animation:dmg-pop .34s cubic-bezier(.2,1.5,.4,1) both,dmg-shake .3s .12s linear 1}
+@keyframes dmg-shake{25%{translate:-2px 1px}50%{translate:2px -1px}75%{translate:-1px -1px}}
+/* Critical hits: gold digits on a red rim, a burst of rays behind, and a CRIT tag. */
+.world-label.dmg.dmg-crit{color:#ffdc4d;--o:#5a1208;--glow:#ffb300dd;z-index:2}
+.dmg-crit .dmg-pop{animation:dmg-crit .42s cubic-bezier(.2,1.6,.35,1) both}
+@keyframes dmg-crit{0%{transform:scale(.2) rotate(-14deg);filter:brightness(3)}40%{transform:scale(1.6) rotate(5deg);filter:brightness(1.8)}65%{transform:scale(.9) rotate(-2deg)}100%{transform:scale(1) rotate(0);filter:none}}
+.dmg-crit .dmg-pop::before{content:"";position:absolute;left:50%;top:40%;width:3.4em;height:3.4em;margin:-1.7em 0 0 -1.7em;z-index:-1;border-radius:50%;
+  background:repeating-conic-gradient(#fff2a8 0 7deg,transparent 7deg 30deg);-webkit-mask:radial-gradient(circle,#000 18%,transparent 66%);mask:radial-gradient(circle,#000 18%,transparent 66%);animation:dmg-burst .5s ease-out both}
+@keyframes dmg-burst{0%{transform:scale(.3) rotate(0);opacity:1}100%{transform:scale(1.35) rotate(40deg);opacity:0}}
+.dmg-crit i{margin-top:1px;padding:1px 5px 2px;border-radius:3px;background:#c8321e;color:#fff4e0;font:900 .34em/1 "Arial Black",Arial,sans-serif;letter-spacing:.18em;font-style:normal;text-shadow:none;box-shadow:0 2px 0 #5a1208}
+/* Other wanderers' blows: smaller (set in JS) and quieter. */
+.world-label.dmg.dmg-other{filter:saturate(.45) brightness(.85)}
+/* A wanderer hurt: red, drops away. */
+.world-label.dmg.dmg-hurt{color:#ff5a4f;--o:#2a0508;--glow:#ff1a1a88}
+.world-label.salvage-label{font-size:14px;letter-spacing:.3px}
+@media(prefers-reduced-motion:reduce){.dmg-pop,.dmg-crit .dmg-pop::before{animation:none!important}}

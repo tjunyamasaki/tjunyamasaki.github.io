@@ -8,6 +8,7 @@ import {ALLIES, REFINE, maxHealth, powerOf, rankOf} from './progression.mjs?v=ha
 import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {splitMarks} from './refine.mjs?v=harvest-18';
 import {grimoire, stepGrimoire} from './grimoire.mjs?v=harvest-18';
+import {slideMove, steer} from './pathing.mjs?v=harvest-18';
 
 const dist = (a, b) => Math.hypot((a.x||0)-(b.x||0), (a.z||0)-(b.z||0));
 const hostiles = w => w.enemies.filter(e => !isMagicAlly(e) && e.hp > 0);
@@ -279,7 +280,13 @@ function stepAllies(w, dt, obstacles, foes){
     if(dist(a, owner) > def.leash){a.x = owner.x+(a.x-owner.x)*.5; a.z = owner.z+(a.z-owner.z)*.5;}
     if(goal){
       const d = Math.max(.01, dist(goal, a)), vx = (goal.x-a.x)/d*speed, vz = (goal.z-a.z)/d*speed;
-      if(def.fly){a.x += vx*dt; a.z += vz*dt; clampToMap(a, w);} else if(!w.move(a, vx, vz, dt, obstacles)) w.move(a, -vz, vx, dt, obstacles);
+      if(def.fly){a.x += vx*dt; a.z += vz*dt; clampToMap(a, w);}
+      else{
+        // On foot: round trunks and walls to reach the foe (or keep up with the owner) (pathing.mjs).
+        const way = steer(w, obstacles, a, goal.x, goal.z, {stop: .3, lazy: true});
+        if(way && !way.done) slideMove(w, a, way.x*speed, way.z*speed, dt, obstacles);
+        else slideMove(w, a, vx, vz, dt, obstacles);
+      }
       if(Math.abs(vx) > .05) a.facing = vx < 0 ? -1 : 1;
       if(a.swing <= 0) a.anim = 'walk';
     }

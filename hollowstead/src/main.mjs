@@ -1,6 +1,6 @@
 import {World,clamp,distance,biome,EXPLORE_CELL,EXPLORE_SIZE} from './engine.mjs?v=harvest-18';
 import {RARITIES,RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-18';
-import {RULES,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,nodeAwake} from './content.mjs?v=harvest-18';
+import {RULES,ITEMS,EQUIPMENT,NODES,STRUCTURES,RECIPES,CHARACTERS,label,phaseAt,dayAt,nodeAwake} from './content.mjs?v=harvest-18';
 import {Renderer,loadTheme} from './renderer.mjs?v=harvest-18';
 import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-18';
 import {createNetwork} from './network.mjs?v=harvest-18';
@@ -15,7 +15,8 @@ import {
   keyboardPrimary,resolveMode,showsLantern,usableLantern,
 } from './ui/actions.mjs?v=harvest-18';
 import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-18';
-import {actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-18';
+import {actionNeedsConfirm,actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-18';
+import {salvageText} from './salvage.mjs?v=harvest-18';
 import {loadMagicModules} from './magic/load.mjs?v=harvest-18';
 import {installMagicSprites,isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {waveLeft} from './arena.mjs?v=harvest-18';
@@ -461,6 +462,7 @@ async function operate(op){
   if(!selection)return;
   const loc=locateUid(p,selection.uid);if(!loc?.stack){clearSelection();dirty=true;return;}
   if(actionNeedsCount(op,loc.stack.quantity)&&pendingOp!==op){pendingOp=op;qtyMode='all';chosenQty=loc.stack.quantity;refresh();return;}
+  if(actionNeedsConfirm(op)&&pendingOp!==op){pendingOp=op;refresh();return;}
   const captured={uid:loc.stack.uid,socket:loc.socket,where:loc.where,quantity:chosenQuantity(loc.stack),itemId:loc.stack.itemId};
   if(itemActionClearsSelection(op)){selection=null;pendingOp=null;}
   if(op==='drop'){
@@ -470,6 +472,11 @@ async function operate(op){
   }
   if(op==='equip'){await withPending({type:'equipItem',uid:captured.uid,socket:equipmentSlotFor(captured.itemId),inventoryRevision:p.inventory.revision,equipmentRevision:p.equipmentRevision});return;}
   if(op==='unequip'){await withPending({type:'unequipItem',uid:captured.uid,socket:captured.socket,inventoryRevision:p.inventory.revision,equipmentRevision:p.equipmentRevision});return;}
+  if(op==='dismantle'){
+    const cmd={type:'dismantleItem',uid:captured.uid,inventoryRevision:p.inventory.revision};
+    if(captured.where==='equipment')cmd.equipmentRevision=p.equipmentRevision;
+    await withPending(cmd);return;
+  }
   if(op==='eat'||op==='heal'){await withPending({type:'consumeItem',uid:captured.uid,inventoryRevision:p.inventory.revision});return;}
   if(op==='take'){await commitMove(loc,{where:'pack',slot:0,stack:null},captured.quantity,{insert:true});return;}
   if(op==='transfer'){
@@ -492,6 +499,20 @@ function itemTip(stack){
   const p=me(),m=masteryView(world,p,stack.itemId),mods=refineLines(p,stack.itemId);
   if(m||mods.length)return [label(stack.itemId),m?weaponAbout('',m,null):'',...mods].filter(Boolean).join('\n');
   return trinketTip(stack.itemId);
+}
+/** The inventory's detail line for a selected stack: name, rarity and what it does. */
+function itemInfo(stack){
+  const tip=itemTip(stack),lines=tip?tip.split('\n'):[label(stack.itemId)],item=ITEMS[stack.itemId],eq=EQUIPMENT[stack.itemId];
+  const facts=[];
+  if(item?.food)facts.push(`+${item.food} hunger`);
+  if(item?.heal)facts.push(`${item.heal>0?'+':''}${item.heal} health`);
+  if(item?.courage)facts.push(`${item.courage>0?'+':''}${item.courage} courage`);
+  if(eq?.damage)facts.push(`${eq.damage} damage`);
+  const max=stackMaxDurability(stack.itemId);
+  if(max&&typeof stack.durability==='number'&&max<999)facts.push(`condition ${Math.ceil(stack.durability)}/${max}`);
+  const rarity=rarityOf(stack.itemId);
+  lines.splice(1,0,[rarity[0].toUpperCase()+rarity.slice(1),...facts].join(' · '));
+  return lines.join('\n');
 }
 function makeCell(key,stack,kind,index,mark=''){
   const equipped=kind==='socket'&&!!stack;
@@ -518,7 +539,7 @@ function inventoryView(p){
   if(loc?.stack){
     const where=loc.where;
     const ops=operationsFor({itemId:loc.stack.itemId,where,chestOpen:!!chestSession});
-    detail={name:label(loc.stack.itemId),chosen:chosenQuantity(loc.stack),maxQuantity:loc.stack.quantity,ops,pendingOp};
+    detail={name:label(loc.stack.itemId),chosen:chosenQuantity(loc.stack),maxQuantity:loc.stack.quantity,ops,pendingOp,confirmText:pendingOp==='dismantle'?salvageText(loc.stack.itemId):'',info:itemInfo(loc.stack)};
   }
   const sprite=theme.sprites[p.character]||theme.sprites.ember;
   return {portraitHTML:`${portrait(p.character)}<small>${escapeHtml(p.name)}</small>`,occupied:p.inventory.slots.filter(Boolean).length,slotMax:p.inventory.slots.length,charm:!!p.charm,sockets,slots,recovery,chest:chestView,selection:detail,pending:actionPending||chestOpening,pendingText:chestOpening?'Opening chest…':actionPending?'Waiting for camp…':'',sprite};
@@ -536,7 +557,7 @@ function guideHTML(){
     ['Explore for treasure','The hollow is vast. Beyond the meadow lie the Autumn Woods and the Graveyard; farther still the Hollow Mire, the Moonshard Crags and the Barrow Fields. Crates, iron-bound chests, moonlit coffers and hollow reliquaries hide out there: hold Open beside one. Better caches sit farther from camp, and guardians watch them. Caches refill after a few days.'],
     ['Brave the frontier','The outer regions punish the unprepared, and every wanderer needs their own answer. The Hollow Mire’s spore fog drains courage, then health: wear a glowcap mask, made from blooms that sprout in the Autumn Woods only after dark. The Moonshard Crags are pitch dark even by day: only your own lit grave lantern, fed by wisp essence that drifts over the Graveyard at night, holds the dark back. The Barrow Fields’ grave-chill slows you: a bone-lined barrow cloak keeps it out. Masks and cloaks wear only inside their region.'],
     ['Grow stronger','Kills, caches, gathering and new regions give experience. Each level adds health and damage. Loot comes in five rarities: common, uncommon, rare, epic and legendary. Bows fire arrows at the nearest foe, staffs throw bursting bolts, broadswords cleave, and the Grimoire of Ash burns everything around you. Heartstones raise your health for good.'],
-    ['Refine your weapons','Creatures drop Dread ichor, and only creatures: briarlings now and then, wraiths, bonewalkers and boglings more often, gravekeepers, golems and the Hollow King by the handful. Stand at a workbench and press Refine: each weapon holds three modifiers, each rolled with a rarity from common to legendary, from sharper crits and faster swings to an extra arrow or star. Reroll any of them with more ichor. Like mastery, refinement is yours, not the item’s.'],
+    ['Refine your weapons','Creatures drop Dread ichor, and only creatures: briarlings now and then, wraiths, bonewalkers and boglings more often, gravekeepers, golems and the Hollow King by the handful. Stand at a workbench and press Refine: each weapon holds three modifiers, each rolled with a rarity from common to legendary, from sharper crits and faster swings to an extra arrow or star. Reroll any of them with more ichor. Like mastery, refinement is yours, not the item’s. Spare gear can be dismantled from Inventory: loot melts into ichor (more the rarer it is), crafted gear gives back half its materials.'],
     ['Outlast the night','Every night is harder than the last, with more creatures and elder champions. Guard the Heartfire: losing it ends the expedition. How many nights can you survive?'],
     ['Read the moon','Tap the moon beside the clock to see tonight’s moon and the next. Under a waxing moon the woods raid your fire in waves. A new moon brings no raid but a darker night: the time to gather what only grows in the dark. A rare blood moon brings the Hollow King, stronger each time he returns, and more waves than any other night. Whatever the moon, creatures stalk anyone who wanders far from the fire after dark, more often deeper in the hollow.'],
   ];

@@ -149,7 +149,7 @@ test('slot labels, quantities, and operations stay explicit', () => {
   assert.equal(adjustQuantity(5, 5, 'inc'), 5);
   assert.deepEqual(operationsFor({itemId: 'berry', where: 'pack', chestOpen: true}), ['eat', 'drop', 'transfer']);
   assert.deepEqual(operationsFor({itemId: 'bandage', where: 'pack'}), ['heal', 'drop']);
-  assert.deepEqual(operationsFor({itemId: 'axe', where: 'pack'}), ['equip', 'drop']);
+  assert.deepEqual(operationsFor({itemId: 'axe', where: 'pack'}), ['equip', 'drop', 'dismantle']);
   assert.deepEqual(operationsFor({itemId: 'axe', where: 'equipment', chestOpen: true}), ['unequip', 'drop', 'transfer']);
   assert.deepEqual(operationsFor({itemId: 'wood', where: 'chest', chestOpen: true}), ['transfer']);
   assert.deepEqual(operationsFor({itemId: 'wood', where: 'recovery'}), ['take']);

@@ -37,6 +37,7 @@
 // is the current cell, skeleton-<anim>-<0-3>.png. facing is -1 toward -x and
 // 1 toward +x.
 
+import {slideMove} from '../pathing.mjs?v=harvest-18'
 import { ownerPower } from './registry.mjs?v=harvest-18'
 
 const ROOT = 'assets/magic/barrow-rattle'
@@ -272,8 +273,8 @@ function steer(world, summon, vx, vz, dt){
     if(typeof world.obstacles === 'function'){
       try{ obstacles = world.obstacles() || [] }catch{ obstacles = [] }
     }
-    if(world.move(summon, vx, vz, dt, obstacles)) return true
-    return !!world.move(summon, -vz, vx, dt, obstacles)
+    // Glance off a trunk's corner instead of grinding into it (pathing.mjs).
+    return !!slideMove(world, summon, vx, vz, dt, obstacles)
   }
   summon.x += vx * dt
   summon.z += vz * dt

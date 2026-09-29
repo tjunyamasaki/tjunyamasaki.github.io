@@ -1,3 +1,4 @@
+import {damageFloater,spawnFloater,stepFloaters} from './floaters.mjs?v=harvest-18';
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
 import {STRUCTURES, RULES} from './content.mjs?v=harvest-18';
 import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-18';
@@ -56,7 +57,6 @@ export async function loadTheme(url=new URL('../themes/harvest/theme.json',impor
   for(const[k,v]of Object.entries(theme.audio))theme.audio[k]=new URL(v,url).href;return theme;
 }
 /** Swarm fights spray numbers; old labels give way so the DOM stays light on phones. */
-const MAX_FLOATERS=36;
 /** Floater colours for 'strike' events: clean harvest strikes (rhythm.mjs) and trinket moments (trinkets.mjs). */
 export const STRIKE_COLORS=Object.freeze({clean:'#ffe6a3',perfect:'#f2c14e',find:'#9fcaff',ward:'#efe6d2',fang:'#b9e2ba',thorn:'#f5c2a9'});
 /**
@@ -209,14 +209,14 @@ export class Renderer {
     }
     return best;
   }
-  float(text,x,z,color='#f8dfb3',opts={}){if(!text)return;const el=document.createElement('div');el.className=opts.className||'world-label';el.textContent=text;el.style.color=color;document.getElementById('world-labels').append(el);this.floaters.push({el,x,z,life:0,alwaysVisible:!!opts.alwaysVisible});while(this.floaters.length>MAX_FLOATERS){const old=this.floaters.shift();old.el.remove();}}
+  float(text,x,z,color='#f8dfb3',opts={}){spawnFloater(this.floaters,text,x,z,color,opts);}
   effect(event,world=null){
     this.weaponFx.event(event,this.clock,world);
     if(event.type==='hit')for(const o of this.objects.values())if(Math.hypot(o.x-event.x,o.z-event.z)<.2)o.hitUntil=this.clock+.22;
-    if(event.type==='damage'&&event.crit)this.float(`${event.text}!`,event.x,event.z,'#ffd35a',{className:'world-label crit-label'});
-    else if(['loot','damage','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
+    if(event.type==='damage')damageFloater(this.floaters,event,this.localId,'hit');
+    else if(['loot','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
     if(event.type==='refine')this.float(`◆ ${event.text}`,event.x,event.z,RARITY_COLORS[event.rarity]||'#fbe1ad',{className:'world-label refine-label',alwaysVisible:event.player===this.localId});
-    if(event.type==='hurt')this.float(event.text,event.x,event.z,'#e53935',{className:'world-label player-hurt',alwaysVisible:true});
+    if(event.type==='hurt')damageFloater(this.floaters,event,this.localId,'hurt');if(event.type==='salvage')this.float(`◆ ${event.text}`,event.x,event.z,RARITY_COLORS[event.rarity]||'#fbe1ad',{className:'world-label salvage-label',alwaysVisible:event.player===this.localId});
     if(event.type==='rare')this.float(`✦ ${event.text}`,event.x,event.z,RARITY_COLORS[rarityOf(event.itemId)]);
     if(event.type==='levelup')this.float(`LEVEL UP · ${event.text}`,event.x,event.z,'#f2c14e');
     if(event.type==='discover')this.float(event.text,event.x,event.z,'#d4fff5');
@@ -380,7 +380,7 @@ export class Renderer {
     if(placement){if(!this.ghost||this.ghost.key!==placement.key){if(this.ghost)this.remove(this.ghost);this.ghost=this.sprite(placement.key,'preview');}this.ghost.sprite.position.set(placement.x,0,placement.z);this.ghost.sprite.material.color.set(placement.valid?'#c8e5a6':'#dd7471');this.ghost.sprite.material.opacity=.7;this.ghost.shadow.visible=false;this.ghost.sprite.visible=true;}else if(this.ghost){this.remove(this.ghost);this.ghost=null;}
     for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2)this.effect(ev,world);this.lastEvent=ev.id;}
     this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);if(e.sweep)e.mesh.geometry.setDrawRange(0,6*Math.ceil(e.sweep*Math.min(1,e.life/.1)));if(!e.fixed)e.mesh.scale.setScalar(e.radius?.3+Math.min(1,e.life*3)*e.radius:1+e.life*(e.type==='impact'?12:4));e.mesh.material.opacity=Math.max(0,1-e.life*(e.sweep?3.2:2))*fade*(e.sweep?.55:1);if(e.life>.5){this.scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();return false;}return true;});
-    this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*(f.alwaysVisible?1:this.reveal(f.x, f.z)));if(f.life>1.8){f.el.remove();return false;}return true;});
+    this.floaters=stepFloaters(this.floaters,dt,(x,z,y)=>this.screenPoint(x,z,y),(x,z)=>this.reveal(x,z));
     const magic=buildMagicEffects(world,this.magicFrame,this.theme);if(weapon?.normal.length)magic.push(...weapon.normal);
     this.magicMesh.update(magic);this.glowMesh.update(weapon?.glow||[]);this.groundFxMesh.update(weapon?.groundNormal||[]);this.groundGlowMesh.update(weapon?.groundGlow||[]);
     this.gl.render(this.scene,this.camera);

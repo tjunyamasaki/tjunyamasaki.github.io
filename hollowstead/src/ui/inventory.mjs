@@ -11,7 +11,7 @@ export const SOCKET_LABELS = Object.freeze({
 
 const OP_LABELS = Object.freeze({
   equip: 'Equip', unequip: 'Unequip', eat: 'Eat', heal: 'Heal', drop: 'Drop',
-  transfer: 'Transfer', take: 'Take',
+  transfer: 'Transfer', take: 'Take', dismantle: 'Dismantle',
 });
 
 export function adjustQuantity(total, current, op) {
@@ -48,7 +48,9 @@ export function slotLabel({empty = false, name = '', quantity = 1, durability = 
   return parts.join(', ');
 }
 
-const ITEM_ACTIONS = new Set(['equip', 'unequip', 'swap', 'eat', 'heal', 'drop', 'confirm-drop', 'transfer', 'take', 'store']);
+const ITEM_ACTIONS = new Set(['equip', 'unequip', 'swap', 'eat', 'heal', 'drop', 'confirm-drop', 'transfer', 'take', 'store', 'dismantle']);
+/** Ops that ask once more before they happen (the second press confirms). */
+const CONFIRM_ACTIONS = new Set(['dismantle']);
 const COUNT_ACTIONS = new Set(['drop', 'transfer', 'take']);
 
 /** Per-item actions clear the UI selection when they are issued. Quantity and inspect do not. */
@@ -59,6 +61,11 @@ export function itemActionClearsSelection(op) {
 /** Drop, transfer, and take ask for 1 / half / all only when the stack can split. */
 export function actionNeedsCount(op, quantity) {
   return COUNT_ACTIONS.has(op) && quantity > 1;
+}
+
+/** Dismantle asks for a second press, showing what it gives back. */
+export function actionNeedsConfirm(op) {
+  return CONFIRM_ACTIONS.has(op);
 }
 
 export function operationsFor({itemId, where, chestOpen = false} = {}) {
@@ -73,6 +80,7 @@ export function operationsFor({itemId, where, chestOpen = false} = {}) {
   else if (where === 'pack' && item?.heal) ops.push('heal');
   if (where !== 'chest') ops.push('drop');
   if (chestOpen) ops.push('transfer');
+  else if ((where === 'pack' || where === 'equipment') && equipmentSlotFor(itemId)) ops.push('dismantle');
   return ops;
 }
 
@@ -98,8 +106,12 @@ export function createInventoryPanel(root, hooks) {
   panel.innerHTML = `
     <div class="rpg-body">
       <section class="equip-column" aria-label="Equipment">
-        <div id="inv-portrait" class="character-card"></div>
-        <div id="inv-sockets" class="socket-grid slot-grid"></div>
+        <p class="section-label equip-label">WORN GEAR</p>
+        <div class="doll">
+          <div id="inv-portrait" class="character-card"></div>
+          <div id="inv-sockets" class="socket-grid"></div>
+        </div>
+        <p id="inv-charm" class="charm-line"></p>
       </section>
       <section class="bag-column" aria-label="Backpack">
         <div class="storage-heading">
@@ -115,11 +127,11 @@ export function createInventoryPanel(root, hooks) {
           </div>
         </div>
         <div id="inv-grid" class="slot-grid" role="grid"></div>
+        <div id="inv-detail" class="item-detail" aria-live="polite"></div>
         <div id="inv-recovery" class="recovery-block" hidden>
           <p class="section-label">SAVED FROM AN OLDER PACK</p>
           <div id="inv-recovery-grid" class="slot-grid recovery-grid"></div>
         </div>
-        <p id="inv-charm" class="charm-line"></p>
       </section>
       <section id="inv-chest" class="chest-column" hidden aria-label="Chest">
         <div class="storage-heading">
@@ -157,6 +169,7 @@ export function createInventoryPanel(root, hooks) {
   const qtyRow = panel.querySelector('#detail-qty');
   const ops = panel.querySelector('#detail-ops');
   const pendingLine = panel.querySelector('#inv-pending');
+  const detail = panel.querySelector('#inv-detail');
   const ghost = document.createElement('div');
   ghost.className = 'drag-ghost';
   ghost.hidden = true;
@@ -167,6 +180,7 @@ export function createInventoryPanel(root, hooks) {
   let portraitSig = '';
   let metaSig = '';
   let charmSig = '';
+  let detailSig = null;
 
   function paintSlot(el, cell) {
     const stack = cell.stack;
@@ -262,8 +276,29 @@ export function createInventoryPanel(root, hooks) {
     paintDetails(view);
   }
 
+  /** What the selected item is: its name and the lines of its tooltip (mastery, refinement, trinket text). */
+  function paintInfo(selection) {
+    const lines = selection ? String(selection.info || '').split('\n').filter(Boolean) : [];
+    const name = selection ? (lines.shift() || selection.name) : '';
+    const sig = selection ? `${name}|${lines.join('|')}` : '';
+    if (detailSig === sig) return;
+    detailSig = sig;
+    detail.replaceChildren();
+    detail.classList.toggle('is-empty', !selection);
+    if (!selection) { detail.textContent = 'Tap an item to see it. Drag to move it.'; return; }
+    const title = document.createElement('b');
+    title.textContent = name;
+    detail.append(title);
+    for (const line of lines.slice(0, 4)) {
+      const row = document.createElement('small');
+      row.textContent = line;
+      detail.append(row);
+    }
+  }
+
   function paintDetails(view) {
     const selection = view.selection;
+    paintInfo(selection);
     panel.classList.toggle('has-selection', !!selection);
     if (!selection) {
       ops.replaceChildren();
@@ -271,14 +306,24 @@ export function createInventoryPanel(root, hooks) {
       qtyRow.hidden = true;
       return;
     }
-    qtyRow.hidden = !selection.pendingOp;
+    const confirming = !!selection.pendingOp && CONFIRM_ACTIONS.has(selection.pendingOp);
+    qtyRow.hidden = !selection.pendingOp || confirming;
     for (const qty of qtyRow.querySelectorAll('button')) qty.disabled = !!view.pending;
     const shown = selection.pendingOp ? [selection.pendingOp] : selection.ops;
-    const sig = shown.join(',');
+    const sig = `${shown.join(',')}|${confirming ? selection.confirmText || '' : ''}`;
     if (ops.dataset.sig !== sig) {
       ops.dataset.sig = sig;
       ops.replaceChildren();
-      for (const op of shown) ops.append(button(op, OP_LABELS[op] || op));
+      for (const op of shown) {
+        const el = button(op, OP_LABELS[op] || op);
+        if (confirming) {
+          el.classList.add('confirm-op');
+          el.innerHTML = `<b>Confirm ${OP_LABELS[op] || op}</b><small></small>`;
+          el.querySelector('small').textContent = selection.confirmText || '';
+        }
+        if (op === 'dismantle') el.classList.add('danger-op');
+        ops.append(el);
+      }
     }
     for (const el of ops.querySelectorAll('button')) el.disabled = !!view.pending;
   }

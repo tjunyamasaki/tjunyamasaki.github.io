@@ -1,6 +1,7 @@
 import {ACTION_RESULT_CACHE_LIMIT, HOTBAR_SLOTS, INTENTS, STORAGE_TYPES} from './contracts.mjs?v=harvest-18';
 import {containerId, planSortSlots} from './inventory.mjs?v=harvest-18';
 import {chestIntent, moveItems} from './chests.mjs?v=harvest-18';
+import {salvageItem} from './salvage.mjs?v=harvest-18';
 
 export const TRANSACTION_PROTOCOL=1;
 const outcome=code=>({ok:code==='ok',code});
@@ -54,6 +55,7 @@ export function inventoryIntent(world,p,cmd){
     if(!Number.isSafeInteger(cmd.quantity)||cmd.quantity<=0||cmd.quantity>loc.stack.quantity)return outcome('invalidQuantity');
     return outcome(world.dropOwned(p,cmd.uid,cmd.quantity)?'ok':'rejected');
   }
+  if(cmd.type==='dismantleItem')return salvageItem(world,p,cmd);
   return outcome('unsupported'); // P3 owns the remaining context/crafting intents.
 }
 

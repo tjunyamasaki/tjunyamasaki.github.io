@@ -189,6 +189,7 @@ export const INTENTS = Object.freeze({
   equipItem: intent('equipItem', ['requestId', 'uid', 'socket', 'inventoryRevision', 'equipmentRevision']),
   unequipItem: intent('unequipItem', ['requestId', 'uid', 'socket', 'inventoryRevision', 'equipmentRevision']),
   dropItem: intent('dropItem', ['requestId', 'uid', 'quantity', 'inventoryRevision'], ['equipmentRevision']),
+  dismantleItem: intent('dismantleItem', ['requestId', 'uid', 'inventoryRevision'], ['equipmentRevision']),
   chestOpen: intent('chestOpen', ['requestId', 'chestId']),
   chestRenew: intent('chestRenew', ['requestId', 'chestId', 'sessionId']),
   chestClose: intent('chestClose', ['requestId', 'chestId', 'sessionId']),

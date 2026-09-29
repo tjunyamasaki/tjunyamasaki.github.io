@@ -24,6 +24,7 @@ import {ALLIES, ROAM} from './progression.mjs?v=harvest-18';
 import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {landBlow, preyFor} from './arsenal.mjs?v=harvest-18';
 import {cartTargets} from './cart.mjs?v=harvest-18';
+import {slideMove, steer} from './pathing.mjs?v=harvest-18';
 
 /** Creatures chew through camp structures at half their bite, so a lone explorer's fire survives an early night. */
 // Creature damage (content.mjs ENEMIES) doubled; these halve with it so walls and the fire take what they did.
@@ -75,7 +76,7 @@ const angleDelta = (a, b) => {let d = (a-b)%TAU; if(d > Math.PI) d -= TAU; if(d 
 const alive = p => p && p.online && !p.down && !p.ghost && p.hp > 0;
 
 // ------------------------------------------------------------------ flow fields
-const FIELD_CELLS = 64, FIELD_SIZE = .5, FIELD_HALF = FIELD_CELLS*FIELD_SIZE/2;
+const FIELD_CELLS = 80, FIELD_SIZE = .5, FIELD_HALF = FIELD_CELLS*FIELD_SIZE/2;
 const FIELD_CLEARANCE = .3, FIELD_REBUILD = .5, FIELD_DRIFT = 1.25;
 const N2 = FIELD_CELLS*FIELD_CELLS;
 const heapKey = new Float32Array(N2*8), heapVal = new Int32Array(N2*8);
@@ -149,7 +150,9 @@ export function buildField(world, obstacles, tx, tz, reuse = null){
       if(nd < distance[nk]){distance[nk] = nd; if(size < heapKey.length) push(nd, nk);}
     }
   }
-  return {ox, oz, blocked, distance, tx, tz, ok: true};
+  // How far the seed sits from the target: a hearth's own footprint, a trunk the prey hugs.
+  const si0 = start % FIELD_CELLS, seedR = Math.hypot(ox+(si0+.5)*FIELD_SIZE-tx, oz+((start-si0)/FIELD_CELLS+.5)*FIELD_SIZE-tz);
+  return {ox, oz, blocked, distance, tx, tz, seedR, ok: true};
 }
 
 /** Cached field for a target entity; rebuilt when it moves or the camp changes. */
@@ -165,33 +168,65 @@ function fieldFor(world, obstacles, target, sig){
   return entry.field;
 }
 
+/** True when the straight line from (x,z) to the field's target crosses no blocked cell. */
+function fieldClear(field, x, z){
+  const dx = field.tx-x, dz = field.tz-z, d = Math.hypot(dx, dz);
+  // The last stretch is the target itself: a hearth's footprint, or prey standing hard against a trunk.
+  const n = Math.ceil(Math.max(0, d-.7-(field.seedR || 0))/(FIELD_SIZE*.5));
+  for(let k = 1; k <= n; k++){
+    const t = k*FIELD_SIZE*.5/d, i = Math.floor((x+dx*t-field.ox)/FIELD_SIZE), j = Math.floor((z+dz*t-field.oz)/FIELD_SIZE);
+    if(i < 0 || j < 0 || i >= FIELD_CELLS || j >= FIELD_CELLS) return false;
+    if(field.blocked[j*FIELD_CELLS+i]) return false;
+  }
+  return true;
+}
+
 /**
- * Where to head next on a field. Returns null to mean "walk straight at the target": outside the
- * field, unreachable, or already on a near-straight shortest path.
+ * Where to head on a field: {x, z} to follow it, 'straight' when the line to the target is open,
+ * 'walled' when no way leads there (a closed camp: go straight and claw the wall), or 'none' when the
+ * field cannot help (outside it, or it failed to build).
  */
-export function fieldStep(field, x, z){
-  if(!field?.ok) return null;
+export function fieldRoute(field, x, z){
+  if(!field?.ok) return 'none';
   const i = Math.floor((x-field.ox)/FIELD_SIZE), j = Math.floor((z-field.oz)/FIELD_SIZE);
-  if(i < 1 || j < 1 || i >= FIELD_CELLS-1 || j >= FIELD_CELLS-1) return null;
+  if(i < 1 || j < 1 || i >= FIELD_CELLS-1 || j >= FIELD_CELLS-1) return 'none';
+  if(fieldClear(field, x, z)) return 'straight';
   let k = j*FIELD_CELLS+i, d = field.distance[k];
-  const straight = Math.hypot(field.tx-x, field.tz-z);
-  if(Number.isFinite(d) && d <= straight*1.1+.8) return null;
-  // Walk two steps down the field and aim at that cell: smoother than the next cell alone.
+  // Standing in a blocked cell (pressed against a trunk): start from the best open neighbour.
   let ci = i, cj = j, cur = Number.isFinite(d) ? d : Infinity, moved = false;
+  if(!Number.isFinite(d)){
+    for(const [di, dj] of NEIGHBOURS){
+      const nd = field.distance[(j+dj)*FIELD_CELLS+i+di];
+      if(nd < cur){cur = nd; ci = i+di; cj = j+dj; moved = true;}
+    }
+    // Walled off from the target: nothing to follow; walk at it and claw through.
+    if(!moved) return 'walled';
+  }
+  // Walk two steps down the field and aim at that cell: smoother than the next cell alone.
   for(let step = 0; step < 2; step++){
     let best = cur, bi = -1, bj = -1;
     for(const [di, dj] of NEIGHBOURS){
       const ni = ci+di, nj = cj+dj; if(ni < 0 || nj < 0 || ni >= FIELD_CELLS || nj >= FIELD_CELLS) continue;
-      const nd = field.distance[nj*FIELD_CELLS+ni];
+      const nk = nj*FIELD_CELLS+ni, nd = field.distance[nk];
+      if(di && dj && (field.blocked[cj*FIELD_CELLS+ni] || field.blocked[nj*FIELD_CELLS+ci])) continue;
       if(nd < best){best = nd; bi = ni; bj = nj;}
     }
     if(bi < 0) break;
     ci = bi; cj = bj; cur = best; moved = true;
   }
-  if(!moved) return null;
+  if(!moved) return 'straight';
   const gx = field.ox+(ci+.5)*FIELD_SIZE, gz = field.oz+(cj+.5)*FIELD_SIZE, l = Math.hypot(gx-x, gz-z);
-  if(l < 1e-4) return null;
-  return {x: (gx-x)/l, z: (gz-z)/l, blocked: !Number.isFinite(d)};
+  if(l < 1e-4) return 'straight';
+  return {x: (gx-x)/l, z: (gz-z)/l};
+}
+
+/**
+ * Where to head next on a field. Returns null to mean "walk straight at the target": outside the
+ * field, unreachable, or the line to the target is already open.
+ */
+export function fieldStep(field, x, z){
+  const route = fieldRoute(field, x, z);
+  return typeof route === 'object' ? route : null;
 }
 
 // ------------------------------------------------------------------ telegraphs
@@ -494,16 +529,21 @@ export function stepMobs(world, dt, obstacles){
       const spec = ATTACKS[move.attacks[0]];
       stop = Math.max(stop, Math.min(spec.trigger*.8, 1.1)+reach);
     }
-    let dirX = 0, dirZ = 0;
+    let dirX = 0, dirZ = 0, walled = false;
     const toX = wantX-e.x, toZ = wantZ-e.z, toD = Math.hypot(toX, toZ);
     if(d > stop && toD > .05){
       dirX = toX/toD; dirZ = toZ/toD;
-      // Round trunks and walls: follow the target's flow field when the straight line is blocked.
+      // Round trunks and walls: follow the target's flow field when the straight line is blocked;
+      // off the field (going home, chasing a summon, prey far away) plan a path of its own.
       if(!move.fly && d > 1.2){
         const anchor = target.homing ? null : (people.includes(target) || target.type === 'hearth' || target.type === 'cart' ? target : null);
-        if(anchor){
-          const step = fieldStep(fieldFor(world, obstacles, anchor, sig), e.x, e.z);
-          if(step){dirX = step.x; dirZ = step.z;}
+        const route = anchor ? fieldRoute(fieldFor(world, obstacles, anchor, sig), e.x, e.z) : 'none';
+        // No way in on the field: a closed palisade to claw through, or just a way round past the field's edge.
+        walled = route === 'walled' && world.buildings.some(b => (b.type === 'wall' || b.type === 'gate') && !b.open && b.hp > 0 && dist(b, e) < 12);
+        if(typeof route === 'object'){dirX = route.x; dirZ = route.z;}
+        else if(route === 'none' || (route === 'walled' && !walled)){
+          const way = steer(world, obstacles, e, target.x, target.z, {stop: Math.min(stop, 1.2), lazy: true, radius: STRUCTURES[target.type]?.radius || 0});
+          if(way && !way.done){dirX = way.x; dirZ = way.z;}
         }
       }
       if(e.detour > 0){
@@ -543,7 +583,8 @@ export function stepMobs(world, dt, obstacles){
       e.x += e.vx*dt; e.z += e.vz*dt;
       const r = Math.hypot(e.x, e.z), R = (world.radius || 96)-1.2; if(r > R){e.x *= R/r; e.z *= R/r;}
     }else{
-      const moved = world.move(e, e.vx, e.vz, dt, obstacles);
+      // Walled out of the camp: press on and claw (below) instead of sliding round the palisade.
+      const moved = walled ? world.move(e, e.vx, e.vz, dt, obstacles) : slideMove(world, e, e.vx, e.vz, dt, obstacles);
       const progress = Math.hypot(e.x-sx, e.z-sz);
       if(!moved || progress < speed*dt*.25){
         e.stuck = (e.stuck || 0)+dt;

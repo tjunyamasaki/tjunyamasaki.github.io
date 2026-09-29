@@ -1,3 +1,4 @@
+import {slideMove, steer} from './pathing.mjs?v=harvest-18';
 import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label, nodeAwake} from './content.mjs?v=harvest-18';
 import {
   CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2, SPILL_LIFETIME_SECONDS,
@@ -1560,7 +1561,8 @@ export class World {
         const drop=this.drops.find(d=>d.id===goal.target&&!d.flight);
         const goalTarget=node||building||drop;
         const d=distance(p,goal), stop=drop?PICKUP.touch*0.5:goalTarget?2.05:.25;
-        if(d>stop){x=(goal.x-p.x)/d;z=(goal.z-p.z)/d;}
+        // Walk round whatever stands between (pathing.mjs): straight when the way is open.
+        if(d>stop){const way=steer(this,obstacles,p,goal.x,goal.z,{stop:Math.max(.25,stop-.1),key:'walk:'+p.id});if(way?.done){p.goal=null;this.tell(p,'No way through');}else if(way){x=way.x;z=way.z;}else{x=(goal.x-p.x)/d;z=(goal.z-p.z)/d;}}
         else if(!goalTarget||(node&&node.ready>this.time))p.goal=null;
         else if(drop)p.goal=null;
         else if(!node&&p.cooldown<=0){this.interact(p,goal.target);p.goal=null;}
@@ -1576,7 +1578,7 @@ export class World {
         if(moving){
           // While a blow is recent the wanderer keeps facing the foe it struck: run one way, fight the other.
           if(!(p.aimUntil>this.time)){p.dx=x;p.dz=z;}
-          const speed=RULES.speed*(p.hunger<=0&&!this.arena?.65:1)*this.speedFactor(p);const moved=this.move(p,x*speed,z*speed,dt,obstacles);if(!moved&&p.goal){this.move(p,-z*speed,x*speed,dt,obstacles);}p.action='walk';
+          const speed=RULES.speed*(p.hunger<=0&&!this.arena?.65:1)*this.speedFactor(p);if(p.goal)slideMove(this,p,x*speed,z*speed,dt,obstacles);else this.move(p,x*speed,z*speed,dt,obstacles);p.action='walk';
         }
         else if(this.time>p.actionUntil)p.action='idle';
       }

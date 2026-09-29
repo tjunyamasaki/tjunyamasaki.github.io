@@ -1,166 +1,166 @@
-# Adding a Hollowstead weapon
+# Making a Hollowstead weapon
 
-All paths below are relative to `hollowstead/`. This is a task guide, not a prerequisite tour of the game. Read one relevant reference, edit the listed integration points, and stop when the requested weapon is usable. Keep this guide current when those integration points change.
+Paths are relative to `hollowstead/`. This guide is the whole briefing: read it, read the **two reference files** in §2, then touch only the files in §4. Don't tour the engine, renderer, UI, networking or world generation; use the symbol searches at the end when you need one fact.
 
-## Quick checklist: the usual magic weapon
+## 1. The bar
 
-- [ ] `src/magic/<id>.mjs`: metadata, successful `use` return, host-only `step`, bounded attack state.
-- [ ] `src/magic/load.mjs` → `SPECS`: register the filename.
-- [ ] `src/engine.mjs` → `MAGIC_AIM`: set usable reach.
-- [ ] `assets/magic/<id>/` + pack `sprites`: item, optional icon, attack artwork.
-- [ ] `src/magic/art.mjs` → `HELD_GEAR`: show and animate the held weapon.
-- [ ] Sprite roles **or** `src/magic/effects.mjs`: visible attacks in both renderers.
-- [ ] `src/progression.mjs` → `ITEM_RARITY`: classify the item.
-- [ ] If requested, `src/arena.mjs` → `STARTERS`: guarantee the first pick; `POOLS`/`RECIPES` only for expedition access.
-- [ ] `src/skill-book.mjs` → `SKILL_BOOK`: the weapon's skill (every weapon has one; see section 7).
-- [ ] `src/fx/kit.mjs` → `HUES`: the weapon's colours, used by its rank flourish and skill effects.
+Every new weapon must feel like a **new toy**, not a reskin. The two finished reworks set the bar:
 
-The sections below explain these steps. Read the alternative route only for a normal arsenal weapon.
+- **Nine-Tail Lantern** (`kitsune-lantern`): the fox's tails hang behind you whenever it's equipped (its fantasy is visible before you attack); the auto attack has a rhythm (3 → 6 → 9 foxfires peel off the tail tips, the ninth bursts); its colour is rolled on equip (gold/red/violet); the skill is the auto attack's mechanic pushed to its limit (three rings of nine, then the spirit pounces).
+- **Starfall Scepter** (`starfall`): a telegraphed mark, a falling star with a trail, a crater; the skill draws a constellation between foes, stars land on its points, then the heart star falls. Every rank adds a visible layer.
 
-## 1. Choose the smallest implementation
+What made them good, and what yours needs:
 
-- **Distinct mechanic, projectile pattern, delayed attack, or summon:** use a module in `src/magic/`. Recommended for new themed weapons; registration supplies inventory, equipment, labels, showcase entries, and arena eligibility.
-- **A variation on an existing sword, bow, or arsenal attack:** reuse `WEAPON_STYLES` and the normal equipment route described at the end. A new magic module is optional, not a requirement for every weapon.
+1. **One fantasy, one verb.** Say it in a sentence ("a coffin on a chain you whirl around you"). Everything (mechanic, look, sound, skill) serves it.
+2. **A mechanic nobody else has** (§3). Movement, timing, positioning or target choice should change because you hold this weapon.
+3. **A rhythm or a build-up**: a combo count, a charge, momentum, stacks, a cycle. Something to read and play with.
+4. **The skill pays off the auto attack's own mechanic**, bigger and stranger, with a clear climax.
+5. **Anticipation → release → impact → linger** in the visuals, with painted shapes (ink outline, saturated fill, a small glow), not additive white washes.
+6. **A rank ladder you can see**: ★1 the plain move, each rank adds a layer (§7), ★5 is a spectacle.
+7. **A sound** for the cast and the big impact.
 
-Read just one reference:
+Keep it simple: one module for the rules, one for the look. No new systems, frameworks, build tools or config layers. No tests unless asked.
 
-- [mourning-bell.mjs](src/magic/mourning-bell.mjs): smallest delayed area attack; about 60 lines. Copy its lifecycle, replacing its Gravecraft art integration.
-- [kitsune-lantern.mjs](src/magic/kitsune-lantern.mjs): homing volleys, swept collisions, target selection, burn, splash, and cleanup. Copy only the parts your mechanic needs.
-- [barrow-rattle.mjs](src/magic/barrow-rattle.mjs): only when implementing an actual summoned actor with movement, attacks, and lifetime.
+## 2. Read exactly these
 
-Decide the ID, attack pattern, damage per hit, cooldown, reach, one visual motif, and how the player obtains it. Infer ordinary choices from the request. Balance a volley by its **total damage per cast**, including repeat hits and damage over time.
+| For | Read | Copy |
+|---|---|---|
+| Rules (host sim) | `src/magic/kitsune-lantern.mjs` (240 lines) | `magicPack`, `use()` guards, `step()` shape, target filter, `pendingHit` with `ownerId`, per-wielder state on the player |
+| Look | `src/fx/kitsune.mjs` (400 lines) | the `KITSUNE_FX` entry at the bottom, `paintFoxTails` (a rig), `paintFoxBolt` (list painter), `FOX_EVENTS` |
+| Skill script | the `kitsune-lantern` entry in `src/skill-book.mjs` and `SKILL_CALLS.foxring` | a `call` beat that runs your module's own mechanic |
+| Brushes | the `Painter` class and `tier()` in `src/fx/kit.mjs` (skim signatures) | |
 
-## 2. Add and register the module
+Only if your weapon needs it: Starfall (`src/fx/starfall.mjs`, `meteor` in `src/arsenal.mjs`) for a telegraphed ground strike; the Pallbearer's Flail (`src/magic/pallbearer.mjs`, `src/fx/pallbearer.mjs`) for per-wielder physics state and a skill run by its own module. Don't open other weapons' modules "for ideas": the table below is the idea inventory. Don't `cat` SVGs (big).
 
-Create `src/magic/<id>.mjs` exporting **`magicPack`, `use(world, player)`, and `step(world, dt)`**. Use a unique kebab-case ID consistently for the item, `packId`, and sprite keys. Example metadata:
+## 3. Don't repeat these patterns
+
+Taken auto attacks (weapon: pattern):
+
+| | |
+|---|---|
+| fist, spear, sword, broadsword, flamberge | melee swing arc with knockback |
+| recurve, bonebow | arrows |
+| crookstaff, skullstaff | bolt that bursts on impact |
+| cinder-staff | firebolt that sets the first foe burning |
+| tome | nova ring around you |
+| fangs | three-hit dagger combo |
+| soulchain | lash that pulls |
+| scythe | reaping arc that heals you |
+| wisplantern | homing wisps |
+| stormrod | chain lightning between foes |
+| starfall | meteor strike on the target |
+| crowtotem | crows fly out and peck |
+| jacklantern | planted pumpkin sentry |
+| wighthorn | summoned Grave Knight |
+| barrow-rattle | skeleton summons (up to four) |
+| censer | freezing frost cloud |
+| gloomgrasp | shadow pool with hands that crush and hold |
+| plaguebeak | lobbed vial → lingering miasma cloud |
+| kitsune-lantern | 3/6/9 homing foxfire volleys from idle tails |
+| widows-needle | pinning dart (root) |
+| spirit-fan | cone gust that shoves and breaks wind-ups |
+| mourning-bell | delayed expanding ring |
+| pallbearer | coffin on a chain with rope physics: heaves build momentum, damage scales with speed, a dodge whips it |
+
+Taken skills: leap slam + stun; line lunge + thorn roots; spinning crescents + wave; leap smash + ground split; fire cyclone on you; blink between foes; pull-then-push reaps; chain-bind + burst; fanned volleys + arrow rain; piercing lance; seeking salvo; drifting drain orb; triple fire rings; wisp swarm; lightning storm; constellation star shower; flock sweep; bomb barrage; horn push + knight charge; freeze + shatter; maw from shadow; miasma vials; foxfire rings + pounce; bone eruption + more summons; fireball rain; web pin + needle rain; cyclone → gale; triple toll; whirl-up, hurl, slam, and the chain yanks you in (pallbearer).
+
+Fresh ground (pick one, or invent): a held tether or beam that drags or links foes, blades orbiting the wielder, a boomerang with a return path, ricochets off foes and walls, marks that stack and detonate, hold-to-charge and release, a trail on the ground that hurts or closes shapes, a gravity well, echoes that repeat your last attack, a decoy or mirror, swapping places with a projectile, reflecting enemy shots, stance switching, timing windows, grow-with-kills, foe-triggered traps, throwing one foe into others, spending health for power.
+
+When you finish, **add your weapon to both lists above**.
+
+## 4. Files to touch (and nothing else)
+
+Write a 5-line design brief first (fantasy, auto verb, rhythm, skill climax, look/palette), then:
+
+- [ ] `src/magic/<id>.mjs`: `magicPack`, `use(world, player)`, `step(world, dt)` (§5).
+- [ ] `src/magic/load.mjs` → `SPECS`: add `'<id>.mjs'`.
+- [ ] `src/engine.mjs` → `MAGIC_AIM`: `'<id>': {reach, range}` (+`speed` for straight shots that should lead). Without it auto-aim uses fist range.
+- [ ] `src/skill-book.mjs` → `SKILL_BOOK['<id>']` and, for the weapon's own mechanic, a `SKILL_CALLS` function (§6).
+- [ ] `src/fx/<id>.mjs` exporting `<NAME>_FX`, added to `WEAPON_FX` in `src/fx/index.mjs` (§7).
+- [ ] `src/fx/kit.mjs` → `HUES['<id>']`: `H(core, main, glow, deep, alt)`; used by the generic flourishes (rank-up, damage flair).
+- [ ] `src/magic/art.mjs`: `HELD_GEAR['<id>']` (reuse a motion: `staff`, `swing`, `thrust`, `bow`, `bell`, `fan`, `rattle`, `needle`, `tome`), or add the id to `UNHELD` when your rig draws the weapon itself.
+- [ ] `assets/magic/<id>/item.svg` (+ square `icon.svg`): hand-written SVG, cartoon horror, thick `#2b2233` outlines, strong silhouette, 2 to 5 KB.
+- [ ] `src/progression.mjs` → `ITEM_RARITY` and the matching `POOLS` list (expedition loot). `STARTERS` in `src/arena.mjs` only if asked.
+- [ ] `src/audio.mjs` → `play()`: a synth branch for your cast/impact event types (copy the `foxfire` branch shape).
+
+Imports use the suffix `?v=harvest-18` exactly like their neighbours (registries are singletons per URL). Don't bump it. Don't also add the id to `EQUIPMENT`, `EQUIPMENT_SLOT_ITEMS` or `WEAPON_STYLES`: the registry supplies inventory, equipment, arena offers and the lab.
+
+## 5. Rules: the host sim contract
+
+The host steps the world at 20 Hz; guests and renderers only draw snapshots. `World.attack()` auto-aims then calls your `use()`; `attackMagic()` around it charges stamina, default cooldown and wear, and stamps `player.magicCast` (you may set `player.cooldown`, `action`/`actionUntil` and call `world.wearEquipped(player, 'weapon', 1)` yourself, as the kitsune does).
+
+- **`use`**: return `null` with no side effects for wrong/broken weapon, `down`/`ghost`/offline player, `cooldown > .05`, non-finite position. Normalise `dx/dz` (fallback `0, 1`). Capture `ownerPower(world, player)` at cast time. Return the created state (truthy).
+- **`step(world, dt)`**: bail unless `dt > 0`. Touch only your `packId` entries; iterate backwards when splicing. Everything has a finite life; clean up on hit, miss, lost target and expiry. Sweep fast things (segment vs circle) so a big `dt` can't tunnel.
+- **Targets**: `e.hp > 0`, finite position, `!isMagicAlly(e)`, not a player id.
+- **Damage**: `(world.pendingHit ||= []).push({targetId, amount: Math.round(base*power), ownerId})`. Always `ownerId`: it gives kill credit, weapon mastery (rank on expeditions) and trinket effects. Never also subtract HP yourself. Hit each foe once per swing/shot, or with a per-target cooldown (`hitAt: {id: time}`) for continuous contact.
+- **Other queues**: `pendingBurn {targetId, dps, remaining}`, `pendingRoot {targetId, remaining}`. `pendingKnock` is dropped for magic weapons (no knockback by design); pulls in skills (`push < 0`) still work.
+- **State**: plain numbers/strings/arrays only. Per-wielder state (combo count, charge, a physics head, a rolled look) goes **on the player** as `p.<name>`: players replicate and save whole. Per-attack state goes in an existing snapshotted list: `magicBolts`, `magicPuffs`, `magicCasts`, `magicSweeps`, `magicDarts`, `magicPins`, `magicRoots`, `magicSummons`, `magicWaves`, as `{id: world.nextId('x'), packId, ownerId, x, z, age, life, ...}`. A new list needs `SNAP_LISTS` in `src/magic/registry.mjs`; avoid it.
+- **Events** for sound and one-shot visuals: `world.event(type, x, z, '', {player: p.id, itemId: PACK, ...})`. One per cast or big impact, never per particle. Events carrying `player` or `itemId` get `rank` (and your `look`) filled in before your painter sees them.
+- **Balance**: judge total damage per cast (all hits, bursts, burns) per second of cooldown against a neighbour of the same rarity, using the lab's damage meter. Uncommon (green) and rare (blue) weapons get half damage and longer cooldowns on purpose, so a showpiece weapon is usually epic or legendary.
+
+## 6. The skill
+
+`SKILL_BOOK['<id>'] = {name, blurb, cooldown (11–16), reach, pose (seconds), cast(k)}`. `cast` runs once on the host and schedules beats with `k.beat(delay, spec)`; `k.dmg(m)` is m ordinary hits (level, rank and stamina included), `k.target(range)` picks the mark `{x, z, enemy}`, `k.foes(range)` lists foes nearest first, `k.scatter`/`k.turn` place things, `k.strength` is the stamina factor. Generic beat kinds (`blast`, `arc`, `line`, `wave`, `pulse`, `dash`, `blink`, `shots`, `bolt`, `summon`, `heal`) are already used everywhere, so lean on them for supporting hits only. The unique part should be a **`{kind: 'call', fn: '<name>', fx: '<name>'}` beat** whose `SKILL_CALLS[name](world, b, owner, obstacles, {hit, hostiles, dist})` drives your module's own mechanic (spawn a supercharged version of your state, change your player field, etc.) and returns extra fields for its `fx:<name>` event. Beats with `fx` fire an `'fx'` event (`fx:<name>` in painters) when they land; lasting beats (`wave`, `pulse`) and pending ones can be drawn every frame from `world.beats` via your `beats` painters.
+
+## 7. The look: `src/fx/<id>.mjs`
+
+Both renderers (Three.js and Canvas) draw the same command lists; nothing is per-renderer. Register one object in `WEAPON_FX` (`src/fx/index.mjs`):
 
 ```js
-import {isMagicAlly, ownerPower} from './registry.mjs?v=harvest-18';
-const PACK = 'your-weapon';
-export const magicPack = {
+export const MY_FX = {
   id: PACK,
-  item: {
-    id: PACK, name: 'Your Weapon', icon: PACK, kind: 'weapon', slot: 'weapon',
-    damage: 20, durability: 150, cooldown: .8, stamina: 8,
-    blurb: 'One sentence explaining what the attack does.',
-  },
-  sprites: {
-    item: {
-      src: `assets/magic/${PACK}/item.svg`,
-      icon: `assets/magic/${PACK}/icon.svg`, // Optional separate UI image.
-      size: [1.4, 1.8], anchor: [.5, .42], columns: 1, rows: 1,
-      clips: {idle: {frames: [0], fps: 1}},
-    },
-  },
+  events: {'<event type>' | 'fx:<skill fx>': {life: ev => secs, paint(d, ev, age, seed){}, kick: ev => ({shake, flash, color})}},
+  beats: {'<skill fx>': {pending(d, b, tt, clock){}, lasting(d, b, t, clock, lead){}}},   // skill beats before/while they fire
+  look: owner => ({look: owner?.myLook}),                  // optional: merged into its events and beats
+  lists: {magicBolts: (d, entry, owner, ctx) => {}},       // your entries in world lists; ctx {lead, clock, time, world, rig(ownerId)}
+  skillCast: (d, cast, owner, age) => {},                  // replaces the generic skill-cast burst
+  magicCast: false,                                        // or (d, p, cast, age): replaces the generic auto-attack flourish
+  rig: (d, world, p, anchor, motion, clock, time) => ({origin, keep}),  // drawn on the wielder every frame while equipped
 };
-// Implement use and step using the lifecycle below and your chosen reference.
 ```
 
-Add `'<id>.mjs'` to **`SPECS` in [src/magic/load.mjs](src/magic/load.mjs)**. Missing `use` or `step` means the registry rejects the module; keep an empty `step` for an instant attack.
+- **Rig** = anything that hangs on the wielder while equipped (tails, a chain, an orbiting thing). It gets its own mesh sorted at `origin` (default: just behind the body; return `{x, y: 0, z}` of the object to sort it in front of or behind the body correctly). `anchor` is the rendered body position (smooth), `motion` its smoothed `{vx, vz}`. Whatever you return as `keep` reaches your list painters as `ctx.rig(ownerId)` (the kitsune launches foxfires from its tail tips this way). Clock-driven idle motion (sway, bob, breathing) is what makes the weapon feel alive.
+- **Painter** (`d`), world units, y up: `orb(x,z,y,r,color,a,{glow,soft,ground})`, `path(points[[x,y,z]], width, color, a, {glow, soft, fill: true|'ribbon', taper})`, `bloom`, `pool`, `stain`, `ring`, `mark` (ink+colour+halo ring), `shock`, `star`, `twinkle`, `beam`, `rays`, `groundRays`, `sparks(x,z,y,n,t,…)`, `motes`, `debris`, `lightning`, `crescent`, `sigil`, `streak`, `light(x,z,r)` (lights the night). Helpers: `at(x,z,y,u,v)` (billboard offset: u right, v up on screen), `rnd(seed,i)`, `easeOut`, `bump`, `fade`, `tier(rank)`, `INK`.
+- **Rank ladder** via `tier(rank)`: ★1 plain shape; ★2 `glow` + trails; ★3 sparks, rays, a second ring; ★4 sigils, pillars, debris, camera `shake`; ★5 prismatic `alt` colour, most particles, screen `flash` on the climax. Rank comes from `rankOf(owner, PACK)` (`src/progression.mjs`) in list painters; events and beats already carry `rank`.
+- **Motion**: draw from replicated state only (`age`, positions, `ctx.lead` to extrapolate `x + vx*lead` between 20 Hz snapshots, `clock` for idle loops). No `Math.random()` (use `rnd(seed, i)`), no `Date.now()`, never mutate the world.
 
-Copy the current import query suffix from neighboring modules (currently `?v=harvest-18`), especially for the mutable registry. Differently queried imports can create different registry instances. Do not bump versions across the project; deployment handles release stamping.
+Lessons from the two reworks (each cost an iteration):
 
-For this route, do **not** also add the item to `EQUIPMENT`, `EQUIPMENT_SLOT_ITEMS`, or `WEAPON_STYLES`. `magicItems` already supplies these contracts. `item.icon` is a **sprite key**; `sprites.item.icon` is an **image path**. Sprite paths beginning `assets/` resolve from the Hollowstead root.
+- Painted beats additive. Saturated fill over an ink outline reads on the pale ground; additive layers wash to white. Use `glow` only for halos and hot cores.
+- Anything whose points all sit at `y ≤ .16` is routed to the ground lists (drawn under sprites). Keep an outline and its fill in the same list: lift both above `.16` or keep both on the ground.
+- Flames and wisps **shrink** as they die; don't fade a translucent fill over ink (it turns brown).
+- Smooth curves need about 20+ points; build ribbons with `fill: 'ribbon'` and widths that taper with `sin(π·t)`.
+- A bright body needs 3 to 4 nested layers (ink grow, main, alt at .6, core at .3), plus a glow halo from ★2.
+- Physics on the host: substeps, and keep speed through constraints (a naive projection bleeds energy every step). Draw it in the rig from replicated state, extrapolated with `lead` (the flail extrapolates its angle round the wielder and smooths only the radius).
+- Melee-range weapons: foes crowd to 0.5–1.4 from the wielder. Make sure that band gets hit, and film with `--dist 2`.
+- Budget: at ★5 with 20 foes, keep fx under about 0.6 ms per frame and 10k vertices (the kitsune measures 0.52 ms / 9.4k). Cull with `d.near(x, z)`, cap particles by tier.
 
-## 3. Implement combat through the host
+## 8. Verify (fast)
 
-`World.attack()` auto-aims, calls `attackMagic()`, then `use()`. The host calls `step()` and consumes queued hits before removing dead enemies and awarding kills. Rendering never advances combat.
+Serve the repo root (`python3 -m http.server 8765` from the folder containing `hollowstead/`), open `http://localhost:8765/hollowstead/?lab`: any weapon, any rank, foes on demand, damage meter, **Free skills**.
 
-**In `use`:** reject wrong/broken gear, downed/ghost/offline players, cooldown, and invalid coordinates. Normalize `player.dx/dz` with a zero-length fallback. Capture `ownerPower(world, player)` **before wear or swapping**; it includes level, equipped arena rank, and temporary power. Create the attack state and return it; return `null` without side effects when rejected.
-
-`attackMagic()` handles stamina, default cooldown, default weapon wear, and the replicated `player.magicCast` stamp after a successful use. Prefer those defaults. Existing packs sometimes call `world.wearEquipped(player, 'weapon', 1)` and set cooldown/action themselves; the wrapper avoids charging unchanged values twice. Do not manually subtract stamina or stack durability. Arena stamina and wear are disabled centrally. For a longer pose, set `player.action = 'attack'` and `player.actionUntil = world.time + duration` together.
-
-**In `step`:** accept only finite positive `dt`. Advance only entries with your `packId`. Use simulation seconds, finite lifetimes, and a backwards loop when splicing shared lists. A large `dt` must cross a delayed hit correctly before expiring it. Use swept segment collision for fast shots and stored hit IDs for attacks that should strike each foe only once.
-
-Target living enemies with finite positions, excluding `isMagicAlly(enemy)` and IDs belonging to `world.players`. Send each hit through one authority path. Recommended for delayed magic:
-
-```js
-(world.pendingHit ||= []).push({
-  targetId: enemy.id, amount: Math.round(baseDamage * cast.power),
-  ownerId: cast.ownerId,
-});
-if (enemy.home && !enemy.aggro) enemy.aggro = true;
-```
-
-The engine applies damage, displays numbers, and assigns `lastHitBy` from `ownerId`. Always pass `ownerId` (a module that subtracts HP itself, like the barrow skeletons or cinder bolts, sets `enemy.lastHitBy` instead): the kill credits weapon mastery on expeditions (`src/mastery.mjs`) and trinket kill effects. Optional queues:
-
-- `pendingKnock`: `{targetId, dx, dz}`. Currently dropped by the engine: area and magic weapons do not knock foes back. Only the weapons in `KNOCKBACK_WEAPONS` (`src/progression.mjs`: fists, spear, sword, fangs and the bows) push, in their auto attacks and skills; pulls (negative skill `push`) still work for every weapon.
-- `pendingBurn`: `{targetId, dps, remaining}`; seconds, refreshed/replaced rather than stacked. The burn has no independent owner field; establish kill credit on the initial hit. Use the existing `arsenal.mjs` `applyDot` pattern if separate DoT ownership is essential.
-- `pendingRoot`: `{targetId, remaining}`; seconds of immobilization.
-
-Do not apply direct HP damage **and** enqueue the same hit, or write both `enemy.pendingHit` and `world.pendingHit`. `world.hurt`/`hurtQuiet` injure **players**. Older pack comments about absent enemy-damage helpers or unregistered durability are historical; use the current contracts above.
-
-Use the existing snapshotted lists: `magicBolts`, `magicPuffs`, `magicCasts`, `magicSweeps`, `magicDarts`, `magicPins`, `magicRoots`, `magicSummons`, `magicWaves`. Entries should be plain serializable objects, usually `{id: world.nextId('prefix'), packId: PACK, ownerId, x, z, age: 0, life, ...}`. Store target IDs, arrays, and numbers, not object references, Sets, functions, or browser objects.
-
-`magicPack.worldLists` adds visual enumeration/cleanup only: it does **not** add replication. A genuinely new list also needs `SNAP_LISTS` in `src/magic/registry.mjs`; prefer an existing list. Do not reuse `world.projectiles` unless intentionally using the engine's built-in projectile simulation. Clean up attacks and cosmetic entries on hit/expiry, including misses and lost targets.
-
-## 4. Give it readable art and motion
-
-Create transparent `assets/magic/<id>/item.svg` and, if useful, a simpler square `icon.svg`. Match the game: simple cartoon horror, thick dark outlines (around `#2b2233`), a strong silhouette, vibrant accents, large readable shapes. Keep collision sizes separate from artwork. Hand-authored SVG works directly; no full art regeneration or new dependency is needed. Avoid dumping existing SVGs into context: some contain large embedded metadata.
-
-Register the held pose in **`HELD_GEAR` in [src/magic/art.mjs](src/magic/art.mjs)**, using the item sprite key:
-
-```js
-'your-weapon': {motion: 'staff', sprite: 'your-weapon', handY: 1.12},
-```
-
-Reuse `staff`, `swing`, `thrust`, `bow`, `bell`, `fan`, `rattle`, `needle`, or `tome` motion first. Add a motion branch to `heldWeaponPose` only for a distinct gesture. Prefer anticipation → release → settle, with a subtle idle bob. Do **not** add a new SVG weapon to `GRAVECRAFT`: that shortcut forces the existing Gravecraft PNG convention and skips the module's sprite definitions.
-
-Choose one attack-visual route:
-
-- **Sprites:** define `sprites.projectile`, `sprites.impact`, and/or `sprites.cast`. Registry keys become `<id>:projectile`, `<id>:impact`, and `<id>:cast`; the corresponding standard lists choose them automatically. `magicSweeps` uses `sprites.sweep` frame arrays. For a list without a built-in role, such as `magicWaves`, set `entry.sprite` to a registered key. Sprite metadata uses world-unit `size`, bottom-left-normalized `anchor`, and optional sheet `columns/rows/clips`.
-- **Procedural effects:** add the pack to `usesMagicEffects()` and emit paths/orbs from `buildMagicEffects()` in [src/magic/effects.mjs](src/magic/effects.mjs). For elaborate effects, follow [kitsune-effects.mjs](src/magic/kitsune-effects.mjs) in a separate helper. These commands already render in both Canvas and Three.js; no per-renderer rewrite is needed. `path` points are **`[x, y, z]`**; the `orb` helper takes **`(x, z, y, radius, color, alpha)`**. Use convex fills or paired `'ribbon'` strips for mesh triangulation. Keep the shared entity budget, and exclude helper-handled entries from generic iteration so they are not counted again.
-
-Only suppress fallback sprites with `usesMagicEffects` once a procedural drawing path exists. Draw from replicated `age`, `frame.time`, and bounded `frame.lead`; do not mutate the world, run collisions, or use `Date.now()`/randomness to drive attacks. Keep per-cast particles bounded and give the impact its own brief recovery/fade.
-
-Optional sound: emit one meaningful `world.event(type, x, z)` per cast or major impact and handle the type in `src/audio.mjs`. Avoid one audio event per particle. The existing `swing` event is automatic.
-
-## 5. Make it aim and become obtainable
-
-1. **Auto-aim:** add `'<id>': {reach: RANGE, range: RANGE}` to `MAGIC_AIM` in `src/engine.mjs`. Add `speed` for straight shots that need target leading; homing shots usually do not need it. Otherwise a new magic weapon falls back to fist range and arena auto-attack feels broken.
-2. **Rarity:** add the ID to `ITEM_RARITY` in `src/progression.mjs`. This controls the card and later arena offer weights. Magic registration already includes it in `arenaWeapons()` and rank-up offers; no separate hotbar or arena-card registration is required. The item's `blurb` supplies the card text.
-3. **First arena card, when requested:** in `src/arena.mjs`, make `STARTERS[0]` the singleton `['<id>']`, preserving exactly three groups total. Putting it in a larger group makes it random. `?arena` opens this mode.
-4. **Expedition access, only when requested:** add to the appropriate `POOLS` array in `src/progression.mjs`, or add a recipe in `src/content.mjs` using an existing recipe/station pattern. Rarity alone does not add loot. An arena prototype needs neither.
-
-## 6. Finish without expanding the task
-
-Honor requested validation. If the user says to skip tests/browser runs, do so and report that honestly. Otherwise use a short arena pass: pick → attack → see damage/effects → miss/expire → swap → rank up. For new combat logic, focus checks on ally exclusion, one intended hit per target, cooldown/costs, cleanup, and level/rank scaling; include snapshot/restore only when adding persistent attack state.
-
-Existing focused tests, run from the repository root when relevant:
+Film it instead of screenshotting by hand (one tiled PNG, deterministic frames):
 
 ```sh
-node --test hollowstead/tests/magic.test.mjs
-node --test hollowstead/tests/battle.test.mjs
+node hollowstead/tools/fx-film.mjs --weapon <id> --ranks 1,3,5 --perf
+node hollowstead/tools/fx-film.mjs --weapon <id> --ranks 5 --skill --times .2,.6,1.1,1.8
+# also: --dist 2 (pull foes close: melee), --move (walk right), --formation around|wall, --foes 12, --zoom 1.2, --size 460x380, --canvas (fallback renderer)
 ```
 
-Use the first for magic contracts, the second for arena/aim/arsenal changes. They do not automatically verify a new mechanic; add focused behavioral cases when needed, not copied assertions for every constant. Avoid full-suite runs, balance simulations, new build tools, or UI redesigns for a small prototype. Report the weapon ID, how to obtain it, and validation performed. Follow the session's commit/push instructions.
+Look at the PNG, fix, re-film. Check: it hits (lab meter climbs), nothing lingers after foes die, no console errors (the tool prints them), ★1 vs ★5 clearly differ. Focused tests when asked: `node --test hollowstead/tests/magic.test.mjs` (known pre-existing failure: "all five items and the skeleton atlas").
 
-Known test maintenance: `magic.test.mjs` currently hardcodes five packs, six sprites, and PNG-only assets. Those assertions predate the Nine-Tail Lantern and its SVGs. A failure there needs updated asset expectations when test work is in scope, not a new weapon-registration workaround. Do not claim the suite passed without running it.
+## 9. Deliver
 
-## 7. Skill, rank flourish and effects
+Report the id, how to get it (rarity/pool, or the lab), and what you verified. Follow the session's delivery rule (the user tests, commits and pushes; write files into their folder when asked). Add the weapon to §3.
 
-Every weapon has an auto attack (everything above) and a **skill**: the ✦ button or Q. A skill needs at least 40 stamina, drains the whole bar (a fuller bar deals more, from 70% to 100%), and recharges on its own cooldown (`p.skillCd`). Rank (★1–★5, `rankOf` in `src/progression.mjs`) adds damage (22% per rank in the arena, 8% on an expedition, where it is earned by kills: `MASTERY`, `src/mastery.mjs`) and decides how much flourish both moves show. A new weapon needs nothing extra for mastery as long as its hits carry `ownerId`.
-
-- **Script the skill** in `SKILL_BOOK` in [src/skill-book.mjs](src/skill-book.mjs): `{name, blurb, cooldown, reach, pose, cast(k)}`. `cast` schedules beats with `k.beat(delay, spec)`; `k.dmg(m)` is m ordinary hits (level, rank and stamina included), `k.target(range)` picks the mark, `k.foes`, `k.scatter` and `k.turn` help place things. Beat kinds, all host-stepped in [src/skills.mjs](src/skills.mjs): `blast`, `arc`, `line` (fire once), `wave` (travels, hits each foe once), `pulse` (repeats; fixed, `follow`ing the wielder or drifting with `v`), `dash`, `blink`, `shots` (engine projectiles), `bolt` (sky lightning that chains), `summon`, `heal` and `call` (a named function in `SKILL_CALLS`). Shared hit effects: `dmg`, `falloff`, `push` (negative pulls; `pushDir` 'along' or 'side'), `stun`, `freeze`, `slow`, `root`, `dot`, `leech`. A lasting beat can queue an `end` beat. `track` makes a pending beat follow a foe.
-- Beats live on `world.beats`, a snapshotted list. Keep them plain data; the script runs once, on the host, when the skill fires.
-- **Draw it** in [src/fx/skills.mjs](src/fx/skills.mjs): an `EVENTS['fx:<fx>']` painter for the moment a beat fires (its `'fx'` event), and a `BEATS[<fx>]` painter with `pending` (before it fires) and/or `lasting` (while a wave or pulse runs). Starfall's painters live in [src/fx/starfall.mjs](src/fx/starfall.mjs) as the worked example. Painters get a `Painter` from [src/fx/kit.mjs](src/fx/kit.mjs) (bloom, pool, shock, mark, sigil, rays, sparks, motes, debris, lightning, crescent, star...) and `tier(rank)`, which says what a rank buys: ★1 the plain shape, ★2 glow and trails, ★3 sparks, rays and a second ring, ★4 sigils, pillars, debris and a camera kick, ★5 prismatic extras and a screen flash. Additive light goes through `glow`; anything at ground height is drawn under the sprites automatically.
-- **Auto-attack flourish** comes from events: melee `slash`/`cleave`, `nova`, `burst`, `chain`, `lash`, `rend`, `frost`, `summon` and hits (`damage` events carry `by`) are dressed up from ★2 in [src/fx/flair.mjs](src/fx/flair.mjs); projectiles glow when they carry `rank`; magic packs get a cast flourish from `player.magicCast`. Include `rank` and `itemId` in a new attack's events so it joins in.
-- **Try it** in the weapon lab (`?lab`): any weapon, any rank, foes on demand, a damage meter, and **Free skills** to replay a skill without waiting.
-
-## Alternative: reuse the normal arsenal
-
-For an existing attack style, add metadata to `EQUIPMENT` in `src/content.mjs`, weapon membership to `EQUIPMENT_SLOT_ITEMS.weapon` in `src/contracts.mjs`, and stats/style to `WEAPON_STYLES` in `src/progression.mjs`. Match an existing entry so its required fields are present. Add item/held sprites to `themes/harvest/theme.json` and `HELD_GEAR`, then rarity and the desired acquisition path above. `arenaWeapons()` includes registered styles automatically.
-
-`World.attack()` in `src/engine.mjs` already implements melee, arrow, bolt, and nova. Other styles dispatch through `ARSENAL` in `src/arsenal.mjs`; use `world.strike(player, enemy, damage, push)` for immediate standard-weapon hits. Only extend `ARSENAL`/`stepArsenal` when adding a behavior that cannot reuse an existing style. New projectile kinds also need presentation mapping; reusing an existing kind avoids that work. Do not register the same ID as both a magic module and normal equipment.
-
-## Find only what you need
-
-Use symbol searches instead of reading whole engine/renderer files:
+## Symbol searches
 
 ```sh
-rg -n -A 24 'MAGIC_AIM|attackMagic\(|consumeMagicQueues\(' hollowstead/src/engine.mjs
-rg -n 'ITEM_RARITY|POOLS|WEAPON_STYLES' hollowstead/src/progression.mjs
-rg -n 'HELD_GEAR|heldWeaponPose' hollowstead/src/magic/art.mjs
+rg -n 'MAGIC_AIM' hollowstead/src/engine.mjs
+rg -n 'ITEM_RARITY|const POOLS' hollowstead/src/progression.mjs
+rg -n 'HELD_GEAR|UNHELD' hollowstead/src/magic/art.mjs
+rg -n "'kitsune-lantern'|SKILL_CALLS|foxring" hollowstead/src/skill-book.mjs
+rg -n "type==='foxfire'" hollowstead/src/audio.mjs
 ```
 
-Skip `legacy/`, world generation, networking internals, UI catalogs, and the full implementation plan unless the mechanic actually touches them. Keep new authoring notes here: the repository's `.gitignore` excludes `docs/` directories.
+Normal arsenal weapons (sword, bows, starfall...) use `WEAPON_STYLES` + `ARSENAL` (`src/arsenal.mjs`); new weapons should be magic modules unless they're a variant of an existing style.

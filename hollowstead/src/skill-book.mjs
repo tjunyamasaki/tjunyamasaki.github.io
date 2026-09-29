@@ -7,6 +7,7 @@ import {ALLIES} from './progression.mjs?v=harvest-18';
 import {mine, skyPath, summon} from './arsenal.mjs?v=harvest-18';
 import {FOXFIRE} from './magic/kitsune-lantern.mjs?v=harvest-18';
 import {ownedSkeletons, raiseSkeleton} from './magic/barrow-rattle.mjs?v=harvest-18';
+import {RITE, beginRite} from './magic/pallbearer.mjs?v=harvest-18';
 import {isMagicAlly, ownerPower} from './magic/registry.mjs?v=harvest-18';
 
 const TAU = Math.PI*2;
@@ -243,6 +244,14 @@ export const SKILL_BOOK = Object.freeze({
       [[.3, 4, 1.3, .8, 0], [.85, 5.6, 1.3, 1, 0], [1.45, 7.2, 2, 1.6, .9]].forEach(([t, r, m, push, st], i) =>
         k.beat(t, {kind: 'blast', fx: 'toll', follow: true, r, dmg: k.dmg(m), push, stun: st, toll: i}));
     }},
+
+  pallbearer: {name: 'Last Rites', cooldown: 13, reach: RITE.reach, pose: .7,
+    blurb: 'Whirl the coffin to a scream and hurl it: it bursts open where it lands, stunning everything, and the chain drags you in after it.',
+    cast(k){
+      const t = k.target(RITE.reach, 5);
+      k.beat(0, {kind: 'call', fn: 'lastrites', fx: 'lastrites', tx: round(t.x), tz: round(t.z),
+        line: k.dmg(1.5), slam: k.dmg(4), drag: k.dmg(1.2), land: k.dmg(2)});
+    }},
 });
 
 // ------------------------------------------------------------------ special beats
@@ -326,4 +335,6 @@ export const SKILL_CALLS = Object.freeze({
     }
     return null;
   },
+  /** Last Rites: the flail's own module whirls, hurls, slams and yanks (src/magic/pallbearer.mjs). */
+  lastrites(world, b, owner){return beginRite(world, owner, b);},
 });

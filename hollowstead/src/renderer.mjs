@@ -107,7 +107,7 @@ class CombatLayer {
 }
 export class Renderer {
   constructor(canvas,theme){
-    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.tailMeshes=new Map();this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);
+    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.rigMeshes=new Map();this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);
     this.scene.fog=new THREE.FogExp2(theme.palette.background,.009);this.camera=new THREE.OrthographicCamera(-15,15,15,-15,.1,180);
     this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.setPixelRatio(Math.min(devicePixelRatio,1.6));this.gl.outputColorSpace=THREE.SRGBColorSpace;
     this.objects=new Map();this.textures=new Map();this.materials=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
@@ -258,19 +258,25 @@ export class Renderer {
    * behind the wielder's sprite so they sort behind it and in front of whatever stands further back.
    * Their glow and ground light join the frame's shared lists.
    */
-  syncKitsuneTails(player, body, world, frameFx){
-    const rig=frameFx&&!player.down?this.weaponFx.tails(world,player,{x:body.x,z:body.z,y:body.sprite.position.y},this.clock,this.magicFrame.time):null;
+  /**
+   * A weapon's body rig (src/fx WEAPON_FX `rig`: the kitsune's tails...), painted each frame into meshes
+   * of its own placed at the rig's `origin`, so it sorts against sprites by that point (behind the
+   * body by default). Its ground light joins the frame's shared lists.
+   */
+  syncWeaponRig(player, body, world, frameFx){
+    const rig=frameFx&&!player.down?this.weaponFx.rig(world,player,{x:body.x,z:body.z,y:body.sprite.position.y},this.clock,this.magicFrame.time):null;
     if(!rig)return;
-    let set=this.tailMeshes.get(player.id);
-    if(!set){set={paint:new MagicMesh(this.scene,{order:0,capacity:16384}),light:new MagicMesh(this.scene,{order:0,additive:true,capacity:8192})};this.tailMeshes.set(player.id,set);}
-    // Both sit just behind the body: the painted tails first, then their light, then the sprite.
-    set.paint.update(rig.normal,{x:body.x,y:0,z:body.z-.08});
-    set.light.update(rig.glow,{x:body.x,y:0,z:body.z-.07});
-    // Dim with the wielder at night, but the spirit keeps a little of its own light.
+    let set=this.rigMeshes.get(player.id);
+    if(!set){set={paint:new MagicMesh(this.scene,{order:0,capacity:16384}),light:new MagicMesh(this.scene,{order:0,additive:true,capacity:8192})};this.rigMeshes.set(player.id,set);}
+    // Painted first, then its light, both sorted at the rig's origin.
+    set.paint.update(rig.normal,rig.origin);
+    set.light.update(rig.glow,{...rig.origin,z:rig.origin.z+.01});
+    // Dim with the wielder at night, but a spirit keeps a little of its own light.
     set.paint.material.color.copy(body.sprite.material.color).multiplyScalar(.7).addScalar(.3);
     set.paint.mesh.visible=body.sprite.visible&&set.paint.count>0;set.light.mesh.visible=body.sprite.visible&&set.light.count>0;
     frameFx.groundGlow.push(...rig.groundGlow);frameFx.groundNormal.push(...rig.groundNormal);
   }
+
 
 
   /** A brief full-screen wash on the biggest weapon moments (src/fx). A DOM layer, so both renderers share it. */
@@ -307,7 +313,7 @@ export class Renderer {
     const p=world.player(localId)||world.players[0]||{x:0,z:2};const fx=demo?0:p.x,fz=demo?-1:p.z;
     this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);
     // Weapon effects first: their camera kick and their light on the night ground belong to this frame.
-    const weapon=demo?null:this.weaponFx.build(world,this.magicFrame,this.clock,dt,this.focus);for(const set of this.tailMeshes.values()){set.paint.mesh.visible=false;set.light.mesh.visible=false;}
+    const weapon=demo?null:this.weaponFx.build(world,this.magicFrame,this.clock,dt,this.focus);for(const set of this.rigMeshes.values()){set.paint.mesh.visible=false;set.light.mesh.visible=false;}
     const kick=weapon?.shake>0?weapon.shake*.32:0,kx=kick?(Math.sin(this.clock*71)+Math.sin(this.clock*43))*kick*.5:0,kz=kick?(Math.sin(this.clock*59+1)+Math.sin(this.clock*31))*kick*.5:0;
     this.camera.position.set(this.focus.x+kx,28,this.focus.z+27+kz);this.camera.lookAt(this.focus.x+kx,0,this.focus.z+kz);this.camera.updateMatrixWorld();
     const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;this.paintField(frame);this.paintFlash(weapon);
@@ -352,7 +358,7 @@ export class Renderer {
       if(kind!=='zone')o.sprite.material.opacity=kind==='drop'?dropBlink(e,world.time,this.clock):e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
       const fade=labelOpacity(display, frame.darkness, frame.lighting);
       if(kind==='building'&&STRUCTURES[key].light){const lit=key==='lantern'||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
-      if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);this.syncKitsuneTails(e,o,world,weapon);}
+      if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);this.syncWeaponRig(e,o,world,weapon);}
       // Night-only finds (regions.mjs) glow in the dark so they can be found from afar.
       if(kind==='node'){const hue=nightGlow(e);if(hue){this.glow(o,1.1);o.glow.material.color.set(hue);o.glow.material.opacity=(.16+.42*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));}}
       if(kind==='building'&&key==='gate'&&e.open)o.sprite.scale.x*=.35;

@@ -9,6 +9,7 @@ const SPECS = [
   'widows-needle.mjs',
   'spirit-fan.mjs',
   'mourning-bell.mjs',
+  'pallbearer.mjs',
 ];
 
 export async function loadMagicModules(){

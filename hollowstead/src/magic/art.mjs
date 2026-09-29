@@ -80,11 +80,14 @@ export function swingAngle(t){
   return -2.2+2.1*ease((t-.52)/.48);
 }
 
+/** Weapons not drawn in the hand: their src/fx rig draws them (WEAPON_FX `rig`). */
+export const UNHELD = new Set(['kitsune-lantern', 'pallbearer']);
+
 export function heldWeaponPose(player, time, theme={}){
   const tool = player.action === 'gather' && TOOL_GEAR[player.gatherTool] ? player.gatherTool : null;
   const id = tool || player.equipment?.weapon?.itemId;
-  // The Nine-Tail Lantern is not held: the kitsune shows itself as tails (src/fx/kitsune.mjs).
-  if(id === 'kitsune-lantern') return null;
+  // Weapons drawn as a body rig by src/fx are not held (the kitsune shows itself as tails).
+  if(UNHELD.has(id)) return null;
   const base = tool ? TOOL_GEAR[tool] : (GRAVECRAFT[id] || HELD_GEAR[id]);
   if(!base) return null;
   const spec = {...base, ...theme.magic?.weapons?.[id]};

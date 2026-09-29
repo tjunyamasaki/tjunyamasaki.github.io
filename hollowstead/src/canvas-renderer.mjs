@@ -49,11 +49,13 @@ export class CanvasRenderer {
   reveal(x,z){if(!this.view)return 1;return labelOpacity(brightnessAt(this.view.sources, x, z, this.view.darkness, this.view.lighting), this.view.darkness, this.view.lighting);}
   glow(x,z,r,opacity){const c=this.ctx,p=this.screenPoint(x,z),feather=this.view?.lighting.ambientFraction||1.2;c.save();c.translate(p.x,p.y);c.scale(1,.72);const radius=r*feather*this.scale;const g=c.createRadialGradient(0,0,radius*0.55,0,0,radius);g.addColorStop(0,`rgba(250,190,113,${opacity})`);g.addColorStop(.55,`rgba(250,190,113,${opacity*.35})`);g.addColorStop(1,'rgba(250,190,113,0)');c.fillStyle=g;c.beginPath();c.arc(0,0,radius,0,Math.PI*2);c.fill();c.restore();}
   drawSprite(key,e,kind,world,frame,p){
-    // The kitsune's tails (src/fx/kitsune.mjs) go down first, behind the wielder.
+    // A weapon's body rig (src/fx WEAPON_FX: the kitsune's tails...). One sorted behind the body is
+    // drawn now; one sorted in front of it (origin nearer the camera) after the body.
+    let rigAfter=null;
     if(kind==='player'&&this.frameFx&&!e.down){
       const bob=e.action==='walk'?Math.abs(Math.sin(this.clock*10+e.x))*this.theme.motion.walkBob:0;
-      const rig=this.weaponFx.tails(world,e,{x:e.x,z:e.z,y:bob},this.clock,this.magicFrame.time);
-      if(rig)drawMagicCanvas(this.ctx,[...rig.groundGlow,...rig.groundNormal,...rig.normal,...rig.glow],(x,z,y)=>this.screenPoint(x,z,y));
+      const rig=this.weaponFx.rig(world,e,{x:e.x,z:e.z,y:bob},this.clock,this.magicFrame.time);
+      if(rig){const list=[...rig.groundGlow,...rig.groundNormal,...rig.normal,...rig.glow];if(rig.origin.z>e.z)rigAfter=list;else drawMagicCanvas(this.ctx,list,(x,z,y)=>this.screenPoint(x,z,y));}
     }
     const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||this.images.get('ember'),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
     const special=kind==='ally'?(e.anim||'idle'):magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0||e.act>0?'attack':'walk'):e.action||'idle'),clip=def.clips[clipName]||def.clips.walk||def.clips.attack||def.clips.idle;
@@ -82,6 +84,7 @@ export class CanvasRenderer {
     c.drawImage(img,(frameIndex%cols)*sw,Math.floor(frameIndex/cols)*sh,sw,sh,-w*def.anchor[0],-h*(1-def.anchor[1]),w,h);c.filter='none';
     const glowImg=kind==='enemy'&&this.images.get('glow-'+key);if(glowImg){const gw=glowImg.naturalWidth/cols,gh=glowImg.naturalHeight/rows;c.globalCompositeOperation='lighter';c.globalAlpha=glowStrength(frame.darkness,e,this.clock);c.drawImage(glowImg,(frameIndex%cols)*gw,Math.floor(frameIndex/cols)*gh,gw,gh,-w*def.anchor[0],-h*(1-def.anchor[1]),w,h);c.globalCompositeOperation='source-over';}
     c.restore();
+    if(rigAfter)drawMagicCanvas(this.ctx,rigAfter,(x,z,y)=>this.screenPoint(x,z,y));
     if((kind==='enemy'||kind==='building'||(kind==='ally'&&key!=='crow'))&&e.hp<e.maxHp&&fade>0.04){const y=s.y-h*(key==='hearth'?.62:kind==='enemy'||kind==='ally'?key==='crawler'?.38:.82:.37);c.save();c.globalAlpha=fade;c.fillStyle='#2a2533';c.fillRect(s.x-21,y,42,4);c.fillStyle=kind==='enemy'?'#df9383':kind==='ally'?'#9fd8a8':'#d2c395';c.fillRect(s.x-20,y+1,40*Math.max(0,e.hp/e.maxHp),2);c.restore();}
     if(kind==='player'&&e.id!==p.id&&fade>0.05){c.save();c.globalAlpha=fade;c.font='10px Arial';c.textAlign='center';c.fillStyle='#f4e4c8';c.fillText(e.name,s.x,s.y-h-4);c.restore();}
     if(kind==='player'&&!e.down&&!e.ghost){

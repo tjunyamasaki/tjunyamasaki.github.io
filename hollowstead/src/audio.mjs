@@ -56,6 +56,18 @@ export class Sound {
       }
       return;
     }
+    if(type.startsWith('coffin')){
+      // The Pallbearer's Flail: a chain whoosh that rises with the spin, wooden thuds with an iron clank,
+      // a wail when the lid bangs open, and a grave-shaking slam.
+      const s=Math.min(1,(ev?.speed||8)/18);
+      if(type==='coffinheave'||type==='coffinthrow'){this.sweep(200+s*300,90,.26,'triangle',.018+.014*s);this.sweep(1500,700,.12,'square',.004,.03);return;}
+      if(type==='coffinhit'){const hard=!!ev?.hard;this.sweep(hard?150:190,48,hard?.3:.18,'sine',hard?.07:.045);this.sweep(hard?620:760,300,.08,'square',ev?.chain?.005:.012);return;}
+      if(type==='coffinshock'){this.sweep(520,1040,.4,'sine',.014);this.sweep(780,1560,.35,'sine',.008,.05);return;}
+      if(type==='coffinslam'){this.sweep(110,32,.7,'sine',.09);this.sweep(300,60,.4,'sawtooth',.02);for(const [f,d] of [[660,.05],[880,.12],[990,.2]])this.sweep(f,f*1.6,.6,'sine',.01,d);return;}
+      if(type==='coffinyank'){for(let i=0;i<5;i++)this.sweep(1800-i*120,900,.05,'square',.006,i*.035);return;}
+      if(type==='coffinland'){this.sweep(160,40,.35,'sine',.07);this.sweep(420,120,.2,'triangle',.02);return;}
+      return;
+    }
     if(type==='gloomcast'||type==='gloomgrab'){
       // A low swell as the shadow spreads; a crunching squeeze when a hand closes.
       const grab=type==='gloomgrab';

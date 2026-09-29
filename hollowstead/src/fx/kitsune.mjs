@@ -309,6 +309,9 @@ export function paintFoxCast(d, e, owner, lead){
 
 /** The kick of the ninth's burst: a camera jolt from ★3, a flash at ★5. */
 export const FOX_EVENTS = {
+  // Kitsune Parade (its SKILL_BOOK beats): the three rings and the spirit's pounce.
+  'fx:foxring': {life: () => .7, paint(d, ev, age){paintFoxRing(d, ev, age);}},
+  'fx:foxspirit': {life: () => 1.4, kick: ev => {const T = tier(ev.rank); return {shake: T.shake*1.3, flash: T.flash*1.04, color: '#fff0d8'};}, paint(d, ev, age, seed){paintFoxPounce(d, ev, age, seed);}},
   foxburst: {life: () => .01, kick: ev => {const T = tier(ev.rank); return {shake: .12+T.shake*.6, flash: T.r >= 5 ? .14 : 0, color: foxLook(ev.look).core};}, paint(){}},
 };
 
@@ -369,3 +372,23 @@ export function paintFoxSkillCast(d, cast, look, age){
   d.pool(cast.x, cast.z, 2.2, P.glow, .45*fade(k));
   if(T.r >= 3) d.sigil(cast.x, cast.z, 1.8, P.main, fade(k, 1.2)*easeOut(age/.1), {spin: age*3, sides: 9, glow: T.r >= 4});
 }
+
+/**
+ * The lantern's entry in src/fx/index.mjs WEAPON_FX: how its lists, events, skill cast and body rig
+ * are drawn. `ctx` gives {lead, clock, time, world, rig(ownerId)}.
+ */
+export const KITSUNE_FX = {
+  id: PACK,
+  events: FOX_EVENTS,
+  beats: {foxspirit: {pending(d, b, tt, clock){paintFoxLeap(d, b, tt, clock);}}},
+  /** Everything the kitsune does is drawn in its wielder's rolled colour. */
+  look: owner => ({look: owner?.kitsuneLook?.hue}),
+  lists: {
+    magicCasts: (d, e, owner, ctx) => paintFoxCast(d, e, owner, ctx.lead),
+    magicBolts: (d, b, owner, ctx) => {if(b.launched) paintFoxBolt(d, b, owner, ctx.rig(b.ownerId), ctx.lead, ctx.clock);},
+    magicPuffs: (d, e, owner, ctx) => paintFoxPuff(d, e, owner, foxRank(owner), ctx.lead),
+  },
+  skillCast: (d, cast, owner, age) => paintFoxSkillCast(d, cast, owner, age),
+  /** The tails, behind the body; returns the tip positions foxfires leave from. */
+  rig: (d, world, p, anchor, motion, clock, time) => ({keep: paintFoxTails(d, world, p, anchor, motion, clock, time)}),
+};

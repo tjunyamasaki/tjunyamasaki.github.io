@@ -3,7 +3,6 @@
 // when it fires (EVENTS, from its 'fx' event). Rank (tier) layers on the show: ★1 is the bare
 // shape of the move, each rank adds glow, sparks, rays, sigils, debris and, at ★5, the extras.
 import {INK, TAU, at, bump, clamp01, easeIn, easeInOut, easeOut, easeOut2, fade, hue, lerp, rnd, tier} from './kit.mjs?v=harvest-18';
-import {paintFoxLeap, paintFoxPounce, paintFoxRing} from './kitsune.mjs?v=harvest-18';
 import {paintImpact, paintMark, paintStar} from './starfall.mjs?v=harvest-18';
 
 const facingOf = e => Math.atan2(e.dz || 0, e.dx || 1);
@@ -315,9 +314,6 @@ export const SKILL_EVENTS = {
       if(k < 1) d.path([at(ev.x+Math.cos(a)*v*age, ev.z+Math.sin(a)*v*age, .5+2*age-6*age*age, -.06, 0), at(ev.x+Math.cos(a)*v*age, ev.z+Math.sin(a)*v*age, .5+2*age-6*age*age, .06, .12)], .06, '#d9ffe8', fade(k), {glow: true});
     }
   }},
-  // Kitsune Parade: drawn in the wielder's kitsune colour (src/fx/kitsune.mjs).
-  'fx:foxring': {life: () => .7, paint(d, ev, age){paintFoxRing(d, ev, age);}},
-  'fx:foxspirit': {life: () => 1.4, kick: kickOf(1.3, '#fff0d8'), paint(d, ev, age, seed){paintFoxPounce(d, ev, age, seed);}},
   'fx:boneburst': {life: () => 1.1, kick: kickOf(1), paint(d, ev, age, seed){
     const h = hue('barrow-rattle'), T = tier(ev.rank), r = ev.r || 3.6;
     burst(d, ev.x, ev.z, r, age, ev.rank, seed, h, {life: .6, y: .5});
@@ -497,7 +493,6 @@ export const SKILL_BEATS = {
     d.bloom(b.x, b.z, .9, .5+grow*.8, h.glow, .6*k);
     d.orb(b.x, b.z, .9, .18+grow*.15, '#ffffff', k, {glow: true});
   }},
-  foxspirit: {pending(d, b, tt, clock){paintFoxLeap(d, b, tt, clock);}},
   lanceshot: {lasting(d, b, t, clock, lead){
     const h = hue('bonebow'), T = tier(b.rank), x = b.x+b.dx*(b.v || 30)*lead, z = b.z+b.dz*(b.v || 30)*lead;
     const x0 = b.x0 ?? x, z0 = b.z0 ?? z, back = Math.min(6, Math.hypot(x-x0, z-z0));

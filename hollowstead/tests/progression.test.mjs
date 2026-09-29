@@ -55,7 +55,7 @@ test('loot tables roll by rarity and luck raises rare finds',()=>{
     assert.ok(coffer.some(r=>['rare','epic','legendary'].includes(rarityOf(r.itemId))));
     for(const {itemId,count} of [...reliquary,...coffer,...rollLoot('crate',rng)]){
       assert.ok(count>0);
-      if(!['cinder-staff','barrow-rattle','widows-needle','spirit-fan','mourning-bell'].includes(itemId))assert.ok(itemDefinition(itemId),itemId);
+      if(!['cinder-staff','barrow-rattle','widows-needle','spirit-fan','mourning-bell','pallbearer'].includes(itemId))assert.ok(itemDefinition(itemId),itemId);
     }
   }
   const lucky=seeded(5),plain=seeded(5);let luckyRare=0,plainRare=0;

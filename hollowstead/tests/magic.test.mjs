@@ -9,7 +9,7 @@ import {BELL} from '../src/magic/mourning-bell.mjs?v=harvest-18';
 import {MagicClock, heldWeaponPose} from '../src/magic/art.mjs?v=harvest-18';
 import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from '../src/magic/effects.mjs?v=harvest-18';
 import {clearShowcaseWorld} from '../src/showcase.mjs';
-import {WeaponFx} from '../src/fx/index.mjs?v=harvest-18';
+import {WEAPON_FX, WeaponFx} from '../src/fx/index.mjs?v=harvest-18';
 
 await loadMagicModules();
 
@@ -68,10 +68,11 @@ test('network/save round trips preserve travelling rings and their already-hit t
   assert.equal(guest.enemies.find(e=>e.id==='far').hp,TOLLED);
 });
 
+/** Commands for a weapon drawn by src/fx (a WEAPON_FX entry): the frame's effects plus its rig. */
 function foxCommands(world,p){
   const fx=new WeaponFx(),frame={time:world.time+.025,lead:.025};
   const built=fx.build(world,frame,1,1/60,{x:p.x,z:p.z});
-  const tails=fx.tails(world,p,{x:p.x,z:p.z,y:0},1,frame.time);
+  const tails=fx.rig(world,p,{x:p.x,z:p.z,y:0},1,frame.time);
   return [...built.normal,...built.glow,...tails.normal,...tails.glow];
 }
 test('both renderers receive finite, bounded effects without mutating the host world',()=>{
@@ -79,8 +80,8 @@ test('both renderers receive finite, bounded effects without mutating the host w
     const {world,p}=setup(id,magicItems[id].durability);foe(world,'target',2);
     world.attack(p);advance(world,.15);
     const before=JSON.stringify(world.snapshot());
-    // The Nine-Tail Lantern is drawn by src/fx (its tails and foxfires), not the pack effects.
-    const commands=id==='kitsune-lantern'?foxCommands(world,p):buildMagicEffects(world,{time:world.time+.025,lead:.025});
+    // Weapons with a WEAPON_FX entry (the lantern's tails, the flail's coffin) are drawn by src/fx, not the pack effects.
+    const commands=WEAPON_FX.some(fx=>fx.id===id)?foxCommands(world,p):buildMagicEffects(world,{time:world.time+.025,lead:.025});
     assert.ok(commands.length>0,id);
     assert.ok(commands.length<500,id);
     for(const c of commands){

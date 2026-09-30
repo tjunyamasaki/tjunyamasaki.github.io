@@ -2,15 +2,18 @@
 // Emits intent descriptions for the local player. Never reads a guest-supplied
 // actor id and never mutates the world. The host rechecks every command.
 
-import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-17';
-import {magicItems} from '../magic/registry.mjs?v=harvest-17';
-import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-17';
-import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-17';
+import {EQUIPMENT, ITEMS, label} from '../content.mjs?v=harvest-18';
+import {magicItems} from '../magic/registry.mjs?v=harvest-18';
+import {FRONTIER_LINES} from '../regions.mjs?v=harvest-18';
+import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-18';
+import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-18';
+import {TRINKET_TEXT} from '../trinkets.mjs?v=harvest-18';
 
 const SPECS = Object.freeze({
   feed: {icon: '▥', label: 'Feed', activation: 'tap'},
   cook: {icon: '◕', label: 'Cook', activation: 'tap'},
   awaken: {icon: '✦', label: 'Awaken', activation: 'tap'},
+  mend: {icon: '✺', label: 'Mend', activation: 'tap'},
   repair: {icon: '✚', label: 'Repair', activation: 'tap'},
   craft: {icon: '⚒', label: 'Craft', activation: 'tap'},
   build: {icon: '⌂', label: 'Build', activation: 'tap'},
@@ -29,9 +32,14 @@ const SPECS = Object.freeze({
   place: {icon: '✓', label: 'Place', activation: 'tap'},
   cancel: {icon: '✕', label: 'Cancel', activation: 'tap'},
   dismantle: {icon: '⌫', label: 'Dismantle', activation: 'hold'},
+  pull: {icon: '⇢', label: 'Pull', activation: 'tap'},
+  upgrade: {icon: '⇧', label: 'Upgrade', activation: 'tap'},
+  refine: {icon: '◈', label: 'Refine', activation: 'tap'},
 });
 
 const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock']);
+/** Context buttons the action cluster can show at once (main.mjs CONTEXT_BUTTONS). */
+const CONTEXT_SLOTS = 4;
 
 function make(id, extra = {}) {
   const spec = SPECS[id];
@@ -97,15 +105,27 @@ export function escapeStep({dragging = false, detailsOpen = false, panel = null,
   return 'open-menu';
 }
 
-/** Keys that still exist. C, Q, and G are intentionally absent. R and Tab cycle the weapon hotbar. */
+/** R and Tab cycle weapons; H drinks a potion from the pack. */
 export function keyboardAction(key) {
   const map = {
     i: 'inventory', b: 'build', m: 'map', f: 'lantern', e: 'primary',
-    ' ': 'attack', shift: 'dodge', enter: 'confirm', escape: 'escape',
+    ' ': 'attack', q: 'skill', shift: 'dodge', enter: 'confirm', escape: 'escape',
     '1': 'action-1', '2': 'action-2', '3': 'action-3', '4': 'action-4',
-    r: 'weapon-next', tab: 'weapon-next',
+    r: 'weapon-next', tab: 'weapon-next', h: 'potion',
   };
   return map[key] || null;
+}
+
+/** Potions stay in the pack; the hotbar uses the same revision-checked consume intent as inventory. */
+export function potionHotbar(player, {mode = 'normal', arena = false, pending = false} = {}) {
+  const stacks = (player?.inventory?.slots || []).filter(stack => stack?.itemId === 'elixir' && stack.quantity > 0);
+  const quantity = stacks.reduce((total, stack) => total + stack.quantity, 0);
+  const usable = quantity > 0 && !arena && !pending && !player?.down && !player?.ghost
+    && ['normal', 'inventory', 'chest'].includes(mode);
+  return {
+    itemId: 'elixir', quantity,
+    command: usable ? {type: 'consumeItem', uid: stacks[0].uid, inventoryRevision: player.inventory.revision} : null,
+  };
 }
 
 export function keyboardPrimary(actions, mode) {
@@ -127,7 +147,7 @@ export function isHarvestAction(id) {
 export function usableLantern(player) {
   if (!player || player.down || player.ghost) return null;
   const light = player.equipment?.light;
-  const lights = ['torch', 'everlantern'];
+  const lights = ['torch', 'everlantern', 'gravelight'];
   const equipped = lights.includes(light?.itemId) && light.durability > 0 ? light : null;
   let carried = null;
   for (const stack of player.inventory?.slots || []) {
@@ -231,6 +251,16 @@ export function describeContext(facts) {
         command: buildingCommand('awaken', id),
       }));
     }
+    // Mend the weapon in hand with a soul ember (mastery.mjs mendPlan); shown only when it is worn.
+    if (facts.type === 'hearth' && facts.mend?.itemId) {
+      list.push(make('mend', {
+        targetId: id,
+        label: `Mend +${Math.max(1, Math.round((facts.mend.boost || 0) * 100))}%`,
+        enabled: !!facts.mend.ok,
+        disabledReason: facts.mend.reason || 'Needs 1 soul ember',
+        command: buildingCommand('mend', id),
+      }));
+    }
   } else if (facts.type === 'bench') {
     list.push(make('craft', {
       targetId: id,
@@ -241,6 +271,12 @@ export function describeContext(facts) {
       targetId: id,
       command: buildingCommand('build', id),
       panel: {tab: 'build', stationType: 'bench', stationId: id},
+    }));
+    // Weapon refinement (src/refine.mjs): opens its own panel rather than the recipe catalog.
+    list.push(make('refine', {
+      targetId: id,
+      command: buildingCommand('refine', id),
+      panel: {sheet: 'refine', stationType: 'bench', stationId: id},
     }));
   } else if (facts.type === 'pot') {
     list.push(make('cook', {
@@ -254,6 +290,28 @@ export function describeContext(facts) {
       enabled: !facts.busy,
       disabledReason: 'Chest in use',
     }));
+  } else if (facts.type === 'cart') {
+    // Hand cart (cart.mjs cartFacts): take or drop the handle, open it like a chest, upgrade beside a workbench.
+    list.push(make('pull', {
+      targetId: id,
+      label: facts.towing ? 'Let go' : 'Pull',
+      enabled: !!facts.towing || !facts.towedByOther,
+      disabledReason: 'Someone else is pulling it',
+      command: {type: 'cart', op: facts.towing ? 'release' : 'pull', cartId: id},
+    }));
+    list.push(make('open', {
+      targetId: id,
+      enabled: !facts.busy,
+      disabledReason: 'Someone has it open',
+    }));
+    if (facts.level < facts.maxLevel) {
+      list.push(make('upgrade', {
+        targetId: id,
+        enabled: !!facts.canUpgrade,
+        disabledReason: facts.upgradeReason || 'Needs more materials',
+        command: {type: 'cart', op: 'upgrade', cartId: id},
+      }));
+    }
   } else if (facts.type === 'gate') {
     list.push(make('toggle', {
       targetId: id,
@@ -292,7 +350,12 @@ export function describeContext(facts) {
     }));
   }
   if (repair) list.push(repair);
-  return list;
+  // The cluster has four buttons: when a building offers more, greyed-out ones give way first.
+  for (let i = 1; i < list.length && list.length > CONTEXT_SLOTS;) {
+    if (list[i].enabled) i++;
+    else list.splice(i, 1);
+  }
+  return list.slice(0, CONTEXT_SLOTS);
 }
 
 export function clusterFor(mode, {context = null, placement = null, maintenance = null} = {}) {
@@ -309,9 +372,11 @@ export function effectLine(itemId) {
   const tag = rarity === 'common' ? '' : `${rarity[0].toUpperCase()}${rarity.slice(1)} · `;
   const magic = magicItems[itemId];
   if (magic) return tag + (magic.blurb || (magic.damage ? `${magic.damage} damage` : 'Magic weapon'));
+  if (Object.hasOwn(FRONTIER_LINES, itemId)) return tag + FRONTIER_LINES[itemId];
   const gear = EQUIPMENT[itemId];
   if (gear) {
     const style = weaponStyle(itemId);
+    if (TRINKET_TEXT[itemId]) return `${tag}${TRINKET_TEXT[itemId]}`;
     if (gear.damage && style?.blurb) return `${tag}${gear.damage} damage · ${style.blurb}`;
     if (gear.damage) return `${tag}${gear.damage} damage · ${STYLE_WORD[style?.style] || 'Melee'}${style?.arc ? ' · cleaves' : ''}${style?.pierce ? ' · pierces' : ''}`;
     if (ARMOR_REDUCTION[itemId]) return `${tag}Absorbs ${Math.round(ARMOR_REDUCTION[itemId] * 100)}% damage`;

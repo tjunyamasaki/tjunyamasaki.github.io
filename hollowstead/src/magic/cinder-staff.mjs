@@ -27,14 +27,14 @@
  */
 
 const PACK = 'cinder-staff';
-import { ownerPower } from './registry.mjs?v=harvest-17';
+import { ownerPower } from './registry.mjs?v=harvest-18';
 
-const SPEED = 12;
+const SPEED = 12 * 1.15;
 const MAX_RANGE = 11;
 const HIT_RADIUS = 0.8;
 const SPAWN_AHEAD = 0.55;
 // Balance (battle update): 23 on impact, then 4 a second for 3 seconds.
-const BURN_DPS = 4;
+const BURN_DPS = 2;
 const BURN_DURATION = 3;
 const FRAME_COUNT = 4;
 const FRAME_FPS = 12;
@@ -95,9 +95,9 @@ export const magicPack = {
     name: 'Cinder Staff',
     kind: 'weapon',
     slot: 'weapon',
-    damage: 23,
+    damage: 12,
     durability: 150,
-    cooldown: 0.8,
+    cooldown: 1.04,
     stamina: 6,
     icon: 'cinder-staff',
     blurb: 'A crooked staff. Its ember throws a firebolt that burns the first hostile it hits.',
@@ -208,8 +208,8 @@ function flyBolt(world, bolt, dt) {
     bolt.x = hit.x;
     bolt.z = hit.z;
     const amount = bolt.damage > 0 ? bolt.damage : DAMAGE;
-    harmHostile(world, hit.enemy, amount);
-    attachBurn(world, hit.enemy.id, bolt.power || 1);
+    harmHostile(world, hit.enemy, amount, bolt.ownerId);
+    attachBurn(world, hit.enemy.id, bolt.power || 1, bolt.ownerId);
     spawnPuff(world, hit.x, hit.z, 0);
     return false;
   }
@@ -241,7 +241,7 @@ function stepBurns(world, dt) {
     while (burn.tick + 1e-8 >= 1 && enemy.hp > 0) {
       burn.tick -= 1;
       if (burn.tick < 1e-8) burn.tick = 0;
-      harmHostile(world, enemy, burn.dps);
+      harmHostile(world, enemy, burn.dps, burn.ownerId);
     }
     if (!(enemy.hp > 0) || burn.remaining <= 1e-6) burns.splice(i, 1);
   }
@@ -347,23 +347,30 @@ function closestOnSegment(px, pz, x0, z0, x1, z1) {
   return { t, x, z, d: Math.hypot(px - x, pz - z) };
 }
 
-function harmHostile(world, enemy, amount) {
+function harmHostile(world, enemy, amount, ownerId = null) {
   if (!enemy || !(enemy.hp > 0) || !(amount > 0)) return;
+  // The caster's refinement (src/refine.mjs): critical hits, Bane, Thirsting.
+  const refined = ownerId && typeof world.refineHit === 'function' ? world.refineHit(ownerId, enemy, amount) : { amount, crit: false };
+  amount = refined.amount;
   enemy.hp -= amount;
+  // Credit the kill to the caster (weapon mastery, trinkets).
+  if (ownerId) enemy.lastHitBy = ownerId;
   const shown = Math.round(amount);
-  emit(world, 'damage', enemy.x, enemy.z, String(shown > 0 ? shown : amount));
+  if (refined.crit && typeof world.event === 'function') world.event('damage', enemy.x, enemy.z, String(shown), { crit: true });
+  else emit(world, 'damage', enemy.x, enemy.z, String(shown > 0 ? shown : amount));
 }
 
-function attachBurn(world, targetId, power = 1) {
+function attachBurn(world, targetId, power = 1, ownerId = null) {
   if (targetId == null) return null;
   if (!Array.isArray(world.magicBurns)) world.magicBurns = [];
   const existing = world.magicBurns.find(burn => burn && burn.packId === PACK && burn.targetId === targetId);
   if (existing) {
     existing.remaining = BURN_DURATION;
     existing.dps = BURN_DPS * power;
+    if (ownerId) existing.ownerId = ownerId;
     return existing;
   }
-  const burn = { targetId, remaining: BURN_DURATION, dps: BURN_DPS * power, tick: 0, packId: PACK };
+  const burn = { targetId, remaining: BURN_DURATION, dps: BURN_DPS * power, tick: 0, packId: PACK, ...(ownerId ? { ownerId } : {}) };
   world.magicBurns.push(burn);
   return burn;
 }

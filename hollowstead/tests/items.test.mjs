@@ -259,7 +259,7 @@ test('T06 only the equipped tool, weapon, and armor change the outcome',()=>{
   assert.equal(chop('worn',1).ready,false);
   nearDurability(chop('worn',1).durability,69);
   assert.equal(chop('worn',2).ready,true);
-  assert.equal(chop('worn',2).wood,5);
+  assert.equal(chop('worn',2).wood,3); // auto-harvest yield (rhythm.mjs)
   assert.equal(chop('worn',2).hits,0);
 
   const {w,p}=camp();
@@ -374,9 +374,13 @@ test('T08 moving the lit lantern turns it off and keeps its fuel',()=>{
   assert.equal(w.transferAll(p,p.equipment.light.uid,chest.store,{grow:true}),true);
   assert.equal(p.lantern,false);
   assert.equal(stackOf(chest.store,'torch').durability,12.5);
+  // Broken gear crumbles (an empty lantern too); a broken weapon stays, to be mended at the Heartfire.
   const emptyTorch=wearStack(makeStack('spent-torch','torch',1,1).stack,1);
-  assert.equal(emptyTorch.removed,false);
-  assert.equal(emptyTorch.stack.durability,0);
+  assert.equal(emptyTorch.removed,true);
+  assert.equal(emptyTorch.stack,null);
+  const brokenBlade=wearStack(makeStack('spent-sword','sword',1,1).stack,1);
+  assert.equal(brokenBlade.removed,false);
+  assert.equal(brokenBlade.stack.durability,0);
   const broken=wearStack(makeStack('spent-axe','axe',1,1).stack,1);
   assert.equal(broken.stack,null);
   assert.equal(broken.removed,true);
@@ -431,7 +435,7 @@ test('T25 a full pack can still finish a chop, and pickup leaves the exact remai
   assert.equal(tree.hits,0);
   assert.equal(qty(p.inventory,'wood'),full);
   assert.equal(qty(p.inventory,'fiber'),0);
-  assert.equal(w.drops.filter(drop=>drop.stack.itemId==='wood').reduce((total,drop)=>total+drop.stack.quantity,0),5);
+  assert.equal(w.drops.filter(drop=>drop.stack.itemId==='wood').reduce((total,drop)=>total+drop.stack.quantity,0),3); // auto-harvest yield (rhythm.mjs)
   assert.equal(w.drops.filter(drop=>drop.stack.itemId==='fiber').reduce((total,drop)=>total+drop.stack.quantity,0),1);
 
   const other=camp();

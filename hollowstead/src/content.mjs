@@ -1,11 +1,13 @@
-import {magicItems} from './magic/registry.mjs?v=harvest-17';
+import {magicItems} from './magic/registry.mjs?v=harvest-18';
 // Simulation identifiers are deliberately independent of art, names and animations.
 const DAY=180, DUSK=30, NIGHT=100;
-export const RULES = Object.freeze({version:1, tick:1/20, radius:96, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2, finalNight:5});
+export const SPEED_SCALE = 1.15;
+export const FIRST_MOB = 'crawler';
+export const RULES = Object.freeze({version:1, tick:1/20, radius:148, maxPlayers:4, day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT, capacity:120, reach:2.8, speed:4.2*SPEED_SCALE, hunger:.09, hungerRest:.54, finalNight:5});
 /**
  * Loose floor piles. Measured in this world: movement clearance 0.33, structure
  * occupancy 0.4, character billboard 1.65 wide (art padding included), interact
- * reach 2.8, walk speed 4.2. Attract is about 3.5 body-clearances and well inside
+ * reach 2.8, walk speed 4.83. Attract is about 3.5 body-clearances and well inside
  * reach, so standing beside a pile starts a dwell without scooping from chop range.
  * Touch matches the body. A full-speed walk crosses the attract diameter in about
  * half a second, so the dwell is long enough that passing by does not collect.
@@ -15,7 +17,7 @@ export const PICKUP = Object.freeze({
   touch: 0.42,
   dwell: 0.65,
   flight: 0.28,
-  dropCooldown: 1.25,
+  dropCooldown: 15,
 });
 export const ITEMS = {
   wood:{name:'Twisted wood',icon:'wood'},stone:{name:'Flint',icon:'stone'},fiber:{name:'Dry grass',icon:'grass'},
@@ -27,31 +29,50 @@ export const ITEMS = {
   shard:{name:'Moonshard',icon:'shard'},bone:{name:'Barrow bone',icon:'bone'},spore:{name:'Glowcap spore',icon:'spore'},
   elixir:{name:'Vigor draught',icon:'elixir',heal:60,courage:20},
   heartstone:{name:'Heartstone',icon:'heartstone',boost:'vigor'},
+  // Frontier: night-only finds from the middle ring that open the outer regions.
+  glowbloom:{name:'Glowcap bloom',icon:'glowbloom'},wispdust:{name:'Wisp essence',icon:'wispdust'},
+  // Refinement: only creatures drop it. Spent at a workbench to roll weapon modifiers (refine.mjs).
+  ichor:{name:'Dread ichor',icon:'ichor'},
 };
 export const EQUIPMENT = {
   axe:{name:'Woodcutter’s axe',icon:'axe',durability:70},pick:{name:'Flint pick',icon:'pick',durability:70},
-  spear:{name:'Briar spear',icon:'spear',durability:100,damage:15},sword:{name:'Moon blade',icon:'sword',durability:160,damage:19},
+  spear:{name:'Briar spear',icon:'spear',durability:100,damage:15},sword:{name:'Moon blade',icon:'sword',durability:160,damage:10},
   armor:{name:'Bark armor',icon:'armor',durability:110},torch:{name:'Hand lantern',icon:'lantern',durability:180},
-  recurve:{name:'Hunter’s recurve',icon:'recurve',durability:150,damage:15},
-  bonebow:{name:'Barrow longbow',icon:'bonebow',durability:220,damage:15},
-  broadsword:{name:'Knight’s broadsword',icon:'broadsword',durability:230,damage:16},
+  recurve:{name:'Hunter’s recurve',icon:'recurve',durability:150,damage:8},
+  bonebow:{name:'Barrow longbow',icon:'bonebow',durability:220,damage:8},
+  broadsword:{name:'Knight’s broadsword',icon:'broadsword',durability:230,damage:8},
   flamberge:{name:'Ember flamberge',icon:'flamberge',durability:280,damage:25},
-  crookstaff:{name:'Moonshard crook',icon:'crookstaff',durability:170,damage:19},
+  crookstaff:{name:'Moonshard crook',icon:'crookstaff',durability:170,damage:10},
   skullstaff:{name:'Hollow skull staff',icon:'skullstaff',durability:220,damage:27},
   tome:{name:'Grimoire of Ash',icon:'tome',durability:260,damage:50},
-  fangs:{name:'Hollow fangs',icon:'fangs',durability:260,damage:10},
+  fangs:{name:'Hollow fangs',icon:'fangs',durability:260,damage:5},
   soulchain:{name:'Soulchain',icon:'soulchain',durability:240,damage:25},
   scythe:{name:'Reaper’s scythe',icon:'scythe',durability:300,damage:29},
-  wisplantern:{name:'Wisp lantern',icon:'wisplantern',durability:180,damage:10},
+  wisplantern:{name:'Wisp lantern',icon:'wisplantern',durability:180,damage:5},
   stormrod:{name:'Thunderhollow rod',icon:'stormrod',durability:200,damage:24},
   starfall:{name:'Starfall scepter',icon:'starfall',durability:220,damage:72},
-  crowtotem:{name:'Carrion totem',icon:'crowtotem',durability:120,damage:8},
+  crowtotem:{name:'Carrion totem',icon:'crowtotem',durability:120,damage:4},
   jacklantern:{name:'Hollow Jack',icon:'jacklantern',durability:110,damage:18},
   wighthorn:{name:'Wightcaller horn',icon:'wighthorn',durability:90,damage:36},
   censer:{name:'Hoarfrost censer',icon:'censer',durability:160,damage:18},
   bonemail:{name:'Barrow bonemail',icon:'bonemail',durability:240},
   shardplate:{name:'Moonshard plate',icon:'shardplate',durability:360},
   everlantern:{name:'Everburning lantern',icon:'everlantern',durability:999},
+  // Frontier gear: each outer region is safe only to the wanderer wearing its gear.
+  sporemask:{name:'Glowcap mask',icon:'sporemask',durability:900},
+  gravelight:{name:'Grave lantern',icon:'gravelight',durability:600},
+  barrowcloak:{name:'Barrow cloak',icon:'barrowcloak',durability:900},
+  // Trinkets: one worn at a time; they never wear out. Effects live in trinkets.mjs.
+  frostanklet:{name:'Frost anklet',icon:'frostanklet',durability:100},
+  nightfang:{name:'Night fang',icon:'nightfang',durability:100},
+  emberheart:{name:'Ember heart',icon:'emberheart',durability:100},
+  crowseye:{name:'Crow’s eye',icon:'crowseye',durability:100},
+  harvestcharm:{name:'Harvest charm',icon:'harvestcharm',durability:100},
+  boneward:{name:'Bone ward',icon:'boneward',durability:100},
+  wispfeather:{name:'Wisp feather',icon:'wispfeather',durability:100},
+  gravedust:{name:'Grave dust',icon:'gravedust',durability:100},
+  moonlocket:{name:'Moon locket',icon:'moonlocket',durability:100},
+  thornknot:{name:'Thorn knot',icon:'thornknot',durability:100},
 };
 export const NODES = {
   tree:{name:'Crooked pine',hits:4,workSeconds:4,handRate:1,tool:'axe',toolRate:2,output:'floor',loot:{wood:5,fiber:1},regrow:420,radius:.55},
@@ -69,6 +90,9 @@ export const NODES = {
   ironchest:{name:'Iron-bound chest',hits:1,workSeconds:1.8,handRate:1,output:'floor',loot:{},table:'ironchest',regrow:1400,radius:.5},
   moonchest:{name:'Moonlit coffer',hits:1,workSeconds:2.4,handRate:1,output:'floor',loot:{},table:'moonchest',regrow:2200,radius:.5},
   reliquary:{name:'Hollow reliquary',hits:1,workSeconds:3,handRate:1,output:'floor',loot:{},table:'reliquary',regrow:3400,radius:.6},
+  // `night`: only there after dark (see nodeAwake). Hidden, untargetable and not solid by day.
+  glowsprout:{name:'Young glowcap',hits:1,workSeconds:1.4,handRate:1,output:'backpack',loot:{glowbloom:2},regrow:320,radius:0,night:true},
+  gravewisp:{name:'Grave wisp',hits:1,workSeconds:1.6,handRate:1,output:'backpack',loot:{wispdust:1},regrow:360,radius:0,night:true},
 };
 export const STRUCTURES = {
   hearth:{name:'Heartfire',hp:600,radius:1,light:8},fire:{name:'Campfire',hp:160,radius:.55,light:6},
@@ -77,6 +101,7 @@ export const STRUCTURES = {
   trap:{name:'Briar trap',hp:100,radius:0},farm:{name:'Pumpkin patch',hp:120,radius:0},
   pot:{name:'Cauldron',hp:160,radius:.55},lantern:{name:'Soul lantern',hp:140,radius:.3,light:6},
   bed:{name:'Bedroll',hp:100,radius:0},ward:{name:'Warding totem',hp:200,radius:.55},
+  cart:{name:'Hand cart',hp:220,radius:.55},
 };
 export const RECIPES = {
   axe:{kind:'tool',cost:{wood:2,stone:2},station:'bench',desc:'Fell trees twice as quickly.'},
@@ -108,6 +133,10 @@ export const RECIPES = {
   roastMeat:{kind:'cook',result:'roast',cost:{meat:1},station:'fire',desc:'Cook a raw morsel safely.'},
   roastCaps:{kind:'cook',result:'roast',cost:{mushroom:2},station:'fire',desc:'Cook away the mushrooms’ unsettling effects.'},
   stew:{kind:'cook',cost:{pumpkin:1,berry:2,meat:1},station:'pot',desc:'A feast: +65 hunger, +35 health and +25 courage.'},
+  sporemask:{kind:'tool',cost:{glowbloom:4,fiber:4,wood:1},station:'bench',desc:'Filters the Hollow Mire’s spore fog.'},
+  gravelight:{kind:'tool',cost:{wispdust:3,ore:3,ember:2},station:'bench',desc:'A wisp-fed lantern bright enough for the Moonshard Crags.'},
+  barrowcloak:{kind:'tool',cost:{bone:8,fiber:6,meat:2},station:'bench',desc:'Bone-lined warmth against the Barrow Fields’ grave-chill.'},
+  cart:{kind:'build',cost:{wood:8,fiber:4,stone:2},desc:'A chest on wheels. Pull it along, open it anywhere.'},
 };
 /**
  * Hostiles. Small melee creatures are weak and come in numbers; big slow ones wind up long and hit
@@ -115,13 +144,13 @@ export const RECIPES = {
  * play). Movement and attack patterns live in mobs.mjs.
  */
 export const ENEMIES = {
-  crawler:{name:'Briarling',hp:24,speed:3,damage:6,range:1.35,period:1.3,loot:{}},
-  wraith:{name:'Lantern wraith',hp:34,speed:2.7,damage:7,range:8.5,period:2.8,loot:{ember:1}},
-  brute:{name:'Gravekeeper',hp:190,speed:1.35,damage:28,range:2.6,period:2.6,loot:{ore:2,ember:2,meat:2}},
-  king:{name:'The Hollow King',hp:950,speed:1.35,damage:30,range:3.6,period:2.2,loot:{ember:15}},
-  bonewalker:{name:'Bonewalker',hp:48,speed:2.5,damage:12,range:5.6,period:2.1,loot:{bone:1}},
-  bogling:{name:'Bogling',hp:52,speed:1.8,damage:10,range:7.5,period:3,loot:{spore:1}},
-  golem:{name:'Moonshard golem',hp:320,speed:1.05,damage:36,range:2.7,period:3,loot:{shard:2,stone:2}},
+  crawler:{name:'Briarling',hp:24,speed:5.5,damage:12,range:1.35,period:1.3,loot:{}},
+  wraith:{name:'Lantern wraith',hp:34,speed:2.7*SPEED_SCALE,damage:14,range:8.5,period:2.8,loot:{ember:1}},
+  brute:{name:'Gravekeeper',hp:190,speed:1.35*SPEED_SCALE,damage:56,range:2.6,period:2.6,loot:{ore:2,ember:2,meat:2}},
+  king:{name:'The Hollow King',hp:950,speed:1.35*SPEED_SCALE,damage:60,range:3.6,period:2.2,loot:{ember:15}},
+  bonewalker:{name:'Bonewalker',hp:48,speed:2.5*SPEED_SCALE,damage:24,range:5.6,period:2.1,loot:{bone:1}},
+  bogling:{name:'Bogling',hp:52,speed:1.8*SPEED_SCALE,damage:20,range:7.5,period:3,loot:{spore:1}},
+  golem:{name:'Moonshard golem',hp:320,speed:1.05*SPEED_SCALE,damage:72,range:2.7,period:3,loot:{shard:2,stone:2}},
 };
 export const CHARACTERS = [
   {id:'ember',name:'Ember',detail:'The lost lantern keeper',color:'#f6a35d'},
@@ -132,6 +161,8 @@ export const CHARACTERS = [
 export const label = key => ITEMS[key]?.name || EQUIPMENT[key]?.name || magicItems[key]?.name || STRUCTURES[key]?.name || ENEMIES[key]?.name || key;
 export function phaseAt(time){const t=time%RULES.cycle;return t<RULES.day?'day':t<RULES.day+RULES.dusk?'dusk':'night';}
 export function dayAt(time){return Math.floor(time/RULES.cycle)+1;}
+/** Night-only nodes (NODES[type].night) exist only while it is night. */
+export function nodeAwake(node, time){return !NODES[node?.type]?.night||phaseAt(time)==='night';}
 export function phaseRemaining(time){const t=time%RULES.cycle;return (t<RULES.day?RULES.day:t<RULES.day+RULES.dusk?RULES.day+RULES.dusk:RULES.cycle)-t;}
 
 // Reject inherited property names at every data-driven lookup boundary.

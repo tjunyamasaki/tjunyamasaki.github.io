@@ -1,0 +1,20 @@
+/* rhythm HUD (src/ui/rhythm.mjs): the harvest pulse ring at the worked node, and the beat on the action button. */
+.rhythm-ring{position:absolute;top:0;left:0;width:0;height:0;pointer-events:none;will-change:transform;--rx:32px;--ry:20px}
+.rhythm-ring[hidden]{display:none}
+.rhythm-ring i{position:absolute;left:calc(var(--rx) * -1);top:calc(var(--ry) * -1);width:calc(var(--rx) * 2);height:calc(var(--ry) * 2);border-radius:50%;box-sizing:border-box}
+.rhythm-target{border:2px solid #f6dca88c;box-shadow:0 0 0 1px #1a14228c,inset 0 0 10px #f6dca826;transition:border-color .08s,box-shadow .08s}
+.rhythm-pulse{border:3px solid #ffe6a3;box-shadow:0 0 10px #ffd27a80;transform-origin:50% 50%;will-change:transform,opacity}
+.rhythm-ring.is-heavy .rhythm-pulse{border-width:4px;border-color:#f1d9b4}
+.rhythm-ring.is-now .rhythm-target{border-color:#fff0c4;box-shadow:0 0 0 1px #1a14228c,0 0 16px #ffd27acc,inset 0 0 12px #ffd27a55}
+.rhythm-ring.is-flash[data-flash="clean"] .rhythm-target{animation:rhythm-clean .28s ease-out}
+.rhythm-ring.is-flash[data-flash="miss"] .rhythm-target{animation:rhythm-miss .28s ease-out}
+@keyframes rhythm-clean{from{transform:scale(1.4);border-color:#fff7dc;border-width:4px;box-shadow:0 0 24px #ffe08a}to{transform:scale(1)}}
+@keyframes rhythm-miss{0%{transform:translateX(-4px);border-color:#9d8f94}40%{transform:translateX(4px);border-color:#9d8f94}100%{transform:none}}
+.rhythm-combo{position:absolute;left:calc(var(--rx) + 4px);top:calc(var(--ry) * -1 - 10px);font:700 13px/1 Arial,Helvetica,sans-serif;color:#ffe6a3;letter-spacing:.3px;text-shadow:0 2px 3px #181421,0 0 8px #181421;white-space:nowrap}
+.rhythm-note{position:absolute;left:0;top:calc(var(--ry) + 4px);transform:translateX(-50%);font:700 10px/1 Arial,Helvetica,sans-serif;letter-spacing:1px;text-transform:uppercase;color:#d3c6b8;text-shadow:0 1px 2px #181421,0 0 6px #181421;white-space:nowrap}
+/* The beat on the main action button, where the right thumb already rests. */
+#action-cluster #context-0.rhythm-live::before{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid #ffe6a3;opacity:calc(var(--beat, 0) * .85);transform:scale(calc(1.3 - var(--beat, 0) * .3));pointer-events:none}
+/* World floaters for clean strikes (renderers: 'strike' events). */
+.world-label.strike-label{font-size:14px;letter-spacing:.4px}
+.world-label.strike-perfect{font-size:15px;letter-spacing:.8px}
+.world-label.strike-find{font-size:13px}

@@ -1,11 +1,18 @@
+import {damageFloater,spawnFloater,stepFloaters} from './floaters.mjs?v=harvest-18';
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {STRUCTURES, RULES} from './content.mjs?v=harvest-17';
-import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-17';
-import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-17';
-import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-17';
-import {ALLIES, DASH} from './progression.mjs?v=harvest-17';
-import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-17';
-import {glowStrength} from './lighting.mjs?v=harvest-17';
+import {STRUCTURES, RULES} from './content.mjs?v=harvest-18';
+import {random, biome, distance, createDropMotion} from './engine.mjs?v=harvest-18';
+import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-18';
+import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-18';
+import {ALLIES, DASH} from './progression.mjs?v=harvest-18';
+import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-18';
+import {nightGlow} from './regions.mjs?v=harvest-18';
+import {dropGlow} from './drops.mjs?v=harvest-18';
+import {glowStrength} from './lighting.mjs?v=harvest-18';
+import {SceneryLayer} from './scenery.mjs?v=harvest-18';
+import {groundColors, walkableAt} from './worldgen.mjs?v=harvest-18';
+import {nodeAwake} from './content.mjs?v=harvest-18';
+import {RopeLayer} from './cart-rope.mjs?v=harvest-18';
 /** Standing stones or lamps ringing the Heartfire plaza (presentation only). */
 export function plazaProps(world,theme){const hearth=world.buildings.find(b=>b.type==='hearth');if(!hearth||!theme.sprites['plaza-prop'])return [];return [0,1,2,3,4,5].map(i=>{const a=i*Math.PI/3;return {e:{id:'plaza'+i,x:hearth.x+Math.cos(a)*4.7,z:hearth.z+Math.sin(a)*4.7*.92},key:'plaza-prop',kind:'prop'};});}
 /** Runestones ringing the battle arena's wall (presentation only; nothing collides with them). */
@@ -20,16 +27,17 @@ export function arenaTile(x,z,R){
   return Math.floor(r/3.2)%2?'#6b6270':'#615968';
 }
 const PROJECTILE_KEYS={arrow:'arrow',bolt:'mbolt',wisp:'wisp',seed:'pumpseed'};
-import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-17';
-import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-17';
-import {MagicMesh} from './magic/effects-three.mjs?v=harvest-17';
-import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-17';
-import {RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-17';
+import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-18';
+import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-18';
+import {MagicMesh} from './magic/effects-three.mjs?v=harvest-18';
+import {WeaponFx, dropBlink} from './fx/index.mjs?v=harvest-18';
+import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-18';
+import {RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-18';
 import {
   LIGHT_FIELD_ORIGIN, LIGHT_FIELD_SIZE, LIGHT_FIELD_SPAN, brightnessAt, canInspect, entityBrightness,
   frameLighting, labelOpacity, linearFromDisplay, spriteTint, warningVisible, writeLightField,
-} from './lighting.mjs?v=harvest-17';
-import {loadImage, loadJson, preloadThemeAssets} from './assets.mjs?v=harvest-17';
+} from './lighting.mjs?v=harvest-18';
+import {loadImage, loadJson, preloadThemeAssets} from './assets.mjs?v=harvest-18';
 /** Art that ships in more than one version (wanderer look, Heartfire). ?look=mask&hearth=b in the URL,
  * or a saved pick, chooses; otherwise the theme default. Sprites are swapped by file suffix. */
 export function themeChoice(theme, name){
@@ -50,7 +58,8 @@ export async function loadTheme(url=new URL('../themes/harvest/theme.json',impor
   for(const[k,v]of Object.entries(theme.audio))theme.audio[k]=new URL(v,url).href;return theme;
 }
 /** Swarm fights spray numbers; old labels give way so the DOM stays light on phones. */
-const MAX_FLOATERS=36;
+/** Floater colours for 'strike' events: clean harvest strikes (rhythm.mjs) and trinket moments (trinkets.mjs). */
+export const STRIKE_COLORS=Object.freeze({clean:'#ffe6a3',perfect:'#f2c14e',find:'#9fcaff',ward:'#efe6d2',fang:'#b9e2ba',thorn:'#f5c2a9'});
 /**
  * Ground telegraphs and hostile shots. Pooled meshes on shared unit geometries: a swarm winding up
  * and a sky full of orbs must not allocate textures every frame.
@@ -99,7 +108,7 @@ class CombatLayer {
 }
 export class Renderer {
   constructor(canvas,theme){
-    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.combat=new CombatLayer(this.scene);this.afterimages=[];
+    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.rigMeshes=new Map();this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);
     this.scene.fog=new THREE.FogExp2(theme.palette.background,.009);this.camera=new THREE.OrthographicCamera(-15,15,15,-15,.1,180);
     this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.setPixelRatio(Math.min(devicePixelRatio,1.6));this.gl.outputColorSpace=THREE.SRGBColorSpace;
     this.objects=new Map();this.textures=new Map();this.materials=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
@@ -157,27 +166,36 @@ export class Renderer {
   }
   remove(o){this.scene.remove(o.sprite,o.shadow);o.sprite.material.map.dispose();o.sprite.material.dispose();if(o.glow){this.scene.remove(o.glow);o.glow.geometry.dispose();o.glow.material.dispose();}if(o.eyes){this.scene.remove(o.eyes);o.eyes.material.map.dispose();o.eyes.material.dispose();}if(o.danger){this.scene.remove(o.danger);o.danger.geometry.dispose();o.danger.material.dispose();}if(o.health){this.scene.remove(o.health.back,o.health.fill);o.health.back.material.dispose();o.health.fill.material.dispose();}this.objects.delete(o.id);}
   terrain(seed,world=null){
-    if(this.ground){this.scene.remove(this.ground);this.ground.geometry.dispose();this.ground.material.dispose();}
+    if(this.ground){this.scene.remove(this.ground);this.ground.geometry.dispose();this.ground.material.map?.dispose();this.ground.material.dispose();}
     if(this.scatter){this.scene.remove(this.scatter);this.scatter.geometry.dispose();this.scatter.material.dispose();}
     if(this.arenaWall){this.scene.remove(this.arenaWall);this.arenaWall.geometry.dispose();this.arenaWall.material.dispose();this.arenaWall=null;}
     const arena=!!world?.arena,R=world?.radius||RULES.radius;
     const rng=random(seed),positions=[],colors=[];const col=new THREE.Color();const tile=arena?1:2;
     const edge=arena?R+12:RULES.radius+8;
-    for(let z=-edge;z<edge;z+=tile)for(let x=-edge;x<edge;x+=tile){
+    if(arena)for(let z=-edge;z<edge;z+=tile)for(let x=-edge;x<edge;x+=tile){
       if(arena){col.set(arenaTile(x+tile/2,z+tile/2,R));col.multiplyScalar(.97+rng()*.05);}
       else{const b=biome(x,z);col.set(this.theme.palette[b]);const path=Math.abs(x+Math.sin(z*.16)*3)<1.8||Math.abs(z-Math.sin(x*.17)*4)<1.6;
       if(path)col.lerp(new THREE.Color(this.theme.palette.path),.6);col.multiplyScalar(.92+rng()*.15);}
       for(const [a,b]of [[x,z],[x,z+tile],[x+tile,z],[x+tile,z],[x,z+tile],[x+tile,z+tile]]){positions.push(a,-.04,b);colors.push(col.r,col.g,col.b);}
     }
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
-    this.ground=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true}));this.bindNight(this.ground.material);this.scene.add(this.ground);
+    if(arena)this.ground=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true}));
+    else{
+      // The hollow's ground (worldgen.groundColors): one texel per unit, filtered, on a single quad that runs on into the void.
+      const g=groundColors(seed,this.theme.palette),n=g.size,E=g.extent,data=new Uint8Array(n*n*4);for(let q=0;q<n*n;q++){data[q*4]=g.rgb[q*3];data[q*4+1]=g.rgb[q*3+1];data[q*4+2]=g.rgb[q*3+2];data[q*4+3]=255;}
+      const map=new THREE.DataTexture(data,n,n,THREE.RGBAFormat);map.colorSpace=THREE.SRGBColorSpace;map.magFilter=THREE.LinearFilter;map.minFilter=THREE.LinearFilter;map.generateMipmaps=false;map.needsUpdate=true;
+      const F=E+160,uv=v=>(v+E)/(2*E),quad=[[-F,-F],[-F,F],[F,-F],[F,-F],[-F,F],[F,F]];geo.setAttribute('position',new THREE.Float32BufferAttribute(quad.flatMap(([x,z])=>[x,-.04,z]),3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(quad.flatMap(([x,z])=>[uv(x),uv(z)]),2));geo.deleteAttribute('color');
+      this.ground=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map}));
+    }
+    this.bindNight(this.ground.material);this.scene.add(this.ground);
     if(arena){
       // The wall: a glowing ring at the edge of the walkable disc.
       this.arenaWall=new THREE.Mesh(new THREE.RingGeometry(R-1.12,R-.88,128),new THREE.MeshBasicMaterial({color:0xe0776b,transparent:true,opacity:.75,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
       this.arenaWall.rotation.x=-Math.PI/2;this.arenaWall.position.y=.02;this.scene.add(this.arenaWall);
     }
-    const pos=[],cols=[];for(let i=0;i<(arena?1400:8000);i++){const x=(rng()-.5)*2*edge,z=(rng()-.5)*2*edge,s=.05+rng()*.2;if(arena&&Math.hypot(x,z)>R-1.5)continue;col.set(rng()<.5?'#bc9767':'#4b5350');for(const[a,b]of [[x,z],[x+s,z+s],[x-s,z+s*.6]]){pos.push(a,.001,b);cols.push(col.r,col.g,col.b);}}
+    const pos=[],cols=[];for(let i=0;i<(arena?1400:8000);i++){const x=(rng()-.5)*2*edge,z=(rng()-.5)*2*edge,s=.05+rng()*.2;if(arena?Math.hypot(x,z)>R-1.5:!walkableAt(seed,x,z))continue;col.set(rng()<.5?'#bc9767':'#4b5350');for(const[a,b]of [[x,z],[x+s,z+s],[x-s,z+s*.6]]){pos.push(a,.001,b);cols.push(col.r,col.g,col.b);}}
     const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));sg.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));this.scatter=new THREE.Mesh(sg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));this.bindNight(this.scatter.material);this.scene.add(this.scatter);
+    this.scenery.build(seed, world);
     this.seed=seed;
   }
   glow(o,radius){if(!o.glow){o.glow=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:this.glowMap,transparent:true,depthWrite:false,opacity:.8}));o.glow.rotation.x=-Math.PI/2;this.scene.add(o.glow);}const feather=this.view?.lighting.ambientFraction||1.2;o.glow.scale.setScalar(radius*feather*2);o.glow.position.set(o.x,.03,o.z);o.glow.visible=o.sprite.visible;}
@@ -186,17 +204,20 @@ export class Renderer {
   pick(x,y,world){
     const viewer=this.localId&&world.player?world.player(this.localId):null;
     let best=null,dist=44;
-    for(const e of [...world.nodes.filter(n=>!n.ready),...world.buildings,...world.drops,...world.enemies,...magicVisuals(world).map(entry=>entry.entity)]){
+    for(const e of [...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)),...world.buildings,...world.drops,...world.enemies,...magicVisuals(world).map(entry=>entry.entity)]){
       if(this.view&&!canInspect(this.view, e.x, e.z, viewer, RULES.reach))continue;
       const s=this.screenPoint(e.x,e.z,.6),d=Math.hypot(x-s.x,y-s.y);if(d<dist){best=e;dist=d;}
     }
     return best;
   }
-  float(text,x,z,color='#f8dfb3',opts={}){if(!text)return;const el=document.createElement('div');el.className=opts.className||'world-label';el.textContent=text;el.style.color=color;document.getElementById('world-labels').append(el);this.floaters.push({el,x,z,life:0,alwaysVisible:!!opts.alwaysVisible});while(this.floaters.length>MAX_FLOATERS){const old=this.floaters.shift();old.el.remove();}}
-  effect(event){
+  float(text,x,z,color='#f8dfb3',opts={}){spawnFloater(this.floaters,text,x,z,color,opts);}
+  effect(event,world=null){
+    this.weaponFx.event(event,this.clock,world);
     if(event.type==='hit')for(const o of this.objects.values())if(Math.hypot(o.x-event.x,o.z-event.z)<.2)o.hitUntil=this.clock+.22;
-    if(['loot','damage','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
-    if(event.type==='hurt')this.float(event.text,event.x,event.z,'#e53935',{className:'world-label player-hurt',alwaysVisible:true});
+    if(event.type==='damage')damageFloater(this.floaters,event,this.localId,'hit');
+    else if(['loot','heal','build','craft'].includes(event.type))this.float(event.text,event.x,event.z,event.type==='damage'?'#f5c2a9':event.type==='heal'?'#b9e2ba':'#fbe1ad');
+    if(event.type==='refine')this.float(`◆ ${event.text}`,event.x,event.z,RARITY_COLORS[event.rarity]||'#fbe1ad',{className:'world-label refine-label',alwaysVisible:event.player===this.localId});
+    if(event.type==='hurt')damageFloater(this.floaters,event,this.localId,'hurt');if(event.type==='salvage')this.float(`◆ ${event.text}`,event.x,event.z,RARITY_COLORS[event.rarity]||'#fbe1ad',{className:'world-label salvage-label',alwaysVisible:event.player===this.localId});
     if(event.type==='rare')this.float(`✦ ${event.text}`,event.x,event.z,RARITY_COLORS[rarityOf(event.itemId)]);
     if(event.type==='levelup')this.float(`LEVEL UP · ${event.text}`,event.x,event.z,'#f2c14e');
     if(event.type==='discover')this.float(event.text,event.x,event.z,'#d4fff5');
@@ -204,11 +225,12 @@ export class Renderer {
     if(event.type==='rankup')this.float(`✦ ${event.text}`,event.x,event.z,'#f2c14e',{alwaysVisible:true});
     if(event.type==='swap')this.float(event.text,event.x,event.z,'#f0dfbd',{className:'world-label swap-label',alwaysVisible:event.player===this.localId});
     if(event.type==='dodge')this.float(event.text,event.x,event.z,'#bfe8ff',{className:'world-label dodge-label',alwaysVisible:event.player===this.localId});
+    if(event.type==='strike')this.float(event.text,event.x,event.z,STRIKE_COLORS[event.kind]||STRIKE_COLORS.clean,{className:`world-label strike-label strike-${event.kind||'clean'}`,alwaysVisible:event.player===this.localId}); // rhythm.mjs / trinkets.mjs
     if(event.type==='dash'){const body=this.objects.get('player'+event.player);if(body){for(let i=0;i<4;i++){const ghost=new THREE.Sprite(body.sprite.material.clone());ghost.center.copy(body.sprite.center);ghost.scale.copy(body.sprite.scale);const t=i/4;ghost.position.set(event.x+(event.dx||0)*DASH.distance*t,body.sprite.position.y,event.z+(event.dz||0)*DASH.distance*t);ghost.material.color.set('#9fd0ff');ghost.material.opacity=0;ghost.renderOrder=1;this.scene.add(ghost);this.afterimages.push({sprite:ghost,life:-t*DASH.time});}}}
     if(event.type==='quake'||event.type==='splat'){const mat=new THREE.MeshBasicMaterial({color:event.type==='quake'?0xff8a5c:0x9fdc6a,transparent:true,depthWrite:false,side:THREE.DoubleSide});const arc=Math.min(Math.PI*2,(event.arc||360)*Math.PI/180);const geo=arc<Math.PI*1.99?new THREE.RingGeometry(.72,1,36,1,-(event.angle||0)-arc/2,arc):new THREE.RingGeometry(.8,1,48);const mesh=new THREE.Mesh(geo,mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||1.5});}
-    if(['slash','cleave'].includes(event.type)){const arc=Math.min(Math.PI*1.9,(event.arc||120)*Math.PI/180),range=event.range||2.5,phi=Math.atan2(event.dz||0,event.dx||1);const geo=new THREE.RingGeometry(range*.5,range*.98,28,1,-phi-arc/2,arc);geo.setDrawRange(0,0);const mat=new THREE.MeshBasicMaterial({color:event.type==='cleave'?0xffe0b0:0xfff4e2,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(geo,mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.5,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,fixed:true,sweep:28});}
+    // Melee swings show no hitbox arc: the weapon's swing pose is the attack, plus rank flair (src/fx) from ★2.
     if(['chain','lash'].includes(event.type)){const pts=event.type==='chain'?(event.points||[]).map(([x,z])=>new THREE.Vector3(x,.9,z)):[new THREE.Vector3(event.x,.9,event.z),new THREE.Vector3(event.x+(event.dx||0)*(event.range||4),.9,event.z+(event.dz||0)*(event.range||4))];if(pts.length>1){const bent=[];for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];for(let k=0;k<6;k++){const t=k/6;bent.push(new THREE.Vector3(a.x+(b.x-a.x)*t+(k?(Math.random()-.5)*.35:0),.9+(k?(Math.random()-.5)*.3:0),a.z+(b.z-a.z)*t+(k?(Math.random()-.5)*.35:0)));}}bent.push(pts[pts.length-1]);const mesh=new THREE.Line(new THREE.BufferGeometry().setFromPoints(bent),new THREE.LineBasicMaterial({color:event.type==='chain'?0xbfe8ff:0xc49bff,transparent:true,depthWrite:false}));this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,fixed:true});}}
-    if(['starfall','mark','frost','freeze','summon','poof','rend','portal'].includes(event.type)){const color={starfall:0xf2c14e,mark:0xf2c14e,frost:0xbfe8ff,freeze:0xe2f6ff,summon:0x9fd8a8,poof:0x9fd8a8,rend:0xd0504a,portal:0xb784ff}[event.type];const mat=new THREE.MeshBasicMaterial({color,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||({freeze:.9,summon:1.1,poof:.8,rend:1}[event.type]||1)});}
+    if(['frost','freeze','summon','poof','rend','portal'].includes(event.type)){const color={starfall:0xf2c14e,mark:0xf2c14e,frost:0xbfe8ff,freeze:0xe2f6ff,summon:0x9fd8a8,poof:0x9fd8a8,rend:0xd0504a,portal:0xb784ff}[event.type];const mat=new THREE.MeshBasicMaterial({color,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||({freeze:.9,summon:1.1,poof:.8,rend:1}[event.type]||1)});}
     if(['nova','burst'].includes(event.type)){const mat=new THREE.MeshBasicMaterial({color:event.type==='nova'?0xf4a64a:0x7fd6c4,transparent:true,depthWrite:false,side:THREE.DoubleSide});const mesh=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z,radius:event.radius||2});}
     if(!event.magicPack&&['hit','kill','hurt','build','craft','impact','bolt'].includes(event.type)){
       const mat=new THREE.MeshBasicMaterial({color:event.type==='hurt'?0xd97773:event.type==='bolt'?0xa7e5d8:0xf4c486,transparent:true,depthWrite:false});const mesh=new THREE.Mesh(new THREE.RingGeometry(.06,.2,10),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(event.x,.1,event.z);this.scene.add(mesh);this.effects.push({mesh,life:0,type:event.type,x:event.x,z:event.z});
@@ -230,8 +252,42 @@ export class Renderer {
     o.sprite.position.set(o.x,pose.y,o.z);o.sprite.scale.set(pose.side*o.def.size[0]*pose.scale,o.def.size[1]*pose.scale,1);
     o.sprite.visible=body.sprite.visible;o.shadow.visible=false;o.sprite.material.opacity=body.sprite.material.opacity;
     o.sprite.material.rotation=pose.rotation;o.sprite.renderOrder=2;
-    o.sprite.material.color.copy(body.sprite.material.color).lerp(new THREE.Color('#ffffff'),.25);
+    // A weapon mid-skill (skills.mjs) burns brighter than the wielder.
+    o.sprite.material.color.copy(body.sprite.material.color).lerp(new THREE.Color('#ffffff'),pose.skilling?.7:.25);
     return id;
+  }
+  /**
+   * The kitsune's tails (src/fx/kitsune.mjs): painted each frame into a mesh of their own, placed just
+   * behind the wielder's sprite so they sort behind it and in front of whatever stands further back.
+   * Their glow and ground light join the frame's shared lists.
+   */
+  /**
+   * A weapon's body rig (src/fx WEAPON_FX `rig`: the kitsune's tails...), painted each frame into meshes
+   * of its own placed at the rig's `origin`, so it sorts against sprites by that point (behind the
+   * body by default). Its ground light joins the frame's shared lists.
+   */
+  syncWeaponRig(player, body, world, frameFx){
+    const rig=frameFx&&!player.down?this.weaponFx.rig(world,player,{x:body.x,z:body.z,y:body.sprite.position.y},this.clock,this.magicFrame.time):null;
+    if(!rig)return;
+    let set=this.rigMeshes.get(player.id);
+    if(!set){set={paint:new MagicMesh(this.scene,{order:0,capacity:16384}),light:new MagicMesh(this.scene,{order:0,additive:true,capacity:8192})};this.rigMeshes.set(player.id,set);}
+    // Painted first, then its light, both sorted at the rig's origin.
+    set.paint.update(rig.normal,rig.origin);
+    set.light.update(rig.glow,{...rig.origin,z:rig.origin.z+.01});
+    // Dim with the wielder at night, but a spirit keeps a little of its own light.
+    set.paint.material.color.copy(body.sprite.material.color).multiplyScalar(.7).addScalar(.3);
+    set.paint.mesh.visible=body.sprite.visible&&set.paint.count>0;set.light.mesh.visible=body.sprite.visible&&set.light.count>0;
+    frameFx.groundGlow.push(...rig.groundGlow);frameFx.groundNormal.push(...rig.groundNormal);
+  }
+
+
+
+  /** A brief full-screen wash on the biggest weapon moments (src/fx). A DOM layer, so both renderers share it. */
+  paintFlash(weapon){
+    const level=weapon?Math.round(weapon.flash*100)/100:0;
+    if(level===this.flashLevel)return;this.flashLevel=level;
+    const el=document.getElementById('fx-flash');if(!el)return;
+    el.style.opacity=String(level);if(level>0)el.style.setProperty('--flash',weapon.flashColor||'#fff3cf');
   }
   /** Hostile orbs, shards and lobbed spores. Extrapolated between 20 Hz ticks so bullets glide. */
   paintShots(world,dt){
@@ -256,24 +312,30 @@ export class Renderer {
     this.afterimages=this.afterimages.filter(a=>{a.life+=dt;a.sprite.material.opacity=a.life<0?0:Math.max(0,.55*(1-a.life/.3));if(a.life>.3){this.scene.remove(a.sprite);a.sprite.material.dispose();return false;}return true;});
   }
   render(world,localId,dt,{target=null,placement=null,demo=false}={}){
-    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;const terrainKey=`${world.seed}:${world.arena?'arena':'world'}`;if(this.terrainKey!==terrainKey){this.terrainKey=terrainKey;this.terrain(world.seed,world);for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
+    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;const terrainKey=`${world.seed}:${world.arena?'arena':'world'}`;if(this.terrainKey!==terrainKey){this.terrainKey=terrainKey;this.terrain(world.seed,world);this.weaponFx.reset();for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
     const p=world.player(localId)||world.players[0]||{x:0,z:2};const fx=demo?0:p.x,fz=demo?-1:p.z;
-    this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);this.camera.position.set(this.focus.x,28,this.focus.z+27);this.camera.lookAt(this.focus.x,0,this.focus.z);this.camera.updateMatrixWorld();
-    const frame=frameLighting(world, this.theme);this.view=frame;this.paintField(frame);
+    this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);
+    // Weapon effects first: their camera kick and their light on the night ground belong to this frame.
+    const weapon=demo?null:this.weaponFx.build(world,this.magicFrame,this.clock,dt,this.focus);for(const set of this.rigMeshes.values()){set.paint.mesh.visible=false;set.light.mesh.visible=false;}
+    const kick=weapon?.shake>0?weapon.shake*.32:0,kx=kick?(Math.sin(this.clock*71)+Math.sin(this.clock*43))*kick*.5:0,kz=kick?(Math.sin(this.clock*59+1)+Math.sin(this.clock*31))*kick*.5:0;
+    this.camera.position.set(this.focus.x+kx,28,this.focus.z+27+kz);this.camera.lookAt(this.focus.x+kx,0,this.focus.z+kz);this.camera.updateMatrixWorld();
+    const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;this.paintField(frame);this.paintFlash(weapon);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
-    this.paintPlaza(world,frame);this.combat.begin();
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).map(e=>({e,key:e.kind==='star'?'star':'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme)];
+    this.paintPlaza(world,frame);this.scenery.update(world,frame,dt,this.focus);this.combat.begin();
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme)];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
       const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.eyes)o.eyes.visible=visible;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
       const present=kind==='drop'?this.dropMotion.sample(e,world,this.clock,dt,id=>{const body=this.objects.get('player'+id);return body?.initialized?{x:body.x,z:body.z}:null;}):null;
       const tx=present?present.x:e.x, tz=present?present.z:e.z;
-      const smooth=['player','enemy','magic','ally'].includes(kind)&&!demo?Math.min(1,dt*(e.id===localId?22:13)):1;
+      const smooth=(['player','enemy','magic','ally'].includes(kind)||key==='cart')&&!demo?Math.min(1,dt*(e.id===localId||(key==='cart'&&e.towedBy===localId)?22:13)):1;
       if(!o.initialized){o.x=tx;o.z=tz;o.initialized=true;}else{o.x+=(tx-o.x)*smooth;o.z+=(tz-o.z)*smooth;}
       const special=kind==='ally'?(e.anim||'idle'):magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0||e.act>0?'attack':'walk'):e.action||'idle'),clip=o.def.clips[clipName]||o.def.clips.walk||o.def.clips.attack||o.def.clips.idle;
       const cols=o.def.columns||1,rows=o.def.rows||1,frameIndex=key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,o.def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length];
       o.sprite.material.map.offset.set((frameIndex%cols)/cols,1-1/rows-Math.floor(frameIndex/cols)/rows);
+      // A hand cart shows its handle on the puller's side. Sprites ignore a negative scale, so mirror the sheet cell instead.
+      if(key==='cart'){const mirror=e.face===1;o.sprite.material.map.repeat.x=(mirror?-1:1)/cols;if(mirror)o.sprite.material.map.offset.x+=1/cols;}
       const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob:kind==='enemy'&&key==='wraith'?.2+Math.sin(this.clock*3)*.1:0;
       let sx=o.def.size[0],sy=o.def.size[1];if(kind==='drop'){sx=.85;sy=1.28;if(present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}}
       if(e.down||e.ghost){sx*=.8;sy*=.65;}
@@ -287,7 +349,8 @@ export class Renderer {
       if(kind==='projectile')o.sprite.material.rotation=-(e.aim||0);
       else if(Number.isFinite(e.aim))o.sprite.material.rotation=e.aim;
       else{o.sprite.material.rotation=moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;if(['attack','gather'].includes(e.action)&&e.actionUntil>world.time)o.sprite.material.rotation=motion.attackTilt*Math.sin((e.actionUntil-world.time)*12);}
-      const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e));
+      const lootGlow=kind==='drop'?dropGlow(e):null;
+      const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e))||!!lootGlow;
       let display=entityBrightness(frame, o.x, o.z, {local:kind==='player'&&e.id===localId, emissive});
       if(kind==='building'&&STRUCTURES[key]?.light&&key!=='lantern'&&!(e.fuel>0))display*=0.45;
       const lamp=brightnessAt(frame.sources, o.x, o.z, 1, frame.lighting);
@@ -296,16 +359,20 @@ export class Renderer {
       if(kind==='enemy'&&e.stunned>0)o.sprite.material.color.lerp(new THREE.Color('#bfe8ff'), .65);
       if(kind==='enemy'&&this.textures.has('glow-'+key)){if(!o.eyes){const gdef=this.theme.sprites['glow-'+key],tex=this.textures.get('glow-'+key).clone();tex.needsUpdate=true;tex.repeat.set(1/(gdef.columns||1),1/(gdef.rows||1));o.eyes=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));o.eyes.center.copy(o.sprite.center);this.scene.add(o.eyes);}o.eyes.material.map.offset.copy(o.sprite.material.map.offset);o.eyes.scale.copy(o.sprite.scale);o.eyes.position.set(o.sprite.position.x,o.sprite.position.y+.03,o.sprite.position.z+.03);o.eyes.material.rotation=o.sprite.material.rotation;o.eyes.visible=o.sprite.visible;o.eyes.material.opacity=glowStrength(frame.darkness,e,this.clock);}
       if(kind==='building'&&key==='farm'&&e.growth>=100&&display>0.55)o.sprite.material.color.lerp(new THREE.Color('#efd394'), .45);
-      if(kind!=='zone')o.sprite.material.opacity=e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
+      if(kind!=='zone')o.sprite.material.opacity=kind==='drop'?dropBlink(e,world.time,this.clock):e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
       const fade=labelOpacity(display, frame.darkness, frame.lighting);
       if(kind==='building'&&STRUCTURES[key].light){const lit=key==='lantern'||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
-      if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);}
+      if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);this.syncWeaponRig(e,o,world,weapon);}
+      // Night-only finds (regions.mjs) glow in the dark so they can be found from afar.
+      if(kind==='node'){const hue=nightGlow(e);if(hue){this.glow(o,1.1);o.glow.material.color.set(hue);o.glow.material.opacity=(.16+.42*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));}}
+      if(lootGlow){this.glow(o,.85);o.glow.material.color.set(lootGlow);o.glow.material.opacity=(.13+.29*frame.darkness)*(.85+.15*Math.sin(this.clock*2.4+e.x))*dropBlink(e,world.time,this.clock);}
       if(kind==='building'&&key==='gate'&&e.open)o.sprite.scale.x*=.35;
       if((kind==='enemy'||kind==='building'||(kind==='ally'&&key!=='crow'))&&e.hp<e.maxHp&&fade>0.04){if(!o.health){const back=new THREE.Sprite(new THREE.SpriteMaterial({color:0x302834,transparent:true,depthWrite:false})),fill=new THREE.Sprite(new THREE.SpriteMaterial({color:kind==='enemy'?0xdf9383:kind==='ally'?0x9fd8a8:0xd2c395,transparent:true,depthWrite:false}));fill.center.set(0,.5);this.scene.add(back,fill);o.health={back,fill};}const y=kind==='ally'?({wight:4.3,jack:2.4}[key]||1.6):(kind==='enemy'?({king:5.4,brute:3.3,wraith:2.2,golem:3.4,bonewalker:2.4,bogling:1.6}[key]||1.3)*(e.elite?1.3:1):key==='hearth'?3.6:1.8);o.health.back.position.set(o.x,y,o.z);o.health.fill.position.set(o.x-.65,y,o.z+.025);o.health.back.scale.set(1.4,.1,1);o.health.fill.scale.set(1.3*Math.max(0,e.hp/e.maxHp),.055,1);o.health.back.material.opacity=o.health.fill.material.opacity=fade;o.health.back.visible=o.health.fill.visible=true;}
       if(kind==='enemy'){const tg=telegraphOf(e);if(tg){const reach=tg.radius||tg.length||2;if(warningVisible(frame, tg.x, tg.z, reach, p))this.combat.telegraph(tg,frame.darkness>0.5?.75:1,this.clock);
         // The creature itself brightens as its blow comes due.
         o.sprite.material.color.lerp(new THREE.Color(tg.heavy?'#ffb3a0':'#fff1e0'),.15+.35*tg.fill);}}
     }
+    (this.ropes||=new RopeLayer(this.scene)).update(world,this.objects,frame,this.theme);
     for(const o of this.objects.values())if(!alive.has(o.id)&&o!==this.ghost)this.remove(o);
     this.paintShots(world,dt);this.combat.end();this.paintAfterimages(dt);
     this.dropMotion.retain(new Set(world.drops.map(drop=>drop.id)));
@@ -314,10 +381,11 @@ export class Renderer {
     const goalFade=p.goal?Math.max(this.reveal(p.goal.x, p.goal.z), distance(p, p.goal)<8?.28:0):0;
     this.pathMarker.visible=!!p.goal&&goalFade>0.04;if(p.goal){this.pathMarker.position.set(p.goal.x,.03,p.goal.z);this.pathMarker.material.opacity=.7*goalFade;}
     if(placement){if(!this.ghost||this.ghost.key!==placement.key){if(this.ghost)this.remove(this.ghost);this.ghost=this.sprite(placement.key,'preview');}this.ghost.sprite.position.set(placement.x,0,placement.z);this.ghost.sprite.material.color.set(placement.valid?'#c8e5a6':'#dd7471');this.ghost.sprite.material.opacity=.7;this.ghost.shadow.visible=false;this.ghost.sprite.visible=true;}else if(this.ghost){this.remove(this.ghost);this.ghost=null;}
-    for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2)this.effect(ev);this.lastEvent=ev.id;}
+    for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2)this.effect(ev,world);this.lastEvent=ev.id;}
     this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);if(e.sweep)e.mesh.geometry.setDrawRange(0,6*Math.ceil(e.sweep*Math.min(1,e.life/.1)));if(!e.fixed)e.mesh.scale.setScalar(e.radius?.3+Math.min(1,e.life*3)*e.radius:1+e.life*(e.type==='impact'?12:4));e.mesh.material.opacity=Math.max(0,1-e.life*(e.sweep?3.2:2))*fade*(e.sweep?.55:1);if(e.life>.5){this.scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();return false;}return true;});
-    this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*(f.alwaysVisible?1:this.reveal(f.x, f.z)));if(f.life>1.8){f.el.remove();return false;}return true;});
-    this.magicMesh.update(buildMagicEffects(world,this.magicFrame,this.theme));
+    this.floaters=stepFloaters(this.floaters,dt,(x,z,y)=>this.screenPoint(x,z,y),(x,z)=>this.reveal(x,z));
+    const magic=buildMagicEffects(world,this.magicFrame,this.theme);if(weapon?.normal.length)magic.push(...weapon.normal);
+    this.magicMesh.update(magic);this.glowMesh.update(weapon?.glow||[]);this.groundFxMesh.update(weapon?.groundNormal||[]);this.groundGlowMesh.update(weapon?.groundGlow||[]);
     this.gl.render(this.scene,this.camera);
   }
 }

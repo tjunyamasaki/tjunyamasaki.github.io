@@ -37,7 +37,7 @@
  * Sprite src values are relative to hollowstead/ (assets/magic/widows-needle/).
  */
 
-import { ownerPower } from './registry.mjs?v=harvest-17';
+import { ownerPower } from './registry.mjs?v=harvest-18';
 
 const PACK = 'widows-needle';
 const RANGE = 9;
@@ -45,9 +45,9 @@ const CONE = 35 * Math.PI / 180;
 const CONE_COS = Math.cos(CONE / 2);
 const ROOT = 2.5;
 // Balance (Long Night): a 26 point pin, then 12 more bleeding out across the root.
-const IMPACT = 26;
-const BLEED = 12;
-const DART_SPEED = 20;
+const IMPACT = 13;
+const BLEED = 6;
+const DART_SPEED = 20 * 1.15;
 const FRAME_FPS = 12;
 const FRAME_COUNT = 4;
 const CAST_LIFE = FRAME_COUNT / FRAME_FPS;
@@ -112,7 +112,7 @@ export const magicPack = {
     slot: 'weapon',
     damage: IMPACT,
     durability: 140,
-    cooldown: 1.0,
+    cooldown: 1.3,
     stamina: 6,
     blurb: 'A pale bone needle wrapped in grave-silk. The dart pins the nearest foe ahead.',
   },
@@ -313,7 +313,7 @@ function tryPin(world, dart) {
   const mob = findHostile(world, dart.targetId);
   if (!mob) return false;
   const killing = mob.hp <= IMPACT * (dart.power || 1);
-  offer(world, mob, Math.round(IMPACT * (dart.power || 1)));
+  offer(world, mob, Math.round(IMPACT * (dart.power || 1)), dart.ownerId);
   if (killing) return true;
   if (!Array.isArray(world.magicRoots)) world.magicRoots = [];
   let root = world.magicRoots.find(entry => entry && entry.packId === PACK && entry.targetId === mob.id);
@@ -333,6 +333,7 @@ function tryPin(world, dart) {
   root.fresh = true;
   root.bleedSent = 0;
   root.power = dart.power || 1;
+  if (dart.ownerId) root.ownerId = dart.ownerId;
   root.remaining = ROOT;
   root.pinX = mob.x;
   root.pinZ = mob.z;
@@ -372,7 +373,7 @@ function advanceRoot(world, root, dt) {
   const due = root.age >= ROOT - 1e-8 ? BLEED : Math.floor(BLEED * (elapsed / ROOT) + 1e-9);
   const slice = due - (Number(root.bleedSent) || 0);
   root.bleedSent = due;
-  if (slice > 0) offer(world, mob, slice * (root.power || 1));
+  if (slice > 0) offer(world, mob, slice * (root.power || 1), root.ownerId);
   root.frame = Math.floor(root.age * 8) % FRAME_COUNT;
   if (root.age >= ROOT - 1e-8) {
     release(mob);
@@ -401,7 +402,7 @@ function release(mob) {
   delete mob.magicRootZ;
 }
 
-function offer(world, mob, amount) {
+function offer(world, mob, amount, ownerId = null) {
   if (!mob || mob.id == null || !(amount > 0)) return;
   if (playerIds(world).has(mob.id)) return;
   const prev = mob.pendingHit;
@@ -410,7 +411,8 @@ function offer(world, mob, amount) {
   else if (prev && typeof prev === 'object' && typeof prev.amount === 'number') total += prev.amount;
   const hit = { targetId: mob.id, amount: total };
   mob.pendingHit = hit;
-  const queued = { targetId: mob.id, amount };
+  // ownerId credits the kill to the caster (weapon mastery, trinkets).
+  const queued = ownerId ? { targetId: mob.id, amount, ownerId } : { targetId: mob.id, amount };
   const current = world.pendingHit;
   if (Array.isArray(current)) current.push(queued);
   else if (current == null) world.pendingHit = [queued];

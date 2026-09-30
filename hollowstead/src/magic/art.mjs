@@ -20,6 +20,9 @@ export const HELD_GEAR = Object.freeze({
   stormrod: {motion: 'staff', sprite: 'held-stormrod'}, starfall: {motion: 'staff', sprite: 'held-starfall'},
   crowtotem: {motion: 'rattle', sprite: 'held-crowtotem'}, jacklantern: {motion: 'bell', handY: 1.0, sprite: 'held-jacklantern'},
   wighthorn: {motion: 'tome', handY: 1.2, sprite: 'held-wighthorn'}, censer: {motion: 'bell', handY: 1.0, sprite: 'held-censer'},
+  'kitsune-lantern': {motion: 'kitsune', handY: 1.12, handX: .59, sprite: 'kitsune-lantern'},
+  plaguebeak: {motion: 'plague', handY: 1.08, handX: .55, sprite: 'plaguebeak'},
+  gloomgrasp: {motion: 'grasp', handY: 1.1, handX: .55, sprite: 'gloomgrasp'},
 });
 
 export const MAGIC_PALETTE = Object.freeze({
@@ -77,9 +80,14 @@ export function swingAngle(t){
   return -2.2+2.1*ease((t-.52)/.48);
 }
 
+/** Weapons not drawn in the hand: their src/fx rig draws them (WEAPON_FX `rig`). */
+export const UNHELD = new Set(['kitsune-lantern', 'pallbearer', 'scythe', 'hollow-moon']);
+
 export function heldWeaponPose(player, time, theme={}){
   const tool = player.action === 'gather' && TOOL_GEAR[player.gatherTool] ? player.gatherTool : null;
   const id = tool || player.equipment?.weapon?.itemId;
+  // Weapons drawn as a body rig by src/fx are not held (the kitsune shows itself as tails).
+  if(UNHELD.has(id)) return null;
   const base = tool ? TOOL_GEAR[tool] : (GRAVECRAFT[id] || HELD_GEAR[id]);
   if(!base) return null;
   const spec = {...base, ...theme.magic?.weapons?.[id]};
@@ -91,6 +99,22 @@ export function heldWeaponPose(player, time, theme={}){
   const t = clamp(age / duration);
   const active = tool ? true : age >= 0 && age < duration;
   let rotation = -.10*side, reach = 0, scale = 1, lift = 0;
+  if(spec.motion === 'kitsune'){
+    // The possessed charm floats even at rest; its cast winds up before a sharp release.
+    rotation = side*(-.08+Math.sin(time*2.8)*.075);
+    lift = .045*Math.sin(time*3.4);
+  }
+  if(spec.motion === 'plague'){
+    // Leans like a walking stick at rest; the beak sways as if sniffing the air.
+    rotation = side*(-.12+Math.sin(time*2.1)*.05);
+    lift = .03*Math.sin(time*4.2);
+  }
+  if(spec.motion === 'grasp'){
+    // The eye-clutching hand breathes: a slow hover and a faint heartbeat pulse.
+    rotation = side*(-.06+Math.sin(time*1.8)*.05);
+    lift = .04*Math.sin(time*2.6);
+    scale = 1+.025*Math.max(0, Math.sin(time*5.2))**4;
+  }
   if(tool){
     const phase = (time % CHOP_PERIOD) / CHOP_PERIOD;
     rotation = side*chopAngle(phase);
@@ -109,11 +133,64 @@ export function heldWeaponPose(player, time, theme={}){
     }
     if(spec.motion === 'bow'){rotation += side*.25*fade; reach = -.15*Math.sin(t*Math.PI);}
     if(spec.motion === 'tome'){scale = 1+.25*Math.sin(t*Math.PI); rotation += Math.sin(t*14)*.2*fade;}
+    if(spec.motion === 'kitsune'){
+      if(t < .26){
+        const wind = inOut(t/.26);
+        rotation += side*.46*wind; lift += .2*wind; reach = -.12*wind; scale = 1-.08*wind;
+      }else if(t < .43){
+        const snap = ease((t-.26)/.17);
+        rotation += side*(.46-.94*snap); lift += .2-.11*snap; reach = -.12+.42*snap; scale = .92+.22*snap;
+      }else{
+        const settle = (t-.43)/.57, rest = 1-ease(settle);
+        rotation += side*(-.48*rest+Math.sin(settle*Math.PI*3)*.10*(1-settle));
+        lift += .09*rest; reach = .3*rest; scale = 1+.14*rest;
+      }
+    }
+    if(spec.motion === 'plague'){
+      // Rear back, peck forward to spit the vial, then two little bird-like nods.
+      if(t < .24){
+        const wind = inOut(t/.24);
+        rotation += side*.55*wind; lift += .16*wind; reach = -.14*wind; scale = 1-.06*wind;
+      }else if(t < .38){
+        const snap = ease((t-.24)/.14);
+        rotation += side*(.55-1.35*snap); lift += .16-.2*snap; reach = -.14+.6*snap; scale = .94+.16*snap;
+      }else{
+        const settle = (t-.38)/.62, rest = 1-ease(settle);
+        rotation += side*(-.8*rest+Math.sin(settle*Math.PI*4)*.12*(1-settle));
+        lift += -.04*rest+Math.abs(Math.sin(settle*Math.PI*2))*.05*(1-settle);
+        reach = .46*rest; scale = 1+.1*rest;
+      }
+    }
+    if(spec.motion === 'grasp'){
+      // Raise the scepter high, drive it down at the ground, then hold it, trembling, while the hands squeeze.
+      if(t < .25){
+        const wind = inOut(t/.25);
+        rotation += side*.5*wind; lift += .28*wind; reach = -.1*wind;
+      }else if(t < .4){
+        const slam = ease((t-.25)/.15);
+        rotation += side*(.5-1.1*slam); lift += .28-.42*slam; reach = -.1+.4*slam; scale = 1+.12*slam;
+      }else{
+        const settle = (t-.4)/.6, rest = 1-ease(settle);
+        rotation += side*(-.6*rest)+Math.sin(settle*40)*.05*rest;
+        lift += -.14*rest; reach = .3*rest; scale = 1+.12*rest;
+      }
+    }
+  }
+  // Skill stance (skills.mjs stamps player.skillCast): blades whirl once overhead, everything else
+  // is raised high and trembles with the power it lets go. Layered over whatever the weapon was doing.
+  const skill = player.skillCast, skillAge = !tool && skill?.itemId === id ? time-skill.at : Infinity;
+  let skilling = false;
+  if(skillAge >= 0 && skillAge < .8){
+    const u = skillAge/.8, rise = Math.sin(Math.PI*clamp(u*1.15));
+    skilling = true;
+    if(melee) rotation = side*(-.2+Math.PI*2*ease(clamp(u/.55)))+(u > .55 ? side*-.2*(1-ease((u-.55)/.45)) : 0);
+    else rotation += side*-.35*rise+Math.sin(u*46)*.07*(1-u);
+    lift += .5*rise; scale *= 1+.32*rise; reach = melee ? .25*rise : reach;
   }
   const length = Math.hypot(player.dx||0,player.dz||0)||1, k = theme.motion?.playerScale || 1;
   return {key: spec.sprite || id, x: side*(spec.handX??.48)*k+(player.dx||0)/length*reach, z: .04+(player.dz||0)/length*reach,
     y: (spec.handY??1.12)*k+Math.sin(time*2.4)*.025+lift+(active&&!melee&&!tool?Math.sin(t*Math.PI)*.12:0),
-    rotation, side, scale: scale*(spec.heldScale??1), active};
+    rotation, side, scale: scale*(spec.heldScale??1), active: active || skilling, skilling};
 }
 
 export function skeletonFrame(entity, lead=0, def=skeletonSprite){

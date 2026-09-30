@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="360" viewBox="0 0 280 360">
+  <title>Nine-Tail Lantern</title>
+  <desc>A wicked ivory fox lantern crowned with nine mint and violet foxfire tails, scarlet cords, and a gold bell.</desc>
+  <defs>
+    <g id="tail" stroke="#2b2233" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M0 12C-24-10-30-43-21-68C-15-86 3-97 0-132C27-113 36-87 26-62C16-37 9-21 0 12Z"/>
+      <path d="M-15-76C-7-91 3-103 0-132C20-116 26-99 25-84L13-94L10-74L0-85Z" fill="#fff1ca" stroke-width="4"/>
+      <path d="M-6-35Q-10-53 0-67" fill="none" stroke="#e2fff8" stroke-width="5"/>
+    </g>
+  </defs>
+  <g stroke="#2b2233" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Nine separate flame tails make a readable fan around the mask. -->
+    <g transform="translate(140 171)">
+      <use href="#tail" transform="rotate(-88) scale(.92)" fill="#b88aee"/>
+      <use href="#tail" transform="rotate(88) scale(.92)" fill="#b88aee"/>
+      <use href="#tail" transform="rotate(-66) scale(.97)" fill="#55d9c3"/>
+      <use href="#tail" transform="rotate(66) scale(.97)" fill="#55d9c3"/>
+      <use href="#tail" transform="rotate(-44)" fill="#aa7ee0"/>
+      <use href="#tail" transform="rotate(44)" fill="#aa7ee0"/>
+      <use href="#tail" transform="rotate(-22) scale(1.03)" fill="#55d9c3"/>
+      <use href="#tail" transform="rotate(22) scale(1.03)" fill="#55d9c3"/>
+      <use href="#tail" transform="scale(1.07)" fill="#b88aee"/>
+    </g>
+    <!-- Heavy cord loop doubles as the lantern's carrying handle. -->
+    <path d="M117 118C89 91 110 65 140 65C170 65 191 91 163 118" fill="none" stroke-width="17"/>
+    <path d="M117 118C89 91 110 65 140 65C170 65 191 91 163 118" fill="none" stroke="#ed574d" stroke-width="8"/>
+    <path d="M118 76L124 84M138 71L138 79M158 76L153 84" stroke="#ffad79" stroke-width="4"/>
+    <!-- A slightly crooked, papery fox face. Broad shapes remain legible in the arena. -->
+    <path d="M84 149L70 87Q107 91 121 114Q140 107 159 114Q179 87 211 82L197 150L215 166L205 194L189 203Q172 240 140 247Q105 238 90 209L74 198L65 169Z" fill="#fff0c9" stroke-width="8"/>
+    <path d="M193 149L205 166L196 186L177 198Q165 225 140 236Q120 233 100 217Q115 242 140 247Q172 240 189 203L205 194L215 166L197 150L211 82Z" fill="#dca984" stroke="none"/>
+    <path d="M85 103L94 139L114 124Z" fill="#ed574d" stroke-width="5"/>
+    <path d="M196 100L187 138L167 125Z" fill="#ed574d" stroke-width="5"/>
+    <path d="M140 122L151 139L140 153L129 139Z" fill="#ed574d" stroke="none"/>
+    <path d="M80 159Q97 146 119 163L126 178Q101 174 80 159Z" fill="#ed574d" stroke="none"/>
+    <path d="M200 159Q181 146 160 163L154 178Q178 174 200 159Z" fill="#ed574d" stroke="none"/>
+    <path d="M85 163Q103 166 122 177Q98 185 85 163Z" fill="#2b2233" stroke-width="5"/>
+    <path d="M195 163Q177 166 158 177Q182 185 195 163Z" fill="#2b2233" stroke-width="5"/>
+    <path d="M100 168L108 171L106 178L101 176Z" fill="#66f0d3" stroke="none"/>
+    <path d="M180 168L172 171L174 178L179 176Z" fill="#66f0d3" stroke="none"/>
+    <path d="M80 184L98 189M83 196L102 198M200 184L182 189M197 196L178 198" fill="none" stroke="#ed574d" stroke-width="6"/>
+    <path d="M133 193Q140 188 147 193L140 200Z" fill="#2b2233" stroke-width="4"/>
+    <path d="M112 208Q140 224 170 204Q159 228 140 230Q125 228 112 208Z" fill="#2b2233" stroke-width="5"/>
+    <path d="M121 215L127 225L132 218M151 217L155 224L162 211" fill="#fff0c9" stroke="none"/>
+    <path d="M140 200L140 209" fill="none" stroke-width="4"/>
+    <path d="M95 130L105 135M180 132L185 122" fill="none" stroke="#fffdf0" stroke-width="5"/>
+    <!-- The red knot, long ribbon tails, and bell punctuate the silhouette below the mask. -->
+    <path d="M137 247Q116 267 104 254Q97 243 111 240Q124 241 137 252M143 247Q164 231 175 244Q181 257 167 261Q154 259 143 252" fill="#ed574d" stroke-width="6"/>
+    <path d="M132 254Q128 281 112 301L117 316L131 306Q146 279 141 255" fill="#ed574d" stroke-width="6"/>
+    <path d="M145 256Q151 281 174 285L182 272L179 296Q156 301 139 264" fill="#ca384d" stroke-width="6"/>
+    <path d="M142 262L147 314" fill="none" stroke-width="9"/>
+    <path d="M142 262L147 314" fill="none" stroke="#ed574d" stroke-width="4"/>
+    <rect x="132" y="242" width="17" height="19" rx="6" fill="#ed574d" stroke-width="5" transform="rotate(-8 140 251)"/>
+    <path d="M133 320Q131 306 146 304Q161 303 162 318L167 326Q151 340 132 329Z" fill="#f7bd57" stroke-width="6"/>
+    <path d="M137 317Q149 322 161 317M147 322L149 331" fill="none" stroke-width="4"/>
+    <path d="M138 311L144 309" stroke="#fff0c9" stroke-width="4"/>
+    <path d="M43 217L46 225L54 228L46 231L43 239L40 231L32 228L40 225Z" fill="#69e4ca" stroke-width="3"/>
+    <path d="M231 97L233 103L239 105L233 107L231 113L229 107L223 105L229 103Z" fill="#f7bd57" stroke-width="3"/>
+  </g>
+</svg>

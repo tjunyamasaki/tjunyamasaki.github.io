@@ -8,6 +8,7 @@ import {
   CLOCK_V2, NIGHT_WAVE_FRACTIONS, V1_PHASE, V2_PHASE, nightWaveOffsets, phaseProgress, remapPhaseTime,
 } from '../src/contracts.mjs';
 import {migrateV1Save} from '../src/serialization.mjs';
+import {moonOf, nextMoon} from '../src/night.mjs';
 import {equippedLanternLit} from '../src/inventory.mjs';
 import {
   HEARTH_LEVEL_STEP, LANTERN_FADE_SECONDS, PLAYER_LIGHT_RADIUS, brightnessAt, canInspect, collectLightSources, combinedStrength,
@@ -50,7 +51,7 @@ test('T28 phaseAt, dayAt, and remaining agree on 180/210/310 and later days',()=
   assert.equal(RULES.cycle*RULES.finalNight,1550);
 });
 
-test('T29 a night has three wave opportunities, the boss every fifth night, and no victory screen',()=>{
+test('T29 a waxing night has three wave opportunities, the boss comes on blood moons, and no victory screen',()=>{
   assert.deepEqual(NIGHT_WAVE_FRACTIONS,[0,0.4,0.8]);
   assert.deepEqual(nightWaveOffsets(RULES.night),[0,40,80]);
   const {w,p}=camp();
@@ -96,7 +97,9 @@ test('T29 a night has three wave opportunities, the boss every fifth night, and 
 
   const boss=camp();
   brace(boss.w);
-  boss.w.time=RULES.cycle*4+RULES.day+RULES.dusk-0.02;
+  const blood=nextMoon(boss.w,'blood'),again=nextMoon(boss.w,'blood',blood+1);
+  assert.equal(moonOf(boss.w,1),'waxing');
+  boss.w.time=RULES.cycle*(blood-1)+RULES.day+RULES.dusk-0.02;
   boss.w.tick(0.05);
   assert.equal(boss.w.enemies.filter(enemy=>enemy.type==='king').length,1);
   assert.equal(boss.w.bossSpawned,true);
@@ -105,13 +108,13 @@ test('T29 a night has three wave opportunities, the boss every fifth night, and 
   boss.w.enemies.find(enemy=>enemy.type==='king').hp=0;
   boss.w.tick();
   assert.equal(boss.w.bossSlain,true);
-  boss.w.time=RULES.cycle*5-0.02;
+  boss.w.time=RULES.cycle*blood-0.02;
   boss.w.tick();
   assert.equal(boss.w.status,'playing');
-  boss.w.time=RULES.cycle*9+RULES.day+RULES.dusk-0.02;
+  boss.w.time=RULES.cycle*(again-1)+RULES.day+RULES.dusk-0.02;
   boss.w.tick(0.05);
   assert.equal(boss.w.enemies.filter(enemy=>enemy.type==='king').length,1);
-  assert.equal(boss.w.bossNight,10);
+  assert.equal(boss.w.bossNight,again);
 });
 
 test('T29 a migrated night does not replay its start or grow a fourth wave',()=>{
@@ -278,9 +281,11 @@ test('theme lighting falls back and does not change safety radii',()=>{
   const self=entityBrightness(frame, 30, 30, {local:true});
   assert.ok(self>=frame.lighting.localSilhouette);
   assert.ok(self<0.3);
+  // The day track's dusk and night stops come from RULES (main.mjs paintClock), never hard-coded in its CSS.
   const css=readFileSync(new URL('../style.css', import.meta.url),'utf8');
-  assert.equal(css.includes('58%'), false);
-  assert.equal(css.includes('69%'), false);
+  const track=css.match(/\.day-track\{[^}]*\}/g)||[];
+  assert.ok(track.length>0);
+  assert.equal(track.some(rule=>rule.includes('58%')||rule.includes('69%')), false);
   const main=readFileSync(new URL('../src/main.mjs', import.meta.url),'utf8');
   assert.match(main, /RULES\.day\/RULES\.cycle/);
   assert.equal(main.includes('time=163'), false);

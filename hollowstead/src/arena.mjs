@@ -2,11 +2,11 @@
 // strength. Before each wave every wanderer picks one of three weapons (a weapon already carried
 // ranks up instead). Health and level are the only other growth. No hunger, courage, stamina,
 // durability or loot. The World owns the simulation; this module owns the wave rules and the picks.
-import {itemDefinition} from './inventory.mjs?v=harvest-17';
-import {label} from './content.mjs?v=harvest-17';
-import {HOTBAR_SLOTS} from './contracts.mjs?v=harvest-17';
-import {ARENA_GROWTH, ELITE, WEAPON_STYLES, enemyXp, pickWeighted, rarityOf} from './progression.mjs?v=harvest-17';
-import {magicItems, isMagicAlly} from './magic/registry.mjs?v=harvest-17';
+import {itemDefinition} from './inventory.mjs?v=harvest-18';
+import {label} from './content.mjs?v=harvest-18';
+import {HOTBAR_SLOTS} from './contracts.mjs?v=harvest-18';
+import {ARENA_GROWTH, ELITE, WEAPON_STYLES, enemyXp, pickWeighted, rarityOf} from './progression.mjs?v=harvest-18';
+import {magicItems, isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 
 export const ARENA = Object.freeze({
   radius: 22,          // world radius: the walkable disc is radius-1
@@ -18,8 +18,8 @@ export const ARENA = Object.freeze({
   spawnClear: 8,       // never closer than this to a wanderer
   xp: 1.6,             // levels are the arena's main growth, so kills teach faster
 });
-/** The first pick: one crafted weapon of each kind (close, far, bursting), so the run starts plain and grows. */
-export const STARTERS = Object.freeze([['spear', 'sword', 'broadsword'], ['recurve', 'bonebow'], ['crookstaff']]);
+/** The prototype's first card is always the Gloomgrasp Scepter, alongside close and ranged choices. */
+export const STARTERS = Object.freeze([['gloomgrasp'], ['spear', 'sword', 'broadsword'], ['recurve', 'bonebow', 'crookstaff']]);
 
 /** Creature strength by wave: numbers grow faster than toughness. */
 export function arenaScale(wave){
@@ -147,7 +147,7 @@ function edgeSpot(world){
   return best;
 }
 
-function spawnPack(world, types){
+export function spawnPack(world, types){
   const spot = edgeSpot(world); if(!spot) return 0;
   world.event('portal', spot.x, spot.z, '', {radius: 1.4+types.length*.12});
   let made = 0;

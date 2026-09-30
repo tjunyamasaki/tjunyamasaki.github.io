@@ -7,7 +7,7 @@
 // dx/dz are a world-unit push away from the caster (about 1.6). Players are never queued.
 // step() only ages sweeps whose id starts with "spirit-fan:" and drops them at the end.
 
-import {ownerPower} from './registry.mjs?v=harvest-17';
+import {ownerPower} from './registry.mjs?v=harvest-18';
 
 const ID = 'spirit-fan';
 // Balance (Long Night): a wide gust that hits hard, shoves, and breaks enemy wind-ups.
@@ -121,7 +121,7 @@ export function use(world, player) {
     const knock = knockFrom(player, facing, mob);
     if (!knock) continue;
     seen.add(mob.id);
-    queue(world, 'pendingHit', {targetId: mob.id, amount: Math.round(DAMAGE * power)});
+    queue(world, 'pendingHit', {targetId: mob.id, amount: Math.round(DAMAGE * power), ownerId: player.id});
     if (mob.windup > 0 && mob.type !== 'king') mob.windup = 0;
     queue(world, 'pendingKnock', {targetId: mob.id, dx: knock.dx, dz: knock.dz});
   }

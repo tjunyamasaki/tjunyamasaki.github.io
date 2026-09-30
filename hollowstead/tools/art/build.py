@@ -21,9 +21,9 @@ def target(t):
 
 
 def registry():
-    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp
+    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine
     reg = {}
-    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp):
+    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine):
         for key, spec in getattr(mod, "SPRITES", getattr(mod, "NODES", {})).items():
             reg[key] = spec
     return reg
@@ -41,12 +41,16 @@ def build_icon(key, spec):
 
 
 def build(key, spec):
-    """spec: (fn, target) for one frame, or dict(frames=[fn..], cols, rows, target)."""
+    """spec: (fn, target) for one frame, dict(frames=[fn..], cols, rows, target), or dict(builder=fn) for a packed atlas."""
+    if isinstance(spec, dict) and "builder" in spec:
+        svg = spec["builder"]()
+        open(os.path.join(SPRITES, f"{key}.svg"), "w").write(svg)
+        return svg
     if isinstance(spec, tuple):
         fn, t = spec
         svg = lib.build_sheet([fn], 1, 1, target(t))
     else:
-        svg = lib.build_sheet(spec["frames"], spec["cols"], spec["rows"], target(spec["target"]))
+        svg = lib.build_sheet(spec["frames"], spec["cols"], spec["rows"], target(spec["target"]), cell=spec.get("cell", (512, 768)))
         if spec.get("icon"):
             icon = lib.build_sheet(spec["frames"][:1], 1, 1, target(spec["target"]))
             open(os.path.join(SPRITES, f"{key}-icon.svg"), "w").write(icon)
@@ -69,11 +73,11 @@ def main():
     for k in todo:
         svg = build(k, reg[k])
         im = lib.render_png(svg)
-        thumbs.append((k, im))
+        thumbs.append((k, im, tuple(c // 2 for c in reg[k].get("cell", (512, 768))) if isinstance(reg[k], dict) else (256, 384)))
         print("built", k, im.size)
-    import longnight, arsenal
-    icons = {**longnight.ICONS, **arsenal.ICONS}
-    wide = {**longnight.WIDE, **arsenal.WIDE}
+    import longnight, arsenal, frontier, scenery, refine
+    icons = {**longnight.ICONS, **arsenal.ICONS, **getattr(frontier, "ICONS", {}), **getattr(scenery, "ICONS", {}), **refine.ICONS}
+    wide = {**longnight.WIDE, **arsenal.WIDE, **getattr(frontier, "WIDE", {}), **getattr(scenery, "WIDE", {})}
     for k, fn in icons.items():
         if a.only and k not in keys:
             continue
@@ -99,10 +103,11 @@ def main():
 def preview(thumbs, out, cols=10):
     cw, ch = 256, 384
     cells = []
-    for k, im in thumbs:
-        for r in range(max(1, im.height // ch)):
-            for c in range(max(1, im.width // cw)):
-                cell = im.crop((c * cw, r * ch, c * cw + cw, r * ch + ch))
+    for k, im, *size in thumbs:
+        cw0, ch0 = size[0] if size else (cw, ch)
+        for r in range(max(1, im.height // ch0)):
+            for c in range(max(1, im.width // cw0)):
+                cell = im.crop((c * cw0, r * ch0 - (ch - ch0), c * cw0 + cw, r * ch0 + ch0))
                 if cell.getbbox():
                     cells.append(cell)
     cols = min(cols, len(cells)); rows = (len(cells) + cols - 1) // cols

@@ -1,4 +1,4 @@
-import {isMagicAlly, ownerPower} from './registry.mjs?v=harvest-17';
+import {isMagicAlly, ownerPower} from './registry.mjs?v=harvest-18';
 
 // Balance (Long Night): the widest ring in the game, delayed, one heavy toll per foe.
 export const BELL = Object.freeze({delay: .28, travel: .65, linger: .32, radius: 5.5, damage: 30, push: 1.2, cooldown: 1.5, stamina: 10});
@@ -45,7 +45,7 @@ export function step(world, dt){
         // Only the travelling front deals damage. The fading echoes are cosmetic.
         if(!Number.isFinite(span) || span>outer || (before>=BELL.delay && span<Math.max(0,inner-.3))) continue;
         wave.hitIds.push(enemy.id);
-        (world.pendingHit ||= []).push({targetId: enemy.id, amount: Math.round(BELL.damage*(wave.power||1))});
+        (world.pendingHit ||= []).push({targetId: enemy.id, amount: Math.round(BELL.damage*(wave.power||1)), ownerId: wave.ownerId});
         (world.pendingKnock ||= []).push({targetId: enemy.id, dx:(span?dx/span:1)*BELL.push, dz:(span?dz/span:0)*BELL.push});
       }
     }

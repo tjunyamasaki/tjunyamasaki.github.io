@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {access, readFile} from 'node:fs/promises';
 import {World} from '../src/engine.mjs';
 import {makeStack} from '../src/inventory.mjs';
-import {loadMagicModules} from '../src/magic/load.mjs?v=harvest-17';
-import {collectMagicSprites, magicItems, magicVisuals} from '../src/magic/registry.mjs?v=harvest-17';
-import {BELL} from '../src/magic/mourning-bell.mjs?v=harvest-17';
-import {MagicClock, heldWeaponPose} from '../src/magic/art.mjs?v=harvest-17';
-import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from '../src/magic/effects.mjs?v=harvest-17';
+import {loadMagicModules} from '../src/magic/load.mjs?v=harvest-18';
+import {collectMagicSprites, magicItems, magicVisuals} from '../src/magic/registry.mjs?v=harvest-18';
+import {BELL} from '../src/magic/mourning-bell.mjs?v=harvest-18';
+import {GRAVECRAFT, MagicClock, heldWeaponPose} from '../src/magic/art.mjs?v=harvest-18';
+import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from '../src/magic/effects.mjs?v=harvest-18';
 import {clearShowcaseWorld} from '../src/showcase.mjs';
+import {WEAPON_FX, WeaponFx} from '../src/fx/index.mjs?v=harvest-18';
 
 await loadMagicModules();
 
@@ -36,7 +37,7 @@ test('Mourning Bell waits for its wave, hits each hostile once, and preserves al
   advance(world,BELL.delay-.01);
   assert.equal(near.hp,100);
   advance(world,.2);
-  assert.equal(near.hp,TOLLED);assert.ok(near.x>1);assert.equal(edge.hp,100);
+  assert.equal(near.hp,TOLLED);assert.equal(near.x,1,'the bell does not knock back');assert.equal(edge.hp,100);
   for(let i=0;i<30;i++)advance(world,.05);
   assert.equal(near.hp,TOLLED);assert.equal(edge.hp,TOLLED);assert.equal(outside.hp,100);
   assert.equal(ally.hp,100);assert.equal(guest.hp,100);assert.equal(accidentalPlayer.hp,100);
@@ -46,7 +47,7 @@ test('Mourning Bell waits for its wave, hits each hostile once, and preserves al
 
 test('bell cooldown, broken equipment, and large ticks cannot duplicate hits',()=>{
   const {world,p}=setup('mourning-bell',1);const target=foe(world,'enemy',3);
-  world.attack(p);assert.equal(p.equipment.weapon,null);
+  world.attack(p);assert.equal(p.equipment.weapon.durability,0,'a broken weapon stays in hand');
   assert.equal(world.magicWaves.length,1);
   advance(world,2);assert.equal(target.hp,TOLLED);assert.equal(world.magicWaves.length,0);
   const second=setup();second.world.attack(second.p);second.world.attack(second.p);
@@ -67,12 +68,20 @@ test('network/save round trips preserve travelling rings and their already-hit t
   assert.equal(guest.enemies.find(e=>e.id==='far').hp,TOLLED);
 });
 
+/** Commands for a weapon drawn by src/fx (a WEAPON_FX entry): the frame's effects plus its rig. */
+function foxCommands(world,p){
+  const fx=new WeaponFx(),frame={time:world.time+.025,lead:.025};
+  const built=fx.build(world,frame,1,1/60,{x:p.x,z:p.z});
+  const tails=fx.rig(world,p,{x:p.x,z:p.z,y:0},1,frame.time);
+  return [...built.normal,...built.glow,...tails.normal,...tails.glow];
+}
 test('both renderers receive finite, bounded effects without mutating the host world',()=>{
   for(const id of Object.keys(magicItems)){
     const {world,p}=setup(id,magicItems[id].durability);foe(world,'target',2);
     world.attack(p);advance(world,.15);
     const before=JSON.stringify(world.snapshot());
-    const commands=buildMagicEffects(world,{time:world.time+.025,lead:.025});
+    // Weapons with a WEAPON_FX entry (the lantern's tails, the flail's coffin) are drawn by src/fx, not the pack effects.
+    const commands=WEAPON_FX.some(fx=>fx.id===id)?foxCommands(world,p):buildMagicEffects(world,{time:world.time+.025,lead:.025});
     assert.ok(commands.length>0,id);
     assert.ok(commands.length<500,id);
     for(const c of commands){
@@ -98,11 +107,18 @@ test('casting poses use replicated time, interpolate between snapshots, and sett
   world.time+=.05;assert.equal(clock.sample(world,15.01).lead,0);
 });
 
-test('all five items and the skeleton atlas resolve to real transparent project assets',async()=>{
-  assert.equal(Object.keys(magicItems).length,5);
-  const sprites=collectMagicSprites();assert.equal(sprites.length,6);
+test('all five Gravecraft items and the skeleton atlas resolve to real transparent project assets',async()=>{
+  // The five Gravecraft weapons and the skeleton atlas are PNGs; the weapons added since draw hand-written SVGs.
+  const gravecraft=Object.keys(GRAVECRAFT);assert.equal(gravecraft.length,5);
+  for(const id of gravecraft)assert.ok(magicItems[id],id);
+  const sprites=collectMagicSprites();assert.equal(sprites.length,Object.keys(magicItems).length+1);
   for(const [key,def] of sprites){
     const url=new URL(def.src);await access(url);
+    if(!GRAVECRAFT[key]&&key!=='gravecraft-skeleton'){
+      assert.match(url.pathname,/\.svg$/,key);assert.match(await readFile(url,'utf8'),/<svg[\s>]/,key);
+      if(def.icon)await access(new URL(def.icon));
+      continue;
+    }
     const png=await readFile(url);assert.equal(png.toString('ascii',1,4),'PNG',key);assert.equal(png[25],6,key);
     assert.equal(png.readUInt32BE(16)%(def.columns||1),0,key);
     assert.equal(png.readUInt32BE(20)%(def.rows||1),0,key);

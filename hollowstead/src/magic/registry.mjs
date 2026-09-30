@@ -1,7 +1,7 @@
 // Mutable registry for magic weapons. Modules register at startup.
 // The engine stays the authority for damage, knockback, burns, and roots.
-import {GRAVECRAFT, gravecraftSprite, skeletonSprite} from './art.mjs?v=harvest-17';
-import {powerOf} from '../progression.mjs?v=harvest-17';
+import {GRAVECRAFT, gravecraftSprite, skeletonSprite} from './art.mjs?v=harvest-18';
+import {powerOf} from '../progression.mjs?v=harvest-18';
 
 /** Level scaling for pack damage: the same multiplier crafted weapons get. */
 export function ownerPower(world, owner){
@@ -267,6 +267,7 @@ function resolveSprite(def, base){
   };
   return {
     src: spriteHref(source.src, base),
+    ...(typeof source.icon === 'string' ? {icon: spriteHref(source.icon, base)} : {}),
     size: Array.isArray(source.size) ? source.size : [1.6, 2.4],
     anchor: Array.isArray(source.anchor) ? source.anchor : [0.5, 0.08],
     columns: source.columns || 1,

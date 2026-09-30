@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {World} from '../src/engine.mjs';
 import {ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES} from '../src/content.mjs';
 import {makeStack} from '../src/inventory.mjs';
-import {collectMagicSprites, magicItems, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-17';
+import {collectMagicSprites, magicItems, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-18';
 import {SHOWCASE_MOB_COUNT_MAX, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseCategories, showcaseMarkup} from '../src/showcase.mjs';
 
 test('showcase catalog stays closed until Spawn and can be dismissed', () => {
@@ -186,7 +186,7 @@ test('present magic weapons hit hostiles once and a placed skeleton can be remov
   const fanX = crawler.x;
   world.attack(player);
   assert.equal(crawler.hp, beforeFan - magicItems['spirit-fan'].damage);
-  assert.ok(crawler.x > fanX);
+  assert.equal(crawler.x, fanX, 'the fan does not knock back');
   assert.equal(world.magicSweeps.length, 1);
 
   player.cooldown = 0;

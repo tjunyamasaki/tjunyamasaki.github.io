@@ -104,13 +104,13 @@ test('runtime clock is 180/30/100 while the protocol is hollowstead-2', () => {
 });
 
 test('shared schema names equipment, intents, recipes, and ranges', () => {
-  assert.deepEqual(EQUIPMENT_SLOTS, ['chop', 'mine', 'weapon', 'body', 'light']);
+  assert.deepEqual(EQUIPMENT_SLOTS, ['chop', 'mine', 'weapon', 'body', 'light', 'head', 'back', 'trinket']);
   assert.deepEqual(EQUIPMENT_SLOT_ITEMS.weapon, ['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome',
     'fangs', 'soulchain', 'scythe', 'wisplantern', 'stormrod', 'starfall', 'crowtotem', 'jacklantern', 'wighthorn', 'censer']);
   assert.equal(MIGRATION_PREFERRED_WEAPON, 'sword');
   assert.equal(equipmentSlotFor('torch'), 'light');
   assert.equal(equipmentSlotFor('berry'), null);
-  assert.deepEqual(SUPPLY_ITEM_IDS, ['wood', 'stone', 'fiber', 'ore', 'ember', 'seed', 'berry', 'pumpkin', 'mushroom', 'meat', 'roast', 'stew', 'bandage', 'shard', 'bone', 'spore', 'elixir', 'heartstone']);
+  assert.deepEqual(SUPPLY_ITEM_IDS, ['wood', 'stone', 'fiber', 'ore', 'ember', 'seed', 'berry', 'pumpkin', 'mushroom', 'meat', 'roast', 'stew', 'bandage', 'shard', 'bone', 'spore', 'elixir', 'heartstone', 'glowbloom', 'wispdust', 'ichor']);
   assert.equal(itemDefinition('wood').stackLimit, STACK_LIMIT);
   assert.equal(itemDefinition('wood').supplyUnits, 1);
   assert.equal(itemDefinition('axe').supplyUnits, 0);
@@ -123,7 +123,7 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(SUPPLY_CAPACITY, 120);
   assert.equal(CHEST_SLOT_COUNT, 24);
   assert.equal(STACK_LIMIT, 64);
-  assert.equal(DROP_LIFETIME_SECONDS, RULES.cycle);
+  assert.equal(DROP_LIFETIME_SECONDS, 90);
   assert.deepEqual(splitStackQuantities(45), [45]);
   assert.deepEqual(splitStackQuantities(130), [64, 64, 2]);
   assert.equal(splitStackQuantities(0), null);
@@ -137,17 +137,17 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(legacyEquipmentPlan({torch: 0}).sockets.light, null);
   assert.equal(legacyEquipmentPlan({spear: 8}).sockets.weapon.itemId, 'spear');
 
-  assert.deepEqual(FIELD_BUILD_RECIPES, ['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed']);
+  assert.deepEqual(FIELD_BUILD_RECIPES, ['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed', 'cart']);
   assert.deepEqual(WORKBENCH_BUILD_RECIPES, [...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward']);
-  assert.deepEqual(WORKBENCH_CRAFT_RECIPES, ['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir']);
+  assert.deepEqual(WORKBENCH_CRAFT_RECIPES, ['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir', 'sporemask', 'gravelight', 'barrowcloak']);
   assert.deepEqual(FIRE_COOK_RECIPES, ['roast', 'roastMeat', 'roastCaps']);
   assert.deepEqual(CAULDRON_COOK_RECIPES, ['stew']);
   assert.equal(RECIPE_CONTEXTS.fieldBuild.source, 'field');
   assert.equal(RECIPE_CONTEXTS.fieldBuild.stationType, null);
   assert.equal(RECIPE_CONTEXTS.fireCook.label, 'Cooking');
   assert.equal(RECIPE_CONTEXTS.cauldronCook.stationType, 'pot');
-  assert.deepEqual(CONTEXT_ACTIONS.hearth, ['feed', 'cook', 'awaken', 'repair']);
-  assert.deepEqual(CONTEXT_ACTIONS.bench, ['craft', 'build', 'repair']);
+  assert.deepEqual(CONTEXT_ACTIONS.hearth, ['feed', 'cook', 'awaken', 'mend', 'repair']);
+  assert.deepEqual(CONTEXT_ACTIONS.bench, ['craft', 'build', 'refine', 'repair']);
   assert.deepEqual(CONTEXT_ACTIONS.chest, ['open', 'repair']);
 
   for (const spec of Object.values(INTENTS)) assert.equal(spec.required.includes('requestId'), true, spec.type);

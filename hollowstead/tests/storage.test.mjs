@@ -30,6 +30,67 @@ function runner(w, actor){
 
 function qty(container, itemId){return countItem(container, itemId);}
 
+function advance(world, seconds){
+  let left=seconds;
+  while(left>1e-8){
+    const dt=Math.min(.05, left);
+    world.tick(dt);
+    left-=dt;
+  }
+}
+
+test('legacy saves with a dodge cooldown recover the spent charge after loading', ()=>{
+  for(const cooldown of [0, 2.4]){
+    const {w, p}=camp();
+    const document=JSON.parse(JSON.stringify({world:w.snapshot({purpose:'save'})}));
+    const saved=document.world.players.find(player=>player.id===p.id);
+    delete saved.dashCharges;
+    delete saved.dashRecharge;
+    saved.dashCooldown=cooldown;
+    const restored=World.fromSave(document);
+    restored.ambient=false;
+    restored.enemies=[];
+    const host=restored.player(p.id);
+    assert.equal(host.dashCharges, cooldown>0?1:2);
+    assert.deepEqual(host.dashRecharge, cooldown>0?[cooldown]:[]);
+    assert.equal(host.dashCooldown, cooldown);
+    advance(restored, 2.45);
+    assert.equal(host.dashCharges, 2, 'a spent legacy charge must not stay unavailable forever');
+    assert.deepEqual(host.dashRecharge, []);
+    assert.equal(host.dashCooldown, 0);
+  }
+});
+
+test('save and network roundtrips preserve partially cooled and queued dodge charges', ()=>{
+  const {w, p}=camp();
+  w.ambient=false;
+  w.enemies=[];
+  assert.equal(w.action(p.id, {type:'dash'}).ok, true);
+  advance(w, 4);
+  assert.equal(w.action(p.id, {type:'dash'}).ok, true);
+  advance(w, 2);
+  assert.equal(p.dashCharges, 0);
+  assert.ok(Math.abs(p.dashRecharge[0]-4)<1e-6);
+  assert.equal(p.dashRecharge[1], 10);
+  for(const purpose of ['save', 'network']){
+    const snapshot=JSON.parse(JSON.stringify(w.snapshot({purpose})));
+    const restored=purpose==='save'?World.fromSave({world:snapshot}):World.restore(snapshot);
+    restored.ambient=false;
+    const host=restored.player(p.id);
+    assert.equal(host.dashCharges, 0);
+    assert.deepEqual(host.dashRecharge, p.dashRecharge);
+    assert.equal(host.dashCooldown, p.dashCooldown);
+    advance(restored, 4);
+    assert.equal(host.dashCharges, 1, 'only the partially cooled charge is ready');
+    assert.equal(host.dashRecharge.length, 1);
+    assert.ok(Math.abs(host.dashRecharge[0]-10)<1e-6, 'the queued charge starts after the first returns');
+    advance(restored, 10);
+    assert.equal(host.dashCharges, 2);
+    assert.deepEqual(host.dashRecharge, []);
+    assert.equal(host.dashCooldown, 0);
+  }
+});
+
 test('a thirteenth distinct stack stays on the floor and a saved pack keeps only what does not fit twelve slots', ()=>{
   const {w, p}=camp();
   w.clearPack(p);

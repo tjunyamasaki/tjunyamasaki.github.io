@@ -1,0 +1,36 @@
+/* Weapon refinement (src/ui/refine.mjs): the workbench's Refine panel, hotbar gems and crit floaters. */
+.refine{--common:#d8d2c2;--uncommon:#8fd3a0;--rare:#79b8ff;--epic:#c49bff;--legendary:#f2c14e}
+.refine-head{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center;padding:4px 0 12px;border-bottom:1px solid var(--border)}
+.refine-head h3{margin:0 0 4px;font:17px Georgia,serif;color:#ebd7b5}
+.refine-head p{font-size:11px;color:var(--muted);line-height:1.45}
+.refine-purse{display:flex;align-items:center;gap:2px;padding:4px 8px 4px 2px;border:1px solid var(--border);border-radius:16px;background:#211c2855;font:13px ui-monospace,monospace;color:#e6c8f4}
+.refine-purse .item-icon,.refine-price .item-icon{width:26px;height:26px;object-fit:contain}
+.refine-name.rarity-uncommon{color:var(--uncommon)}.refine-name.rarity-rare{color:var(--rare)}.refine-name.rarity-epic{color:var(--epic)}.refine-name.rarity-legendary{color:var(--legendary)}
+.refine-slots{list-style:none;margin:12px 0 6px;padding:0;display:flex;flex-direction:column;gap:8px}
+.refine-slot{--tone:#8a7f8f;display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;padding:10px 10px 10px 8px;border:1px solid color-mix(in srgb,var(--tone) 45%,transparent);border-left:3px solid var(--tone);border-radius:8px;background:color-mix(in srgb,var(--tone) 9%,#241f2b)}
+.refine-slot.rarity-common{--tone:var(--common)}.refine-slot.rarity-uncommon{--tone:var(--uncommon)}.refine-slot.rarity-rare{--tone:var(--rare)}
+.refine-slot.rarity-epic{--tone:var(--epic);box-shadow:0 0 14px #c49bff26}.refine-slot.rarity-legendary{--tone:var(--legendary);box-shadow:0 0 18px #f2c14e33}
+.refine-slot.is-open{--tone:var(--orange);border-style:dashed;border-left-style:solid}
+.refine-slot.is-locked{opacity:.45;border-style:dashed}
+.refine-gem{font-size:20px;line-height:1;color:var(--tone);text-align:center;text-shadow:0 0 8px color-mix(in srgb,var(--tone) 60%,transparent)}
+.refine-text b{font-size:13px;color:#f0dfbd}
+.refine-text small{margin-left:6px;font:9px ui-monospace,monospace;letter-spacing:1px;text-transform:uppercase;color:var(--tone)}
+.refine-text p{font-size:12px;line-height:1.4;color:#e1d2bb;margin-top:3px}
+.refine-slot.is-open .refine-text p,.refine-slot.is-locked .refine-text p{color:var(--muted);font-size:11px}
+.refine-slot button{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:74px;min-height:44px;padding:5px 9px;font-size:11px}
+.refine-price{display:flex;align-items:center;gap:1px;font:10px ui-monospace,monospace}
+.refine-price .item-icon{width:18px;height:18px}
+.refine-slot.is-fresh{animation:refine-roll .9s ease-out}
+@keyframes refine-roll{0%{transform:scale(.96);box-shadow:0 0 0 2px var(--tone),0 0 30px var(--tone)}100%{transform:scale(1)}}
+.refine-note{font-size:11px;line-height:1.55;color:var(--muted);margin:10px 0 0}
+.refine-note b{color:#e1d2bb;font-weight:600}
+.refine-odds{display:flex;flex-wrap:wrap;gap:4px 10px;margin:10px 0 0;font:9px ui-monospace,monospace;letter-spacing:.4px}
+.refine-odds .rarity-common{color:var(--common)}.refine-odds .rarity-uncommon{color:var(--uncommon)}.refine-odds .rarity-rare{color:var(--rare)}.refine-odds .rarity-epic{color:var(--epic)}.refine-odds .rarity-legendary{color:var(--legendary)}
+/* Hotbar: one gem per modifier, in its rarity's colour, down the weapon's right edge. */
+.hotbar .weapon-slot .refine-gems{position:absolute;right:2px;top:7px;display:flex;flex-direction:column;gap:2px;pointer-events:none}
+.hotbar .weapon-slot .refine-gems i{display:block;width:5px;height:5px;transform:rotate(45deg);background:#d8d2c2;box-shadow:0 0 0 1px #1a1520}
+.hotbar .weapon-slot .refine-gems i.rarity-uncommon{background:#8fd3a0}.hotbar .weapon-slot .refine-gems i.rarity-rare{background:#79b8ff}
+.hotbar .weapon-slot .refine-gems i.rarity-epic{background:#c49bff;box-shadow:0 0 0 1px #1a1520,0 0 4px #c49bff}.hotbar .weapon-slot .refine-gems i.rarity-legendary{background:#f2c14e;box-shadow:0 0 0 1px #1a1520,0 0 5px #f2c14e}
+/* Critical hits (Keen) float bigger and gold; a fresh roll floats in its rarity's colour. */
+.world-label.crit-label{font-size:17px;letter-spacing:.3px;text-shadow:0 2px 3px #181421,0 0 10px #7a4a0a}
+.world-label.refine-label{font-size:14px;letter-spacing:.4px}

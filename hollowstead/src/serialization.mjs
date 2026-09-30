@@ -4,15 +4,15 @@
 // not shift time or deadlines again. World.restore accepts clock `v2` only.
 
 import {
-  CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, SUPPLY_ITEM_IDS, V2_PHASE,
-  legacyEquipmentPlan, nextNightWaveTime, phaseMigrationDelta, phaseProgress, remapPhaseTime,
-} from './contracts.mjs?v=harvest-17';
+  CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, STORAGE_TYPES, SUPPLY_ITEM_IDS, V2_PHASE,
+  legacyEquipmentPlan, storageSlotCount, nextNightWaveTime, phaseMigrationDelta, phaseProgress, remapPhaseTime,
+} from './contracts.mjs?v=harvest-18';
 import {
   BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, collectLocations, cloneStack, createBackpack, createContainer, createRecovery,
   duplicateUids, emptyEquipment, itemDefinition, makeStack, planInsert, validateContainer,
   validateEquipment, validateStack, containerId,
-} from './inventory.mjs?v=harvest-17';
-import {STRUCTURES} from './content.mjs?v=harvest-17';
+} from './inventory.mjs?v=harvest-18';
+import {STRUCTURES} from './content.mjs?v=harvest-18';
 
 export {SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, CLOCK_V1, CLOCK_V2};
 
@@ -73,17 +73,19 @@ function settleBackpack(player, mint){
 }
 
 function settleChest(building){
-  if(building?.type!=='chest'||!building.store?.slots)return false;
+  if(!STORAGE_TYPES.includes(building?.type)||!building.store?.slots)return false;
+  // Chests hold CHEST_SLOT_COUNT; a hand cart holds its level's slots (a cart saved before it had a store gets one).
+  const size=storageSlotCount(building);
   const slots=building.store.slots;
   const overflow=building.overflow;
   const overflowId=containerId('overflow', building.id);
   const overflowOk=overflow==null||(overflow.id===overflowId&&Array.isArray(overflow.slots)&&overflow.slots.some(Boolean));
-  if(slots.length===CHEST_SLOT_COUNT&&overflowOk)return false;
+  if(slots.length===size&&overflowOk)return false;
   const extras=[];
-  if(slots.length>CHEST_SLOT_COUNT)extras.push(...slots.slice(CHEST_SLOT_COUNT).filter(Boolean).map(cloneStack));
+  if(slots.length>size)extras.push(...slots.slice(size).filter(Boolean).map(cloneStack));
   if(overflow?.slots)extras.push(...overflow.slots.filter(Boolean).map(cloneStack));
-  const active=slots.slice(0, CHEST_SLOT_COUNT).map(cloneStack);
-  while(active.length<CHEST_SLOT_COUNT)active.push(null);
+  const active=slots.slice(0, size).map(cloneStack);
+  while(active.length<size)active.push(null);
   building.store.slots=active;
   if(extras.length){
     const next=createContainer(overflowId, extras.length);
@@ -101,7 +103,11 @@ export function settleStorage(world){
   for(const row of collectLocations(world))if(row?.uid)used.add(row.uid);
   const mint=mintFactory(world, used);
   let changed=false;
-  for(const player of world.players||[])if(settleBackpack(player, mint))changed=true;
+  for(const player of world.players||[]){
+    // Saves from before the head/back/trinket sockets: the new sockets start empty.
+    if(player?.equipment&&typeof player.equipment==='object')for(const slot of EQUIPMENT_SLOTS)if(!Object.hasOwn(player.equipment, slot)){player.equipment[slot]=null;changed=true;}
+    if(settleBackpack(player, mint))changed=true;
+  }
   for(const building of world.buildings||[])if(settleChest(building))changed=true;
   return changed;
 }
@@ -180,7 +186,7 @@ export function validateV2World(data){
     const store=validateContainer(building.store, limits);
     if(!store.ok)return store;
     if(building.overflow!=null){
-      if(building.type!=='chest'||building.overflow.id!==containerId('overflow', building.id))return {ok:false, code:'corrupt'};
+      if(!STORAGE_TYPES.includes(building.type)||building.overflow.id!==containerId('overflow', building.id))return {ok:false, code:'corrupt'};
       const overflow=validateContainer(building.overflow);
       if(!overflow.ok)return overflow;
       if(!building.overflow.slots.some(Boolean))return {ok:false, code:'corrupt'};
@@ -203,7 +209,7 @@ export function validateV2World(data){
     if(!Array.isArray(data.chestBusy)||data.chestBusy.length>4)return {ok:false,code:'corrupt'};
     const owners=new Set(),chests=new Set();
     for(const session of data.chestBusy){
-      if(!session||!playerIds.has(session.ownerId)||owners.has(session.ownerId)||chests.has(session.chestId)||!data.buildings.some(b=>b.id===session.chestId&&b.type==='chest')||typeof session.sessionId!=='string'||session.sessionId.length>64||!Number.isFinite(session.openedAt)||!Number.isFinite(session.expiresAt))return {ok:false,code:'corrupt'};
+      if(!session||!playerIds.has(session.ownerId)||owners.has(session.ownerId)||chests.has(session.chestId)||!data.buildings.some(b=>b.id===session.chestId&&STORAGE_TYPES.includes(b.type))||typeof session.sessionId!=='string'||session.sessionId.length>64||!Number.isFinite(session.openedAt)||!Number.isFinite(session.expiresAt))return {ok:false,code:'corrupt'};
       owners.add(session.ownerId);chests.add(session.chestId);
     }
   }

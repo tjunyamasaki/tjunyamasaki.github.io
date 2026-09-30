@@ -1,11 +1,16 @@
-import { registerMagicModule } from './registry.mjs?v=harvest-17';
+import { registerMagicModule } from './registry.mjs?v=harvest-18';
 
 const SPECS = [
+  'gloomgrasp.mjs',
+  'plaguebeak.mjs',
+  'kitsune-lantern.mjs',
   'barrow-rattle.mjs',
   'cinder-staff.mjs',
   'widows-needle.mjs',
   'spirit-fan.mjs',
   'mourning-bell.mjs',
+  'pallbearer.mjs',
+  'hollow-moon.mjs',
 ];
 
 export async function loadMagicModules(){

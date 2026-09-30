@@ -37,18 +37,19 @@
 // is the current cell, skeleton-<anim>-<0-3>.png. facing is -1 toward -x and
 // 1 toward +x.
 
-import { ownerPower } from './registry.mjs?v=harvest-17'
+import {slideMove} from '../pathing.mjs?v=harvest-18'
+import { ownerPower } from './registry.mjs?v=harvest-18'
 
 const ROOT = 'assets/magic/barrow-rattle'
 const CAP = 4
 // Balance (Long Night): sturdier, harder-hitting skeletons that hostiles now fight back.
-const COOLDOWN = 1.5
+const COOLDOWN = 1.95
 const LIFE = 24
 const SKELETON_HP = 60
-const SKELETON_DAMAGE = 18
+const SKELETON_DAMAGE = 9
 const RANGE = 1.25
-const SPEED = 3.5
-const CATCHUP = 4.4
+const SPEED = 3.5 * 1.15
+const CATCHUP = 4.4 * 1.15
 const SIGHT = 12
 const FOLLOW = 1.15
 const SWING = 0.44
@@ -66,7 +67,7 @@ export const magicPack = {
     name: 'Barrow Rattle',
     kind: 'weapon',
     slot: 'weapon',
-    damage: 4,
+    damage: 2,
     durability: 110,
     cooldown: COOLDOWN,
     stamina: 8,
@@ -214,18 +215,19 @@ function emit(world, type, x, z, text){
 }
 
 function strike(world, summon, target){
-  const amount = Math.round(SKELETON_DAMAGE * (summon.power || 1))
+  let amount = Math.round(SKELETON_DAMAGE * (summon.power || 1))
   if(typeof target.hp !== 'number'){
     summon.pendingHit = {targetId: target.id, amount}
     return
   }
+  // The master's refinement (src/refine.mjs): critical hits, Bane, Thirsting.
+  const refined = summon.ownerId && typeof world.refineHit === 'function' ? world.refineHit(summon.ownerId, target, amount) : {amount, crit: false}
+  amount = Math.round(refined.amount)
   target.hp -= amount
-  const dx = (typeof target.x === 'number' ? target.x : summon.x) - summon.x
-  const dz = (typeof target.z === 'number' ? target.z : summon.z) - summon.z
-  const span = Math.hypot(dx, dz) || 1
-  if(typeof target.x === 'number') target.x += dx / span * 0.32
-  if(typeof target.z === 'number') target.z += dz / span * 0.32
-  emit(world, 'damage', target.x, target.z, amount)
+  // Credit the kill to the skeleton's master (weapon mastery, trinkets).
+  if(summon.ownerId) target.lastHitBy = summon.ownerId
+  if(refined.crit && typeof world.event === 'function') world.event('damage', target.x, target.z, String(amount), {crit: true})
+  else emit(world, 'damage', target.x, target.z, amount)
   if(summon.pendingHit) delete summon.pendingHit
 }
 
@@ -271,8 +273,8 @@ function steer(world, summon, vx, vz, dt){
     if(typeof world.obstacles === 'function'){
       try{ obstacles = world.obstacles() || [] }catch{ obstacles = [] }
     }
-    if(world.move(summon, vx, vz, dt, obstacles)) return true
-    return !!world.move(summon, -vz, vx, dt, obstacles)
+    // Glance off a trunk's corner instead of grinding into it (pathing.mjs).
+    return !!slideMove(world, summon, vx, vz, dt, obstacles)
   }
   summon.x += vx * dt
   summon.z += vz * dt
@@ -332,6 +334,26 @@ export function use(world, player){
   emit(world, 'swing', player.x, player.z, '')
   return summon
 }
+
+/**
+ * Raise one skeleton at a spot for the Barrow Legion skill (skills.mjs): no cap, cooldown or wear.
+ * The caller decides how many may stand at once.
+ */
+export function raiseSkeleton(world, player, x, z){
+  if(!world || !player || typeof x !== 'number' || typeof z !== 'number') return null
+  if(!Array.isArray(world.magicSummons)) world.magicSummons = []
+  const power = ownerPower(world, player)
+  const summon = {
+    id: mintId(world), ownerId: player.id == null ? 'player' : player.id, x, z,
+    hp: Math.round(SKELETON_HP * power), maxHp: Math.round(SKELETON_HP * power), power, age: 0,
+    facing: (Number(player.dx) || 0) < 0 ? -1 : 1, anim: 'idle', sprite: framePath('idle', 0), type: 'skeleton',
+    damage: SKELETON_DAMAGE, range: RANGE, swinging: false, swingT: 0, didHit: false, nextSwing: 0,
+  }
+  world.magicSummons.push(summon)
+  return summon
+}
+/** Living skeletons of one owner (the Barrow Legion skill mends and counts them). */
+export function ownedSkeletons(world, ownerId){ return owned(world, ownerId) }
 
 export function step(world, dt){
   if(!world || typeof world !== 'object' || !Array.isArray(world.magicSummons) || world.magicSummons.length === 0) return

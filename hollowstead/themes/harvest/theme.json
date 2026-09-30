@@ -14,7 +14,11 @@
     "accent": "#eaaa6a",
     "mire": "#5c6a4e",
     "crags": "#6c6679",
-    "barrow": "#655862"
+    "barrow": "#655862",
+    "water": "#3f5566",
+    "shore": "#6f7a6a",
+    "thicket": "#3c4a40",
+    "void": "#1f1d27"
   },
   "lighting": {
     "ambientNight": 0.20,
@@ -1632,6 +1636,472 @@
       },
       "icon": "./sprites/heartstone-icon.svg?v=art3"
     },
+    "glowbloom": {
+      "src": "./sprites/glowbloom.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/glowbloom-icon.svg?v=frontier1"
+    },
+    "wispdust": {
+      "src": "./sprites/wispdust.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/wispdust-icon.svg?v=frontier1"
+    },
+    "sporemask": {
+      "src": "./sprites/sporemask.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/sporemask-icon.svg?v=frontier1"
+    },
+    "gravelight": {
+      "src": "./sprites/gravelight.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/gravelight-icon.svg?v=frontier1"
+    },
+    "barrowcloak": {
+      "src": "./sprites/barrowcloak.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/barrowcloak-icon.svg?v=frontier1"
+    },
+    "frostanklet": {
+      "src": "./sprites/frostanklet.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/frostanklet-icon.svg?v=frontier1"
+    },
+    "nightfang": {
+      "src": "./sprites/nightfang.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/nightfang-icon.svg?v=frontier1"
+    },
+    "emberheart": {
+      "src": "./sprites/emberheart.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/emberheart-icon.svg?v=frontier1"
+    },
+    "crowseye": {
+      "src": "./sprites/crowseye.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/crowseye-icon.svg?v=frontier1"
+    },
+    "harvestcharm": {
+      "src": "./sprites/harvestcharm.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/harvestcharm-icon.svg?v=frontier1"
+    },
+    "boneward": {
+      "src": "./sprites/boneward.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/boneward-icon.svg?v=frontier1"
+    },
+    "wispfeather": {
+      "src": "./sprites/wispfeather.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/wispfeather-icon.svg?v=frontier1"
+    },
+    "gravedust": {
+      "src": "./sprites/gravedust.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/gravedust-icon.svg?v=frontier1"
+    },
+    "moonlocket": {
+      "src": "./sprites/moonlocket.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moonlocket-icon.svg?v=frontier1"
+    },
+    "thornknot": {
+      "src": "./sprites/thornknot.svg?v=frontier1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/thornknot-icon.svg?v=frontier1"
+    },
+    "glowsprout": {
+      "src": "./sprites/glowsprout.svg?v=frontier1",
+      "size": [
+        1.6,
+        2.4
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 4
+        }
+      }
+    },
+    "gravewisp": {
+      "src": "./sprites/gravewisp.svg?v=frontier1",
+      "size": [
+        1.6,
+        2.4
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        }
+      }
+    },
+    "cart": {
+      "src": "./sprites/cart.svg?v=frontier1",
+      "size": [
+        2.3,
+        2.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 3,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/cart-icon.svg?v=frontier1"
+    },
+    "moon-waxing": {
+      "src": "./sprites/moon-waxing-icon.svg?v=frontier1",
+      "size": [
+        1.0,
+        1.0
+      ],
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moon-waxing-icon.svg?v=frontier1"
+    },
+    "moon-new": {
+      "src": "./sprites/moon-new-icon.svg?v=frontier1",
+      "size": [
+        1.0,
+        1.0
+      ],
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moon-new-icon.svg?v=frontier1"
+    },
+    "moon-blood": {
+      "src": "./sprites/moon-blood-icon.svg?v=frontier1",
+      "size": [
+        1.0,
+        1.0
+      ],
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moon-blood-icon.svg?v=frontier1"
+    },
     "bonemail": {
       "src": "./sprites/bonemail.svg?v=art3",
       "size": [
@@ -3103,6 +3573,49 @@
           "fps": 3
         }
       }
+    },
+    "scenery": {
+      "src": "./sprites/scenery.svg?v=scn1",
+      "size": [
+        12.8,
+        7.2
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "ichor": {
+      "src": "./sprites/ichor.svg?v=refine1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/ichor-icon.svg?v=refine1"
     }
   },
   "motion": {

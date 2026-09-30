@@ -1,26 +1,33 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
-import {STRUCTURES, RULES} from './content.mjs?v=harvest-17';
-import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-17';
-import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-17';
-import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-17';
-import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-17';
-import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-17';
-import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-17';
-import {ALLIES, DASH, RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-17';
-import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-17';
-import {arenaProps, arenaTile, plazaProps} from './renderer.mjs?v=harvest-17';
-import {glowStrength} from './lighting.mjs?v=harvest-17';
+import {damageFloater,spawnFloater,stepFloaters} from './floaters.mjs?v=harvest-18';
+import {STRUCTURES, RULES, nodeAwake} from './content.mjs?v=harvest-18';
+import {paintScenery} from './scenery.mjs?v=harvest-18';
+import {paintRopes} from './cart-rope.mjs?v=harvest-18';
+import {groundColors, groundHex} from './worldgen.mjs?v=harvest-18';
+import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-18';
+import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-18';
+import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-18';
+import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-18';
+import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-18';
+import {WeaponFx, dropBlink} from './fx/index.mjs?v=harvest-18';
+import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-18';
+import {ALLIES, DASH, RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-18';
+import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-18';
+import {nightGlow} from './regions.mjs?v=harvest-18';
+import {dropGlow} from './drops.mjs?v=harvest-18';
+import {arenaProps, arenaTile, plazaProps} from './renderer.mjs?v=harvest-18';
+import {STRIKE_COLORS} from './renderer.mjs?v=harvest-18';
+import {glowStrength} from './lighting.mjs?v=harvest-18';
 const PROJECTILE_KEYS={arrow:'arrow',bolt:'mbolt',wisp:'wisp',seed:'pumpseed'};
 import {
   brightnessAt, canInspect, entityBrightness, frameLighting, labelOpacity, shadeHex, warningVisible,
-} from './lighting.mjs?v=harvest-17';
-import {loadImage, preloadThemeAssets} from './assets.mjs?v=harvest-17';
+} from './lighting.mjs?v=harvest-18';
+import {loadImage, preloadThemeAssets} from './assets.mjs?v=harvest-18';
 /** Swarm fights spray numbers; old labels give way so the DOM stays light on phones. */
-const MAX_FLOATERS=36;
 export class CanvasRenderer {
   constructor(canvas,theme){
-    this.canvas=canvas;this.theme=theme;this.magicClock=new MagicClock();this.magicActors=new Map();this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');
+    this.canvas=canvas;this.theme=theme;this.magicClock=new MagicClock();this.weaponFx=new WeaponFx();this.flashLevel=-1;this.magicActors=new Map();this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');
     this.images=new Map();this.zoom=1;this.clock=0;this.lastEvent=0;this.seed=null;this.effects=[];this.floaters=[];this.focus={x:0,z:0,set:(x,y,z)=>{this.focus.x=x;this.focus.z=z;}};this.dropMotion=createDropMotion();this.view=null;this.localId=null;
     this.onResize=()=>this.resize();watchViewport(this.onResize);this.resize();
   }
@@ -32,33 +39,44 @@ export class CanvasRenderer {
   pick(x,y,world){
     const viewer=this.localId&&world.player?world.player(this.localId):null;
     let best=null,dist=44;
-    for(const e of [...world.nodes.filter(n=>!n.ready),...world.buildings,...world.drops,...world.enemies,...magicVisuals(world).map(entry=>entry.entity)]){
+    for(const e of [...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)),...world.buildings,...world.drops,...world.enemies,...magicVisuals(world).map(entry=>entry.entity)]){
       if(this.view&&!canInspect(this.view, e.x, e.z, viewer, RULES.reach))continue;
       const s=this.screenPoint(e.x,e.z,.6),d=Math.hypot(x-s.x,y-s.y);if(d<dist){best=e;dist=d;}
     }
     return best;
   }
   ellipse(x,z,r,color,fill=true){const c=this.ctx,p=this.screenPoint(x,z);c.beginPath();c.ellipse(p.x,p.y,r*this.scale,r*this.scale*.72,0,0,Math.PI*2);if(fill){c.fillStyle=color;c.fill();}else{c.strokeStyle=color;c.lineWidth=1.5;c.stroke();}}
-  float(text,x,z,color='#f8dfb3',opts={}){if(!text)return;const el=document.createElement('div');el.className=opts.className||'world-label';el.textContent=text;el.style.color=color;document.getElementById('world-labels').append(el);this.floaters.push({el,x,z,life:0,alwaysVisible:!!opts.alwaysVisible});while(this.floaters.length>MAX_FLOATERS){const old=this.floaters.shift();old.el.remove();}}
+  float(text,x,z,color='#f8dfb3',opts={}){spawnFloater(this.floaters,text,x,z,color,opts);}
   reveal(x,z){if(!this.view)return 1;return labelOpacity(brightnessAt(this.view.sources, x, z, this.view.darkness, this.view.lighting), this.view.darkness, this.view.lighting);}
   glow(x,z,r,opacity){const c=this.ctx,p=this.screenPoint(x,z),feather=this.view?.lighting.ambientFraction||1.2;c.save();c.translate(p.x,p.y);c.scale(1,.72);const radius=r*feather*this.scale;const g=c.createRadialGradient(0,0,radius*0.55,0,0,radius);g.addColorStop(0,`rgba(250,190,113,${opacity})`);g.addColorStop(.55,`rgba(250,190,113,${opacity*.35})`);g.addColorStop(1,'rgba(250,190,113,0)');c.fillStyle=g;c.beginPath();c.arc(0,0,radius,0,Math.PI*2);c.fill();c.restore();}
   drawSprite(key,e,kind,world,frame,p){
+    // A weapon's body rig (src/fx WEAPON_FX: the kitsune's tails...). One sorted behind the body is
+    // drawn now; one sorted in front of it (origin nearer the camera) after the body.
+    let rigAfter=null;
+    if(kind==='player'&&this.frameFx&&!e.down){
+      const bob=e.action==='walk'?Math.abs(Math.sin(this.clock*10+e.x))*this.theme.motion.walkBob:0;
+      const rig=this.weaponFx.rig(world,e,{x:e.x,z:e.z,y:bob},this.clock,this.magicFrame.time);
+      if(rig){const list=[...rig.groundGlow,...rig.groundNormal,...rig.normal,...rig.glow];if(rig.origin.z>e.z)rigAfter=list;else drawMagicCanvas(this.ctx,list,(x,z,y)=>this.screenPoint(x,z,y));}
+    }
     const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||this.images.get('ember'),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
     const special=kind==='ally'?(e.anim||'idle'):magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0||e.act>0?'attack':'walk'):e.action||'idle'),clip=def.clips[clipName]||def.clips.walk||def.clips.attack||def.clips.idle;
     const cols=def.columns||1,rows=def.rows||1,frameIndex=key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
     let w=(kind==='drop'?.85:def.size[0])*this.scale,h=(kind==='drop'?1.28:def.size[1])*this.scale;if(kind==='drop'&&e.flightT){const shrink=1-e.flightT*0.35;w*=shrink;h*=shrink;}if(e.down||e.ghost){w*=.8;h*=.65;}if(kind==='enemy'&&e.elite){w*=1.3;h*=1.3;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(kind==='zone'&&e.kind==='frost'){w*=e.radius/1.3;h*=e.radius/1.3;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
     const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob*this.scale:kind==='enemy'&&key==='wraith'?(Math.sin(this.clock*3)*.1+.2)*this.scale:0;
-    const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e));
+    const lootGlow=kind==='drop'?dropGlow(e):null;
+    const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e))||!!lootGlow;
     let display=kind==='preview'?Math.max(0.72, entityBrightness(frame, e.x, e.z)):entityBrightness(frame, e.x, e.z, {local:kind==='player'&&e.id===p.id, emissive});
     if(kind==='building'&&['hearth','fire'].includes(key)&&e.fuel<=0)display*=0.45;
     if(kind==='held')display=display*.75+.25;
     const fade=labelOpacity(display, frame.darkness, frame.lighting);
-    c.save();c.globalAlpha=kind==='zone'&&e.kind==='frost'?.8*Math.min(1,e.age*3)*Math.min(1,(e.life-e.age)*2):kind==='ally'?Math.min(1,(e.spawn||1)*4,(e.life-e.age)*2):e.ghost?.4:key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
+    c.save();c.globalAlpha=kind==='drop'?dropBlink(e,world.time,this.clock):kind==='zone'&&e.kind==='frost'?.8*Math.min(1,e.age*3)*Math.min(1,(e.life-e.age)*2):kind==='ally'?Math.min(1,(e.spawn||1)*4,(e.life-e.age)*2):e.ghost?.4:key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
+    // Valuable loot has a smaller halo than the night-only resources.
+    const halo=lootGlow||(kind==='node'&&nightGlow(e));if(halo){const r=(lootGlow?1:1.3)*this.scale,g=c.createRadialGradient(0,0,0,0,0,r);g.addColorStop(0,halo+'aa');g.addColorStop(.5,halo+'40');g.addColorStop(1,halo+'00');c.save();c.translate(ground.x,ground.y);c.scale(1,.72);c.globalCompositeOperation='lighter';c.globalAlpha*=(lootGlow?.2+.38*frame.darkness:.3+.55*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));c.fillStyle=g;c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();c.restore();}
     if(kind!=='held'&&kind!=='zone'){c.fillStyle='#211b2b30';c.beginPath();c.ellipse(ground.x,ground.y,w*.26,w*.10,0,0,Math.PI*2);c.fill();}
     c.translate(s.x,s.y-bob);
     if(e.pose){c.rotate(-e.pose.rotation);c.scale(e.pose.side,1);}
     else{
-      if((kind==='player'&&e.dx<-.1)||((kind==='magic'||kind==='ally')&&e.facing===-1)||(kind==='enemy'&&e.face===-1))c.scale(-1,1);
+      if((kind==='player'&&e.dx<-.1)||((kind==='magic'||kind==='ally')&&e.facing===-1)||(kind==='enemy'&&e.face===-1)||(key==='cart'&&e.face===1))c.scale(-1,1);
       let tilt=Number.isFinite(e.aim)?-e.aim:moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;
       if(!Number.isFinite(e.aim)&&['attack','gather'].includes(e.action)&&e.actionUntil>world.time)tilt=motion.attackTilt*Math.sin((e.actionUntil-world.time)*12);
       c.rotate(-tilt);
@@ -68,6 +86,7 @@ export class CanvasRenderer {
     c.drawImage(img,(frameIndex%cols)*sw,Math.floor(frameIndex/cols)*sh,sw,sh,-w*def.anchor[0],-h*(1-def.anchor[1]),w,h);c.filter='none';
     const glowImg=kind==='enemy'&&this.images.get('glow-'+key);if(glowImg){const gw=glowImg.naturalWidth/cols,gh=glowImg.naturalHeight/rows;c.globalCompositeOperation='lighter';c.globalAlpha=glowStrength(frame.darkness,e,this.clock);c.drawImage(glowImg,(frameIndex%cols)*gw,Math.floor(frameIndex/cols)*gh,gw,gh,-w*def.anchor[0],-h*(1-def.anchor[1]),w,h);c.globalCompositeOperation='source-over';}
     c.restore();
+    if(rigAfter)drawMagicCanvas(this.ctx,rigAfter,(x,z,y)=>this.screenPoint(x,z,y));
     if((kind==='enemy'||kind==='building'||(kind==='ally'&&key!=='crow'))&&e.hp<e.maxHp&&fade>0.04){const y=s.y-h*(key==='hearth'?.62:kind==='enemy'||kind==='ally'?key==='crawler'?.38:.82:.37);c.save();c.globalAlpha=fade;c.fillStyle='#2a2533';c.fillRect(s.x-21,y,42,4);c.fillStyle=kind==='enemy'?'#df9383':kind==='ally'?'#9fd8a8':'#d2c395';c.fillRect(s.x-20,y+1,40*Math.max(0,e.hp/e.maxHp),2);c.restore();}
     if(kind==='player'&&e.id!==p.id&&fade>0.05){c.save();c.globalAlpha=fade;c.font='10px Arial';c.textAlign='center';c.fillStyle='#f4e4c8';c.fillText(e.name,s.x,s.y-h-4);c.restore();}
     if(kind==='player'&&!e.down&&!e.ghost){
@@ -90,18 +109,28 @@ export class CanvasRenderer {
     poly(Math.max(.02,tg.fill));c.fillStyle=`rgba(${hot},${.46*alpha})`;c.fill();c.restore();
   }
   render(world,localId,dt,{target=null,placement=null,demo=false}={}){
-    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;if(this.seed!==world.seed){this.seed=world.seed;this.lastEvent=0;this.magicActors.clear();}
+    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;if(this.seed!==world.seed){this.seed=world.seed;this.lastEvent=0;this.magicActors.clear();this.weaponFx.reset();}
     const p=world.player(localId)||world.players[0]||{x:0,z:2};this.focus.x+=((demo?0:p.x)-this.focus.x)*Math.min(1,dt*6);this.focus.z+=((demo?-1:p.z)-this.focus.z)*Math.min(1,dt*6);
-    const frame=frameLighting(world, this.theme);this.view=frame;
+    // Weapon effects (src/fx): built first so their camera kick and night light land this frame.
+    const weapon=demo?null:this.weaponFx.build(world,this.magicFrame,this.clock,dt,this.focus);this.frameFx=weapon;
+    const kick=weapon?.shake>0?weapon.shake*.32:0,kx=kick?(Math.sin(this.clock*71)+Math.sin(this.clock*43))*kick*.5:0,kz=kick?(Math.sin(this.clock*59+1)+Math.sin(this.clock*31))*kick*.5:0;
+    this.focus.x+=kx;this.focus.z+=kz;
+    const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;
+    {const level=weapon?Math.round(weapon.flash*100)/100:0;if(level!==this.flashLevel){this.flashLevel=level;const el=document.getElementById('fx-flash');if(el){el.style.opacity=String(level);if(level>0)el.style.setProperty('--flash',weapon.flashColor||'#fff3cf');}}}
     const c=this.ctx;c.clearRect(0,0,this.width,this.height);c.fillStyle=shadeHex(this.theme.palette.background, 1-frame.darkness*0.72, frame.darkness, frame.lighting);c.fillRect(0,0,this.width,this.height);
     const halfX=this.width/this.scale/2+3,halfZ=this.height/(this.scale*.72)/2+6;
+    // The hollow's ground colours (worldgen.groundColors, the same texels the WebGL ground uses); tiles along a shore,
+    // thicket or the edge split into unit tiles so the colour follows the walkable shape.
+    const tone=world.arena?null:(this.groundTone?.seed===world.seed&&this.groundTone.palette===this.theme.palette?this.groundTone:(this.groundTone={seed:world.seed,palette:this.theme.palette,colors:groundColors(world.seed,this.theme.palette)})).colors;
+    const landAt=(x,z)=>{const i=Math.floor((x+tone.extent)*tone.res),j=Math.floor((z+tone.extent)*tone.res);return i<0||j<0||i>=tone.size||j>=tone.size?4:tone.land[j*tone.size+i];};
+    const plain=(x,z,size)=>{for(let a=.25;a<size;a+=.5)for(let b=.25;b<size;b+=.5)if(landAt(x+a,z+b)!==1)return false;return true;};
     const paintTile=(x,z,size,detail)=>{
+      if(tone&&size>.5&&!plain(x,z,size)){const h=size/2;paintTile(x,z,h,detail);paintTile(x+h,z,h,detail);paintTile(x,z+h,h,detail);paintTile(x+h,z+h,h,detail);return;}
       const cx=x+size/2,cz=z+size/2;
-      const path=Math.abs(cx+Math.sin(cz*.16)*3)<1.8||Math.abs(cz-Math.sin(cx*.17)*4)<1.6;
       const display=brightnessAt(frame.sources, cx, cz, frame.darkness, frame.lighting);
-      c.fillStyle=shadeHex(world.arena?arenaTile(cx,cz,world.radius):this.theme.palette[path?'path':biome(x,z)], display, frame.darkness, frame.lighting);
+      c.fillStyle=shadeHex(world.arena?arenaTile(cx,cz,world.radius):groundHex(tone,cx,cz)||this.theme.palette.void||this.theme.palette.background, display, frame.darkness, frame.lighting);
       const a=this.screenPoint(x,z),b=this.screenPoint(x+size,z+size);c.fillRect(a.x-.5,a.y-.5,b.x-a.x+1,b.y-a.y+1);
-      if(!detail)return;
+      if(!detail||(tone&&landAt(cx,cz)!==1))return;
       const hash=Math.abs(Math.sin(x*13.7+z*4.3+world.seed)*43758)%1;
       c.fillStyle=`rgba(35,31,42,${hash*.07*display})`;c.fillRect(a.x,a.y,b.x-a.x+1,b.y-a.y+1);
       if(display>0.2){for(let i=0;i<2;i++){const s=this.screenPoint(x+hash*1.9,z+(hash+i*.5)%1*size);c.strokeStyle=hash>.5?`rgba(182,153,108,${display*.4})`:`rgba(53,78,72,${display*.4})`;c.lineWidth=1;c.beginPath();c.moveTo(s.x-2,s.y+1);c.lineTo(s.x,s.y-2);c.lineTo(s.x+3,s.y);c.stroke();}}
@@ -126,7 +155,10 @@ export class CanvasRenderer {
     for(const e of world.enemies){const tg=telegraphOf(e);if(!tg||Math.abs(tg.x-this.focus.x)>halfX+6||Math.abs(tg.z-this.focus.z)>halfZ+6)continue;if(!warningVisible(frame, tg.x, tg.z, tg.radius||tg.length||2, p))continue;this.drawTelegraph(tg,frame.darkness>0.5?.75:1);}
     for(const s of hostileShots(world))if(s.kind==='spore'&&Math.abs(s.x-this.focus.x)<halfX+4&&Math.abs(s.z-this.focus.z)<halfZ+4)this.drawTelegraph({shape:'circle',x:s.x,z:s.z,radius:s.radius,fill:s.fill,heavy:false},.9);
     const hearthB=world.buildings.find(b=>b.type==='hearth')||(world.arena?{x:0,z:0,level:1}:null),plazaImg=this.images.get('plaza');if(hearthB&&plazaImg){const size=this.theme.sprites.plaza.size[0]*this.scale,q=this.screenPoint(hearthB.x,hearthB.z,0);c.save();c.filter=`brightness(${Math.min(1,entityBrightness(frame,hearthB.x,hearthB.z,{emissive:true}))})`;c.drawImage(plazaImg,q.x-size/2,q.y-size*.36,size,size*.72);c.filter='none';const g=this.images.get('plaza-glow');if(g){c.globalCompositeOperation='lighter';c.globalAlpha=(.12+.5*frame.darkness)*(.75+.25*Math.sin(this.clock*1.6));c.drawImage(g,q.x-size/2,q.y-size*.36,size,size*.72);}c.restore();}
-    const entities=[...world.nodes.filter(n=>!n.ready).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).map(z=>({e:z.kind==='star'?{...z,x:z.x+Math.max(0,1-z.age/z.delay)*3,lift:.4+Math.max(0,1-z.age/z.delay)*9}:z,key:z.kind==='star'?'star':'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme)];
+    paintScenery(this,c,world,frame,dt,'ground');
+    if(weapon&&(weapon.groundNormal.length||weapon.groundGlow.length))drawMagicCanvas(c,[...weapon.groundNormal,...weapon.groundGlow],(x,z,y)=>this.screenPoint(x,z,y));
+    paintRopes(this,c,world,frame,this.theme,true);
+    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme)];
     const drawn=entities.map(entry=>{
       if(entry.key==='gravecraft-skeleton'){
         const last=this.magicActors.get(entry.e.id)||{x:entry.e.x,z:entry.e.z};
@@ -138,6 +170,8 @@ export class CanvasRenderer {
       return {...entry, e:{...entry.e, x:present.x, z:present.z, lift:present.y, flightT:present.t||0}, depth:present.z};
     });
     drawn.sort((a,b)=>(a.depth??a.e.z)-(b.depth??b.e.z));for(const {e,key,kind}of drawn){if(kind==='drop'&&!this.theme.sprites[key])continue;if(Math.abs(e.x-this.focus.x)<halfX+4&&Math.abs(e.z-this.focus.z)<halfZ+4)this.drawSprite(key,e,kind,world,frame,p);}
+    paintRopes(this,c,world,frame,this.theme);
+    paintScenery(this,c,world,frame,dt,'air');
     this.dropMotion.retain(new Set(world.drops.map(drop=>drop.id)));
     const summonIds=new Set((world.magicSummons||[]).map(e=>e.id));for(const id of this.magicActors.keys())if(!summonIds.has(id))this.magicActors.delete(id);
     for(const s of hostileShots(world)){
@@ -148,9 +182,11 @@ export class CanvasRenderer {
       const g=c.createRadialGradient(q.x,q.y,0,q.x,q.y,r);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(.35,`rgba(${color},.85)`);g.addColorStop(1,`rgba(${color},0)`);c.fillStyle=g;c.beginPath();c.arc(q.x,q.y,r,0,Math.PI*2);c.fill();
     }
     if(placement){c.save();c.globalAlpha=.7;this.drawSprite(placement.key,{x:placement.x,z:placement.z},'preview',world,frame,p);c.restore();this.ellipse(placement.x,placement.z,.9,placement.valid?'#bbdca5':'#d67d79',false);}
-    for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2){if(['loot','damage','heal','build','craft'].includes(ev.type))this.float(ev.text,ev.x,ev.z,ev.type==='damage'?'#f5c2a9':ev.type==='heal'?'#b9e2ba':'#fbe1ad');if(ev.type==='hurt')this.float(ev.text,ev.x,ev.z,'#e53935',{className:'world-label player-hurt',alwaysVisible:true});if(ev.type==='rare')this.float(`✦ ${ev.text}`,ev.x,ev.z,RARITY_COLORS[rarityOf(ev.itemId)]);if(ev.type==='levelup')this.float(`LEVEL UP · ${ev.text}`,ev.x,ev.z,'#f2c14e');if(ev.type==='discover')this.float(ev.text,ev.x,ev.z,'#d4fff5');if(ev.type==='freeze')this.float(ev.text,ev.x,ev.z,'#d6f1ff');if(ev.type==='rankup')this.float(`✦ ${ev.text}`,ev.x,ev.z,'#f2c14e',{alwaysVisible:true});if(ev.type==='swap')this.float(ev.text,ev.x,ev.z,'#f0dfbd',{className:'world-label swap-label',alwaysVisible:ev.player===this.localId});if(ev.type==='dodge')this.float(ev.text,ev.x,ev.z,'#bfe8ff',{className:'world-label dodge-label',alwaysVisible:ev.player===this.localId});if(!ev.magicPack&&['slash','cleave','kill','hurt','impact','bolt','nova','burst','chain','lash','starfall','mark','frost','freeze','summon','poof','rend','quake','splat','dash','portal'].includes(ev.type))this.effects.push({...ev,life:0,radius:ev.radius||({freeze:.9,summon:1.1,poof:.8,rend:1}[ev.type])});}this.lastEvent=ev.id;}
-    this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);if(e.type==='dash'){const a=this.screenPoint(e.x,e.z,1),b=this.screenPoint(e.x+(e.dx||0)*DASH.distance,e.z+(e.dz||0)*DASH.distance,1);c.save();c.globalAlpha=Math.max(0,.55-e.life*1.8);c.strokeStyle='#bfe0ff';c.lineCap='round';c.lineWidth=Math.max(4,.7*this.scale);c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();c.restore();return e.life<.3;}if(e.type==='slash'||e.type==='cleave'){const arc=Math.min(Math.PI*1.9,(e.arc||120)*Math.PI/180),range=e.range||2.5,phi=Math.atan2(e.dz||0,e.dx||1),upto=Math.min(1,e.life/.1),n=24;c.save();c.globalAlpha=fade*Math.max(0,1-e.life*3.2)*.6;c.strokeStyle=e.type==='cleave'?'#ffe0b0':'#fff4e2';c.lineCap='round';c.lineWidth=Math.max(3,range*.4*this.scale*.72);c.beginPath();for(let i=0;i<=n*upto;i++){const a=phi-arc/2+arc*i/n,q=this.screenPoint(e.x+Math.cos(a)*range*.75,e.z+Math.sin(a)*range*.75,.5);if(i)c.lineTo(q.x,q.y);else c.moveTo(q.x,q.y);}c.stroke();c.restore();return e.life<.35;}if(e.type==='chain'||e.type==='lash'){const pts=e.type==='chain'?e.points||[]:[[e.x,e.z],[e.x+(e.dx||0)*(e.range||4),e.z+(e.dz||0)*(e.range||4)]];c.save();c.globalAlpha=fade*Math.max(0,1-e.life*2);c.strokeStyle=e.type==='chain'?'#bfe8ff':'#c49bff';c.lineWidth=3;c.beginPath();pts.forEach(([x,z],i)=>{const q=this.screenPoint(x,z,.9);if(i)c.lineTo(q.x+(Math.random()-.5)*6,q.y+(Math.random()-.5)*6);else c.moveTo(q.x,q.y);});c.stroke();c.restore();return e.life<.5;}const tint={starfall:'242,193,78',mark:'242,193,78',frost:'191,232,255',freeze:'226,246,255',summon:'159,216,168',poof:'159,216,168',rend:'208,80,74',quake:'255,138,92',splat:'159,220,106',portal:'183,132,255'}[e.type];c.save();c.globalAlpha=fade;if(tint){this.ellipse(e.x,e.z,.3+Math.min(1,e.life*3)*e.radius,`rgba(${tint},${Math.max(0,1-e.life*2)})`,false);c.restore();return e.life<.5;}this.ellipse(e.x,e.z,e.radius?.3+Math.min(1,e.life*3)*e.radius:.2+e.life*(e.type==='impact'?8:3),e.type==='burst'?`rgba(127,214,196,${Math.max(0,1-e.life*2)})`:`rgba(246,194,131,${Math.max(0,1-e.life*2)})`,false);c.restore();return e.life<.5;});
-    drawMagicCanvas(c,buildMagicEffects(world,this.magicFrame,this.theme),(x,z,y)=>this.screenPoint(x,z,y));
-    this.floaters=this.floaters.filter(f=>{f.life+=dt;const s=this.screenPoint(f.x,f.z,1+f.life*.7);f.el.style.transform=`translate(${s.x}px,${s.y}px) translate(-50%,-50%)`;f.el.style.opacity=String(Math.min(1,(1.8-f.life)*2)*(f.alwaysVisible?1:this.reveal(f.x, f.z)));if(f.life>1.8){f.el.remove();return false;}return true;});
+    for(const ev of world.events)if(ev.id>this.lastEvent){if(!demo&&world.time-ev.at<2){this.weaponFx.event(ev,this.clock,world);if(ev.type==='damage')damageFloater(this.floaters,ev,this.localId,'hit');else if(['loot','heal','build','craft'].includes(ev.type))this.float(ev.text,ev.x,ev.z,ev.type==='damage'?'#f5c2a9':ev.type==='heal'?'#b9e2ba':'#fbe1ad');if(ev.type==='refine')this.float(`◆ ${ev.text}`,ev.x,ev.z,RARITY_COLORS[ev.rarity]||'#fbe1ad',{className:'world-label refine-label',alwaysVisible:ev.player===this.localId});if(ev.type==='hurt')damageFloater(this.floaters,ev,this.localId,'hurt');if(ev.type==='salvage')this.float(`◆ ${ev.text}`,ev.x,ev.z,RARITY_COLORS[ev.rarity]||'#fbe1ad',{className:'world-label salvage-label',alwaysVisible:ev.player===this.localId});if(ev.type==='rare')this.float(`✦ ${ev.text}`,ev.x,ev.z,RARITY_COLORS[rarityOf(ev.itemId)]);if(ev.type==='levelup')this.float(`LEVEL UP · ${ev.text}`,ev.x,ev.z,'#f2c14e');if(ev.type==='discover')this.float(ev.text,ev.x,ev.z,'#d4fff5');if(ev.type==='freeze')this.float(ev.text,ev.x,ev.z,'#d6f1ff');if(ev.type==='rankup')this.float(`✦ ${ev.text}`,ev.x,ev.z,'#f2c14e',{alwaysVisible:true});if(ev.type==='swap')this.float(ev.text,ev.x,ev.z,'#f0dfbd',{className:'world-label swap-label',alwaysVisible:ev.player===this.localId});if(ev.type==='dodge')this.float(ev.text,ev.x,ev.z,'#bfe8ff',{className:'world-label dodge-label',alwaysVisible:ev.player===this.localId});if(ev.type==='strike')this.float(ev.text,ev.x,ev.z,STRIKE_COLORS[ev.kind]||STRIKE_COLORS.clean,{className:`world-label strike-label strike-${ev.kind||'clean'}`,alwaysVisible:ev.player===this.localId});if(!ev.magicPack&&['kill','hurt','impact','bolt','nova','burst','chain','lash','frost','freeze','summon','poof','rend','quake','splat','dash','portal'].includes(ev.type))this.effects.push({...ev,life:0,radius:ev.radius||({freeze:.9,summon:1.1,poof:.8,rend:1}[ev.type])});}this.lastEvent=ev.id;}
+    this.effects=this.effects.filter(e=>{e.life+=dt;const fade=this.reveal(e.x, e.z);if(e.type==='dash'){const a=this.screenPoint(e.x,e.z,1),b=this.screenPoint(e.x+(e.dx||0)*DASH.distance,e.z+(e.dz||0)*DASH.distance,1);c.save();c.globalAlpha=Math.max(0,.55-e.life*1.8);c.strokeStyle='#bfe0ff';c.lineCap='round';c.lineWidth=Math.max(4,.7*this.scale);c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();c.restore();return e.life<.3;}if(e.type==='chain'||e.type==='lash'){const pts=e.type==='chain'?e.points||[]:[[e.x,e.z],[e.x+(e.dx||0)*(e.range||4),e.z+(e.dz||0)*(e.range||4)]];c.save();c.globalAlpha=fade*Math.max(0,1-e.life*2);c.strokeStyle=e.type==='chain'?'#bfe8ff':'#c49bff';c.lineWidth=3;c.beginPath();pts.forEach(([x,z],i)=>{const q=this.screenPoint(x,z,.9);if(i)c.lineTo(q.x+(Math.random()-.5)*6,q.y+(Math.random()-.5)*6);else c.moveTo(q.x,q.y);});c.stroke();c.restore();return e.life<.5;}const tint={starfall:'242,193,78',mark:'242,193,78',frost:'191,232,255',freeze:'226,246,255',summon:'159,216,168',poof:'159,216,168',rend:'208,80,74',quake:'255,138,92',splat:'159,220,106',portal:'183,132,255'}[e.type];c.save();c.globalAlpha=fade;if(tint){this.ellipse(e.x,e.z,.3+Math.min(1,e.life*3)*e.radius,`rgba(${tint},${Math.max(0,1-e.life*2)})`,false);c.restore();return e.life<.5;}this.ellipse(e.x,e.z,e.radius?.3+Math.min(1,e.life*3)*e.radius:.2+e.life*(e.type==='impact'?8:3),e.type==='burst'?`rgba(127,214,196,${Math.max(0,1-e.life*2)})`:`rgba(246,194,131,${Math.max(0,1-e.life*2)})`,false);c.restore();return e.life<.5;});
+    const magic=buildMagicEffects(world,this.magicFrame,this.theme);if(weapon){magic.push(...weapon.normal,...weapon.glow);}
+    drawMagicCanvas(c,magic,(x,z,y)=>this.screenPoint(x,z,y));
+    this.floaters=stepFloaters(this.floaters,dt,(x,z,y)=>this.screenPoint(x,z,y),(x,z)=>this.reveal(x,z));
+    this.focus.x-=kx;this.focus.z-=kz;
   }
 }

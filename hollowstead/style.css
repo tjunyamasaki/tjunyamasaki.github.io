@@ -36,7 +36,7 @@
 #joystick{width:120px;height:120px;flex:none}
 #joystick small{display:none}
 #stick{left:50%;top:50%;margin-left:-25.5px;margin-top:-25.5px}
-#action-cluster{position:relative;width:180px;height:168px;flex:none;display:grid;grid-template-columns:44px 56px 68px;grid-template-rows:44px 44px 68px;gap:6px;align-items:stretch;justify-items:stretch}
+#action-cluster{--main-action-size:68px;position:relative;width:216px;height:168px;flex:none;display:grid;grid-template-columns:repeat(3,var(--main-action-size));grid-template-rows:44px 44px var(--main-action-size);gap:6px;align-items:stretch;justify-items:stretch}
 #action-cluster .round{position:relative;left:auto;right:auto;top:auto;bottom:auto;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;gap:0;font-size:15px;line-height:1}
 #action-cluster .round small{font-size:7px;line-height:1;margin-top:1px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #context-1{grid-column:1;grid-row:1;justify-self:start;align-self:start}
@@ -44,8 +44,8 @@
 #dodge{grid-column:3;grid-row:1;justify-self:end;align-self:start}
 #context-3{grid-column:1;grid-row:2;justify-self:start;align-self:center}
 #lantern-button{grid-column:2;grid-row:2;justify-self:center;align-self:center}
-#action-cluster #attack{grid-column:2;grid-row:3;width:56px;height:56px;min-width:56px;min-height:56px;justify-self:center;align-self:end;font-size:20px}
-#action-cluster #context-0{grid-column:3;grid-row:3;width:68px;height:68px;min-width:68px;min-height:68px;justify-self:end;align-self:end;font-size:20px}
+#action-cluster #attack{grid-column:2;grid-row:3;width:var(--main-action-size);height:var(--main-action-size);min-width:var(--main-action-size);min-height:var(--main-action-size);justify-self:center;align-self:end;font-size:20px}
+#action-cluster #context-0{grid-column:3;grid-row:3;width:var(--main-action-size);height:var(--main-action-size);min-width:var(--main-action-size);min-height:var(--main-action-size);justify-self:end;align-self:end;font-size:20px}
 #action-cluster .is-off{visibility:hidden;pointer-events:none}
 #action-cluster .is-disabled{opacity:.45}
 #action-cluster .confirming{position:relative}
@@ -59,6 +59,16 @@
 .hotbar button>span{font-size:20px}
 .hotbar small{font-size:8px;margin-top:3px;white-space:nowrap}
 .hotbar kbd{display:none}
+.hotbar .potion-slot{position:relative;width:50px;min-width:50px;border:1px solid #dac29a40;border-radius:9px;background:#211c2855}
+.hotbar .potion-slot .item-icon{width:30px;height:30px;object-fit:contain;pointer-events:none}
+.hotbar .potion-slot>small{margin-top:0}
+.hotbar .potion-slot .potion-count{position:absolute;top:2px;right:3px;min-width:13px;padding:1px 2px;border-radius:4px;background:#211c28dd;color:var(--cream);font-size:9px;letter-spacing:0}
+body.arena #hotbar-potion{display:none}
+@media(max-width:600px){.hotbar .potion-slot{width:44px;min-width:44px}}
+@media(max-width:350px){
+  .hotbar button{width:44px;min-width:44px}
+  .bottom-controls #joystick{width:80px;height:80px}
+}
 .sheet{top:max(12px,env(safe-area-inset-top));bottom:max(12px,env(safe-area-inset-bottom));right:max(12px,env(safe-area-inset-right));pointer-events:auto}
 .sheet>header{flex:none;gap:8px}
 .sheet-tools{display:flex;gap:8px;flex:none}
@@ -76,12 +86,33 @@
 .sheet:is([data-sheet="inventory"],[data-sheet="chest"]) #sheet-content{padding:0 10px 10px;flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;overscroll-behavior:contain;touch-action:pan-y}
 .rpg-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;gap:8px}
 .rpg-body{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y}
-.equip-column{display:flex;gap:6px;align-items:center;overflow-x:auto;flex:none;min-width:0}
-.character-card{display:flex;align-items:center;justify-content:center;width:40px;flex:none}
-.character-card .portrait{width:29px;height:44px}
-.character-card small{display:none}
-.socket-grid.slot-grid{display:grid;grid-template-columns:repeat(5,44px);gap:4px;flex:none;width:max-content}
-.socket-grid .item-slot{width:44px;height:44px;max-width:44px;min-width:44px;aspect-ratio:auto}
+/* Worn gear: a paper doll. Armour, head, back and trinket on the left; weapon, light and tools on the right. */
+.equip-column{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none;min-width:0;padding:8px 10px 10px;border:1px solid #dac29a24;border-radius:10px;background:radial-gradient(ellipse at 50% 42%,#f0b76a1c,transparent 62%),#211c2833}
+.equip-label{margin:0;align-self:stretch;text-align:center}
+.doll{--sock:48px;display:grid;grid-template-columns:var(--sock) minmax(70px,auto) var(--sock);grid-template-rows:repeat(4,var(--sock));gap:6px 8px;align-items:center}
+.doll .socket-grid{display:contents}
+.doll .item-slot{width:var(--sock);height:var(--sock);min-width:var(--sock);min-height:var(--sock);aspect-ratio:auto;border-radius:9px}
+.doll [data-slot-key="socket:head"]{grid-area:1/1}.doll [data-slot-key="socket:body"]{grid-area:2/1}.doll [data-slot-key="socket:back"]{grid-area:3/1}.doll [data-slot-key="socket:trinket"]{grid-area:4/1}
+.doll [data-slot-key="socket:weapon"]{grid-area:1/3}.doll [data-slot-key="socket:light"]{grid-area:2/3}.doll [data-slot-key="socket:chop"]{grid-area:3/3}.doll [data-slot-key="socket:mine"]{grid-area:4/3}
+.doll .item-slot[data-empty="true"]{border-style:dashed;background:#211c2826}
+.doll .item-slot.is-equipped{box-shadow:inset 0 0 0 2px var(--mint),0 0 12px #8fd3c026}
+.character-card{grid-area:1/2/5/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:100%;position:relative}
+.character-card{isolation:isolate}
+.character-card .portrait{position:relative;width:64px;height:96px}
+.character-card .portrait::after{content:"";position:absolute;left:50%;bottom:-2px;width:62px;height:12px;transform:translateX(-50%);border-radius:50%;background:#15111c80;z-index:-1}
+.character-card small{font:13px Georgia,serif;color:var(--cream);max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.equip-column .charm-line{font-size:10px;text-align:center}
+/* The selected item: name, rarity line, and its tooltip lines. */
+.item-detail{display:flex;flex-direction:column;gap:2px;min-height:44px;padding:6px 10px;border-left:2px solid var(--orange);background:#211c2844;border-radius:0 6px 6px 0;font-size:11px;color:var(--muted)}
+.item-detail b{font:15px Georgia,serif;font-weight:normal;color:var(--cream)}
+.item-detail small{font-size:10.5px;line-height:1.35;color:var(--muted)}
+.item-detail small:first-of-type{color:var(--orange);letter-spacing:.3px}
+.item-detail.is-empty{justify-content:center;border-left-color:#dac29a33;font-style:italic}
+.rpg-panel.with-chest .item-detail{display:none}
+.detail-ops .danger-op{border-color:#d9857e66}
+.detail-ops .confirm-op{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:5px 10px;background:#7c3f3a;border-color:#e0806f;color:#fff1e6;line-height:1.1}
+.detail-ops .confirm-op b{font-size:12px}
+.detail-ops .confirm-op small{font-size:9.5px;color:#ffd9a8}
 .bag-column,.chest-column{display:flex;flex-direction:column;gap:6px;min-width:0;flex:none}
 .bag-meta,.charm-line{margin:0;color:var(--muted);font-size:11px}
 .charm-line:empty,.pending-line:empty{display:none}
@@ -106,8 +137,9 @@
 .storage-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;flex-wrap:wrap;min-height:44px}
 .storage-tools{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto}
 .storage-tools button{min-width:44px;min-height:44px;padding:8px 10px;flex:none}
-.item-slot[data-tip].is-selected,.item-slot[data-tip]:hover{overflow:visible;z-index:3}
-.item-slot[data-tip].is-selected::after,.item-slot[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);z-index:4;padding:4px 7px;border-radius:4px;background:#211c28f2;border:1px solid #d6ba8e66;color:var(--cream);font:11px Arial,sans-serif;letter-spacing:.2px;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px #17111f66}
+.rpg-panel.with-chest .item-slot[data-tip].is-selected{overflow:visible;z-index:3}
+@media(hover:hover){.item-slot[data-tip]:hover{overflow:visible;z-index:3}}
+.rpg-panel.with-chest .item-slot[data-tip].is-selected::after,.item-slot[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);z-index:4;padding:4px 7px;border-radius:4px;background:#211c28f2;border:1px solid #d6ba8e66;color:var(--cream);font:11px Arial,sans-serif;letter-spacing:.2px;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px #17111f66}
 .chest-overflow{flex:none;max-height:34%;overflow:auto;overscroll-behavior:contain}
 .rpg-panel.with-chest .rpg-body{gap:6px;overflow:auto}
 .rpg-panel.with-chest .bag-column,.rpg-panel.with-chest .chest-column{flex:none;min-height:auto;overflow:visible}
@@ -115,15 +147,28 @@
 .rpg-panel.with-chest .charm-line{display:none}
 .rpg-panel.with-chest .recovery-block{flex:none;max-height:40%;overflow:auto;overscroll-behavior:contain}
 .rpg-panel.with-chest .recovery-block .section-label{margin:4px 0 6px;font-size:8px;letter-spacing:1px}
+/* A chest shows only the pack beside the chest: worn gear lives in Inventory. */
+.rpg-panel.with-chest .equip-column{display:none}
+@media(min-width:600px){
+  .sheet[data-sheet="inventory"]{width:min(700px,calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
+  .rpg-panel:not(.with-chest) .rpg-body{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:12px 16px}
+  .rpg-panel:not(.with-chest) .bag-column{min-width:0}
+}
 @media(min-width:700px){
   .sheet[data-sheet="chest"]{width:min(760px,calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
-  .rpg-panel.with-chest .rpg-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto auto;align-content:start;gap:8px 16px}
-  .rpg-panel.with-chest .equip-column{grid-column:1 / -1;min-height:44px;overflow:visible}
+  .rpg-panel.with-chest .rpg-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:8px 16px}
 }
 @media(max-width:699px){
-  .rpg-panel.with-chest .equip-column{display:none}
   .rpg-panel.with-chest .chest-column{order:1}
   .rpg-panel.with-chest .bag-column{order:2}
+}
+/* Short landscape screens: tighter doll so the pack stays in view without scrolling. */
+@media(max-height:430px){
+  .doll{--sock:44px;gap:4px 6px}
+  .character-card .portrait{width:52px;height:78px}
+  .equip-column{padding:6px 8px 8px;gap:4px}
+  .equip-label{display:none}
+  .sheet:is([data-sheet="inventory"],[data-sheet="chest"])>header{padding:6px 12px;min-height:50px}
 }
 @media(max-width:900px){#minimap{width:76px;height:76px}}
 @media(max-width:700px){
@@ -145,6 +190,8 @@
   .hotbar{bottom:calc(12px + env(safe-area-inset-bottom))}
   .sheet{top:8px;bottom:8px;left:auto;right:max(8px,env(safe-area-inset-right));width:min(460px,56vw);max-height:none;height:auto;border-radius:12px}
 }
+/* Short, narrow landscape screens need the action row above the six-slot hotbar. */
+@media(max-height:520px) and (min-width:601px) and (max-width:800px){.bottom-controls{bottom:calc(74px + env(safe-area-inset-bottom))}}
 #showcase-panel{position:fixed;z-index:36;top:0;left:0;width:100%;height:100dvh;padding:0;background:none;border:0;box-shadow:none;pointer-events:none;touch-action:manipulation}
 #showcase-panel[hidden]{display:none!important}
 #showcase-panel .showcase-bar{pointer-events:auto;position:absolute;top:calc(104px + env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));display:flex;gap:6px;z-index:2;touch-action:manipulation}
@@ -202,10 +249,24 @@
 .hotbar .weapon-slot.empty{opacity:.55;border-style:dashed}
 .hotbar .weapon-slot.empty>span{font-size:16px;color:var(--muted)}
 .hotbar .weapon-slot .rank{position:absolute;left:0;right:0;bottom:1px;margin:0;font-size:7px;letter-spacing:-.5px;color:#f2c14e;text-shadow:0 1px 2px #120f16;text-align:center;pointer-events:none}
+/* Expedition weapons: mastery (gold, top) and condition (orange, bottom). */
+.hotbar .weapon-slot .mastery,.hotbar .weapon-slot .wear{position:absolute;left:7px;right:7px;margin:0;border-radius:2px;overflow:hidden;pointer-events:none}
+.hotbar .weapon-slot .mastery{top:3px;height:2px;background:#f2c14e2e}
+.hotbar .weapon-slot .mastery em{display:block;height:100%;background:#f2c14e;box-shadow:0 0 4px #f2c14eaa}
+.hotbar .weapon-slot .wear{bottom:3px;height:3px;background:#bcb39933}
+.hotbar .weapon-slot .wear em{display:block;height:100%;background:var(--orange)}
+.hotbar .weapon-slot.mastered .rank{top:5px;bottom:auto}
+.hotbar .weapon-slot.worn{border-color:#e0523f99}
+.hotbar .weapon-slot.worn .wear em{background:#e0523f;animation:worn-pulse 1.2s ease-in-out infinite}
+@keyframes worn-pulse{50%{opacity:.45}}
+.hotbar .weapon-slot.broken .item-icon{filter:grayscale(1) brightness(.6);opacity:.7}
+.hotbar .weapon-slot .broken-tag{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%) rotate(-12deg);margin:0;font-size:7px;font-weight:700;letter-spacing:.5px;color:#fff1e6;background:#b8332acc;text-align:center;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.hotbar .weapon-slot.worn .wear em{animation:none}}
 #action-cluster #attack.armed .item-icon{width:32px;height:32px;object-fit:contain;pointer-events:none;margin-top:-2px}
 #action-cluster #attack.armed small{margin-top:0}
 #action-cluster #dodge{position:relative}
 #action-cluster #dodge::after{content:"";position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(#bfe0ffcc calc(var(--cd,0) * 1turn),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));pointer-events:none}
+#action-cluster #dodge .dodge-count{position:absolute;right:-4px;top:-4px;min-width:14px;height:14px;padding:0 2px;border-radius:7px;background:#1a2430;color:#d7f2ff;border:1px solid #bfe0ff88;font:9px/12px ui-monospace,monospace;text-align:center;pointer-events:none}
 .world-label.dodge-label{font-size:17px;letter-spacing:.6px;color:#bfe8ff}
 body.arena .vital.hunger,body.arena .vital.courage,body.arena #hotbar-inventory,body.arena #hotbar-build,body.arena #action-cluster .stamina-track,body.arena #lantern-button{display:none}
 body.arena .weapon-bar{border-right:0;padding-right:0;margin-right:0}
@@ -227,6 +288,23 @@ body.arena .hotbar .weapon-slot .item-icon{width:40px;height:40px}
 .pick-badge.rank{background:#f2c14e33;color:#f6d27a}
 .pick-card.rarity-uncommon{border-color:#8fd3a088}.pick-card.rarity-rare{border-color:#79b8ffaa}.pick-card.rarity-epic{border-color:#c49bffaa;box-shadow:0 10px 26px #17111f66,0 0 16px #c49bff33}.pick-card.rarity-legendary{border-color:#f2c14ecc;box-shadow:0 10px 26px #17111f66,0 0 20px #f2c14e44}
 .pick-card.rarity-uncommon .pick-rarity{color:#8fd3a0}.pick-card.rarity-rare .pick-rarity{color:#79b8ff}.pick-card.rarity-epic .pick-rarity{color:#c49bff}.pick-card.rarity-legendary .pick-rarity{color:#f2c14e}
+.pick-card.pick-kitsune{border:2px solid #ae70ff;background:radial-gradient(ellipse at 50% 28%,#4ff1cd19,transparent 55%),linear-gradient(155deg,#34243f,#241c30);box-shadow:0 10px 26px #17111f66,inset 0 0 0 2px #24192f,0 0 22px #ae70ff2b}
+.pick-kitsune .pick-icon{filter:drop-shadow(0 4px 0 #24192f);animation:kitsune-float 2.8s ease-in-out infinite}
+.pick-kitsune .pick-badge:not(.rank){background:#ff594c;color:#24192f;border-color:#24192f}
+.pick-card.pick-kitsune:hover,.pick-card.pick-kitsune:focus-visible{border-color:#4ff1cd;box-shadow:0 10px 26px #17111f66,0 0 24px #4ff1cd33}
+@keyframes kitsune-float{0%,100%{transform:translateY(1px) rotate(-3deg)}50%{transform:translateY(-4px) rotate(3deg)}}
+.pick-card.pick-plague{border:2px solid #8fd65a;background:radial-gradient(ellipse at 50% 30%,#c8ff5c1c,transparent 58%),radial-gradient(ellipse at 20% 90%,#4fae5c22,transparent 50%),linear-gradient(155deg,#2c2838,#1f1b29);box-shadow:0 10px 26px #17111f66,inset 0 0 0 2px #24192f,0 0 22px #8fd65a2e}
+.pick-plague .pick-icon{filter:drop-shadow(0 4px 0 #24192f);transform-origin:50% 80%;animation:plague-peck 2.6s ease-in-out infinite}
+.pick-plague .pick-badge:not(.rank){background:#c8ff5c;color:#24192f;border-color:#24192f}
+.pick-plague b{color:#e8f7c9}
+.pick-card.pick-plague:hover,.pick-card.pick-plague:focus-visible{border-color:#e0ab4a;box-shadow:0 10px 26px #17111f66,0 0 26px #c8ff5c3d}
+.pick-card.pick-gloom{border:2px solid #8a5cff;background:radial-gradient(ellipse at 50% 30%,#ff4fd814,transparent 55%),radial-gradient(ellipse at 50% 100%,#8a5cff2a,transparent 60%),linear-gradient(160deg,#241a33,#130e1c);box-shadow:0 10px 26px #0a0610aa,inset 0 0 0 2px #0f0a16,0 0 22px #8a5cff38}
+.pick-gloom .pick-icon{filter:drop-shadow(0 4px 0 #0f0a16) drop-shadow(0 0 8px #8a5cff66);transform-origin:50% 90%;animation:gloom-grip 2.4s ease-in-out infinite}
+.pick-gloom .pick-badge:not(.rank){background:#ff4fd8;color:#0f0a16;border-color:#0f0a16}
+.pick-gloom b{color:#e4d6ff}
+.pick-card.pick-gloom:hover,.pick-card.pick-gloom:focus-visible{border-color:#ff4fd8;box-shadow:0 10px 26px #0a0610aa,0 0 28px #ff4fd83d}
+@keyframes gloom-grip{0%,100%{transform:translateY(3px) scale(.96)}40%{transform:translateY(-3px) scale(1.03)}52%{transform:translateY(-1px) scale(.93,1.02)}60%{transform:translateY(-2px) scale(1.01)}}
+@keyframes plague-peck{0%,58%,100%{transform:translateY(0) rotate(-2deg)}66%{transform:translateY(-3px) rotate(-7deg)}72%{transform:translateY(1px) rotate(6deg)}80%{transform:translateY(-1px) rotate(-1deg)}88%{transform:translateY(0) rotate(3deg)}}
 .arena-replace{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:#29232ff2}
 .arena-replace p{margin:0 0 8px;font-size:13px}
 .replace-row{display:flex;justify-content:center;gap:8px}

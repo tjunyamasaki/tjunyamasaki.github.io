@@ -37,7 +37,7 @@ test('escape closes drag, details, panel, then placement, before the menu', () =
   assert.equal(escapeStep({}), 'open-menu');
 });
 
-test('keyboard map keeps inventory controls and drops C, Q, and G', () => {
+test('keyboard map keeps inventory controls, gives Q to the weapon skill and drops C and G', () => {
   assert.equal(keyboardAction('i'), 'inventory');
   assert.equal(keyboardAction('b'), 'build');
   assert.equal(keyboardAction('m'), 'map');
@@ -48,7 +48,7 @@ test('keyboard map keeps inventory controls and drops C, Q, and G', () => {
   assert.equal(keyboardAction('1'), 'action-1');
   assert.equal(keyboardAction('4'), 'action-4');
   assert.equal(keyboardAction('c'), null);
-  assert.equal(keyboardAction('q'), null);
+  assert.equal(keyboardAction('q'), 'skill');
   assert.equal(keyboardAction('g'), null);
 });
 
@@ -83,8 +83,8 @@ test('context buttons are direct and ordered', () => {
   const full = describeContext({kind: 'building', type: 'hearth', id: 'h', hp: 20, maxHp: 20, fuel: 10, level: 3, wood: 2, canAwaken: false});
   assert.deepEqual(full.map(action => action.id), ['feed', 'cook']);
   const bench = describeContext({kind: 'building', type: 'bench', id: 'b', hp: 1, maxHp: 2, wood: 0});
-  assert.deepEqual(bench.map(action => action.id), ['craft', 'build', 'repair']);
-  assert.equal(bench[2].enabled, false);
+  assert.deepEqual(bench.map(action => action.id), ['craft', 'build', 'refine', 'repair']);
+  assert.equal(bench[3].enabled, false);
   const pot = describeContext({kind: 'building', type: 'pot', id: 'p', hp: 2, maxHp: 2, wood: 1});
   assert.deepEqual(pot.map(action => action.id), ['cook']);
   assert.equal(pot[0].panel.stationType, 'pot');
@@ -149,7 +149,7 @@ test('slot labels, quantities, and operations stay explicit', () => {
   assert.equal(adjustQuantity(5, 5, 'inc'), 5);
   assert.deepEqual(operationsFor({itemId: 'berry', where: 'pack', chestOpen: true}), ['eat', 'drop', 'transfer']);
   assert.deepEqual(operationsFor({itemId: 'bandage', where: 'pack'}), ['heal', 'drop']);
-  assert.deepEqual(operationsFor({itemId: 'axe', where: 'pack'}), ['equip', 'drop']);
+  assert.deepEqual(operationsFor({itemId: 'axe', where: 'pack'}), ['equip', 'drop', 'dismantle']);
   assert.deepEqual(operationsFor({itemId: 'axe', where: 'equipment', chestOpen: true}), ['unequip', 'drop', 'transfer']);
   assert.deepEqual(operationsFor({itemId: 'wood', where: 'chest', chestOpen: true}), ['transfer']);
   assert.deepEqual(operationsFor({itemId: 'wood', where: 'recovery'}), ['take']);

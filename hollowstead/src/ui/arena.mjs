@@ -1,9 +1,10 @@
 // Battle arena and weapon hotbar views. Pure: builds markup and labels from plain world data,
 // never mutates the world. main.mjs owns the DOM and sends the picks.
 
-import {RECIPES, label} from '../content.mjs?v=harvest-17';
-import {magicItems} from '../magic/registry.mjs?v=harvest-17';
-import {ARENA_GROWTH, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-17';
+import {RECIPES, label} from '../content.mjs?v=harvest-18';
+import {magicItems} from '../magic/registry.mjs?v=harvest-18';
+import {ARENA_GROWTH, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-18';
+import {skillOf} from '../skills.mjs?v=harvest-18';
 
 const escape = value => String(value).replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
 
@@ -17,7 +18,7 @@ const BLURBS = Object.freeze({
   crookstaff: 'Moonshard bolts that burst on impact.',
   flamberge: 'A huge 150° cleave with long reach.',
   skullstaff: 'A big bursting bolt that slows what it hits.',
-  tome: 'A ring of fire around you. Made for swarms.',
+  tome: 'Burning pages circle you and fly out like boomerangs. Kills tear more.',
 });
 export function weaponBlurb(itemId){
   return BLURBS[itemId] || weaponStyle(itemId)?.blurb || magicItems[itemId]?.blurb || RECIPES[itemId]?.desc || '';
@@ -36,7 +37,7 @@ export function hotbarView(player){
   return (player?.hotbar || [null, null, null]).map((uid, index) => {
     const stack = uid ? stacks.find(s => s.uid === uid) || null : null;
     return {
-      index, uid, itemId: stack?.itemId || null, name: stack ? label(stack.itemId) : '',
+      index, uid, stack, itemId: stack?.itemId || null, name: stack ? label(stack.itemId) : '',
       active: !!(stack && worn && worn.uid === stack.uid),
       rank: stack ? (player?.ranks?.[stack.itemId] || 0) : 0,
       rarity: stack ? rarityOf(stack.itemId) : 'common',
@@ -49,9 +50,10 @@ export function offerMarkup(offers, icon){
   return (offers || []).map((offer, i) => {
     const rarity = rarityOf(offer.itemId);
     const badge = offer.owned ? `<span class="pick-badge rank">RANK UP ${rankStars(offer.rank)}</span>` : '<span class="pick-badge">NEW</span>';
-    return `<button type="button" class="pick-card rarity-${rarity}" data-pick="${i}" aria-label="${escape(label(offer.itemId))}, ${rarity}${offer.owned ? `, rank up to ${offer.rank}` : ', new weapon'}">`
+    return `<button type="button" class="pick-card rarity-${rarity}${offer.itemId === 'kitsune-lantern' ? ' pick-kitsune' : offer.itemId === 'plaguebeak' ? ' pick-plague' : offer.itemId === 'gloomgrasp' ? ' pick-gloom' : ''}" data-pick="${i}" aria-label="${escape(label(offer.itemId))}, ${rarity}${offer.owned ? `, rank up to ${offer.rank}` : ', new weapon'}">`
       + `${badge}<span class="pick-icon">${icon(offer.itemId)}</span><b>${escape(label(offer.itemId))}</b>`
-      + `<small class="pick-rarity">${rarity.toUpperCase()}</small><span class="pick-blurb">${escape(weaponBlurb(offer.itemId))}</span></button>`;
+      + `<small class="pick-rarity">${rarity.toUpperCase()}</small><span class="pick-blurb">${escape(weaponBlurb(offer.itemId))}</span>`
+      + (skillOf(offer.itemId) ? `<span class="pick-skill"><b>✦ ${escape(skillOf(offer.itemId).name)}</b> ${escape(skillOf(offer.itemId).blurb)}</span>` : '') + '</button>';
   }).join('');
 }
 

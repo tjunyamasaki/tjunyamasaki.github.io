@@ -20,6 +20,8 @@ import {markerPulse, paintMarker, targetMarker} from './target-marker.mjs?v=harv
 import {arenaProps, arenaTile, plazaProps} from './renderer.mjs?v=harvest-18';
 import {STRIKE_COLORS} from './renderer.mjs?v=harvest-18';
 import {glowStrength} from './lighting.mjs?v=harvest-18';
+import {paintDungeonCanvas} from './dungeon/canvas.mjs?v=harvest-18';
+import {dungeonProps} from './dungeon/art.mjs?v=harvest-18';
 const PROJECTILE_KEYS={arrow:'arrow',bolt:'mbolt',wisp:'wisp',seed:'pumpseed'};
 import {
   brightnessAt, canInspect, entityBrightness, frameLighting, labelOpacity, shadeHex, warningVisible,
@@ -91,9 +93,9 @@ export class CanvasRenderer {
     const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||this.images.get('ember'),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
     const special=kind==='ally'?(e.anim||'idle'):magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0||e.act>0?'attack':'walk'):e.action||'idle'),clip=def.clips[clipName]||def.clips.walk||def.clips.attack||def.clips.idle;
     const cols=def.columns||1,rows=def.rows||1,frameIndex=key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
-    let w=def.size[0]*this.scale,h=def.size[1]*this.scale;if(e.down||e.ghost){w*=.8;h*=.65;}if(kind==='enemy'&&e.elite){w*=1.3;h*=1.3;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(kind==='zone'&&e.kind==='frost'){w*=e.radius/1.3;h*=e.radius/1.3;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
+    let w=def.size[0]*this.scale,h=def.size[1]*this.scale;if(e.down||e.ghost){w*=.8;h*=.65;}if(kind==='enemy'&&e.elite){w*=1.3;h*=1.3;}if(kind==='enemy'&&e.warden){w*=1.12;h*=1.12;}if(kind==='prop'&&e.scale){w*=e.scale;h*=e.scale;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(kind==='zone'&&e.kind==='frost'){w*=e.radius/1.3;h*=e.radius/1.3;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
     const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob*this.scale:kind==='enemy'&&key==='wraith'?(Math.sin(this.clock*3)*.1+.2)*this.scale:0;
-    const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e));
+    const emissive=(kind==='prop'&&e.glow)||(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e));
     let display=kind==='preview'?Math.max(0.72, entityBrightness(frame, e.x, e.z)):entityBrightness(frame, e.x, e.z, {local:kind==='player'&&e.id===p.id, emissive});
     if(kind==='building'&&['hearth','fire'].includes(key)&&e.fuel<=0)display*=0.45;
     if(kind==='held')display=display*.75+.25;
@@ -150,7 +152,7 @@ export class CanvasRenderer {
     const halfX=this.width/this.scale/2+3,halfZ=this.height/(this.scale*.72)/2+6;
     // The hollow's ground colours (worldgen.groundColors, the same texels the WebGL ground uses); tiles along a shore,
     // thicket or the edge split into unit tiles so the colour follows the walkable shape.
-    const tone=world.arena?null:(this.groundTone?.seed===world.seed&&this.groundTone.palette===this.theme.palette?this.groundTone:(this.groundTone={seed:world.seed,palette:this.theme.palette,colors:groundColors(world.seed,this.theme.palette)})).colors;
+    const tone=world.arena||world.dungeon?null:(this.groundTone?.seed===world.seed&&this.groundTone.palette===this.theme.palette?this.groundTone:(this.groundTone={seed:world.seed,palette:this.theme.palette,colors:groundColors(world.seed,this.theme.palette)})).colors;
     const landAt=(x,z)=>{const i=Math.floor((x+tone.extent)*tone.res),j=Math.floor((z+tone.extent)*tone.res);return i<0||j<0||i>=tone.size||j>=tone.size?4:tone.land[j*tone.size+i];};
     const plain=(x,z,size)=>{for(let a=.25;a<size;a+=.5)for(let b=.25;b<size;b+=.5)if(landAt(x+a,z+b)!==1)return false;return true;};
     const paintTile=(x,z,size,detail)=>{
@@ -164,8 +166,9 @@ export class CanvasRenderer {
       c.fillStyle=`rgba(35,31,42,${hash*.07*display})`;c.fillRect(a.x,a.y,b.x-a.x+1,b.y-a.y+1);
       if(display>0.2){for(let i=0;i<2;i++){const s=this.screenPoint(x+hash*1.9,z+(hash+i*.5)%1*size);c.strokeStyle=hash>.5?`rgba(182,153,108,${display*.4})`:`rgba(53,78,72,${display*.4})`;c.lineWidth=1;c.beginPath();c.moveTo(s.x-2,s.y+1);c.lineTo(s.x,s.y-2);c.lineTo(s.x+3,s.y);c.stroke();}}
     };
-    for(let z=Math.max(-RULES.radius-6,Math.floor((this.focus.z-halfZ)/2)*2);z<Math.min(RULES.radius+6,this.focus.z+halfZ);z+=2)for(let x=Math.max(-RULES.radius-6,Math.floor((this.focus.x-halfX)/2)*2);x<Math.min(RULES.radius+6,this.focus.x+halfX);x+=2)paintTile(x,z,2,true);
-    if(frame.darkness>0.05){
+    if(world.dungeon)paintDungeonCanvas(this,c,world,frame,this.clock,halfX,halfZ);
+    else for(let z=Math.max(-RULES.radius-6,Math.floor((this.focus.z-halfZ)/2)*2);z<Math.min(RULES.radius+6,this.focus.z+halfZ);z+=2)for(let x=Math.max(-RULES.radius-6,Math.floor((this.focus.x-halfX)/2)*2);x<Math.min(RULES.radius+6,this.focus.x+halfX);x+=2)paintTile(x,z,2,true);
+    if(frame.darkness>0.05&&!world.dungeon){
       for(const source of frame.sources){
         const reach=source.radius*frame.lighting.ambientFraction+0.75;
         const x0=Math.max(-RULES.radius-6,Math.floor((source.x-reach)*2)/2),x1=Math.min(RULES.radius+6,source.x+reach);
@@ -187,7 +190,7 @@ export class CanvasRenderer {
     paintScenery(this,c,world,frame,dt,'ground');
     if(weapon&&(weapon.groundNormal.length||weapon.groundGlow.length))drawMagicCanvas(c,[...weapon.groundNormal,...weapon.groundGlow],(x,z,y)=>this.screenPoint(x,z,y));
     paintRopes(this,c,world,frame,this.theme,true);
-    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme)];
+    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
     const drawn=entities.map(entry=>{
       if(entry.key==='gravecraft-skeleton'){
         const last=this.magicActors.get(entry.e.id)||{x:entry.e.x,z:entry.e.z};

@@ -11,6 +11,7 @@ Creating a weapon? Start with the focused [weapon authoring guide](WEAPON_AUTHOR
 - **Venture alone** starts immediately, without a connection service.
 - **Gather your friends** opens a waiting camp. Share its invite link or five-character code, then select **Enter the woods**. Friends can join an expedition already underway.
 - **Continue expedition** resumes the last save on this browser. Select **Host my saved expedition** before opening a camp to resume it with friends.
+- **Dungeons** is a crawl through floors carved fresh every time, alone or with up to three friends. See [Dungeons](#dungeons).
 - **Battle arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
 - **Weapon lab** is the arena without rounds, for trying and balancing weapons. See [Weapon lab](#weapon-lab).
 
@@ -44,6 +45,19 @@ The hollow is ringed by six regions. The Meadow around camp is safe; the Autumn 
 - **The curve.** Night 1 is a handful of briarlings. Each day adds many more creatures, a little more health and damage, new kinds and more elites: the nights get more crowded faster than any one creature gets tougher. The Heartfire mends by day and spits embers at whatever claws at it, but it will not hold alone for long.
 
 See `docs/GAMEPLAY_PLAN.md` for the full design.
+
+## Dungeons
+
+**Dungeons** on the title screen (or `?dungeon` in the address, `?dungeon=crypt`, `caverns` or `ossuary` to pin one) goes down below the hollow. Choose **Descend alone**, or **Gather a party** to open a camp: friends join with its code like any camp, even mid-run. Runs are not saved.
+
+- **Every floor is new.** Each is carved from a seed by one of the variations: the **Barrow Crypt** (stone chambers and straight passages, pillared halls), the **Rootwarren** (winding caves lit by glowcaps) and the **Moonlit Ossuary** (a lattice of great colonnaded halls). Pick one on the title screen or let each floor choose.
+- **The camp.** Every floor starts at a camp: a fire that mends anyone resting by it and cooks, and a workbench to craft and refine. Everyone arrives with a briar spear, bark armour, a recurve, two bandages and a Vigor draught. There is no hunger or courage down here, and weapons never wear.
+- **Chambers.** Creatures in a chamber wake as you come near and chase a little way past its door; a resting one has to see you first. Clear a chamber for experience. Ambush chambers pour two waves out of rifts around you. Caches wait in chambers (the best in dead ends), and treasure chambers are guarded by an elder. Loot, levels, weapon mastery and refinement all work as on an expedition, and deeper floors find better things.
+- **Shrines.** Stand by a shrine's stone and it blesses the party once a floor: **Mending** (everyone mended, the fallen rise), **Fury** (harder blows until the next stairs) or **Fortune** (richer finds on this floor).
+- **The Warden.** The stairs down are in the Warden's chamber, farthest from the camp. Walk in and the Warden rises with its escort; every fifth floor it is the Hollow King. Slay it and the stairs open, and anyone who fell rises beside a friend. The whole standing party stands in the stairs to go down: experience for the floor, a new floor, everyone mended.
+- **Falling.** A fallen wanderer keeps their pack: a friend can hold Revive, or they rise when the Warden falls. Each wanderer has one last-chance charm per run. When everyone is down, the run ends.
+
+The map and minimap show only what the party has walked near. The HUD badge under your health says what to do next. See `docs/DUNGEONS.md` for how floors are built, how to add a variation, and how dungeons can open from an expedition.
 
 ## Battle arena
 

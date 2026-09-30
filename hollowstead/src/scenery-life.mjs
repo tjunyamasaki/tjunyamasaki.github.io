@@ -62,7 +62,7 @@ export class AmbientLife {
    */
   update(model, world, frame, clock, dt, view, reduced = false){
     this.nGround = this.nAir = this.nGlow = 0;
-    if(!model?.env || !world || world.arena)return;
+    if(!model?.env || !world || world.arena || world.dungeon)return;
     const near = this.near;near.length = 0;
     for(const p of world.players || [])if(p.online !== false && !p.ghost && !p.down)near.push(p);
     const darkness = frame?.darkness || 0, caps = LIFE.caps;

@@ -34,6 +34,9 @@ import {cartAction, cartLabel, cartSlots, cartSpeed, stepCarts} from './cart.mjs
 import {harvestLoot, rhythmStep, rhythmStrike} from './rhythm.mjs?v=harvest-18';
 import {trinketEvent, trinketSpeed} from './trinkets.mjs?v=harvest-18';
 import {generateNodes, walkableAt, landNear} from './worldgen.mjs?v=harvest-18';
+// Dungeons (src/dungeon): a run through freshly carved floors. The rules live there; the World calls these hooks.
+import {dungeonKill, dungeonLuck, dungeonNodes, dungeonScale, joinDungeon, layoutOf, setupDungeon, stepDungeon} from './dungeon/run.mjs?v=harvest-18';
+import {routeCells, sightLine, walkableAt as dungeonWalkable, walkableNear as dungeonLandNear} from './dungeon/layout.mjs?v=harvest-18';
 import {isMagicAlly, magicAttackProfile, magicModuleFor, magicModules, magicSnapshotFields, readPendingBurn, readPendingHit, restoreMagicFields} from './magic/registry.mjs?v=harvest-18';
 
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -150,7 +153,7 @@ const MAGIC_AIM=Object.freeze({
  * Guests only draw creatures and shots, so the network copy rounds every number to centimetres and
  * drops per-charge bookkeeping. Fifty creatures fit in a fraction of the bytes.
  */
-const HOST_ONLY=new Set(['hitIds','cooldown','slam','slowed','power','flank','stuck','back','detour','leash','roamer','aggro','home','vx','vz','level','pat']);
+const HOST_ONLY=new Set(['hitIds','cooldown','slam','slowed','power','flank','stuck','back','detour','leash','roamer','aggro','home','vx','vz','level','pat','room','hunt']);
 const WINDUP_ONLY=new Set(['atk','wt','ang','tx','tz']);
 function compactForNetwork(entity){
   const out={},busy=entity.windup>0||entity.act>0;
@@ -180,9 +183,9 @@ export function makeMap(seed){
 export class World {
   constructor(seed=(Math.random()*0xffffffff)>>>0, options={}){
     this.version=SAVE_VERSION_V2;this.clock=CLOCK_V2;this.seed=seed;this.time=0;this.status='lobby';this.players=[];
-    this.showcase=options?.showcase===true;this.radius=RULES.radius;this.arena=null;this.hostile=[];
+    this.showcase=options?.showcase===true;this.radius=RULES.radius;this.arena=null;this.dungeon=null;this.hostile=[];
     for(const key of ['frameObstacles','fieldBudget','obstacleCache','flowFields'])Object.defineProperty(this,key,{value:key==='flowFields'?new Map():null,writable:true,configurable:true,enumerable:false});
-    const bare=this.showcase||options?.arena===true||options?.lab===true;
+    const bare=this.showcase||options?.arena===true||options?.lab===true||!!options?.dungeon||options?.bare===true;
     this.nodes=bare?[]:makeMap(seed);
     this.buildings=bare?[]:[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
     this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=true;this.wipe=0;this.bossNight=0;this.roamTimer=ROAM.interval;this.guardsDay=0;this.projectiles=[];this.allies=[];this.zones=[];this.beats=[];this.best={day:1,level:1,loot:null,lootRank:-1};this.ambient=options?.ambient!==false;
@@ -191,6 +194,7 @@ export class World {
     this.stats={gathered:0,built:0,revives:0};this.inputs=new Map();this.rng=random(seed^0x1234);this.mobRng=random(seed^0xa11ce);this.spawnRng=random(seed^0x5eed);this.lootRng=random(seed^0x100f);this.discoverTimer=0;
     if(options?.arena===true||options?.lab===true)setupArena(this);
     if(options?.lab===true)setupLab(this);
+    if(options?.dungeon)setupDungeon(this, options.dungeon===true?{}:options.dungeon);
   }
   nextId(prefix){return prefix+(this.idCounter++);}
   nextItemUid(){return `i${this.idCounter++}`;}
@@ -222,6 +226,7 @@ export class World {
       p.inventory.slots=p.inventory.slots.map(()=>null);p.inventory.revision++;
     }
     if(this.arena){p.growth='arena';p.ranks={};p.charm=0;const a=this.players.length*1.7;p.x=Math.cos(a)*1.2;p.z=Math.sin(a)*1.2;}
+    if(this.dungeon)joinDungeon(this,p);
     return p;
   }
   leave(id){releaseChests(this,id);const p=this.player(id);if(p){p.online=false;p.goal=null;this.inputs.delete(id);}}
@@ -338,6 +343,7 @@ export class World {
     const current=p.equipment[slot];
     if(!current||!(amount>0))return;
     if(this.arena)return; // Arena weapons never wear out.
+    if(this.dungeon&&!this.dungeon.wear&&slot!=='light')return; // Nor do a dungeon run's (there is no Heartfire to mend them); lanterns still burn.
     // Tempered (refine.mjs): a refined weapon wears more slowly.
     if(slot==='weapon'){const tempered=refineStat(p,'tempered',current.itemId);if(tempered>0)amount*=1-tempered;}
     const worn=wearStack(current, amount);
@@ -622,7 +628,7 @@ export class World {
     switch(cmd.type){
       case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){const gx=clamp(cmd.x,-this.radius+1,this.radius-1),gz=clamp(cmd.z,-this.radius+1,this.radius-1),land=this.walkable(gx,gz)?null:this.landNear(gx,gz,6);p.goal={x:land?land.x:gx,z:land?land.z:gz,target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
       case 'craft':return this.performCraft(p, cmd.recipe, cmd.stationId);
-      case 'build':return this.performBuild(p, cmd.recipe, cmd.x, cmd.z, cmd.stationId, cmd.rotation);
+      case 'build':return this.dungeon?{ok:false,code:'unavailable'}:this.performBuild(p, cmd.recipe, cmd.x, cmd.z, cmd.stationId, cmd.rotation);
       case 'use':{
         let stack=null;
         if(typeof cmd.uid==='string'){stack=p.inventory.slots.find(slot=>slot?.uid===cmd.uid)||null;if(!stack)return {ok:false,code:'unknownItem'};}
@@ -768,7 +774,7 @@ export class World {
   beginDismantle(p, targetId, holding){
     if(!holding){this.dismantleHolds.delete(p.id);return {ok:true,code:'ok'};}
     const building=this.buildings.find(b=>b.id===targetId&&b.hp>0&&distance(p,b)<4);
-    if(!building||building.type==='hearth')return {ok:false,code:'rejected'};
+    if(!building||building.type==='hearth'||building.fixed)return {ok:false,code:'rejected'};
     if(this.chestSessions.has(building.id))return {ok:false,code:'chestInUse'};
     const current=this.dismantleHolds.get(p.id);
     if(!current||current.buildingId!==building.id)this.dismantleHolds.set(p.id,{buildingId:building.id,elapsed:0});
@@ -922,8 +928,9 @@ export class World {
     this.harvestWork.delete(node.id);
     const finder=this.player(ids[0]);
     if(NODES[node.type].table){
-      const tier=tierAt(node.x,node.z);
-      const rolls=rollLoot(NODES[node.type].table,this.lootRng,tier>=2?.5:0);
+      const tier=this.dungeon?0:tierAt(node.x,node.z);
+      const rolls=rollLoot(NODES[node.type].table,this.lootRng,this.dungeon?dungeonLuck(this):tier>=2?.5:0);
+      if(this.dungeon)this.dungeon.stats.caches++;
       this.spillLoot(rolls,node.x,node.z,finder?.name);
       for(const id of ids)this.awardXp(this.player(id),rollXp(node.type));
       this.event('impact',node.x,node.z,NODES[node.type].name);this.event('cache',node.x,node.z,'',{key:node.type});
@@ -1349,11 +1356,15 @@ export class World {
   armNextWave(){armNextWave(this);}
   spawnWave(){spawnWave(this);}
   /** True where a walker's centre may stand: the arena disc, or the hollow's walkable land (worldgen.mjs). */
-  walkable(x,z){return this.arena||this.showcase?Math.hypot(x,z)<this.radius-1:walkableAt(this.seed,x,z);}
+  walkable(x,z){if(this.dungeon){const floor=layoutOf(this);return floor?dungeonWalkable(floor,x,z):false;}return this.arena||this.showcase?Math.hypot(x,z)<this.radius-1:walkableAt(this.seed,x,z);}
+  /** Dungeons only: true when rock does not stand between two points (a resting creature needs to see you). */
+  canSee(a,b){const floor=this.dungeon&&layoutOf(this);return !floor||sightLine(floor,a.x,a.z,b.x,b.z);}
+  /** Dungeons only: a whole-floor route between two points (pathing.mjs, when its own search runs out). */
+  coarseRoute(x0,z0,x1,z1){const floor=this.dungeon&&layoutOf(this);return floor?routeCells(floor,x0,z0,x1,z1):null;}
   /** The nearest walkable point within maxR units (the spot itself when it is walkable), or null. */
-  landNear(x,z,maxR=6){if(this.arena||this.showcase){const r=Math.hypot(x,z),R=this.radius-1.05;return r<R?{x,z}:r>0?{x:x*R/r,z:z*R/r}:{x:0,z:0};}return landNear(this.seed,x,z,maxR);}
+  landNear(x,z,maxR=6){if(this.dungeon){const floor=layoutOf(this);return floor?dungeonLandNear(floor,x,z,maxR):null;}if(this.arena||this.showcase){const r=Math.hypot(x,z),R=this.radius-1.05;return r<R?{x,z}:r>0?{x:x*R/r,z:z*R/r}:{x:0,z:0};}return landNear(this.seed,x,z,maxR);}
   /** Walk speed multiplier from region hazards, a pulled cart and the worn trinket. */
-  speedFactor(p){return this.arena?1:regionSpeed(this,p)*cartSpeed(this,p)*trinketSpeed(this,p);}
+  speedFactor(p){return this.arena?1:this.dungeon?trinketSpeed(this,p):regionSpeed(this,p)*cartSpeed(this,p)*trinketSpeed(this,p);}
   /**
    * Solid things a walker cannot enter. Returns the few camp structures as a plain array and hangs
    * the many standing trees and rocks on `.grid`, a 4-unit spatial hash cached until a node is felled,
@@ -1458,6 +1469,7 @@ export class World {
   /** Strength of a new creature: by day survived (and region tier) on an expedition, by wave in the arena. */
   mobScale(tier=0){
     if(this.arena){const wave=Math.max(1,this.arena.wave||1);return {scale:arenaScale(wave),level:wave,elite:arenaEliteChance(wave),boss:1+.3*Math.max(0,Math.floor(wave/10)-1)};}
+    if(this.dungeon)return dungeonScale(this,tier);
     const day=dayAt(this.time);
     return {scale:enemyScale(day+tier*2),level:day+tier*2,elite:eliteChance(day,tier),boss:1+.25*Math.max(0,kingVisits(this,day)-1)};
   }
@@ -1533,6 +1545,7 @@ export class World {
     pruneChests(this);if(this.status!=='playing')return;dt=clamp(dt,0,.1);
     let phase='day';
     if(this.arena){this.time+=dt;if(this.arena.lab)stepLab(this,dt);else stepArena(this,dt);if(this.status!=='playing')return;}
+    else if(this.dungeon){this.time+=dt;stepDungeon(this,dt);if(this.status!=='playing')return;}
     else{
     const before=phaseAt(this.time),oldDay=dayAt(this.time);this.time+=dt;phase=phaseAt(this.time);
     if(before!==phase){const survived=dayAt(this.time)-1;this.event('phase',0,0,phase==='day'?(survived>0?`Dawn. ${survived} ${survived===1?'night':'nights'} survived.`:'Dawn. You made it.'):phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='day')this.best.day=Math.max(this.best.day||1,dayAt(this.time));if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);this.enemies=this.enemies.filter(e=>e.type==='king'||e.home||isMagicAlly(e));this.hostile=[];}}
@@ -1545,8 +1558,11 @@ export class World {
     for(const p of this.players){
       if(!p.online)continue;p.cooldown=Math.max(0,p.cooldown-dt);this.tickDash(p,dt);p.iframes=Math.max(0,(p.iframes||0)-dt);
       if(p.ghost){p.dash=0;continue;}
-      if(p.down){p.dash=0;p.down-=dt;if(p.down<=0){p.down=0;p.ghost=true;p.revive=0;this.reviveWork.delete(p.id);this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}continue;}
-      if(!this.showcase&&!this.arena){
+      if(p.down){p.dash=0;p.down-=dt;if(p.down<=0){p.down=0;p.ghost=true;p.revive=0;this.reviveWork.delete(p.id);
+        // Down in a dungeon a fallen wanderer keeps their pack: they rise when the Warden falls, or at the next stairs.
+        if(this.dungeon)this.event('announce',p.x,p.z,`${p.name} will rise when the Warden falls`);
+        else{this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}}continue;}
+      if(!this.showcase&&!this.arena&&!this.dungeon){
         p.hunger=Math.max(0,p.hunger-dt*(p.rest?RULES.hungerRest:RULES.hunger));
         const light=phase!=='night'||this.lit(p);p.courage=clamp(p.courage+dt*(light?.6:-3),0,100);
         if(p.hunger<=0)this.hurtQuiet(p,dt*1.2);if(!light&&p.courage<20)this.hurtQuiet(p,dt*(p.courage<=0?6:2));
@@ -1604,15 +1620,15 @@ export class World {
       // The sun did most of the work (sunburn.mjs): no loot, experience or mastery, just ash.
       const burnt=sunTook(e);
       const loot=ENEMIES[e.type]?.loot;if(loot&&!burnt)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));
-      if(!isMagicAlly(e)){this.kills++;if(!this.showcase&&!burnt){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}
+      if(!isMagicAlly(e)){this.kills++;if(this.dungeon)dungeonKill(this,e);if(!this.showcase&&!burnt){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)+(e.warden?1:0)+dungeonLuck(this)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}
       this.event('kill',e.x,e.z);if(burnt)this.event('ashes',e.x,e.z,'',{creature:e.type,king:e.type==='king'});
-      if(e.type==='king'){this.bossSlain=true;this.event('announce',e.x,e.z,burnt?'The Hollow King burns away in the daylight, and takes his treasure with him.':'The Hollow King falls. His treasure spills across the grass.');}
+      if(e.type==='king'&&!this.dungeon){this.bossSlain=true;this.event('announce',e.x,e.z,burnt?'The Hollow King burns away in the daylight, and takes his treasure with him.':'The Hollow King falls. His treasure spills across the grass.');}
     }
     this.enemies=this.enemies.filter(e=>e.hp>0);
     for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth'&&!this.showcase)this.status='defeat';}
     this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.stack?.quantity>0&&(d.flight||d.until>this.time));
     const active=this.players.filter(p=>p.online);if(active.length&&active.every(p=>(p.down||p.ghost)&&!p.charm)){this.wipe+=dt;if(this.wipe>(this.arena?1.6:6))this.status='defeat';}else this.wipe=0;
-    if(!this.arena)this.discoverTimer-=dt;if(this.discoverTimer<=0){this.discoverTimer=.5;const seen=new Set(this.explored),N=EXPLORE_SIZE,R=RULES.radius;for(const p of active){const gx=Math.floor((p.x+R)/EXPLORE_CELL),gz=Math.floor((p.z+R)/EXPLORE_CELL);for(let x=gx-2;x<=gx+2;x++)for(let z=gz-2;z<=gz+2;z++)if(x>=0&&z>=0&&x<N&&z<N)seen.add(z*N+x);
+    if(!this.arena&&!this.dungeon)this.discoverTimer-=dt;if(this.discoverTimer<=0){this.discoverTimer=.5;const seen=new Set(this.explored),N=EXPLORE_SIZE,R=RULES.radius;for(const p of active){const gx=Math.floor((p.x+R)/EXPLORE_CELL),gz=Math.floor((p.z+R)/EXPLORE_CELL);for(let x=gx-2;x<=gx+2;x++)for(let z=gz-2;z<=gz+2;z++)if(x>=0&&z>=0&&x<N&&z<N)seen.add(z*N+x);
       if(!p.ghost&&!this.showcase){const region=regionAt(p.x,p.z);p.regions=Array.isArray(p.regions)?p.regions:['meadow'];if(!p.regions.includes(region)){p.regions.push(region);this.awardXp(p,DISCOVER_XP*(1+REGIONS[region].tier));this.event('discover',p.x,p.z,REGIONS[region].name,{player:p.id});this.tell(p,`Discovered ${REGIONS[region].name}`);}}}
       this.explored=[...seen];}
     if(this.status==='playing')this.advanceChannels(dt);
@@ -1639,7 +1655,7 @@ export class World {
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
       projectiles:this.projectiles, allies:this.allies, zones:this.zones, beats:this.beats, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
-      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, radius:this.radius, night:this.night,
+      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night,
       ...magicSnapshotFields(this),
     };
     if(purpose==='network'){pruneChests(this);data.chestBusy=[...this.chestSessions.values()].map(s=>({...s}));data.worldId=this.networkId;data.transactionRevision=this.transactionRevision;}
@@ -1648,9 +1664,10 @@ export class World {
   static restore(data){
     if(data&&typeof data==='object')settleStorage(data);
     if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
-    const world=new World(data.seed);
-    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','radius','night'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
-    if(world.arena){world.nodes=[];}if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||!world.arena)world.radius=RULES.radius;
+    // A dungeon floor is rebuilt from its seed (dungeon/layout.mjs), never from the hollow's map.
+    const world=new World(data.seed,data.dungeon?{bare:true}:{});
+    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    if(world.arena){world.nodes=[];}if(world.dungeon)world.nodes=dungeonNodes(world);if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||(!world.arena&&!world.dungeon))world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
     for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);sanitizeRefine(p);}
     world.version=SAVE_VERSION_V2;world.clock=CLOCK_V2;

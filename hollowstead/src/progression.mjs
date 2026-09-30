@@ -199,7 +199,9 @@ export function powerOf(p){
   const might=p?.might>0?p.might:1;
   // Honed: the weapon in hand's refinement (REFINE below).
   const honed=1+refineStat(p,'honed');
-  return level*(1+(arena?ARENA_GROWTH.rank:MASTERY.rank)*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might*honed;
+  // `boon`: a blessing that lasts a while (a dungeon's Fury shrine, until the next stairs).
+  const boon=p?.boon>0?p.boon:1;
+  return level*(1+(arena?ARENA_GROWTH.rank:MASTERY.rank)*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might*honed*boon;
 }
 // ------------------------------------------------------------------ refinement
 /**

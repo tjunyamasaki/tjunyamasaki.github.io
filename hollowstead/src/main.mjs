@@ -35,6 +35,9 @@ import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/la
 import {REFINE_CURRENCY, carriedWeapons, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
 import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
 import {createHurtFx} from './hurt-fx.mjs?v=harvest-18';
+import {dungeonStatus, layoutOf} from './dungeon/run.mjs?v=harvest-18';
+import {VARIANTS, isVariant} from './dungeon/variants.mjs?v=harvest-18';
+import {floorTones} from './dungeon/art.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -52,6 +55,8 @@ let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:
 let stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
 let connectionText='',saveText='';
 let autoAttack=true,pickPending=null,arenaMarkup='',hotbarSig='',attackSig='',skillSig='',zoomBeforeArena=null;
+/** Dungeons: the variation picked on the title screen ('' = a new one every floor). */
+let dungeonPick='';
 /** Weapon lab panel state (presentation only; the lab's rules live in lab.mjs). */
 let labOpen='',labRankPick=3,labFoe='mix',labCount=10,labFormation='ahead',labSheetCache='',labBarCache='',labMeterCache='';
 /** The arena is a swarm fight: start a little wider than the exploring camera. */
@@ -128,7 +133,7 @@ function maintainChest(){
     });
   }
 }
-function save(manual=false){if(world?.showcase||world?.arena){if(manual)toast(world.arena?'Arena runs are not saved':'Showcase stays on this screen');return;}if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;try{localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));saveText='Saved on this browser';if(manual)toast('Expedition saved');dirty=true;}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
+function save(manual=false){if(world?.showcase||world?.arena||world?.dungeon){if(manual)toast(world.dungeon?'Dungeon runs are not saved':world.arena?'Arena runs are not saved':'Showcase stays on this screen');return;}if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;try{localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));saveText='Saved on this browser';if(manual)toast('Expedition saved');dirty=true;}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
 function syncSaveOption(){const plan=continuePlan(),visible=!!(plan.ok||plan.recoverable);$('continue').hidden=!visible;$('saved-option').hidden=!visible;}
 function resetInput(){keys.clear();stick={x:0,z:0};hold={act:false,attack:false};pointer=null;const stickEl=$('stick');if(stickEl)stickEl.style.transform='';const player=world?.player(localId);if(player)world.input(localId,{x:0,z:0,act:false,attack:false});network?.input({x:0,z:0,act:false,attack:false});}
 function endContextHold(){
@@ -169,8 +174,9 @@ function cancelMaintenance(){maintenance=false;maintenanceTarget=null;endContext
 function clearSelection(){selection=null;pendingOp=null;qtyMode='all';chosenQty=1;}
 function refresh(){dirty=true;ui();}
 function discardPanel(){inventoryPanel?.destroy();inventoryPanel=null;}
-function prepareWorld(resume=false){
-  if(resume){const plan=continuePlan();if(!plan.ok)throw new Error(plan.message);const resumed=World.fromSave(plan.save);if(plan.write==='v2')localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify(plan.save));world=resumed;world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This saved expedition is missing its host.');p.online=true;if(world.status!=='playing')world.status='playing';}
+function prepareWorld(resume=false,dungeon=null){
+  if(dungeon){world=new World((Math.random()*0xffffffff)>>>0,{dungeon});world.addPlayer('host',$('player-name').value,character);}
+  else if(resume){const plan=continuePlan();if(!plan.ok)throw new Error(plan.message);const resumed=World.fromSave(plan.save);if(plan.write==='v2')localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify(plan.save));world=resumed;world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This saved expedition is missing its host.');p.online=true;if(world.status!=='playing')world.status='playing';}
   else{world=new World();world.addPlayer('host',$('player-name').value,character);}
   localId='host';lastEvent=world.eventId;lastNotice=0;lastEnd='';selected=null;cancelPlacement();cancelMaintenance();clearSelection();resetInput();paused=false;remotePaused=false;linkLost=false;saveTime=0;dirty=true;
 }
@@ -179,25 +185,28 @@ function enterGame(){
   linkLost=false;cancelPlacement();cancelMaintenance();
   if(world?.showcase){connectionText='Showcase';saveText='Not saved';showStatus('');}
   else if(world?.arena){connectionText=world.arena.lab?'Weapon lab':'Battle arena';saveText=world.arena.lab?'The lab is not saved':'Arena runs are not saved';showStatus('');}
+  else if(world?.dungeon){connectionText=mode==='solo'?'Dungeon run':connectionText||'Connected to camp';saveText='Dungeon runs are not saved';showStatus('');}
   else if(mode==='solo'){connectionText='Expedition saved locally';saveText='Saved on this browser';showStatus('Expedition saved locally');}
   else{connectionText=connectionText||'Connected to camp';saveText=mode==='guest'?'Kept by the host':'Saved on this browser';}
-  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase);announce(world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':dayAt(world.time)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
-  document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
+  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase);announce(world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':dayAt(world.time)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
+  document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);document.body.classList.toggle('dungeon',!!world?.dungeon);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
   showLab(!!world?.arena?.lab);
 }
 async function goHome(){
   leaveArena();
-  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;$('room-panel').hidden=true;$('home-panel').hidden=false;$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();demoWorld();
+  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;$('room-panel').hidden=true;$('dungeon-panel').hidden=true;$('home-panel').hidden=false;$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();demoWorld();
   void checkForUpdate();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
-function setBusy(value){busy=value;for(const id of ['host','join','solo','continue','showcase','arena','lab']){const el=$(id);if(el)el.disabled=value;}}
-function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status;world=World.restore(data);dirty=true;if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');$('home-panel').hidden=true;$('room-panel').hidden=false;$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
-async function hostCamp(){
-  if(busy)return;setBusy(true);sound.unlock();storeProfile();showStatus('Opening the camp…');
-  try{prepareWorld($('host-save').checked);world.status='lobby';mode='host';network=makeNetwork();room=await bounded(network.host());if(!room)return;$('home-panel').hidden=true;$('room-panel').hidden=false;$('room-code').textContent=room;$('launch').hidden=false;$('room-note').textContent='Friends can also join after you start.';showStatus('Camp ready');dirty=true;setBusy(false);}
+function setBusy(value){busy=value;for(const id of ['host','join','solo','continue','showcase','arena','lab','dungeon','dungeon-solo','dungeon-host']){const el=$(id);if(el)el.disabled=value;}}
+function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status,wasDeep=!!world.dungeon;world=World.restore(data);dirty=true;if(!!world.dungeon!==wasDeep&&!$('room-panel').hidden)roomLabels();if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');$('home-panel').hidden=true;$('room-panel').hidden=false;$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
+async function hostCamp(dungeon=null){
+  if(busy)return;setBusy(true);sound.unlock();storeProfile();showStatus(dungeon?'Opening the dungeon doors…':'Opening the camp…');
+  try{prepareWorld(!dungeon&&$('host-save').checked,dungeon);world.status='lobby';mode='host';network=makeNetwork();room=await bounded(network.host());if(!room)return;$('home-panel').hidden=true;$('dungeon-panel').hidden=true;$('room-panel').hidden=false;roomLabels();$('room-code').textContent=room;$('launch').hidden=false;$('room-note').textContent='Friends can also join after you start.';showStatus('Camp ready');dirty=true;setBusy(false);}
   catch(error){await network?.stop();network=null;mode='front';setBusy(false);showStatus(`Could not open the camp. ${error.message} Solo play is always available.`,true);}
 }
+/** The waiting-camp panel speaks of the woods or of the dungeon, whichever the host opened. */
+function roomLabels(){const deep=!!world?.dungeon;$('launch').innerHTML=deep?'Descend <span>→</span>':'Enter the woods <span>→</span>';$('room-heading').textContent=deep?'Deeper together.':'Better together.';$('room-lede').textContent=deep?'Invite your friends, then take the stairs down.':'Invite your friends, then enter the woods.';}
 async function joinCamp(){
   if(busy)return;setBusy(true);sound.unlock();storeProfile();room=$('room-input').value.trim().toUpperCase();showStatus('Following the lanterns…');
   try{world=new World();mode='guest';network=makeNetwork();await bounded(network.join(room,$('player-name').value,character));}catch(error){await network?.stop();network=null;mode='front';setBusy(false);showStatus(error.message,true);}
@@ -253,6 +262,18 @@ function startArena(){
   if(zoomBeforeArena==null){zoomBeforeArena=renderer.zoom;renderer.setZoom(ARENA_ZOOM);}
   enterGame();
 }
+/** Dungeons: a run through freshly carved floors, alone. Not saved. */
+function startDungeon(variant=dungeonPick){
+  sound.unlock();storeProfile();
+  try{prepareWorld(false,{variant:isVariant(variant)?variant:null});mode='solo';room='';enterGame();}catch(error){showStatus(error.message,true);}
+}
+function dungeonWelcome(){const status=dungeonStatus(world);return status?`Floor ${status.depth} · ${status.name}. Find the Warden and take the stairs down.`:'';}
+/** Title screen: the Dungeons panel, with a card for each variation. */
+function showDungeonPanel(open){
+  $('dungeon-panel').hidden=!open;$('home-panel').hidden=open;
+  if(!open)return;
+  $('dungeon-floors').innerHTML=[{id:'',name:'Any depths',blurb:'A new variation on every floor.'},...VARIANTS].map(v=>`<button type="button" class="dungeon-floor" data-variant="${v.id}" aria-pressed="${dungeonPick===v.id}"><b>${escapeHtml(v.name)}</b><small>${escapeHtml(v.blurb)}</small></button>`).join('');
+}
 /** Weapon lab: the arena without rounds. Any weapon at any rank; foes on demand; a damage meter. */
 function startLab(){
   sound.unlock();storeProfile();
@@ -298,7 +319,7 @@ function labCommand(value){
   dirty=true;paintLab(true);
 }
 function leaveArena(){
-  showLab(false);document.body.classList.remove('lab');
+  showLab(false);document.body.classList.remove('lab','dungeon');
   $('arena-pick').hidden=true;pickPending=null;arenaMarkup='';document.body.classList.remove('arena');
   if(zoomBeforeArena!=null){renderer.setZoom(zoomBeforeArena);zoomBeforeArena=null;}
 }
@@ -561,6 +582,7 @@ function guideHTML(){
     ['Grow stronger','Kills, caches, gathering and new regions give experience. Each level adds health and damage. Loot comes in five rarities: common, uncommon, rare, epic and legendary. Bows fire arrows at the nearest foe, staffs throw bursting bolts, broadswords cleave, and the Grimoire of Ash burns everything around you. Heartstones raise your health for good.'],
     ['Refine your weapons','Creatures drop Dread ichor, and only creatures: briarlings now and then, wraiths, bonewalkers and boglings more often, gravekeepers, golems and the Hollow King by the handful. Stand at a workbench and press Refine: each weapon holds three modifiers, each rolled with a rarity from common to legendary, from sharper crits and faster swings to an extra arrow or star. Reroll any of them with more ichor. Like mastery, refinement is yours, not the item’s. Spare gear can be dismantled from Inventory: loot melts into ichor (more the rarer it is), crafted gear gives back half its materials.'],
     ['Outlast the night','Every night is harder than the last, with more creatures and elder champions. Guard the Heartfire: losing it ends the expedition. How many nights can you survive?'],
+    ['Go down into the dungeons','Dungeons on the title screen is a crawl of its own, alone or with up to three friends. Every floor is carved fresh: the Barrow Crypt, the Rootwarren and the Moonlit Ossuary each build theirs differently. Chambers wake as you come near; clear them, open their caches and find the Warden by the stairs. Slay it and the stairs open: the whole party stands in them to go down. Shrines bless you once a floor, the camp fire mends you and its workbench refines your weapons. Fallen friends rise when the Warden falls. Every fifth floor, the Hollow King waits. Weapons never wear down there, and a run is never saved: how deep can you go?'],
     ['Read the moon','Tap the moon beside the clock to see tonight’s moon and the next. Under a waxing moon the woods raid your fire in waves. A new moon brings no raid but a darker night: the time to gather what only grows in the dark. A rare blood moon brings the Hollow King, stronger each time he returns, and more waves than any other night. Whatever the moon, creatures stalk anyone who wanders far from the fire after dark, more often deeper in the hollow.'],
   ];
   return `<p class="guide-intro">The woods are unkind.<br>Your friends don’t have to be.</p>${steps.map(([title,text],index)=>`<div class="guide-step"><b>${String(index+1).padStart(2,'0')}</b><div><h3>${title}</h3><p>${text}</p></div></div>`).join('')}<div class="key-help"><span>WASD / arrows · Move</span><span>E · Context action</span><span>Space · Attack</span><span>Shift · Dodge</span><span>R · Swap weapon</span><span>I · Inventory</span><span>B · Build</span><span>F · Lantern</span><span>M · Map</span><span>1–4 · More actions</span><span>Esc · Menu</span></div><p class="muted small">The host saves the expedition automatically. Continue it alone, or host the saved expedition to open a new camp. Keep the host’s tab open during co-op; switching away pauses everyone.</p>`;
@@ -592,9 +614,9 @@ async function toggleFullscreen(){
   syncFullscreenUi();renderer?.resize?.();
 }
 function menuHTML(){
-  const camp=room?`Camp ${escapeHtml(room)}`:world?.arena?.lab?'Weapon lab':world?.arena?'Battle arena':world?.showcase?'Showcase':'Solo expedition';
-  const auto=world?.arena?`<div class="menu-row"><span>Auto-attack</span><button type="button" data-command="auto" aria-pressed="${autoAttack}">${autoAttack?'On':'Off'}</button></div>`:'';
-  return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div>${auto}<div class="menu-row"><span>Fullscreen</span><button type="button" data-command="fullscreen">${isFullscreen()?'Exit fullscreen':'Fullscreen'}</button></div>${fullscreenNote?`<p class="muted small">${escapeHtml(fullscreenNote)}</p>`:''}<div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'&&!world?.arena&&!world?.showcase?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">${world?.arena?'Leave the arena':'Save & return to title'}</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
+  const camp=room?`Camp ${escapeHtml(room)}`:world?.dungeon?'Dungeon run':world?.arena?.lab?'Weapon lab':world?.arena?'Battle arena':world?.showcase?'Showcase':'Solo expedition';
+  const auto=world?.arena||world?.dungeon?`<div class="menu-row"><span>Auto-attack</span><button type="button" data-command="auto" aria-pressed="${autoAttack}">${autoAttack?'On':'Off'}</button></div>`:'';
+  return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div>${auto}<div class="menu-row"><span>Fullscreen</span><button type="button" data-command="fullscreen">${isFullscreen()?'Exit fullscreen':'Fullscreen'}</button></div>${fullscreenNote?`<p class="muted small">${escapeHtml(fullscreenNote)}</p>`:''}<div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'&&!world?.arena&&!world?.dungeon&&!world?.showcase?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">${world?.arena?'Leave the arena':world?.dungeon?'Leave the dungeon':'Save & return to title'}</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
 }
 function replaceContent(html){
   const content=$('sheet-content');
@@ -613,12 +635,14 @@ function renderSheet(){
   const p=me();
   let title='',kicker='THE WANDERER’S COMPANION';
   if(sheet==='guide'){title='A field guide';kicker='FIELD NOTES';setTabs('');replaceContent(guideHTML());}
-  else if(sheet==='menu'){title=world?.arena?'Catch your breath':'By the fire';kicker=world?.arena?'ARENA PAUSED':mode==='solo'?'EXPEDITION PAUSED':linkLost?'CONNECTION CLOSED':'THE EXPEDITION CONTINUES';setTabs('');replaceContent(menuHTML());}
+  else if(sheet==='menu'){title=world?.arena||world?.dungeon?'Catch your breath':'By the fire';kicker=world?.arena?'ARENA PAUSED':world?.dungeon&&mode==='solo'?'THE DEEP WAITS':mode==='solo'?'EXPEDITION PAUSED':linkLost?'CONNECTION CLOSED':'THE EXPEDITION CONTINUES';setTabs('');replaceContent(menuHTML());}
   else if(sheet==='map'){
-    title=world.arena?'The arena':'The Hollow Harvest';kicker=world.arena?`WAVE ${Math.max(1,world.arena.wave)} · ${waveLeft(world)} FOES LEFT`:`DAY ${dayAt(world.time)} · SHARED EXPLORATION`;setTabs('');
+    const deep=dungeonStatus(world);
+    title=deep?deep.name:world.arena?'The arena':'The Hollow Harvest';kicker=deep?`FLOOR ${deep.depth} · ${deep.cleared} OF ${deep.total} CHAMBERS CLEARED`:world.arena?`WAVE ${Math.max(1,world.arena.wave)} · ${waveLeft(world)} FOES LEFT`:`DAY ${dayAt(world.time)} · SHARED EXPLORATION`;setTabs('');
     const place=p?REGIONS[regionAt(p.x,p.z)]?.name:'';const found=p?.regions?.length||1;
     const swatch=(color,text)=>`<span class="swatch" style="background:${color}"></span>${text}`;
-    if(world.arena)replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Arena map"></canvas><p class="map-legend">● You &nbsp; <span style="color:#e0776b">●</span> Creatures &nbsp; <span style="color:#f2c14e">●</span> The Hollow King</p>`);
+    if(deep)replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Dungeon floor map"></canvas><p class="map-legend">● Wanderers &nbsp; <span style="color:#f2c14e">▼</span> Stairs down &nbsp; <span style="color:#bfe0ff">✧</span> Shrine &nbsp; <span style="color:#e0776b">●</span> Warden<br>${swatch(RARITY_COLORS.common,'Crate')} ${swatch(RARITY_COLORS.rare,'Iron-bound chest')} ${swatch(RARITY_COLORS.epic,'Moonlit coffer')} ${swatch(RARITY_COLORS.legendary,'Reliquary')}<br>${escapeHtml(deep.objective)}. Deepest floor this run: ${deep.best}.</p>`);
+    else if(world.arena)replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Arena map"></canvas><p class="map-legend">● You &nbsp; <span style="color:#e0776b">●</span> Creatures &nbsp; <span style="color:#f2c14e">●</span> The Hollow King</p>`);
     else replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Explored world map"></canvas><p class="map-legend">✦ Heartfire &nbsp; ● Wanderers &nbsp; ◆ Camp &nbsp; <span style="color:#e0776b">●</span> Guardians<br>${swatch(RARITY_COLORS.common,'Crate')} ${swatch(RARITY_COLORS.rare,'Iron-bound chest')} ${swatch(RARITY_COLORS.epic,'Moonlit coffer')} ${swatch(RARITY_COLORS.legendary,'Reliquary')}<br>${place?`You are in ${escapeHtml(place)}. `:''}Regions discovered: ${found} of 6.<br>Danger and treasure grow the farther you travel from the Heartfire.</p>`);
     drawMap($('full-map'),true);
   }else if(!p)return;
@@ -652,6 +676,7 @@ function renderSheet(){
 function drawMap(canvas,full=false){
   if(!canvas)return;
   const ctx=canvas.getContext('2d'),size=canvas.width,R=RULES.radius,N=EXPLORE_SIZE,cell=EXPLORE_CELL;ctx.clearRect(0,0,size,size);ctx.fillStyle='#282733';ctx.fillRect(0,0,size,size);
+  if(world.dungeon){drawDungeonMap(ctx,size,full);return;}
   if(world.arena){
     // The arena map is the whole disc: where the swarm is thick, and where the champions are.
     const AR=world.radius,scale=size/(AR*2+2),sx=x=>x*scale+size/2,sz=z=>z*scale+size/2;
@@ -679,6 +704,39 @@ function drawMap(canvas,full=false){
   for(const q of world.players.filter(q=>q.online)){if(!vis(q.x,q.z))continue;ctx.fillStyle=CHARACTERS.find(c=>c.id===q.character)?.color||'#f4e3b2';ctx.strokeStyle='#27222e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sx(q.x),sz(q.z),q.id===localId?5:3.8,0,Math.PI*2);ctx.fill();ctx.stroke();}
   if(full){ctx.strokeStyle='#d8c29a44';ctx.lineWidth=1;ctx.beginPath();ctx.arc(sx(0),sz(0),R*scale,0,Math.PI*2);ctx.stroke();ctx.font='13px monospace';ctx.fillStyle='#e0caaa';ctx.textAlign='center';ctx.fillText('N',size/2,16);ctx.font='11px Georgia';ctx.fillText('HEARTFIRE',sx(0),sz(0)+18);}
 }
+/** A floor image, one pixel per cell (cached per floor). The map shows only what the party has walked near. */
+let floorImage=null;
+function floorCanvas(L){
+  if(floorImage?.key===L.key)return floorImage.canvas;
+  const canvas=document.createElement('canvas');canvas.width=L.w;canvas.height=L.h;const c=canvas.getContext('2d'),tones=floorTones(L),img=c.createImageData(L.w,L.h);
+  for(let k=0;k<L.w*L.h;k++){const hex=L.cells[k]===1?tones.floor[k]:L.cells[k]===2?tones.wall[k]:null;if(!hex)continue;const n=parseInt(hex.slice(1),16);img.data[k*4]=(n>>16)&255;img.data[k*4+1]=(n>>8)&255;img.data[k*4+2]=n&255;img.data[k*4+3]=255;}
+  c.putImageData(img,0,0);floorImage={key:L.key,canvas};return canvas;
+}
+function drawDungeonMap(ctx,size,full){
+  const L=layoutOf(world);if(!L)return;const d=world.dungeon,me_=world.player(localId)||world.players[0]||{x:0,z:0};
+  const span=full?Math.max(L.w,L.h)+6:44,scale=size/span,cx=full?0:me_.x,cz=full?0:me_.z;
+  const sx=x=>(x-cx)*scale+size/2,sz=z=>(z-cz)*scale+size/2;
+  ctx.fillStyle='#1c1922';ctx.fillRect(0,0,size,size);
+  const image=floorCanvas(L),C=4,N=74,R=N*C/2,explored=new Set(world.explored);ctx.imageSmoothingEnabled=false;
+  // The explored grid (4-unit cells) reveals the floor image piece by piece.
+  for(const k of explored){const gx=k%N,gz=(k-gx)/N,x=gx*C-R,z=gz*C-R;const i=Math.max(0,Math.floor(x-L.ox)),j=Math.max(0,Math.floor(z-L.oz)),i1=Math.min(L.w,Math.floor(x+C-L.ox)),j1=Math.min(L.h,Math.floor(z+C-L.oz));if(i1<=i||j1<=j)continue;ctx.drawImage(image,i,j,i1-i,j1-j,sx(L.ox+i),sz(L.oz+j),(i1-i)*scale+.6,(j1-j)*scale+.6);}
+  const seen=(x,z)=>explored.has(Math.floor((z+R)/C)*N+Math.floor((x+R)/C));
+  const cacheColor={crate:RARITY_COLORS.common,ironchest:RARITY_COLORS.rare,moonchest:RARITY_COLORS.epic,reliquary:RARITY_COLORS.legendary};
+  for(const n of world.nodes){if(!seen(n.x,n.z))continue;const x=sx(n.x),y=sz(n.z),r=full?4.5:4;ctx.globalAlpha=n.ready?.3:1;ctx.fillStyle=cacheColor[n.type]||'#d8d2c2';ctx.strokeStyle='#1e1624';ctx.lineWidth=1.5;ctx.fillRect(x-r,y-r*.7,r*2,r*1.4);ctx.strokeRect(x-r,y-r*.7,r*2,r*1.4);ctx.globalAlpha=1;}
+  if(L.shrine&&seen(L.shrine.x,L.shrine.z)){ctx.fillStyle=d.shrine?'#6f7c91':'#bfe0ff';ctx.font=`${full?20:15}px Georgia`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('✧',sx(L.shrine.x),sz(L.shrine.z));}
+  if(seen(L.portal.x,L.portal.z)||d.phase==='open'){ctx.fillStyle=d.phase==='open'?'#f2c14e':'#8a7f8c';ctx.font=`${full?20:15}px Georgia`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('▼',sx(L.portal.x),sz(L.portal.z));}
+  for(const e of world.enemies){if(!(e.hp>0)||isMagicAlly(e)||!e.warden)continue;ctx.fillStyle='#e0776b';ctx.beginPath();ctx.arc(sx(e.x),sz(e.z),full?6:4.5,0,Math.PI*2);ctx.fill();}
+  if(!full)for(const e of world.enemies){if(!(e.hp>0)||isMagicAlly(e)||e.warden||distance(e,me_)>14)continue;ctx.fillStyle='#e0776b99';ctx.beginPath();ctx.arc(sx(e.x),sz(e.z),2.2,0,Math.PI*2);ctx.fill();}
+  for(const q of world.players.filter(q=>q.online)){ctx.globalAlpha=q.ghost?.45:1;ctx.fillStyle=CHARACTERS.find(c=>c.id===q.character)?.color||'#f4e3b2';ctx.strokeStyle='#27222e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sx(q.x),sz(q.z),(q.id===localId?5:3.8)*(full?1.3:1),0,Math.PI*2);ctx.fill();ctx.stroke();ctx.globalAlpha=1;}
+}
+/** The clock in a dungeon: the floor, the variation, and how much of the floor is cleared. */
+function paintDungeonClock(){
+  const s=dungeonStatus(world);if(!s)return;
+  $('region-name').textContent=s.phase==='open'?'THE STAIRS ARE OPEN':`${s.short} · ${s.cleared}/${s.total}`;
+  $('day-number').textContent=`FLOOR ${String(s.depth).padStart(2,'0')}`;
+  const track=$('day-track');if(track.dataset.stops!=='dungeon'){track.dataset.stops='dungeon';track.style.background='linear-gradient(90deg,#4f4a6e,#9d8fd0 70%,#f2c14e)';}
+  $('day-progress').style.left=`${clamp(s.phase==='open'?1:s.cleared/Math.max(1,s.total),0,1)*100}%`;
+}
 function paintVital(key,value,name){const bar=$(`${key}-bar`);if(!bar)return;const amount=clamp(value,0,100);bar.style.width=`${amount}%`;const row=bar.closest('[role="progressbar"]');if(!row)return;const shown=String(Math.ceil(amount));row.setAttribute('aria-valuenow',shown);row.setAttribute('aria-label',`${name} ${shown}`);}
 function paintClock(){
   const dayEnd=RULES.day/RULES.cycle*100,duskEnd=(RULES.day+RULES.dusk)/RULES.cycle*100,track=$('day-track');
@@ -702,8 +760,10 @@ function paintCluster(modeName,p){
     placement:placement?{valid:!!placement.valid,pending:!!placement.pending,reason:placement.reason||''}:null,
     maintenance:{building:building?{id:building.id,type:building.type,hp:building.hp,maxHp:building.maxHp}:null,locked:!!(building&&world.chestSessions.get(building.id)&&world.chestSessions.get(building.id).ownerId!==localId),wood:p?world.available(p,'wood'):0,inRange:!!(p&&building&&distance(p,building)<RULES.reach)},
   });
-  liveActions=actions;
-  CONTEXT_BUTTONS.forEach((id,index)=>paintAction($(id),actions[index]||null,modeName));
+  // Dungeons: the camp's bench refines and crafts, its fire cooks; nothing is built, fed or taken apart.
+  const shown=world?.dungeon?actions.filter(action=>action&&!['build','repair','feed','dismantle'].includes(action.id)):actions;
+  liveActions=shown;
+  CONTEXT_BUTTONS.forEach((id,index)=>paintAction($(id),shown[index]||null,modeName));
   const combat=allowsCombat(modeName);
   for(const id of ['attack','dodge','skill']){const el=$(id);if(!el)continue;el.classList.toggle('is-off',!combat);el.tabIndex=combat?0:-1;el.setAttribute('aria-hidden',combat?'false':'true');}
   const light=p&&showsLantern(modeName)?usableLantern(p):null;
@@ -842,16 +902,17 @@ function ui(){
     paintVital('hp',p.hp/maxHealth(p)*100,'Health');$('level-number').textContent=String(p.level||1);const xpPct=clamp((p.xp||0)/xpToNext(p.level||1)*100,0,100);$('xp-ring').style.setProperty('--xp',`${xpPct}%`);$('xp-ring').setAttribute('aria-valuenow',String(Math.round(xpPct)));$('level-chip').setAttribute('aria-label',`Open settings, level ${p.level||1}, ${Math.round(xpPct)} percent to next`);$('region-name').textContent=(REGIONS[regionAt(p.x,p.z)]?.name||'').toUpperCase();paintVital('hunger',p.hunger,'Hunger');paintVital('courage',p.courage,'Courage');
     $('stamina-bar').style.width=`${p.stamina}%`;
     if(world.arena)paintArenaClock();
+    else if(world.dungeon)paintDungeonClock();
     else{$('day-number').textContent=`DAY ${String(dayAt(world.time)).padStart(2,'0')}`;
     $('day-progress').style.left=`${(world.time%RULES.cycle)/RULES.cycle*100}%`;
     paintClock();}
     paintHotbar(p);paintPotion(p);paintAttack(p);paintArenaPick(p);paintFeatureHud(featureContext(p));
-    $('party').innerHTML=world.players.filter(q=>q.id!==localId).map(q=>`<div class="party-row"><span class="party-dot" style="background:${CHARACTERS.find(c=>c.id===q.character)?.color}"></span><b>${escapeHtml(q.name)}</b><span>${!q.online?'away':q.down?'needs help!':q.ghost?'returns at dawn':''}</span></div>`).join('');
+    $('party').innerHTML=world.players.filter(q=>q.id!==localId).map(q=>`<div class="party-row"><span class="party-dot" style="background:${CHARACTERS.find(c=>c.id===q.character)?.color}"></span><b>${escapeHtml(q.name)}</b><span>${!q.online?'away':q.down?'needs help!':q.ghost?(world.dungeon?'rises with the Warden':'returns at dawn'):''}</span></div>`).join('');
     if(p.noticeAt&&p.noticeAt!==lastNotice){toast(p.notice);lastNotice=p.noticeAt;}
-    for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(ev.type==='rare'&&distance(p,ev)<14)toast(`Found ${ev.text} · ${rarityOf(ev.itemId)}`);if(distance(p,ev)<20||ev.type==='phase')sound.play(ev.type,ev);}}
+    for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(ev.type==='rare'&&distance(p,ev)<14)toast(`Found ${ev.text} · ${rarityOf(ev.itemId)}`);if(distance(p,ev)<20||ev.type==='phase'||ev.type==='descend')sound.play(ev.type,ev);}}
     $('downed').hidden=!p.down&&!p.ghost;
-    if(p.down||p.ghost){$('downed-text').textContent=world.arena&&world.players.filter(q=>q.online).length<2?'The swarm has you.':p.charm?'Use your one last-chance charm, or let a teammate hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds until your supplies drop.`:'Your supplies are on the ground. You return at dawn if the camp survives.';$('use-charm').hidden=!p.charm;if(sheet)closeSheet();cancelPlacement();cancelMaintenance();inventoryPanel?.cancelDrag();}
-    const boss=world.enemies.find(e=>e.type==='king');$('boss-bar').hidden=!boss;document.body.classList.toggle('boss',!!boss);if(boss)$('boss-bar').querySelector('em').style.width=`${boss.hp/boss.maxHp*100}%`;
+    if(p.down||p.ghost){$('downed-text').textContent=world.dungeon?(p.charm?'Use your one last-chance charm, or let a friend hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds.`:'You keep your pack. You rise when the Warden falls, or at the next stairs.'):world.arena&&world.players.filter(q=>q.online).length<2?'The swarm has you.':p.charm?'Use your one last-chance charm, or let a teammate hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds until your supplies drop.`:'Your supplies are on the ground. You return at dawn if the camp survives.';$('use-charm').hidden=!p.charm;if(sheet)closeSheet();cancelPlacement();cancelMaintenance();inventoryPanel?.cancelDrag();}
+    const boss=world.enemies.find(e=>e.type==='king'||(e.warden&&e.hp>0));$('boss-bar').hidden=!boss;document.body.classList.toggle('boss',!!boss);if(boss){$('boss-bar').querySelector('em').style.width=`${boss.hp/boss.maxHp*100}%`;const name=boss.type==='king'?'THE HOLLOW KING':`${label(boss.type)} WARDEN`.toUpperCase();const tag=$('boss-bar').querySelector('span');if(tag.textContent!==name)tag.textContent=name;}
     if(placement){
       if(placement.showcase){if(!placement.anchored){placement.x=Math.round((p.x+p.dx*3)*2)/2;placement.z=Math.round((p.z+p.dz*3)*2)/2;}const why=showcasePlaceReason(world,p,placement.kind,placement.key,placement.x,placement.z);placement.valid=!why;placement.reason=why||'';}
       else if(placement.stationId&&!world.buildings.some(b=>b.id===placement.stationId&&b.hp>0)){cancelPlacement();toast('That workbench is gone');}
@@ -863,7 +924,7 @@ function ui(){
     if(sheet==='refine'){const station=world.buildings.find(b=>b.id===refining.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(maintenance&&maintenanceTarget&&!world.buildings.some(b=>b.id===maintenanceTarget&&b.hp>0))maintenanceTarget=null;
     paintCluster(currentMode(),p);drawMap($('minimap'));
-    if(['victory','defeat'].includes(world.status)&&lastEnd!==world.status){lastEnd=world.status;resetInput();endContextHold();cancelPlacement();cancelMaintenance();closeSheet();save();$('end-screen').hidden=false;const won=world.status==='victory';if(world.arena){const top=Math.max(...world.players.map(q=>q.level||1)),a=world.arena;$('end-kicker').textContent='THE ARENA FALLS SILENT';$('end-title').textContent=`Fallen on wave ${Math.max(1,a.wave)}.`;$('end-text').textContent=a.best?`You cleared ${a.best} ${a.best===1?'wave':'waves'} and reached level ${top}. Every run starts over; the swarm grows every wave.`:'The first wave took you. Keep moving, and dodge through the glowing warnings.';$('end-stats').innerHTML=`<span><b>${a.best||0}</b>WAVES</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=true;$('new-expedition').hidden=false;$('new-expedition').innerHTML='Fight again <span>→</span>';}else{$('new-expedition').innerHTML='Another expedition →';$('end-kicker').textContent=won?'THE CURSE IS BROKEN':'THE EXPEDITION ENDS';$('end-title').textContent=won?'Morning, at last.':'The last light.';$('end-text').textContent=won?'Five nights in the hollow. One fire kept alive. You made a home where nothing was meant to live.':world.buildings.some(b=>b.type==='hearth')?'The woods claimed every wanderer. A stronger camp and a friend’s helping hand can turn the next night.':'The Heartfire was destroyed. Walls, traps and a well-fed fire will help your next camp endure.';const top=Math.max(...world.players.map(q=>q.level||1));$('end-text').textContent+=world.best?.loot?` Best find: ${label(world.best.loot)}.`:'';$('end-stats').innerHTML=`<span><b>${Math.max(0,dayAt(world.time)-1)}</b>NIGHTS</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=!won||mode==='guest';$('new-expedition').hidden=mode==='guest';}}
+    if(['victory','defeat'].includes(world.status)&&lastEnd!==world.status){lastEnd=world.status;resetInput();endContextHold();cancelPlacement();cancelMaintenance();closeSheet();save();$('end-screen').hidden=false;const won=world.status==='victory';if(world.dungeon){const top=Math.max(...world.players.map(q=>q.level||1)),d=world.dungeon;$('end-kicker').textContent='THE DEEP KEEPS ITS OWN';$('end-title').textContent=`Fallen on floor ${d.depth}.`;$('end-text').textContent=`${d.stats.floors?`You went down ${d.stats.floors} ${d.stats.floors===1?'flight':'flights'} of stairs`:'The first floor held you'}, cleared ${d.stats.rooms} ${d.stats.rooms===1?'chamber':'chambers'} and opened ${d.stats.caches} ${d.stats.caches===1?'cache':'caches'}. Every floor is carved anew; the next run starts at the top.${world.best?.loot?` Best find: ${label(world.best.loot)}.`:''}`;$('end-stats').innerHTML=`<span><b>${d.depth}</b>FLOOR</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=true;$('new-expedition').hidden=mode==='guest';$('new-expedition').innerHTML='Descend again <span>→</span>';}else if(world.arena){const top=Math.max(...world.players.map(q=>q.level||1)),a=world.arena;$('end-kicker').textContent='THE ARENA FALLS SILENT';$('end-title').textContent=`Fallen on wave ${Math.max(1,a.wave)}.`;$('end-text').textContent=a.best?`You cleared ${a.best} ${a.best===1?'wave':'waves'} and reached level ${top}. Every run starts over; the swarm grows every wave.`:'The first wave took you. Keep moving, and dodge through the glowing warnings.';$('end-stats').innerHTML=`<span><b>${a.best||0}</b>WAVES</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=true;$('new-expedition').hidden=false;$('new-expedition').innerHTML='Fight again <span>→</span>';}else{$('new-expedition').innerHTML='Another expedition →';$('end-kicker').textContent=won?'THE CURSE IS BROKEN':'THE EXPEDITION ENDS';$('end-title').textContent=won?'Morning, at last.':'The last light.';$('end-text').textContent=won?'Five nights in the hollow. One fire kept alive. You made a home where nothing was meant to live.':world.buildings.some(b=>b.type==='hearth')?'The woods claimed every wanderer. A stronger camp and a friend’s helping hand can turn the next night.':'The Heartfire was destroyed. Walls, traps and a well-fed fire will help your next camp endure.';const top=Math.max(...world.players.map(q=>q.level||1));$('end-text').textContent+=world.best?.loot?` Best find: ${label(world.best.loot)}.`:'';$('end-stats').innerHTML=`<span><b>${Math.max(0,dayAt(world.time)-1)}</b>NIGHTS</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=!won||mode==='guest';$('new-expedition').hidden=mode==='guest';}}
   }
   if(sheet&&dirty)renderSheet();
   dirty=false;
@@ -877,7 +938,7 @@ function aimEntity(){
 function setupControls(){
   $('characters').innerHTML=CHARACTERS.map(c=>`<button class="character" type="button" data-character="${c.id}" aria-label="${c.name}, ${c.detail}" aria-pressed="${c.id===character}">${portrait(c.id)}<small>${c.name}</small></button>`).join('');
   $('characters').onclick=e=>{const b=e.target.closest('[data-character]');if(!b)return;character=b.dataset.character;for(const el of $('characters').children)el.setAttribute('aria-pressed',el===b);if(mode==='front')world.players[0].character=character;storeProfile();};
-  $('host').onclick=hostCamp;$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
+  $('host').onclick=hostCamp;$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   $('hotbar-inventory').onclick=toggleInventory;$('hotbar-build').onclick=toggleFieldBuild;
@@ -973,7 +1034,7 @@ function setupControls(){
     if(cmd==='zoom-in')renderer.setZoom(renderer.zoom+.15);if(cmd==='zoom-out')renderer.setZoom(renderer.zoom-.15);
     if(cmd==='maintain'){closeSheet();maintenance=true;maintenanceTarget=null;selected=null;dirty=true;}
   };
-  $('new-expedition').onclick=()=>{if(world?.arena){$('end-screen').hidden=true;lastEnd='';if(world.arena.lab)startLab();else startArena();return;}if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World();for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();lastEnd='';$('end-screen').hidden=true;network.broadcast();save();}else solo();};
+  $('new-expedition').onclick=()=>{if(world?.dungeon){const pin=world.dungeon.forced;$('end-screen').hidden=true;lastEnd='';if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World((Math.random()*0xffffffff)>>>0,{dungeon:{variant:pin}});for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();document.body.classList.add('dungeon');announce(dungeonWelcome());network.broadcast();}else startDungeon(pin||'');return;}if(world?.arena){$('end-screen').hidden=true;lastEnd='';if(world.arena.lab)startLab();else startArena();return;}if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World();for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();lastEnd='';$('end-screen').hidden=true;network.broadcast();save();}else solo();};
   $('end-home').onclick=goHome;$('endless').onclick=()=>{world.status='playing';world.endless=true;world.bossSpawned=true;lastEnd='';$('end-screen').hidden=true;save();network?.broadcast();};
   window.addEventListener('keydown',event=>{
     if(['INPUT','TEXTAREA'].includes(event.target.tagName)||$('game').hidden||!$('end-screen').hidden)return;
@@ -1005,7 +1066,7 @@ function setupControls(){
     if(named==='weapon-next'){event.preventDefault();cycleWeapon();return;}
     if(named==='potion'){event.preventDefault();void drinkPotion();return;}
     if(named==='inventory'){if(world?.arena)return;toggleInventory();return;}
-    if(named==='build'){if(world?.arena)return;toggleFieldBuild();return;}
+    if(named==='build'){if(world?.arena||world?.dungeon)return;toggleFieldBuild();return;}
     if(named==='map'){sheet==='map'?closeSheet():openSheet('map');return;}
     if(named==='lantern'){if(showsLantern(modeName)&&usableLantern(actor))void send({type:'lanternToggle'});return;}
     if((modeName==='downed'||modeName==='ghost')&&actor?.charm&&(key==='e'||key==='enter')){void send({type:'interact'});return;}
@@ -1037,7 +1098,7 @@ function setupControls(){
  * auto-attack. It never interrupts a held Gather or Revive.
  */
 function autoSwing(modeName){
-  if(!world?.arena||!autoAttack||!allowsCombat(modeName)||hold.act||holdKind)return false;
+  if(!(world?.arena||world?.dungeon)||!autoAttack||!allowsCombat(modeName)||hold.act||holdKind)return false;
   const p=me();if(!p||p.down||p.ghost||p.cooldown>.05)return false;
   const reach=world.weaponReach(p);
   return world.enemies.some(e=>e.hp>0&&!isMagicAlly(e)&&distance(e,p)<reach);
@@ -1098,9 +1159,10 @@ async function init(){
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void checkForUpdate();});
   setInterval(()=>void checkForUpdate(),60000);
   $('loading').hidden=true;$('front').hidden=false;requestAnimationFrame(frame);
-  if(params.has('dev')||params.has('showcase')||params.has('arena')||params.has('lab'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,startLab,labCommand,setTime(t){world.time=t;},get network(){return network;}};
+  if(params.has('dev')||params.has('showcase')||params.has('arena')||params.has('lab')||params.has('dungeon'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,startLab,startDungeon,labCommand,setTime(t){world.time=t;},get network(){return network;}};
   if(params.has('showcase'))startShowcase();
   else if(params.has('lab'))startLab();
   else if(params.has('arena'))startArena();
+  else if(params.has('dungeon'))startDungeon(params.get('dungeon')||'');
 }
 init().catch(error=>{$('load-status').textContent=`The woods could not be loaded. ${error.message} Try reloading in a browser with WebGL enabled.`;$('loading').querySelector('p').textContent='The lantern went out.';console.error(error);});

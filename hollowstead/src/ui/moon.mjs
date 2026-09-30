@@ -90,7 +90,7 @@ export function paint(ctx){
   theme = ctx.theme || theme;
   const world = ctx.world;
   if(!ensureDom() || !badge) return;
-  if(!world || world.arena || world.showcase){
+  if(!world || world.arena || world.dungeon || world.showcase){
     if(!badge.hidden){badge.hidden = true; hideCard(); sig = '';}
     return;
   }
@@ -114,7 +114,7 @@ export function frame(ctx, dt){
   if(cardTimer > 0){cardTimer -= dt; if(cardTimer <= 0) hideCard();}
   if(!veil) return;
   const world = ctx.world;
-  const darkness = world && !world.arena && moonLighting(world) === MOON_LIGHT.blood ? Math.max(0, Math.min(1, ctx.renderer?.view?.darkness || 0)) : 0;
+  const darkness = world && !world.arena && !world.dungeon && moonLighting(world) === MOON_LIGHT.blood ? Math.max(0, Math.min(1, ctx.renderer?.view?.darkness || 0)) : 0;
   const opacity = Math.round(darkness*50)/50;
   if(opacity !== veilOpacity){veilOpacity = opacity; veil.style.opacity = String(opacity);}
 }

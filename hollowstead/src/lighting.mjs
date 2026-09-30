@@ -8,6 +8,8 @@ import {RANGES} from './contracts.mjs?v=harvest-18';
 import {equippedLanternLit} from './inventory.mjs?v=harvest-18';
 import {moonLighting} from './night.mjs?v=harvest-18';
 import {GRAVELIGHT_RADIUS_SCALE, regionDarkness} from './regions.mjs?v=harvest-18';
+import {DUNGEON, layoutOf} from './dungeon/run.mjs?v=harvest-18';
+import {variantOf} from './dungeon/variants.mjs?v=harvest-18';
 
 export const HEARTH_LEVEL_STEP = 1.5;
 export const PLAYER_LIGHT_RADIUS = RANGES.lanternLight;
@@ -194,11 +196,24 @@ export function brightnessAt(sources, x, z, darkness, lighting=resolveLighting(n
   return (1-cover)+cover*night;
 }
 
+/**
+ * Dungeons are dark whatever the hour: every wanderer carries a little light, torches and glowing
+ * things light the chambers, the camp fire burns, and the stairs shine once they open.
+ * Adds those sources (only the ones near the viewer) and returns the floor's darkness.
+ */
+export function dungeonLights(world, viewer, sources){
+  const floor=layoutOf(world);if(!floor)return 0;
+  const cx=Number.isFinite(viewer?.x)?viewer.x:0, cz=Number.isFinite(viewer?.z)?viewer.z:0, near=(x,z)=>Math.abs(x-cx)<46&&Math.abs(z-cz)<46;
+  for(const player of world.players||[])if(player.online&&!player.ghost&&!sources.some(source=>source.kind==='player'&&source.id===player.id))sources.push({x:player.x, z:player.z, radius:DUNGEON.playerLight*(player.down?.6:1), kind:'player', id:player.id});
+  for(const light of floor.lights)if(near(light.x,light.z))sources.push({x:light.x, z:light.z, radius:light.radius, kind:'torch'});
+  if(world.dungeon.phase==='open')sources.push({x:floor.portal.x, z:floor.portal.z, radius:5, kind:'portal'});
+  return variantOf(floor.variant).darkness;
+}
 export function frameLighting(world, theme, viewer=null){
   let lighting=resolveLighting(theme);
   // The battle arena keeps no clock: it is always lit enough to read every telegraph.
   let darkness=world?.arena?0:phaseDarkness(world?.time||0, clockSchedule(), lighting);
-  if(world&&!world.arena){
+  if(world&&!world.arena&&!world.dungeon){
     // Tonight's moon may tint or deepen the dark; some regions are dark even by day (per viewer).
     const moon=moonLighting(world);
     if(moon){lighting={...lighting};if(moon.tint)lighting.nightTint=moon.tint;if(moon.ambient>0)lighting.ambientNight=Math.min(1,lighting.ambientNight*moon.ambient);}
@@ -206,6 +221,7 @@ export function frameLighting(world, theme, viewer=null){
     if(regional>darkness)darkness=Math.min(1,regional);
   }
   const sources=collectLightSources(world);
+  if(world?.dungeon)darkness=dungeonLights(world, viewer, sources);
   return {lighting, darkness, sources};
 }
 

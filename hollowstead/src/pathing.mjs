@@ -53,7 +53,13 @@ export function clearLine(world, obstacles, x0, z0, x1, z1, selfId = null){
 export function findPath(world, obstacles, sx, sz, tx, tz, {stop = .3, selfId = null, wide = true, radius = 0, expand = MAX_EXPAND} = {}){
   // A tight box first (cheap); if the way round leaves it, look again much wider.
   const near = searchPath(world, obstacles, sx, sz, tx, tz, stop, selfId, MARGIN, radius, expand);
-  return near.complete || !wide ? near : searchPath(world, obstacles, sx, sz, tx, tz, stop, selfId, MARGIN*3, radius, expand);
+  if(near.complete || !wide) return near;
+  const far = searchPath(world, obstacles, sx, sz, tx, tz, stop, selfId, MARGIN*3, radius, expand);
+  if(far.complete) return far;
+  // A maze (a dungeon floor) can wind far outside any box round the two ends: ask the world for
+  // its coarse route, and walk that instead.
+  const route = world.coarseRoute?.(sx, sz, tx, tz);
+  return route?.length ? {points: route, complete: true} : far;
 }
 
 function searchPath(world, obstacles, sx, sz, tx, tz, stop, selfId, margin, radius, expand){

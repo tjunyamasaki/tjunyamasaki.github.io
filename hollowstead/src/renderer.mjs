@@ -15,6 +15,9 @@ import {SceneryLayer} from './scenery.mjs?v=harvest-18';
 import {groundColors, walkableAt} from './worldgen.mjs?v=harvest-18';
 import {nodeAwake} from './content.mjs?v=harvest-18';
 import {RopeLayer} from './cart-rope.mjs?v=harvest-18';
+import {DungeonLayer} from './dungeon/three.mjs?v=harvest-18';
+import {dungeonProps} from './dungeon/art.mjs?v=harvest-18';
+import {layoutOf} from './dungeon/run.mjs?v=harvest-18';
 /** The Heartfire plaza is kept flat (no standing props) so buildings and drops read on it; the arena keeps its runestones. */
 export function plazaProps(){return [];}
 /** Runestones ringing the battle arena's wall (presentation only; nothing collides with them). */
@@ -110,7 +113,7 @@ class CombatLayer {
 }
 export class Renderer {
   constructor(canvas,theme){
-    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.rigMeshes=new Map();this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);
+    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.rigMeshes=new Map();this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);this.dungeonLayer=null;
     this.scene.fog=new THREE.FogExp2(theme.palette.background,.009);this.camera=new THREE.OrthographicCamera(-15,15,15,-15,.1,180);
     this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.setPixelRatio(Math.min(devicePixelRatio,1.6));this.gl.outputColorSpace=THREE.SRGBColorSpace;
     this.objects=new Map();this.textures=new Map();this.materials=new Map();this.dropTextures=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
@@ -202,6 +205,10 @@ export class Renderer {
     if(this.ground){this.scene.remove(this.ground);this.ground.geometry.dispose();this.ground.material.map?.dispose();this.ground.material.dispose();}
     if(this.scatter){this.scene.remove(this.scatter);this.scatter.geometry.dispose();this.scatter.material.dispose();}
     if(this.arenaWall){this.scene.remove(this.arenaWall);this.arenaWall.geometry.dispose();this.arenaWall.material.dispose();this.arenaWall=null;}
+    // A dungeon floor is its own ground, walls and stairs (dungeon/three.mjs).
+    this.dungeonLayer||=new DungeonLayer(this.scene,material=>this.bindNight(material));
+    if(world?.dungeon){this.ground=null;this.scatter=null;this.dungeonLayer.build(world);this.scenery.build(seed, world);this.seed=seed;return;}
+    this.dungeonLayer.dispose();
     const arena=!!world?.arena,R=world?.radius||RULES.radius;
     const rng=random(seed),positions=[],colors=[];const col=new THREE.Color();const tile=arena?1:2;
     const edge=arena?R+12:RULES.radius+8;
@@ -345,7 +352,7 @@ export class Renderer {
     this.afterimages=this.afterimages.filter(a=>{a.life+=dt;a.sprite.material.opacity=a.life<0?0:Math.max(0,.55*(1-a.life/.3));if(a.life>.3){this.scene.remove(a.sprite);a.sprite.material.dispose();return false;}return true;});
   }
   render(world,localId,dt,{target=null,placement=null,demo=false}={}){
-    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;const terrainKey=`${world.seed}:${world.arena?'arena':'world'}`;if(this.terrainKey!==terrainKey){this.terrainKey=terrainKey;this.terrain(world.seed,world);this.weaponFx.reset();for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
+    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;const terrainKey=`${world.seed}:${world.arena?'arena':world.dungeon?`dungeon:${layoutOf(world)?.key}`:'world'}`;if(this.terrainKey!==terrainKey){this.terrainKey=terrainKey;this.terrain(world.seed,world);this.weaponFx.reset();for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
     const p=world.player(localId)||world.players[0]||{x:0,z:2};const fx=demo?0:p.x,fz=demo?-1:p.z;
     this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);
     // Weapon effects first: their camera kick and their light on the night ground belong to this frame.
@@ -354,8 +361,8 @@ export class Renderer {
     this.camera.position.set(this.focus.x+kx,28,this.focus.z+27+kz);this.camera.lookAt(this.focus.x+kx,0,this.focus.z+kz);this.camera.updateMatrixWorld();
     const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;this.paintField(frame);this.paintFlash(weapon);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
-    this.paintPlaza(world,frame);this.scenery.update(world,frame,dt,this.focus);this.combat.begin();
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme)];
+    this.paintPlaza(world,frame);if(world.dungeon)this.dungeonLayer?.update(world,frame,this.clock);this.scenery.update(world,frame,dt,this.focus);this.combat.begin();
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
@@ -373,6 +380,8 @@ export class Renderer {
       let sx=o.def.size[0],sy=o.def.size[1];if(kind==='drop'&&present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}
       if(e.down||e.ghost){sx*=.8;sy*=.65;}
       if(kind==='enemy'&&e.elite){sx*=1.3;sy*=1.3;}
+      if(kind==='enemy'&&e.warden){sx*=1.12;sy*=1.12;}
+      if(kind==='prop'&&e.scale){sx*=e.scale;sy*=e.scale;}
       if(key==='gravecraft-skeleton')sy*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
       if(o.hitUntil>this.clock){const squash=Math.sin((o.hitUntil-this.clock)*14)*(motion.hitSquash||0);sx*=1+squash;sy*=1-squash;}
       const flip=(kind==='player'&&e.dx<-.1)||((kind==='magic'||kind==='ally')&&e.facing===-1)||(kind==='enemy'&&e.face===-1);
@@ -383,7 +392,7 @@ export class Renderer {
       else if(Number.isFinite(e.aim))o.sprite.material.rotation=e.aim;
       else{o.sprite.material.rotation=moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;if(['attack','gather'].includes(e.action)&&e.actionUntil>world.time)o.sprite.material.rotation=motion.attackTilt*Math.sin((e.actionUntil-world.time)*12);}
       const lootGlow=kind==='drop'?dropGlow(e):null;
-      const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e))||!!lootGlow;
+      const emissive=(kind==='prop'&&e.glow)||(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e))||!!lootGlow;
       let display=entityBrightness(frame, o.x, o.z, {local:kind==='player'&&e.id===localId, emissive});
       if(kind==='building'&&STRUCTURES[key]?.light&&key!=='lantern'&&!(e.fuel>0))display*=0.45;
       const lamp=brightnessAt(frame.sources, o.x, o.z, 1, frame.lighting);
@@ -399,6 +408,7 @@ export class Renderer {
       // Night-only finds (regions.mjs) glow in the dark so they can be found from afar.
       if(kind==='node'){const hue=nightGlow(e);if(hue){this.glow(o,1.1);o.glow.material.color.set(hue);o.glow.material.opacity=(.16+.42*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));}}
       if(kind==='drop'){const beacon=present?.t?null:lootBeacon(e.stack?.itemId);if(beacon)this.syncBeacon(o,beacon,e,frame,dropBlink(e,world.time,this.clock),true);else if(o.beacon)this.syncBeacon(o,null,e,null,0,false);}
+      if(kind==='prop'&&e.light>0){this.glow(o,e.light*.75);o.glow.material.color.set(e.tint||'#ffffff');o.glow.material.opacity=(.1+frame.darkness*.18)*(1+Math.sin(this.clock*7+e.x*3)*.06);}
       if(kind==='building'&&key==='gate'&&e.open)o.sprite.scale.x*=.35;
       if((kind==='enemy'||kind==='building'||(kind==='ally'&&key!=='crow'))&&e.hp<e.maxHp&&fade>0.04){if(!o.health){const back=new THREE.Sprite(new THREE.SpriteMaterial({color:0x302834,transparent:true,depthWrite:false})),fill=new THREE.Sprite(new THREE.SpriteMaterial({color:kind==='enemy'?0xdf9383:kind==='ally'?0x9fd8a8:0xd2c395,transparent:true,depthWrite:false}));fill.center.set(0,.5);this.scene.add(back,fill);o.health={back,fill};}const y=kind==='ally'?({wight:4.3,jack:2.4}[key]||1.6):(kind==='enemy'?({king:5.4,brute:3.3,wraith:2.2,golem:3.4,bonewalker:2.4,bogling:1.6}[key]||1.3)*(e.elite?1.3:1):key==='hearth'?3.6:1.8);o.health.back.position.set(o.x,y,o.z);o.health.fill.position.set(o.x-.65,y,o.z+.025);o.health.back.scale.set(1.4,.1,1);o.health.fill.scale.set(1.3*Math.max(0,e.hp/e.maxHp),.055,1);o.health.back.material.opacity=o.health.fill.material.opacity=fade;o.health.back.visible=o.health.fill.visible=true;}
       if(kind==='enemy'){const tg=telegraphOf(e);if(tg){const reach=tg.radius||tg.length||2;if(warningVisible(frame, tg.x, tg.z, reach, p))this.combat.telegraph(tg,frame.darkness>0.5?.75:1,this.clock);

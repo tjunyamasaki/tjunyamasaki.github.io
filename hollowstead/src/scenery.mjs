@@ -159,7 +159,7 @@ export class SceneryLayer {
   /** Rebuild for a new world (seed change, arena on/off). */
   build(seed, world){
     this.clear();this.world = world;this.seed = seed;this.life.reset();
-    this.off = !this.enabled || !!world?.arena;
+    this.off = !this.enabled || !!world?.arena || !!world?.dungeon;
     if(this.off)return;
     this.model.reset(seed, world, this.override ? syntheticShape(seed, world?.radius, this.override) : null);
     this.syncLake();
@@ -317,7 +317,7 @@ class CanvasScenery {
     if(dark > .02){c.globalAlpha = dark;c.drawImage(this.dark, cx, cy, cw, ch, dx, dy, w, hh);c.globalAlpha = 1;}
   }
   paint(c, world, frame, dt, pass){
-    if(!this.atlas || world.arena)return;
+    if(!this.atlas || world.arena || world.dungeon)return;
     this.sync(world);
     const r = this.renderer, view = this.view;
     r.ctxScale = Math.min(globalThis.devicePixelRatio || 1, 1.6);

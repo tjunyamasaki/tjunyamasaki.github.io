@@ -470,7 +470,9 @@ export function stepMobs(world, dt, obstacles){
     // Choose prey.
     let target = null;
     if(e.home){
-      const prey = [preyFor(world, e, quarry, e.aggro ? ROAM.aggro+6 : ROAM.aggro)].find(q => q && Math.hypot(q.x-e.home.x, q.z-e.home.z) < e.leash+8) || null;
+      let prey = [preyFor(world, e, quarry, e.aggro ? ROAM.aggro+6 : ROAM.aggro)].find(q => q && Math.hypot(q.x-e.home.x, q.z-e.home.z) < e.leash+8) || null;
+      // Underground a resting creature has to see you first: no waking a whole floor through the rock.
+      if(prey && !e.aggro && world.dungeon && !world.canSee(e, prey)) prey = null;
       if(prey){e.aggro = true; target = prey;}
       else{
         e.aggro = false;
@@ -580,8 +582,16 @@ export function stepMobs(world, dt, obstacles){
     if(speed < .02){e.vx = e.vz = 0; continue;}
 
     if(move.fly){
-      e.x += e.vx*dt; e.z += e.vz*dt;
-      const r = Math.hypot(e.x, e.z), R = (world.radius || 96)-1.2; if(r > R){e.x *= R/r; e.z *= R/r;}
+      // Fliers pass over trees and walls; a dungeon's rock still stops them.
+      if(world.dungeon){
+        // Knocked into the rock by a blow: back out onto the floor first.
+        if(!world.walkable(e.x, e.z)){const land = world.landNear(e.x, e.z, 4); if(land){e.x = land.x; e.z = land.z;}}
+        const nx = e.x+e.vx*dt, nz = e.z+e.vz*dt; if(world.walkable(nx, nz)){e.x = nx; e.z = nz;} else if(world.walkable(nx, e.z)) e.x = nx; else if(world.walkable(e.x, nz)) e.z = nz;
+      }
+      else{
+        e.x += e.vx*dt; e.z += e.vz*dt;
+        const r = Math.hypot(e.x, e.z), R = (world.radius || 96)-1.2; if(r > R){e.x *= R/r; e.z *= R/r;}
+      }
     }else{
       // Walled out of the camp: press on and claw (below) instead of sliding round the palisade.
       const moved = walled ? world.move(e, e.vx, e.vz, dt, obstacles) : slideMove(world, e, e.vx, e.vz, dt, obstacles);

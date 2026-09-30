@@ -9,8 +9,9 @@ import * as frontier from './frontier.mjs?v=harvest-18';
 import * as cart from './cart.mjs?v=harvest-18';
 import * as rhythm from './rhythm.mjs?v=harvest-18';
 import * as trinkets from './trinkets.mjs?v=harvest-18';
+import * as dungeon from './dungeon.mjs?v=harvest-18';
 
-const MODULES = [moon, frontier, cart, rhythm, trinkets];
+const MODULES = [moon, frontier, cart, rhythm, trinkets, dungeon];
 
 export function bindFeatureHud(ctx){for(const m of MODULES)m.bind?.(ctx);}
 export function paintFeatureHud(ctx){for(const m of MODULES)m.paint?.(ctx);}

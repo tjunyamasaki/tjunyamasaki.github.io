@@ -80,7 +80,7 @@ export function geared(p, id){
 }
 
 /** True when `p` stands in the Crags without their own lit grave lantern: to them it is an unlit night. */
-export function regionUnlit(world, p){return !!p&&!world?.arena&&!world?.showcase&&hazardAt(p.x, p.z)==='crags'&&!geared(p, 'crags');}
+export function regionUnlit(world, p){return !!p&&!world?.arena&&!world?.dungeon&&!world?.showcase&&hazardAt(p.x, p.z)==='crags'&&!geared(p, 'crags');}
 
 /** A night-only node's halo colour, or null for every other node. */
 export function nightGlow(node){return NODES[node?.type]?.night?NIGHT_GLOW[node.type]||'#d4fff5':null;}
@@ -130,7 +130,7 @@ function noteFinds(world, p, dt){
 
 /** Walk speed multiplier from the region (grave-chill). */
 export function regionSpeed(world, p){
-  if(!p||world?.arena||world?.showcase)return 1;
+  if(!p||world?.arena||world?.dungeon||world?.showcase)return 1;
   return hazardAt(p.x, p.z)==='barrow'&&!geared(p, 'barrow')?HAZARDS.barrow.speed:1;
 }
 
@@ -148,7 +148,7 @@ const lastDark={x:NaN, z:NaN, value:0};
 
 /** Extra darkness 0..1 for the viewer's screen (the Crags by day). Read by lighting.frameLighting every frame. */
 export function regionDarkness(world, viewer){
-  if(!world||!viewer||world.arena||world.showcase||!Number.isFinite(viewer.x)||!Number.isFinite(viewer.z))return 0;
+  if(!world||!viewer||world.arena||world.dungeon||world.showcase||!Number.isFinite(viewer.x)||!Number.isFinite(viewer.z))return 0;
   if(Math.abs(viewer.x-lastDark.x)<.08&&Math.abs(viewer.z-lastDark.z)<.08)return lastDark.value;
   lastDark.x=viewer.x;lastDark.z=viewer.z;lastDark.value=cragsCover(viewer.x, viewer.z);
   return lastDark.value;
@@ -159,7 +159,7 @@ export function regionDarkness(world, viewer){
  * {region, name, hazard, protected, state:'worn'|'missing'|'carried'|'unlit', itemId, slot, label, tip}.
  */
 export function regionStatus(world, p){
-  if(!world||!p||world.arena||world.showcase||p.down||p.ghost)return null;
+  if(!world||!p||world.arena||world.dungeon||world.showcase||p.down||p.ghost)return null;
   const region=hazardAt(p.x, p.z);if(!region)return null;
   const gear=REGION_GEAR[region],safe=geared(p, region),worn=p.equipment?.[gear.slot];
   let state='worn';

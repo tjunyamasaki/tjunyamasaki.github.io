@@ -90,6 +90,7 @@ function context(world, p, itemId, def, rank, strength, cast){
   const clampToArena = pt => {
     const R = (world.radius || 60)-1.4, r = Math.hypot(pt.x, pt.z);
     if((world.arena || world.showcase) && r > R){pt.x *= R/r; pt.z *= R/r;}
+    if(world.dungeon && !world.walkable(pt.x, pt.z)){const land = world.landNear(pt.x, pt.z, 6); if(land){pt.x = land.x; pt.z = land.z;}}
     return pt;
   };
   const ctx = {

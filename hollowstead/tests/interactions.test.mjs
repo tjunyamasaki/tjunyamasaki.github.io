@@ -93,9 +93,6 @@ test('T16 field build list, exact targets, and first workbench progression',()=>
   assert.equal(act(built.w,built.p,{type:'build',recipe:'pot',x:potSpot.x,z:potSpot.z,stationId:nearby.id}).ok,false);
   nearby.hp=nearby.maxHp;
   nearby.x=built.p.x+5;nearby.z=built.p.z;
-  assert.equal(act(built.w,built.p,{type:'build',recipe:'pot',x:potSpot.x,z:potSpot.z,stationId:nearby.id}).ok,false);
-  assert.equal(built.w.buildings.some(b=>b.type==='pot'),false);
-  nearby.x=built.p.x+1;nearby.z=built.p.z;
   assert.equal(act(built.w,built.p,{type:'build',recipe:'pot',x:potSpot.x,z:potSpot.z,stationId:nearby.id}).ok,true);
   assert.equal(built.w.buildings.filter(b=>b.type==='pot').length,1);
 

@@ -629,7 +629,7 @@ function renderSheet(){
     setTabs(tabs);
     const recipes=ids.map(id=>{
       const recipe=RECIPES[id],resultId=recipe.result||id;
-      return {id,name:label(resultId),desc:recipe.desc,icon:icon(resultId),action:model.action,reason:world.recipeReason(p,id,catalog.stationId)||'',costs:Object.entries(recipe.cost).map(([itemId,need])=>({have:world.available(p,itemId),need,name:label(itemId),short:world.available(p,itemId)<need}))};
+      return {id,name:label(resultId),desc:recipe.desc,icon:icon(resultId),action:model.action,reason:world.recipeReason(p,id,catalog.stationId)||'',costs:Object.entries(recipe.cost).map(([itemId,need])=>{const have=world.available(p,itemId,recipe.kind==='build');return {have,need,name:label(itemId),short:have<need};})};
     });
     replaceContent(catalogMarkup({recipes,maintain:model.maintain,pendingId:catalogPending}));
   }else if(sheet==='refine'){

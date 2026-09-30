@@ -406,9 +406,10 @@ export class World {
   }
   collapseRecovery(p){if(p.recovery&&!p.recovery.slots.some(Boolean))p.recovery=null;}
   nearby(p,type,range=4){return this.buildings.find(b=>(b.type===type||(type==='fire'&&['hearth','fire'].includes(b.type)))&&b.hp>0&&distance(p,b)<range&&(type!=='fire'||b.fuel>0));}
-  stores(p){pruneChests(this);return this.buildings.filter(b=>(b.type==='chest'||b.type==='cart')&&b.hp>0&&inSupplyChestRange(distance(p,b))&&(!this.chestSessions.has(b.id)||this.chestSessions.get(b.id).ownerId===p.id)).map(b=>b.store);}
-  available(p,itemId){return this.count(p, itemId)+this.stores(p).reduce((total, store)=>total+countItem(store, itemId), 0);}
-  canPay(p,cost){return Object.entries(cost).every(([itemId, need])=>Number.isInteger(need)&&this.available(p, itemId)>=need);}
+  // Only new construction can draw distant supplies. Crafting, repairs and other upkeep stay local.
+  stores(p,forBuild=false){pruneChests(this);return this.buildings.filter(b=>(b.type==='chest'||b.type==='cart')&&b.hp>0&&(forBuild||inSupplyChestRange(distance(p,b)))&&(!this.chestSessions.has(b.id)||this.chestSessions.get(b.id).ownerId===p.id)).map(b=>b.store);}
+  available(p,itemId,forBuild=false){return this.count(p, itemId)+this.stores(p,forBuild).reduce((total, store)=>total+countItem(store, itemId), 0);}
+  canPay(p,cost,forBuild=false){return Object.entries(cost).every(([itemId, need])=>Number.isInteger(need)&&this.available(p, itemId,forBuild)>=need);}
   takeCost(clones,cost){
     for(const [itemId, need] of Object.entries(cost)){
       if(!itemDefinition(itemId)||!Number.isInteger(need)||need<=0)return false;
@@ -423,8 +424,8 @@ export class World {
     }
     return true;
   }
-  pay(p,cost){
-    const sources=[p.inventory, ...this.stores(p)];
+  pay(p,cost,forBuild=false){
+    const sources=[p.inventory, ...this.stores(p,forBuild)];
     const clones=sources.map(cloneContainer);
     if(!this.takeCost(clones, cost))return false;
     sources.forEach((live, index)=>{live.slots=clones[index].slots;live.revision=clones[index].revision;});
@@ -439,24 +440,25 @@ export class World {
     const plan=planInsert(clones[0], made.stack, {supplyCapacity:null, allowPartial:false, grow:false, acceptsItems:true, mintUid:()=>'preview-split'});
     return plan.ok?'':'Pack full — store or drop some supplies';
   }
-  stationBuilding(p, recipeId, stationId){
+  stationBuilding(p, recipeId, stationId, placing=false){
     const spec=stationRule(recipeId);
     if(!spec)return true;
     if(typeof stationId!=='string'||!stationId)return null;
     const building=this.buildings.find(b=>b.id===stationId&&b.hp>0);
-    if(!building||!spec.accepts(building.type)||!inCraftRange(distance(p,building)))return null;
+    const remotePlacement=placing&&RECIPES[recipeId]?.kind==='build';
+    if(!building||!spec.accepts(building.type)||(!remotePlacement&&!inCraftRange(distance(p,building))))return null;
     if(spec.needsFuel&&!(building.fuel>0))return 'fuel';
     return building;
   }
-  recipeReason(p,key,stationId){
+  recipeReason(p,key,stationId,placing=false){
     const recipe=RECIPES[key];
     if(!recipe)return 'Unknown recipe';
     if(recipe.station){
-      const station=this.stationBuilding(p, key, stationId);
+      const station=this.stationBuilding(p, key, stationId,placing);
       if(station==='fuel')return 'The fire needs wood';
       if(!station)return stationLabel(key);
     }
-    if(!this.canPay(p, recipe.cost))return 'Gather the missing materials';
+    if(!this.canPay(p, recipe.cost,recipe.kind==='build'))return 'Gather the missing materials';
     if(recipe.kind!=='build'){
       const sources=[p.inventory, ...this.stores(p)];
       const clones=sources.map(cloneContainer);
@@ -495,8 +497,8 @@ export class World {
     if(this.players.some(q=>q.online&&!q.ghost&&Math.hypot(q.x-x,q.z-z)<radius+.4))return 'A wanderer is standing here';
     if(this.buildings.some(b=>Math.hypot(b.x-x,b.z-z)<Math.max(.65,STRUCTURES[b.type].radius)+radius+.1))return 'Too close to another structure';
     if(this.nodes.some(n=>!n.ready&&NODES[n.type].radius>.3&&Math.hypot(n.x-x,n.z-z)<NODES[n.type].radius+radius))return 'Clear these resources first';
-    if(RECIPES[type].station&&!this.stationBuilding(p, type, stationId))return 'Build this at a workbench';
-    return this.recipeReason(p,type,stationId);
+    if(RECIPES[type].station&&!this.stationBuilding(p, type, stationId,true))return 'Build this at a workbench';
+    return this.recipeReason(p,type,stationId,true);
   }
   transferAll(p,uid,dest,{grow=false,supplyCapacity=null,accepts=true}={}){
     const loc=this.locate(p, uid);
@@ -739,7 +741,7 @@ export class World {
     const sx=Math.round(x*2)/2, sz=Math.round(z*2)/2;
     const reason=this.canBuild(p, recipeId, sx, sz, stationId);
     if(reason){this.tell(p, reason);return {ok:false,code:reason==='Build this at a workbench'?'stationRequired':'rejected'};}
-    if(!this.pay(p, RECIPES[recipeId].cost))return {ok:false,code:'rejected'};
+    if(!this.pay(p, RECIPES[recipeId].cost,true))return {ok:false,code:'rejected'};
     const building=this.structure(recipeId, sx, sz);building.rotation=rotation===1?1:0;this.buildings.push(building);this.stats.built++;p.cooldown=.4;this.event('build',sx,sz,STRUCTURES[building.type].name);this.assertItems();
     return {ok:true,code:'ok'};
   }

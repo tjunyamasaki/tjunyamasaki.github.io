@@ -16,6 +16,7 @@ import {ALLIES, DASH, RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest
 import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-18';
 import {nightGlow} from './regions.mjs?v=harvest-18';
 import {beaconArt, beaconPhase, beaconStrength, dropSticker, lootBeacon, preloadDropArt} from './drop-art.mjs?v=harvest-18';
+import {markerPulse, paintMarker, targetMarker} from './target-marker.mjs?v=harvest-18';
 import {arenaProps, arenaTile, plazaProps} from './renderer.mjs?v=harvest-18';
 import {STRIKE_COLORS} from './renderer.mjs?v=harvest-18';
 import {glowStrength} from './lighting.mjs?v=harvest-18';
@@ -178,7 +179,7 @@ export class CanvasRenderer {
     if(world.arena){c.save();c.strokeStyle='rgba(224,119,107,.8)';c.lineWidth=Math.max(2,.22*this.scale);const q=this.screenPoint(0,0);c.beginPath();c.ellipse(q.x,q.y,(world.radius-1)*this.scale,(world.radius-1)*this.scale*.72,0,0,Math.PI*2);c.stroke();c.restore();}
     for(const b of world.buildings)if(STRUCTURES[b.type].light&&(b.type==='lantern'||b.fuel>0))this.glow(b.x,b.z,STRUCTURES[b.type].light+(b.type==='hearth'?(b.level-1)*1.5:0),.08+frame.darkness*.1);
     for(const source of frame.sources)if(source.kind==='player')this.glow(source.x,source.z,source.radius,.06+frame.darkness*.08);
-    if(target&&!placement){const fade=this.reveal(target.x, target.z);if(fade>0.05){c.save();c.globalAlpha=fade;c.setLineDash([5,4]);c.lineDashOffset=-this.clock*6;this.ellipse(target.x,target.z,1,'#edc48c',false);c.setLineDash([]);c.restore();}}
+    if(target&&!placement){const fade=this.reveal(target.x, target.z),m=targetMarker(this.theme,target);if(fade>0.05&&m){const q=this.screenPoint(target.x,target.z);c.save();c.globalAlpha=fade;c.translate(q.x,q.y);c.scale(1,.72);paintMarker(c,0,0,m.radius*markerPulse(this.clock),this.scale,m.color);c.restore();}}
     if(p.goal){const fade=Math.max(this.reveal(p.goal.x, p.goal.z), distance(p, p.goal)<8?.28:0);if(fade>0.04){c.save();c.globalAlpha=fade;this.ellipse(p.goal.x,p.goal.z,.2,'#eadaba',false);c.restore();}}
     for(const e of world.enemies){const tg=telegraphOf(e);if(!tg||Math.abs(tg.x-this.focus.x)>halfX+6||Math.abs(tg.z-this.focus.z)>halfZ+6)continue;if(!warningVisible(frame, tg.x, tg.z, tg.radius||tg.length||2, p))continue;this.drawTelegraph(tg,frame.darkness>0.5?.75:1);}
     for(const s of hostileShots(world))if(s.kind==='spore'&&Math.abs(s.x-this.focus.x)<halfX+4&&Math.abs(s.z-this.focus.z)<halfZ+4)this.drawTelegraph({shape:'circle',x:s.x,z:s.z,radius:s.radius,fill:s.fill,heavy:false},.9);

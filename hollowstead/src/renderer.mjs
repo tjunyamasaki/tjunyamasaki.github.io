@@ -9,6 +9,7 @@ import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-18';
 import {nightGlow} from './regions.mjs?v=harvest-18';
 import {dropGlow} from './drops.mjs?v=harvest-18';
 import {beaconArt, beaconPhase, beaconStrength, dropSticker, lootBeacon, preloadDropArt} from './drop-art.mjs?v=harvest-18';
+import {markerCanvas, markerPulse, targetMarker} from './target-marker.mjs?v=harvest-18';
 import {glowStrength} from './lighting.mjs?v=harvest-18';
 import {SceneryLayer} from './scenery.mjs?v=harvest-18';
 import {groundColors, walkableAt} from './worldgen.mjs?v=harvest-18';
@@ -127,7 +128,8 @@ export class Renderer {
       uNightOrigin:{value:new THREE.Vector2(LIGHT_FIELD_ORIGIN,LIGHT_FIELD_ORIGIN)},
       uNightSpan:{value:LIGHT_FIELD_SPAN},
     };
-    this.marker=new THREE.Mesh(new THREE.RingGeometry(.85,1,40),new THREE.MeshBasicMaterial({color:theme.palette.accent,transparent:true,opacity:.8,side:THREE.DoubleSide,depthWrite:false}));this.marker.rotation.x=-Math.PI/2;this.marker.visible=false;this.scene.add(this.marker);
+    // Target marker (target-marker.mjs): a textured ground quad, the texture redrawn per target size and colour.
+    this.marker=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({transparent:true,side:THREE.DoubleSide,depthWrite:false}));this.markerTextures=new Map();this.markerKey='';this.marker.rotation.x=-Math.PI/2;this.marker.visible=false;this.scene.add(this.marker);
     this.ghost=null;this.pathMarker=new THREE.Mesh(new THREE.RingGeometry(.16,.22,20),new THREE.MeshBasicMaterial({color:0xeadaba,transparent:true,opacity:.7,side:THREE.DoubleSide}));this.pathMarker.rotation.x=-Math.PI/2;this.pathMarker.visible=false;this.scene.add(this.pathMarker);
     this.viewWidth=1;this.viewHeight=1;this.onResize=()=>this.resize();watchViewport(this.onResize);this.resize();
   }
@@ -408,7 +410,7 @@ export class Renderer {
     this.paintShots(world,dt);this.combat.end();this.paintAfterimages(dt);
     this.dropMotion.retain(new Set(world.drops.map(drop=>drop.id)));
     const markerFade=target?this.reveal(target.x, target.z):0;
-    this.marker.visible=!!target&&!placement&&markerFade>0.05;if(target){this.marker.position.set(target.x,.04,target.z);this.marker.rotation.z=this.clock*.3;this.marker.material.opacity=.8*markerFade;}
+    this.marker.visible=!!target&&!placement&&markerFade>0.05;if(target){const m=targetMarker(this.theme,target),r=Math.round(m.radius*10)/10,key=`${r}|${m.color}`;if(this.markerKey!==key){let tex=this.markerTextures.get(key);if(!tex){const art=markerCanvas(r,m.color);tex=new THREE.CanvasTexture(art.canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.userData.size=art.size;this.markerTextures.set(key,tex);}this.marker.material.map=tex;this.marker.material.needsUpdate=true;this.markerKey=key;}const s=this.marker.material.map.userData.size*markerPulse(this.clock);this.marker.scale.set(s,s,1);this.marker.position.set(target.x,.04,target.z);this.marker.material.opacity=markerFade;}
     const goalFade=p.goal?Math.max(this.reveal(p.goal.x, p.goal.z), distance(p, p.goal)<8?.28:0):0;
     this.pathMarker.visible=!!p.goal&&goalFade>0.04;if(p.goal){this.pathMarker.position.set(p.goal.x,.03,p.goal.z);this.pathMarker.material.opacity=.7*goalFade;}
     if(placement){if(!this.ghost||this.ghost.key!==placement.key){if(this.ghost)this.remove(this.ghost);this.ghost=this.sprite(placement.key,'preview');}this.ghost.sprite.position.set(placement.x,0,placement.z);this.ghost.sprite.material.color.set(placement.valid?'#c8e5a6':'#dd7471');this.ghost.sprite.material.opacity=.7;this.ghost.shadow.visible=false;this.ghost.sprite.visible=true;}else if(this.ghost){this.remove(this.ghost);this.ghost=null;}

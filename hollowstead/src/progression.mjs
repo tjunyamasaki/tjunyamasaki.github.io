@@ -298,8 +298,8 @@ export const WEAPON_STYLES = Object.freeze({
     blurb:'Calls three carrion crows that fly to your foes (up to six)'},
   jacklantern:{style:'sentry', cap:2, sight:8, cooldown:2.2, stamina:12,
     blurb:'Plants a pumpkin sentry that spits burning seeds (up to two)'},
-  wighthorn:{style:'wight', mend:.35, sight:10, cooldown:3, stamina:16,
-    blurb:'Raises a Grave Knight who taunts and cleaves. Blow again to mend him'},
+  wighthorn:{style:'wight', sight:10, cooldown:1.5, stamina:12,
+    blurb:'Raises a Grave Knight who taunts and takes the hits. Every blow orders a charge from where he stands to your mark: Thrust, Cleave, then Gravefall'},
   censer:{style:'frost', range:8, radius:2.6, life:4, freezeAfter:1.2, freeze:1.8, cooldown:2.3, stamina:14,
     blurb:'Swings out a freezing fog. Foes inside slow, then freeze solid'},
 });
@@ -307,7 +307,7 @@ export const WEAPON_STYLES = Object.freeze({
 export const ALLIES = Object.freeze({
   crow:{name:'Carrion crow', hp:18, life:14, speed:7*1.15, sight:9, leash:16, range:.9, period:.75, follow:1.4, fly:true, scales:true},
   jack:{name:'Pumpkin sentry', hp:110, life:24, sight:8, leash:30, period:.8, shot:13*1.15, ranged:true, scales:true},
-  wight:{name:'Grave Knight', hp:300, life:40, speed:3.2*1.15, sight:10, leash:18, range:1.9, arc:140, period:1.2, follow:1.6, taunt:7, guard:.7, scales:true},
+  wight:{name:'Grave Knight', hp:300, life:40, speed:3.2*1.15, sight:10, leash:18, range:1.9, arc:140, period:1.2, follow:1.6, taunt:7, guard:.7, scales:true, commanded:true},
 });
 export function weaponStyle(itemId){return WEAPON_STYLES[itemId]||null;}
 /**

@@ -259,7 +259,7 @@ test('the censer slows, then freezes foes solid so their blows never land',()=>{
   const x=e.x;sim(w,.5);assert.equal(e.x,x);
 });
 
-test('summons: crows fly, sentries shoot, the Grave Knight taunts and takes the hits',()=>{
+test('summons: crows fly, sentries shoot, the Grave Knight charges on the horn, taunts and takes the hits',()=>{
   const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'crowtotem');
   w.attack(p);assert.equal(w.allies.filter(a=>a.type==='crow').length,WEAPON_STYLES.crowtotem.count);
   ready(p);w.attack(p);ready(p);w.attack(p);
@@ -271,11 +271,15 @@ test('summons: crows fly, sentries shoot, the Grave Knight taunts and takes the 
   const [mark]=foes(w,[[6,0]]);mark.speed=0;sim(w,2);assert.ok(mark.hp<500);
   w.allies=[];w.enemies=[];arm(w,p,'wighthorn');ready(p);w.attack(p);
   const knight=w.allies.find(a=>a.type==='wight');assert.ok(knight);
-  knight.x=6;knight.z=0;p.x=-6;
+  knight.x=6;knight.z=0;knight.order=null;knight.restAt=w.time;p.x=-1;
   const [brute]=foes(w,[[8,0]],'brute');
-  sim(w,4);
+  // The horn orders him onto the brute; he strikes it and holds it off you.
+  ready(p);w.attack(p);sim(w,4);
   assert.ok(knight.hp<knight.maxHp,'the knight drew the attack');assert.equal(p.hp,100);assert.ok(brute.hp<500);
-  ready(p);const hp=knight.hp;w.attack(p);assert.ok(knight.hp>hp);assert.equal(w.allies.filter(a=>a.type==='wight').length,1);
+  // The third note, the Gravefall, mends him.
+  ready(p);w.attack(p);sim(w,1);
+  assert.ok(w.events.some(ev=>ev.type==='knightstrike'&&ev.note===2));assert.ok(w.events.some(ev=>ev.type==='heal'));
+  assert.equal(w.allies.filter(a=>a.type==='wight').length,1);
   const copy=World.restore(JSON.parse(JSON.stringify(w.snapshot())));
   assert.equal(copy.allies.length,w.allies.length);
 });

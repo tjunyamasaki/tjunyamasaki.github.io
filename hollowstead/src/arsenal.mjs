@@ -9,6 +9,7 @@ import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {splitMarks} from './refine.mjs?v=harvest-18';
 import {grimoire, stepGrimoire} from './grimoire.mjs?v=harvest-18';
 import {reap} from './reaper.mjs?v=harvest-18';
+import {horn, stepKnights} from './wightcaller.mjs?v=harvest-18';
 import {slideMove, steer} from './pathing.mjs?v=harvest-18';
 
 const dist = (a, b) => Math.hypot((a.x||0)-(b.x||0), (a.z||0)-(b.z||0));
@@ -174,14 +175,8 @@ const sentry = (w, p, {style, damage}) => {
   w.wearEquipped(p, 'weapon', 1);
 };
 
-const wight = (w, p, {style, damage}) => {
-  const knight = mine(w, p, 'wight')[0];
-  if(knight){
-    knight.age = 0; knight.damage = damage; const heal = Math.round(knight.maxHp*style.mend);
-    knight.hp = Math.min(knight.maxHp, knight.hp+heal); w.event('heal', knight.x, knight.z, `+${heal}`);
-  }else{const f = facing(p); summon(w, p, 'wight', p.x+f.x*1.4, p.z+f.z*1.4, damage);}
-  w.wearEquipped(p, 'weapon', 1);
-};
+// The Wightcaller horn orders its Grave Knight (src/wightcaller.mjs).
+const wight = (w, p, opts) => horn(w, p, {...opts, summon, aimTarget});
 
 // ------------------------------------------------------------------ crowd control
 const frost = (w, p, {style, damage}) => {
@@ -224,6 +219,7 @@ export function stepArsenal(w, dt, obstacles){
     w.zones = w.zones.filter(zone => !zone.done);
   }
   stepAllies(w, dt, obstacles, foes);
+  stepKnights(w, dt, obstacles, slideMove);
   stepGrimoire(w, dt);
 }
 
@@ -235,6 +231,8 @@ function stepAllies(w, dt, obstacles, foes){
     const owner = w.player(a.owner);
     if(!owner || a.age >= a.life){a.hp = 0; continue;}
     if(a.hp <= 0) continue;
+    // A commanded ally (the Grave Knight) moves only on orders: src/wightcaller.mjs steps it.
+    if(def.commanded) continue;
     const reachable = foes.filter(e => e.hp > 0 && dist(e, a) < def.sight && dist(e, owner) < def.leash);
     const target = reachable.sort((x, y) => dist(x, a)-dist(y, a))[0];
     a.anim = a.swing > 0 ? 'attack' : 'idle';

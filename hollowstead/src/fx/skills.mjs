@@ -228,22 +228,6 @@ export const SKILL_EVENTS = {
     // Pumpkin shell pieces.
     d.debris(ev.x, ev.z, 5+T.r, age, '#e0741c', seed+5, {speed: 4, up: 6, size: .16});
   }},
-  'fx:hornblast': {life: () => .9, kick: kickOf(1, '#dff6ff'), paint(d, ev, age, seed){
-    const h = hue('wighthorn'), T = tier(ev.rank);
-    for(let i = 0; i < 2+T.rings; i++){
-      const k = (age-i*.1)/.6;
-      if(k > 0 && k < 1) d.shock(ev.x, ev.z, .5+(ev.r || 3.6)*1.2*easeOut(k), .1*(1-k)+.03, i%2 ? h.alt : h.glow, fade(k));
-    }
-    d.bloom(ev.x, ev.z, 1.2, 1.4, h.core, .7*fade(age/.4));
-    if(T.r >= 3) d.motes(ev.x, ev.z, T.motes, age, ev.r || 3.6, h.main, .8, seed);
-  }},
-  'fx:charge': {life: ev => ev.end ? .7 : ev.start ? .4 : .01, kick: ev => ev.start ? kickOf(.6)(ev) : null, paint(d, ev, age, seed){
-    const h = hue('wighthorn'), T = tier(ev.rank);
-    if(ev.start){const k = age/.4; d.sigil(ev.x, ev.z, 1.6, h.main, fade(k), {spin: age*3}); return;}
-    const k = age/.7;
-    d.streak([ev.x0, 1.2, ev.z0], [ev.x, 1.2, ev.z], (1.6+.15*T.r)*(1-k), h.glow, .45*fade(k), .1);
-    burst(d, ev.x, ev.z, 1.6, age, ev.rank, seed, h, {life: .5, y: 1, rays: false});
-  }},
   'fx:frostnova': {life: () => 1.3, kick: kickOf(1.1, '#e6f8ff'), paint(d, ev, age, seed){
     const h = hue('censer'), T = burst(d, ev.x, ev.z, ev.r || 5, age, ev.rank, seed, h, {life: .8, y: .6, sparks: 1.2});
     const k = age/1.3;
@@ -451,18 +435,6 @@ export const SKILL_BEATS = {
     d.bloom(x, z, 1, 1+.12*T.r, h.core, .7);
     if(T.r >= 3) d.sparks(x, z, 1, 4, (clock*4)%.25, h.alt, .9, Math.floor(clock*16), {speed: 2, up: 1, life: .25});
     d.light(x, z, 3);
-  }},
-  charge: {lasting(d, b, t, clock, lead){
-    const h = hue('wighthorn'), T = tier(b.rank), x = b.x+b.dx*(b.v || 15)*lead, z = b.z+b.dz*(b.v || 15)*lead;
-    const f = Math.atan2(b.dz, b.dx), side = [-b.dz, b.dx];
-    // A spectral rider's wedge: lance tip, shield and a streaming mane of light.
-    const tip = [x+b.dx*1.3, 1.3, z+b.dz*1.3];
-    d.path([tip, [x+side[0]*.9-b.dx*.6, 1.1, z+side[1]*.9-b.dz*.6], [x-b.dx*1.2, 1.7, z-b.dz*1.2], [x-side[0]*.9-b.dx*.6, 1.1, z-side[1]*.9-b.dz*.6]], 0, h.main, .55, {fill: true, glow: true});
-    d.path([tip, [x-b.dx*2.4, 1.4, z-b.dz*2.4]], .12, '#ffffff', .9, {glow: true, taper: .6});
-    d.streak([x-b.dx*4, 1.2, z-b.dz*4], [x, 1.2, z], 1.8+.1*T.r, h.glow, .35);
-    for(let i = 0; i < 3; i++){const k = ((clock*6+i/3)%1); d.shock(x-b.dx*k*2, z-b.dz*k*2, .3+k*.9, .05, h.core, (1-k)*.8);}
-    if(T.r >= 3) d.twinkle(x, z, 2.2, .2, h.alt, .9, clock*5);
-    d.light(x, z, 3.5);
   }},
   flock: {lasting(d, b, t, clock, lead){
     const h = hue('crowtotem'), T = tier(b.rank), x = b.x+b.dx*(b.v || 13)*lead, z = b.z+b.dz*(b.v || 13)*lead;

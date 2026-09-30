@@ -10,6 +10,7 @@ import {PALLBEARER_FX} from './pallbearer.mjs?v=harvest-18';
 import {GLOOM_FX} from './gloomgrasp.mjs?v=harvest-18';
 import {GRIMOIRE_FX} from './grimoire.mjs?v=harvest-18';
 import {REAPER_FX} from './reaper.mjs?v=harvest-18';
+import {HORN_FX} from './wightcaller.mjs?v=harvest-18';
 import {magicItems} from '../magic/registry.mjs?v=harvest-18';
 import {rankOf} from '../progression.mjs?v=harvest-18';
 
@@ -27,7 +28,7 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
  *                      behind the body); `keep` is handed back to its list painters as ctx.rig(ownerId).
  * Starfall predates this and is wired in by hand below.
  */
-export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAPER_FX];
+export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAPER_FX, HORN_FX];
 const FOE_FX = WEAPON_FX.filter(fx => fx.foes);
 const FX_BY_ID = new Map(WEAPON_FX.map(fx => [fx.id, fx]));
 

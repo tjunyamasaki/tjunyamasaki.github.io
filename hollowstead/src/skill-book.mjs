@@ -11,6 +11,7 @@ import {RITE, beginRite} from './magic/pallbearer.mjs?v=harvest-18';
 import {gripAll} from './magic/gloomgrasp.mjs?v=harvest-18';
 import {finalChapter} from './grimoire.mjs?v=harvest-18';
 import {deathMark, deathReap} from './reaper.mjs?v=harvest-18';
+import {wildHunt} from './wightcaller.mjs?v=harvest-18';
 import {isMagicAlly, ownerPower} from './magic/registry.mjs?v=harvest-18';
 
 const TAU = Math.PI*2;
@@ -168,12 +169,18 @@ export const SKILL_BOOK = Object.freeze({
       }
     }},
 
-  wighthorn: {name: 'Last Charge', cooldown: 14, reach: 10, pose: 1,
-    blurb: 'A horn blast hurls foes back, then a spectral Grave Knight charges through them. Your own knight is called or mended.',
+  wighthorn: {name: 'Wild Hunt', cooldown: 14, reach: 10, pose: 1,
+    blurb: 'The horn calls the Wild Hunt: four ghost riders and your Grave Knight charge through the mark from five sides and meet in one great Gravefall.',
     cast(k){
-      k.beat(.12, {kind: 'blast', fx: 'hornblast', follow: true, r: 3.6, dmg: k.dmg(1), push: 1.8, falloff: .2});
-      k.beat(.2, {kind: 'call', fn: 'knight', quiet: true, dmg: k.dmg(1)});
-      k.beat(.42, {kind: 'wave', fx: 'charge', follow: true, len: 11, v: 15, w: 1.6, dmg: k.dmg(2.6), push: 1.2, pushDir: 'side', stun: .6});
+      const t = k.target(9, 5), x = round(t.x), z = round(t.z);
+      // Your own knight (src/wightcaller.mjs) charges in and leaps; four ghost riders run through from the other sides.
+      k.beat(0, {kind: 'call', fn: 'wildhunt', fx: 'wildhunt', x, z, power: round(k.strength)});
+      const a0 = Math.atan2(z-k.z, x-k.x);
+      for(let i = 1; i <= 4; i++){
+        const a = a0+i*TAU/5, dx = -Math.cos(a), dz = -Math.sin(a);
+        k.beat(.2+i*.06, {kind: 'wave', fx: 'ghostrider', x: round(x-dx*6.5), z: round(z-dz*6.5), dx: round(dx), dz: round(dz), len: 7.5, v: 16, w: 1.1, dmg: k.dmg(.6), seq: i});
+      }
+      k.beat(.95, {kind: 'blast', fx: 'huntfall', x, z, r: 3.2, dmg: k.dmg(1.8), stun: .8, falloff: .25});
     }},
 
   censer: {name: 'Absolute Zero', cooldown: 13, reach: 5, pose: 1,
@@ -325,13 +332,6 @@ export const SKILL_CALLS = Object.freeze({
     }
     return {pts, hits: pts.length};
   },
-  /** Last Charge: your Grave Knight answers the horn, whole again (or is raised). */
-  knight(world, b, owner){
-    const knight = mine(world, owner, 'wight')[0];
-    if(knight){knight.hp = knight.maxHp; knight.age = 0; world.event('heal', knight.x, knight.z, `+${Math.round(knight.maxHp)}`);}
-    else summon(world, owner, 'wight', owner.x-(owner.dx || 0)*1.4, owner.z-(owner.dz || 0)*1.4, b.dmg || 30);
-    return null;
-  },
   /** Murder of Crows: extra crows past the totem's usual flock. */
   summon(world, b, owner){
     const type = b.ally || 'crow';
@@ -351,5 +351,7 @@ export const SKILL_CALLS = Object.freeze({
   finalchapter(world, b, owner){return finalChapter(world, owner, b);},
   /** Last Harvest: Death dooms everything in reach, then reaps it (src/reaper.mjs). */
   deathmark(world, b, owner){return deathMark(world, owner, b);},
+  /** Wild Hunt: your Grave Knight charges the mark and ends in a Gravefall there (src/wightcaller.mjs). */
+  wildhunt(world, b, owner){return wildHunt(world, owner, b, summon);},
   deathreap(world, b, owner, obstacles, {hit}){return deathReap(world, owner, b, e => hit(world, owner, e, b, owner.x, owner.z, obstacles));},
 });

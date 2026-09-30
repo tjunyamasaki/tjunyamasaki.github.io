@@ -8,6 +8,7 @@ import {ALLIES, DASH} from './progression.mjs?v=harvest-18';
 import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-18';
 import {nightGlow} from './regions.mjs?v=harvest-18';
 import {dropGlow} from './drops.mjs?v=harvest-18';
+import {beaconArt, beaconPhase, beaconStrength, dropSticker, lootBeacon, preloadDropArt} from './drop-art.mjs?v=harvest-18';
 import {glowStrength} from './lighting.mjs?v=harvest-18';
 import {SceneryLayer} from './scenery.mjs?v=harvest-18';
 import {groundColors, walkableAt} from './worldgen.mjs?v=harvest-18';
@@ -111,7 +112,7 @@ export class Renderer {
     this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.rigMeshes=new Map();this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);
     this.scene.fog=new THREE.FogExp2(theme.palette.background,.009);this.camera=new THREE.OrthographicCamera(-15,15,15,-15,.1,180);
     this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.setPixelRatio(Math.min(devicePixelRatio,1.6));this.gl.outputColorSpace=THREE.SRGBColorSpace;
-    this.objects=new Map();this.textures=new Map();this.materials=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
+    this.objects=new Map();this.textures=new Map();this.materials=new Map();this.dropTextures=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
     this.ray=new THREE.Raycaster();this.groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);this.v=new THREE.Vector3();this.view=null;this.localId=null;
     this.shadowGeo=new THREE.CircleGeometry(1,16);this.shadowMat=new THREE.MeshBasicMaterial({color:0x241e2c,transparent:true,opacity:.19,depthWrite:false});
     const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d'),g=ctx.createRadialGradient(64,64,2,64,64,64);g.addColorStop(0,'rgba(255,217,149,.5)');g.addColorStop(.5,'rgba(239,176,100,.22)');g.addColorStop(1,'rgba(240,163,93,0)');ctx.fillStyle=g;ctx.fillRect(0,0,128,128);this.glowMap=new THREE.CanvasTexture(c);
@@ -154,7 +155,7 @@ export class Renderer {
     const channel=byte=>linearFromDisplay(Math.min(1, Math.max(0, display*(byte/255))));
     material.color.setRGB(channel(tint.r), channel(tint.g), channel(tint.b));
   }
-  async preload(){await preloadThemeAssets(this.theme);await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{const map=new THREE.Texture(await loadImage(def.src));map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;map.minFilter=THREE.LinearFilter;map.magFilter=THREE.LinearFilter;this.textures.set(key,map);}));}
+  async preload(){await preloadThemeAssets(this.theme);preloadDropArt(this.theme);await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{const map=new THREE.Texture(await loadImage(def.src));map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;map.minFilter=THREE.LinearFilter;map.magFilter=THREE.LinearFilter;this.textures.set(key,map);}));}
   resize(){const size=viewSize(this.canvas);const w=size.width,h=size.height;this.viewWidth=w;this.viewHeight=h;this.gl.setSize(w,h,false);const aspect=w/Math.max(1,h),half=orthographicHalf(w,h);this.camera.left=-half*aspect/this.zoom;this.camera.right=half*aspect/this.zoom;this.camera.top=half/this.zoom;this.camera.bottom=-half/this.zoom;this.camera.updateProjectionMatrix();}
   setZoom(value){this.zoom=Math.max(.65,Math.min(1.6,value));this.resize();}
   sprite(key,id){
@@ -164,7 +165,37 @@ export class Renderer {
     this.scene.add(sprite);const shadow=new THREE.Mesh(this.shadowGeo,this.shadowMat);shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;shadow.scale.setScalar(def.size[0]*.26);this.scene.add(shadow);
     const o={id,key,sprite,shadow,def,x:0,z:0,initialized:false};this.objects.set(id,o);return o;
   }
-  remove(o){this.scene.remove(o.sprite,o.shadow);o.sprite.material.map.dispose();o.sprite.material.dispose();if(o.glow){this.scene.remove(o.glow);o.glow.geometry.dispose();o.glow.material.dispose();}if(o.eyes){this.scene.remove(o.eyes);o.eyes.material.map.dispose();o.eyes.material.dispose();}if(o.danger){this.scene.remove(o.danger);o.danger.geometry.dispose();o.danger.material.dispose();}if(o.health){this.scene.remove(o.health.back,o.health.fill);o.health.back.material.dispose();o.health.fill.material.dispose();}this.objects.delete(o.id);}
+  /** A dropped item: its icon as a rimmed sticker (drop-art.mjs). Null while the icon decodes. */
+  dropSprite(key,id,e){
+    const st=dropSticker(this.theme,key,e.stack?.itemId);if(!st)return null;
+    let base=this.dropTextures.get(st);if(!base){base=new THREE.CanvasTexture(st.canvas);base.colorSpace=THREE.SRGBColorSpace;base.minFilter=THREE.LinearFilter;base.magFilter=THREE.LinearFilter;base.generateMipmaps=false;this.dropTextures.set(st,base);}
+    const def={size:[st.width,st.height],anchor:st.anchor,columns:1,rows:1,clips:{idle:{frames:[0],fps:1}}};
+    const map=base.clone();map.needsUpdate=true;
+    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map,transparent:true,alphaTest:.04,depthWrite:false}));sprite.center.set(...def.anchor);sprite.scale.set(...def.size,1);
+    this.scene.add(sprite);const shadow=new THREE.Mesh(this.shadowGeo,this.shadowMat);shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;shadow.scale.setScalar(st.width*.3);this.scene.add(shadow);
+    const o={id,key,sprite,shadow,def,x:0,z:0,initialized:false};this.objects.set(id,o);return o;
+  }
+  /** Epic and legendary loot: a pool and ripple on the ground, a column of light behind the item, motes in front. */
+  syncBeacon(o,b,e,frame,blink,visible){
+    if(!o.beacon){
+      const art=beaconArt();if(!art?.beam)return;
+      this.beaconTex||=Object.fromEntries(Object.entries(art).map(([k,c])=>{const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return [k,t];}));
+      const mat=map=>({map,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,color:new THREE.Color(b.color)});
+      const flat=map=>{const m=new THREE.Mesh(this.beaconPlane||=new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial(mat(map)));m.rotation.x=-Math.PI/2;m.renderOrder=-1;return m;};
+      const beam=new THREE.Sprite(new THREE.SpriteMaterial(mat(this.beaconTex.beam)));beam.center.set(.5,0);
+      const motes=Array.from({length:b.motes},()=>new THREE.Sprite(new THREE.SpriteMaterial(mat(this.beaconTex.mote))));
+      o.beacon={pool:flat(this.beaconTex.pool),ring:flat(this.beaconTex.ring),beam,motes};
+      this.scene.add(o.beacon.pool,o.beacon.ring,beam,...motes);
+    }
+    const B=o.beacon,all=[B.pool,B.ring,B.beam,...B.motes];for(const m of all)m.visible=visible;if(!visible)return;
+    const str=beaconStrength(frame.darkness,this.clock,e.x,blink),{ripple,motes}=beaconPhase(b,this.clock,e.x);
+    B.pool.position.set(o.x,.025,o.z);B.pool.scale.set(b.ring*1.3,b.ring*1.3,1);B.pool.material.opacity=.8*str;
+    const r=.5+ripple*(b.ring*2-.5);B.ring.position.set(o.x,.03,o.z);B.ring.scale.set(r,r,1);B.ring.material.opacity=(1-ripple)*str;
+    // Just behind the item in depth, so it sorts after the scenery behind it but under the item.
+    B.beam.position.set(o.x,0,o.z-.06);B.beam.scale.set(b.width,b.height,1);B.beam.material.opacity=str;
+    B.motes.forEach((m,i)=>{const q=motes[i];m.position.set(o.x+q.x,q.t*b.height*.9,o.z+.06);m.scale.set(.3,.3,1);m.material.opacity=q.alpha*str;});
+  }
+  remove(o){if(o.beacon){for(const m of [o.beacon.pool,o.beacon.ring,o.beacon.beam,...o.beacon.motes]){this.scene.remove(m);m.material.dispose();}o.beacon=null;}this.scene.remove(o.sprite,o.shadow);o.sprite.material.map.dispose();o.sprite.material.dispose();if(o.glow){this.scene.remove(o.glow);o.glow.geometry.dispose();o.glow.material.dispose();}if(o.eyes){this.scene.remove(o.eyes);o.eyes.material.map.dispose();o.eyes.material.dispose();}if(o.danger){this.scene.remove(o.danger);o.danger.geometry.dispose();o.danger.material.dispose();}if(o.health){this.scene.remove(o.health.back,o.health.fill);o.health.back.material.dispose();o.health.fill.material.dispose();}this.objects.delete(o.id);}
   terrain(seed,world=null){
     if(this.ground){this.scene.remove(this.ground);this.ground.geometry.dispose();this.ground.material.map?.dispose();this.ground.material.dispose();}
     if(this.scatter){this.scene.remove(this.scatter);this.scatter.geometry.dispose();this.scatter.material.dispose();}
@@ -326,7 +357,7 @@ export class Renderer {
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
-      const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key){if(o)this.remove(o);o=this.sprite(key,id);}o.sprite.visible=o.shadow.visible=visible;if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.eyes)o.eyes.visible=visible;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
+      const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key){if(o)this.remove(o);o=kind==='drop'?this.dropSprite(key,id,e):this.sprite(key,id);if(!o){alive.delete(id);continue;}}o.sprite.visible=o.shadow.visible=visible;if(o.beacon&&!visible)this.syncBeacon(o,null,e,null,0,false);if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.eyes)o.eyes.visible=visible;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
       const present=kind==='drop'?this.dropMotion.sample(e,world,this.clock,dt,id=>{const body=this.objects.get('player'+id);return body?.initialized?{x:body.x,z:body.z}:null;}):null;
       const tx=present?present.x:e.x, tz=present?present.z:e.z;
       const smooth=(['player','enemy','magic','ally'].includes(kind)||key==='cart')&&!demo?Math.min(1,dt*(e.id===localId||(key==='cart'&&e.towedBy===localId)?22:13)):1;
@@ -337,7 +368,7 @@ export class Renderer {
       // A hand cart shows its handle on the puller's side. Sprites ignore a negative scale, so mirror the sheet cell instead.
       if(key==='cart'){const mirror=e.face===1;o.sprite.material.map.repeat.x=(mirror?-1:1)/cols;if(mirror)o.sprite.material.map.offset.x+=1/cols;}
       const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob:kind==='enemy'&&key==='wraith'?.2+Math.sin(this.clock*3)*.1:0;
-      let sx=o.def.size[0],sy=o.def.size[1];if(kind==='drop'){sx=.85;sy=1.28;if(present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}}
+      let sx=o.def.size[0],sy=o.def.size[1];if(kind==='drop'&&present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}
       if(e.down||e.ghost){sx*=.8;sy*=.65;}
       if(kind==='enemy'&&e.elite){sx*=1.3;sy*=1.3;}
       if(key==='gravecraft-skeleton')sy*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
@@ -365,7 +396,7 @@ export class Renderer {
       if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);this.syncWeaponRig(e,o,world,weapon);}
       // Night-only finds (regions.mjs) glow in the dark so they can be found from afar.
       if(kind==='node'){const hue=nightGlow(e);if(hue){this.glow(o,1.1);o.glow.material.color.set(hue);o.glow.material.opacity=(.16+.42*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));}}
-      if(lootGlow){this.glow(o,.85);o.glow.material.color.set(lootGlow);o.glow.material.opacity=(.13+.29*frame.darkness)*(.85+.15*Math.sin(this.clock*2.4+e.x))*dropBlink(e,world.time,this.clock);}
+      if(kind==='drop'){const beacon=present?.t?null:lootBeacon(e.stack?.itemId);if(beacon)this.syncBeacon(o,beacon,e,frame,dropBlink(e,world.time,this.clock),true);else if(o.beacon)this.syncBeacon(o,null,e,null,0,false);}
       if(kind==='building'&&key==='gate'&&e.open)o.sprite.scale.x*=.35;
       if((kind==='enemy'||kind==='building'||(kind==='ally'&&key!=='crow'))&&e.hp<e.maxHp&&fade>0.04){if(!o.health){const back=new THREE.Sprite(new THREE.SpriteMaterial({color:0x302834,transparent:true,depthWrite:false})),fill=new THREE.Sprite(new THREE.SpriteMaterial({color:kind==='enemy'?0xdf9383:kind==='ally'?0x9fd8a8:0xd2c395,transparent:true,depthWrite:false}));fill.center.set(0,.5);this.scene.add(back,fill);o.health={back,fill};}const y=kind==='ally'?({wight:4.3,jack:2.4}[key]||1.6):(kind==='enemy'?({king:5.4,brute:3.3,wraith:2.2,golem:3.4,bonewalker:2.4,bogling:1.6}[key]||1.3)*(e.elite?1.3:1):key==='hearth'?3.6:1.8);o.health.back.position.set(o.x,y,o.z);o.health.fill.position.set(o.x-.65,y,o.z+.025);o.health.back.scale.set(1.4,.1,1);o.health.fill.scale.set(1.3*Math.max(0,e.hp/e.maxHp),.055,1);o.health.back.material.opacity=o.health.fill.material.opacity=fade;o.health.back.visible=o.health.fill.visible=true;}
       if(kind==='enemy'){const tg=telegraphOf(e);if(tg){const reach=tg.radius||tg.length||2;if(warningVisible(frame, tg.x, tg.z, reach, p))this.combat.telegraph(tg,frame.darkness>0.5?.75:1,this.clock);

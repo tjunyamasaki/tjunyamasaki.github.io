@@ -8,7 +8,9 @@ to src/scenery-atlas.mjs (generated: do not edit by hand). Every drawing shares 
 U design units per world unit, upright things stand on (256, 740), flat decals and fliers are centred on
 (256, 512). So a prop's size in the world is simply its drawn size, and animation frames line up.
 
-Decoration must stay quieter than the nodes you can harvest: smaller, softer colours, a thinner outline.
+Decoration must stay quieter than the nodes you can harvest: smaller and in softer colours. It keeps the
+same outline weight as everything else (lib.LINE_WU), so it reads as part of the same world; small props
+therefore carry few, large shapes: no interior mark much thinner than half the outline.
 """
 import math, os, random
 from lib import *
@@ -18,7 +20,8 @@ U = 230.0              # design units per world unit
 GX, GY = 256, 740      # ground contact of upright props and critters
 CX, CY = 256, 512      # centre of flat decals and fliers
 PPU = 80               # atlas pixels per world unit
-LINE = .62             # outline weight (design units, x BASE_LINE): about 0.022 world units, thinner than the nodes
+LINE = lib.LINE_WU * U / BASE_LINE   # outline weight (x BASE_LINE): the same world-unit line as every other sprite
+RIPPLE = .62 / LINE    # water rings are light, not ink: they keep their original thin weight
 PAD = 3                # transparent pixels around every cell
 ATLAS_W = 1024
 
@@ -45,6 +48,9 @@ FEATH = "#3b3346"; FEATH_D = "#2a2433"; FEATH_L = "#625673"
 BAT = "#4a3f5a"; BAT_D = "#342b40"; BAT_L = "#665a78"
 FROG = "#6f8a4e"; FROG_D = "#536b3a"; FROG_L = "#9bb472"; BELLY = "#c9c79a"
 MOTH = "#d7ccb2"; MOTH_D = "#ada186"; MOTH_L = "#f1e9d6"
+
+
+HEAD = 1.45           # flower heads, scaled up so petals stay open at the shared outline weight
 
 
 def u(v):
@@ -100,6 +106,7 @@ def flower_cluster(heads, petal, petal_d, centre, kind, seed):
         b += stroke(curve(GX + dx * .3, GY, GX + dx, GY - h, r.uniform(-14, 14)), 4, G_D)
     for dx, h, s in heads:
         x, y = GX + dx, GY - h
+        s *= HEAD   # heads big enough that the shared outline never swallows them
         if kind == "daisy":
             ps = [oval(x + math.cos(a) * 15 * s, y + math.sin(a) * 11 * s, 11 * s, 5.5 * s, math.degrees(a)) for a in [k * math.pi / 4 for k in range(8)]]
             b += union(ps, petal, 9)
@@ -111,7 +118,7 @@ def flower_cluster(heads, petal, petal_d, centre, kind, seed):
             b += f'<circle cx="{f(x)}" cy="{f(y)}" r="{f(4 * s)}" fill="{centre}" stroke="none"/>'
         elif kind == "bell":
             for k in range(3):
-                bx, by = x + (k - 1) * 13 * s, y + 6 + abs(k - 1) * 9 * s
+                bx, by = x + (k - 1) * 17 * s, y + 6 + abs(k - 1) * 9 * s
                 bell = f"M{f(bx - 8 * s)} {f(by)} Q{f(bx - 9 * s)} {f(by - 16 * s)} {f(bx)} {f(by - 17 * s)} Q{f(bx + 9 * s)} {f(by - 16 * s)} {f(bx + 8 * s)} {f(by)} L{f(bx + 11 * s)} {f(by + 5 * s)} L{f(bx)} {f(by + 2 * s)} L{f(bx - 11 * s)} {f(by + 5 * s)} Z"
                 b += fill(bell, petal if k != 1 else petal_d, 7)
         elif kind == "poppy":
@@ -119,13 +126,14 @@ def flower_cluster(heads, petal, petal_d, centre, kind, seed):
             b += shaded(d, cup, petal, petal_d, 5, -4, "", 7)
             b += ell(x, y - 8 * s, 5 * s, 3.5 * s, centre, 4)
         elif kind == "spike":
-            for k in range(5):
-                b += ell(x + math.sin(k * 1.7) * 4 * s, y + k * 10 * s, 7 * s - k * .4, 6 * s, petal if k % 2 else petal_d, 5)
+            buds = [(x + math.sin(k * 1.7) * 4 * s, y + k * 10 * s, 7 * s - k * .4, 6 * s) for k in range(4)]
+            b += union([oval(bx, by, rx, ry) for bx, by, rx, ry in buds], petal, 8)
+            b += "".join(fill_ns(oval(bx + 2 * s, by + 2 * s, rx * .55, ry * .5), petal_d, .9) for bx, by, rx, ry in buds[1::2])
     return d, b
 
 
 def daisy():
-    return flower_cluster([(-46, 104, 1.0), (22, 138, 1.1), (64, 88, .85), (-8, 70, .8)], "#e6dfca", "#c4bca4", "#d6a445", "daisy", 3)
+    return flower_cluster([(-46, 104, 1.0), (22, 138, 1.1), (64, 80, .85)], "#e6dfca", "#c4bca4", "#d6a445", "daisy", 3)
 
 
 def buttercup():
@@ -133,7 +141,7 @@ def buttercup():
 
 
 def bluebell():
-    return flower_cluster([(-30, 126, 1.0), (40, 150, 1.05), (-72, 92, .85)], "#8d8fc4", "#6b6ca0", "#6b6ca0", "bell", 7)
+    return flower_cluster([(-40, 120, 1.0), (40, 150, 1.05)], "#8d8fc4", "#6b6ca0", "#6b6ca0", "bell", 7)
 
 
 def poppy():
@@ -141,7 +149,7 @@ def poppy():
 
 
 def heather():
-    return flower_cluster([(-44, 118, .9), (0, 150, 1.0), (46, 124, .9), (-78, 84, .75), (80, 90, .75)], "#b47ba3", "#8e5c83", "#8e5c83", "spike", 11)
+    return flower_cluster([(-50, 112, .9), (0, 150, 1.0), (52, 118, .9)], "#b47ba3", "#8e5c83", "#8e5c83", "spike", 11)
 
 
 def tuft():
@@ -186,7 +194,7 @@ def scarecrow():
     b += fill(f"M96 372 L416 366 L416 392 L96 398 Z", WG, 7)
     shirt = "M170 372 L342 372 L402 380 L404 420 L352 420 L330 560 L182 560 L160 420 L108 420 L110 380 Z"
     b += shaded(d, shirt, CLOTHR, CLOTHR_D, 8, 0, brush((196, 400), (190, 470), (200, 540), 5, "#a8705c", .8))
-    b += fill("M270 440 L312 436 L314 476 L272 480 Z", BURLAP_D, 5) + line("M276 446 L306 470 M306 446 L278 472", 3)
+    b += fill("M270 440 L312 436 L314 476 L272 480 Z", BURLAP_D, 5)
     b += line("M172 470 L332 466", 7) + line("M172 470 L332 466", 4, DRY_D)
     for (x, y, a) in [(104, 400, 180), (408, 400, 0), (200, 562, 100), (256, 566, 90), (312, 562, 80)]:
         for k in (-22, 0, 22):
@@ -195,7 +203,7 @@ def scarecrow():
     head = blob(256, 306, 50, 54, 9, .06, 5)
     b += shaded(d, head, BURLAP, BURLAP_D, 6, 4, brush((222, 280), (226, 300), (236, 322), 4, "#d6c49c", .8))
     b += line("M232 290 L248 306 M248 290 L232 306 M266 290 L282 306 M282 290 L266 306", 5)
-    b += line("M234 330 Q256 342 280 330", 4) + line("M240 326 L240 336 M256 330 L256 340 M272 326 L272 336", 3)
+    b += line("M234 330 Q256 342 280 330", 4)
     b += line("M218 356 Q256 366 294 356", 7) + line("M218 356 Q256 366 294 356", 3, DRY_D)
     b += ell(256, 258, 92, 18, "#5a4a52", 7)
     b += fill("M212 258 Q214 196 256 190 Q300 196 300 258 Z", "#5a4a52", 7) + line("M214 244 Q256 254 298 244", 6, "#8f3a3f")
@@ -229,10 +237,10 @@ def fern(scale=1.0, seed=3, n=5):
         fronds.append((tip, ctrl, i))
     for tip, ctrl, i in sorted(fronds, key=lambda t: abs(t[2] - (n - 1) / 2), reverse=True):
         col = GW if i % 2 else GW_D
-        P = qpts((GX, GY - 4), ctrl, tip, 10)
+        P = qpts((GX, GY - 4), ctrl, tip, 6)
         leaflets = []
         for k, (x, y, nx, ny, t) in enumerate(P[1:-1]):
-            w = 26 * scale * (1 - t * .7)
+            w = 36 * scale * (1 - t * .6)
             for side in (-1, 1):
                 leaflets.append(oval(x + nx * w * .55 * side, y + ny * w * .55 * side, w * .6, w * .22, math.degrees(math.atan2(ny * side, nx * side))))
         b += union(leaflets + [ribbon((GX, GY - 4), ctrl, tip, lambda t: 7 * scale * (1 - t) + 2)], col, 9)
@@ -320,8 +328,6 @@ def old_lantern():
     glass = f"M{x - 22} {GY - 246} L{x + 22} {GY - 246} L{x + 18} {GY - 176} L{x - 18} {GY - 176} Z"
     b += fill(glass, "#4a4d5a", 6)
     b += fill_ns(f"M{x - 18} {GY - 240} L{x - 2} {GY - 240} L{x - 6} {GY - 182} L{x - 15} {GY - 182} Z", "#6b7080", .9)
-    b += line(f"M{x + 4} {GY - 236} L{x + 12} {GY - 214} L{x + 6} {GY - 200}", 2.5, "#8b90a0")
-    b += line(f"M{x - 8} {GY - 246} L{x - 7} {GY - 176} M{x + 8} {GY - 246} L{x + 7} {GY - 176}", 3)
     b += rrect(x - 26, GY - 180, 52, 12, 4, IRN, 6)
     b += fill_ns(blob(x + 12, GY - 184, 10, 5, 6, .3, 2), "#8a5a3c", .9)
     b += brush((GX - 3, GY - 40), (GX - 4, GY - 140), (GX - 1, GY - 230), 3, IRN_L, .8)
@@ -351,12 +357,11 @@ def cross_stone():
 def candles():
     d = []; b = ""
     b += fill(blob(GX, GY - 4, 64, 11, 8, .15, 3), WAX_D, 5)
-    for (x, h, w) in [(-30, 70, 15), (8, 96, 17), (40, 50, 13)]:
+    for (x, h, w) in [(-24, 72, 20), (22, 100, 22)]:
         X = GX + x
         c = f"M{X - w} {GY - 4} L{X - w} {GY - h} Q{X} {GY - h - 8} {X + w} {GY - h} L{X + w} {GY - 4} Z"
-        b += shaded(d, c, WAX, WAX_D, 5, 0)
-        b += fill(f"M{X - w} {GY - h + 2} Q{X - w - 4} {GY - h + 22} {X - w + 4} {GY - h + 26} Q{X - w + 8} {GY - h + 16} {X - w + 7} {GY - h + 4} Z", WAX, 3)
-        b += line(f"M{X} {GY - h - 4} L{X + 2} {GY - h - 16}", 3)
+        b += shaded(d, c, WAX, WAX_D, 7, 0)
+        b += line(f"M{X} {GY - h - 4} L{X + 2} {GY - h - 18}", 4)
     return d, b
 
 
@@ -708,9 +713,9 @@ def ripple(k):
     """Water rings spreading from a plop (top-down, centred)."""
     d = []; b = ""
     r1 = 34 + k * 44; ry = r1 * .9
-    b += f'<ellipse cx="{CX}" cy="{CY}" rx="{f(r1)}" ry="{f(ry)}" fill="none" stroke="#b9ccd6" stroke-width="{sw(11 - k * 3)}" opacity=".9"/>'
+    b += f'<ellipse cx="{CX}" cy="{CY}" rx="{f(r1)}" ry="{f(ry)}" fill="none" stroke="#b9ccd6" stroke-width="{sw((11 - k * 3) * RIPPLE)}" opacity=".9"/>'
     if k:
-        b += f'<ellipse cx="{CX}" cy="{CY}" rx="{f(r1 * .55)}" ry="{f(ry * .55)}" fill="none" stroke="#9fb6c4" stroke-width="{sw(9 - k * 2)}" opacity=".85"/>'
+        b += f'<ellipse cx="{CX}" cy="{CY}" rx="{f(r1 * .55)}" ry="{f(ry * .55)}" fill="none" stroke="#9fb6c4" stroke-width="{sw((9 - k * 2) * RIPPLE)}" opacity=".85"/>'
     else:
         for a in range(0, 360, 60):
             x = CX + math.cos(math.radians(a)) * 20; y = CY + math.sin(math.radians(a)) * 18

@@ -60,7 +60,6 @@ export function damageFloater(list, ev, localId = null, kind = 'hit'){
   const num = document.createElement('b');
   num.textContent = kind === 'hurt' ? `−${Math.ceil(amount)}` : String(Math.ceil(amount));
   pop.append(num);
-  if(crit){const tag = document.createElement('i'); tag.textContent = 'CRIT'; pop.append(tag);}
   el.append(pop);
   if(!mount(el)) return null;
   // A little random fling to one side; hurt numbers drop instead of rising.

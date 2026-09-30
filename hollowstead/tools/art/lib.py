@@ -4,6 +4,12 @@ Every asset is drawn in a free "design space" (roughly a 512 x 768 frame with th
 ground near y=740). `build_sheet` measures the drawing, fits it into the footprint
 the asset should occupy inside its 512 x 768 cell, and rescales outline widths so
 every sprite ends up with the same line weight on screen.
+
+Line weight is set in WORLD units (LINE_WU), not per cell: the game stretches each cell to
+the sprite's world size (theme.json `size`), so a fixed width per cell made a tree's outline
+several times heavier than a tuft of grass or a dropped item. `line_for(world_width)` turns
+the world weight into the cell width `build_sheet` needs. Big silhouettes may carry a little
+more weight (up to BIG_LINE_MAX), never more.
 """
 import io, json, math, random
 import cairosvg
@@ -32,8 +38,21 @@ CLOTH = "#e8dcc0"; CLOTH_D = "#c4b393"
 
 # ---------------------------------------------------------------- stroke scaling
 K = 1.0          # multiplier applied to every stroke / brush width
-TARGET_LINE = 13.0  # final outline thickness inside a 512 x 768 cell
+TARGET_LINE = 13.0  # legacy: outline thickness inside a 512 x 768 cell when no world size is known
 BASE_LINE = 8.0
+
+# One outline for the whole world, in world units: the wanderers' line (13 px in a 512 cell
+# drawn 2.25 units wide), about 2 px on a phone. Everything else is matched to it.
+LINE_WU = 13.0 / 512 * 2.25
+LINE_REF_WIDTH = 2.25      # world width that gets exactly LINE_WU
+BIG_LINE_MAX = 1.25        # the largest props (trees, the king) may be at most this much heavier
+ICON_WU = 1.0              # square icons are drawn about one world unit wide (inventory slot, dropped item)
+
+
+def line_for(world_width, cell_width=512, big=True):
+    """Outline width inside a cell `cell_width` px wide that the game draws `world_width` units wide."""
+    k = min(BIG_LINE_MAX, max(1.0, (world_width / LINE_REF_WIDTH) ** 0.3)) if big else 1.0
+    return LINE_WU * k * cell_width / world_width
 
 def sw(n):
     return f"{n * K:.2f}"
@@ -211,15 +230,16 @@ def fit_transform(ub, target, align="bottom", ref=None):
     oy = (ty1 - ub[3] * s) if align == "bottom" else ((ty0 + ty1) / 2 - (ub[1] + ub[3]) / 2 * s)
     return s, ox, oy
 
-def build_sheet(frame_fns, cols, rows, target, cell=(512, 768), out_scale=0.5, align="bottom", center_on_first=True):
-    """frame_fns: list of callables returning (defs:list, body:str). Returns svg string."""
+def build_sheet(frame_fns, cols, rows, target, cell=(512, 768), out_scale=0.5, align="bottom", center_on_first=True, line=None):
+    """frame_fns: list of callables returning (defs:list, body:str). Returns svg string.
+    `line`: outline width in cell pixels (see line_for); None keeps the legacy TARGET_LINE."""
     global K
     K = 1.0
     frames = [fn() for fn in frame_fns]
     bbs = [bbox(fr) for fr in frames]
     s, ox, oy = fit_transform(union_bb(bbs), target, align, bbs[0] if center_on_first else None)
     # redraw with compensated line weight, measure again
-    K = TARGET_LINE / (BASE_LINE * s)
+    K = (TARGET_LINE if line is None else line) / (BASE_LINE * s)
     frames = [fn() for fn in frame_fns]
     bbs = [bbox(fr) for fr in frames]
     s, ox, oy = fit_transform(union_bb(bbs), target, align, bbs[0] if center_on_first else None)

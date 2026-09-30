@@ -15,7 +15,7 @@ import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-
 import {ALLIES, DASH, RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-18';
 import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-18';
 import {nightGlow} from './regions.mjs?v=harvest-18';
-import {dropGlow} from './drops.mjs?v=harvest-18';
+import {beaconArt, beaconPhase, beaconStrength, dropSticker, lootBeacon, preloadDropArt} from './drop-art.mjs?v=harvest-18';
 import {arenaProps, arenaTile, plazaProps} from './renderer.mjs?v=harvest-18';
 import {STRIKE_COLORS} from './renderer.mjs?v=harvest-18';
 import {glowStrength} from './lighting.mjs?v=harvest-18';
@@ -31,7 +31,7 @@ export class CanvasRenderer {
     this.images=new Map();this.zoom=1;this.clock=0;this.lastEvent=0;this.seed=null;this.effects=[];this.floaters=[];this.focus={x:0,z:0,set:(x,y,z)=>{this.focus.x=x;this.focus.z=z;}};this.dropMotion=createDropMotion();this.view=null;this.localId=null;
     this.onResize=()=>this.resize();watchViewport(this.onResize);this.resize();
   }
-  async preload(){await preloadThemeAssets(this.theme);await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{try{this.images.set(key,await loadImage(def.src));}catch{throw new Error(`Missing sprite: ${key}`);}}));}
+  async preload(){await preloadThemeAssets(this.theme);preloadDropArt(this.theme);await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{try{this.images.set(key,await loadImage(def.src));}catch{throw new Error(`Missing sprite: ${key}`);}}));}
   resize(){const size=viewSize(this.canvas);this.width=size.width;this.height=size.height;const dpr=Math.min(devicePixelRatio||1,1.6);this.canvas.width=Math.round(this.width*dpr);this.canvas.height=Math.round(this.height*dpr);this.ctx.setTransform(dpr,0,0,dpr,0,0);const half=orthographicHalf(this.width,this.height);this.scale=this.height/(2*half/this.zoom);}
   setZoom(value){this.zoom=Math.max(.65,Math.min(1.6,value));this.resize();}
   screenPoint(x,z,y=0){return{x:(x-this.focus.x)*this.scale+this.width/2,y:(z-this.focus.z)*this.scale*.72-y*this.scale*.694+this.height/2};}
@@ -49,7 +49,36 @@ export class CanvasRenderer {
   float(text,x,z,color='#f8dfb3',opts={}){spawnFloater(this.floaters,text,x,z,color,opts);}
   reveal(x,z){if(!this.view)return 1;return labelOpacity(brightnessAt(this.view.sources, x, z, this.view.darkness, this.view.lighting), this.view.darkness, this.view.lighting);}
   glow(x,z,r,opacity){const c=this.ctx,p=this.screenPoint(x,z),feather=this.view?.lighting.ambientFraction||1.2;c.save();c.translate(p.x,p.y);c.scale(1,.72);const radius=r*feather*this.scale;const g=c.createRadialGradient(0,0,radius*0.55,0,0,radius);g.addColorStop(0,`rgba(250,190,113,${opacity})`);g.addColorStop(.55,`rgba(250,190,113,${opacity*.35})`);g.addColorStop(1,'rgba(250,190,113,0)');c.fillStyle=g;c.beginPath();c.arc(0,0,radius,0,Math.PI*2);c.fill();c.restore();}
+  /** A dropped item: its icon as a rimmed sticker (drop-art.mjs); valuable loot also gets a beacon. */
+  drawDrop(key,e,world,frame){
+    const st=dropSticker(this.theme,key,e.stack?.itemId);if(!st)return;
+    const c=this.ctx,S=this.scale,ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
+    const shrink=e.flightT?1-e.flightT*0.35:1,w=st.width*S*shrink,h=st.height*S*shrink;
+    const blink=dropBlink(e,world.time,this.clock),beacon=e.flightT?null:lootBeacon(e.stack?.itemId);
+    const display=entityBrightness(frame,e.x,e.z,{emissive:!!beacon});
+    if(beacon)this.drawBeacon(beacon,ground,e,frame,blink,'back');
+    c.save();c.globalAlpha=blink;
+    c.fillStyle='#211b2b44';c.beginPath();c.ellipse(ground.x,ground.y,w*.34,w*.11,0,0,Math.PI*2);c.fill();
+    c.filter=`brightness(${Math.min(1,Math.max(0,display))})`;
+    c.drawImage(st.canvas,s.x-w*st.anchor[0],s.y-h*(1-st.anchor[1]),w,h);c.filter='none';c.restore();
+    if(beacon)this.drawBeacon(beacon,ground,e,frame,blink,'front');
+  }
+  /** Epic and legendary loot: a pool and ripple on the ground and a column of light (behind), motes (in front). */
+  drawBeacon(b,ground,e,frame,blink,layer){
+    const art=beaconArt(b.color);if(!art?.beam)return;
+    const c=this.ctx,S=this.scale,str=beaconStrength(frame.darkness,this.clock,e.x,blink),{ripple,motes}=beaconPhase(b,this.clock,e.x);
+    c.save();c.globalCompositeOperation='lighter';
+    if(layer==='back'){
+      const pool=b.ring*1.3*S;c.globalAlpha=.8*str;c.drawImage(art.pool,ground.x-pool/2,ground.y-pool*.36,pool,pool*.72);
+      const ring=(.5+ripple*(b.ring*2-.5))*S;c.globalAlpha=(1-ripple)*str;c.drawImage(art.ring,ground.x-ring/2,ground.y-ring*.36,ring,ring*.72);
+      const H=b.height*S,W=b.width*S;c.globalAlpha=str;c.drawImage(art.beam,ground.x-W/2,ground.y-H,W,H);
+    }else{
+      for(const m of motes){const r=.3*S,y=ground.y-m.t*b.height*S*.9;c.globalAlpha=m.alpha*str;c.drawImage(art.mote,ground.x+m.x*S-r/2,y-r/2,r,r);}
+    }
+    c.restore();
+  }
   drawSprite(key,e,kind,world,frame,p){
+    if(kind==='drop')return this.drawDrop(key,e,world,frame);
     // A weapon's body rig (src/fx WEAPON_FX: the kitsune's tails...). One sorted behind the body is
     // drawn now; one sorted in front of it (origin nearer the camera) after the body.
     let rigAfter=null;
@@ -61,17 +90,16 @@ export class CanvasRenderer {
     const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||this.images.get('ember'),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
     const special=kind==='ally'?(e.anim||'idle'):magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0||e.act>0?'attack':'walk'):e.action||'idle'),clip=def.clips[clipName]||def.clips.walk||def.clips.attack||def.clips.idle;
     const cols=def.columns||1,rows=def.rows||1,frameIndex=key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
-    let w=(kind==='drop'?.85:def.size[0])*this.scale,h=(kind==='drop'?1.28:def.size[1])*this.scale;if(kind==='drop'&&e.flightT){const shrink=1-e.flightT*0.35;w*=shrink;h*=shrink;}if(e.down||e.ghost){w*=.8;h*=.65;}if(kind==='enemy'&&e.elite){w*=1.3;h*=1.3;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(kind==='zone'&&e.kind==='frost'){w*=e.radius/1.3;h*=e.radius/1.3;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
+    let w=def.size[0]*this.scale,h=def.size[1]*this.scale;if(e.down||e.ghost){w*=.8;h*=.65;}if(kind==='enemy'&&e.elite){w*=1.3;h*=1.3;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(kind==='zone'&&e.kind==='frost'){w*=e.radius/1.3;h*=e.radius/1.3;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
     const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob*this.scale:kind==='enemy'&&key==='wraith'?(Math.sin(this.clock*3)*.1+.2)*this.scale:0;
-    const lootGlow=kind==='drop'?dropGlow(e):null;
-    const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e))||!!lootGlow;
+    const emissive=(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e));
     let display=kind==='preview'?Math.max(0.72, entityBrightness(frame, e.x, e.z)):entityBrightness(frame, e.x, e.z, {local:kind==='player'&&e.id===p.id, emissive});
     if(kind==='building'&&['hearth','fire'].includes(key)&&e.fuel<=0)display*=0.45;
     if(kind==='held')display=display*.75+.25;
     const fade=labelOpacity(display, frame.darkness, frame.lighting);
-    c.save();c.globalAlpha=kind==='drop'?dropBlink(e,world.time,this.clock):kind==='zone'&&e.kind==='frost'?.8*Math.min(1,e.age*3)*Math.min(1,(e.life-e.age)*2):kind==='ally'?Math.min(1,(e.spawn||1)*4,(e.life-e.age)*2):e.ghost?.4:key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
-    // Valuable loot has a smaller halo than the night-only resources.
-    const halo=lootGlow||(kind==='node'&&nightGlow(e));if(halo){const r=(lootGlow?1:1.3)*this.scale,g=c.createRadialGradient(0,0,0,0,0,r);g.addColorStop(0,halo+'aa');g.addColorStop(.5,halo+'40');g.addColorStop(1,halo+'00');c.save();c.translate(ground.x,ground.y);c.scale(1,.72);c.globalCompositeOperation='lighter';c.globalAlpha*=(lootGlow?.2+.38*frame.darkness:.3+.55*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));c.fillStyle=g;c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();c.restore();}
+    c.save();c.globalAlpha=kind==='zone'&&e.kind==='frost'?.8*Math.min(1,e.age*3)*Math.min(1,(e.life-e.age)*2):kind==='ally'?Math.min(1,(e.spawn||1)*4,(e.life-e.age)*2):e.ghost?.4:key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
+    // Night-only resources glow so they can be found in the dark.
+    const halo=kind==='node'&&nightGlow(e);if(halo){const r=1.3*this.scale,g=c.createRadialGradient(0,0,0,0,0,r);g.addColorStop(0,halo+'aa');g.addColorStop(.5,halo+'40');g.addColorStop(1,halo+'00');c.save();c.translate(ground.x,ground.y);c.scale(1,.72);c.globalCompositeOperation='lighter';c.globalAlpha*=(.3+.55*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));c.fillStyle=g;c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();c.restore();}
     if(kind!=='held'&&kind!=='zone'){c.fillStyle='#211b2b30';c.beginPath();c.ellipse(ground.x,ground.y,w*.26,w*.10,0,0,Math.PI*2);c.fill();}
     c.translate(s.x,s.y-bob);
     if(e.pose){c.rotate(-e.pose.rotation);c.scale(e.pose.side,1);}

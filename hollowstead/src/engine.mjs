@@ -32,7 +32,7 @@ import {armNextWave, kingVisits, spawnWave, stepNight} from './night.mjs?v=harve
 import {applyRegions, regionSpeed} from './regions.mjs?v=harvest-18';
 import {cartAction, cartLabel, cartSlots, cartSpeed, stepCarts} from './cart.mjs?v=harvest-18';
 import {harvestLoot, rhythmStep, rhythmStrike} from './rhythm.mjs?v=harvest-18';
-import {trinketEvent, trinketSpeed} from './trinkets.mjs?v=harvest-18';
+import {cacheOpened, cacheRate, charmOf, reviveRate, socketsAllowed, trinketEvent, trinketHaste, trinketSpeed, unlockCharm, CHARM} from './trinkets.mjs?v=harvest-18';
 import {generateNodes, walkableAt, landNear} from './worldgen.mjs?v=harvest-18';
 // Dungeons (src/dungeon): a run through freshly carved floors. The rules live there; the World calls these hooks.
 import {dungeonKill, dungeonLuck, dungeonNodes, dungeonScale, joinDungeon, layoutOf, setupDungeon, stepDungeon} from './dungeon/run.mjs?v=harvest-18';
@@ -153,7 +153,7 @@ const MAGIC_AIM=Object.freeze({
  * Guests only draw creatures and shots, so the network copy rounds every number to centimetres and
  * drops per-charge bookkeeping. Fifty creatures fit in a fraction of the bytes.
  */
-const HOST_ONLY=new Set(['hitIds','cooldown','slam','slowed','power','flank','stuck','back','detour','leash','roamer','aggro','home','vx','vz','level','pat','room','hunt']);
+const HOST_ONLY=new Set(['hitIds','cooldown','slam','slowed','power','flank','stuck','back','detour','leash','roamer','aggro','home','vx','vz','level','pat','room','hunt','chalk','oneBlow','tinder']);
 const WINDUP_ONLY=new Set(['atk','wt','ang','tx','tz']);
 function compactForNetwork(entity){
   const out={},busy=entity.windup>0||entity.act>0;
@@ -221,6 +221,7 @@ export class World {
     p={id,name:String(name).replace(/[<>\x00-\x1f]/g,'').trim().slice(0,18)||'Wanderer',character:CHARACTERS.some(c=>c.id===character)?character:'ember',x:2+this.players.length*.8,z:1.8,dx:0,dz:1,hp:100,hunger:90,courage:100,stamina:100,inventory:createBackpack(id),equipment:emptyEquipment(),equipmentRevision:0,recovery:null,cooldown:0,dash:0,dashCharges:DASH.charges,dashRecharge:[],dashCooldown:0,down:0,ghost:false,revive:0,charm:1,online:true,lantern:false,rest:false,action:'idle',actionUntil:0,notice:'',noticeAt:0,goal:null,level:1,xp:0,bonusHp:0,maxHp:100,regions:['meadow'],hotbar:Array(HOTBAR_SLOTS).fill(null),hotbarIndex:0};
     this.players.push(p);
     this.give(p,'wood',3);this.give(p,'stone',2);this.give(p,'fiber',3);this.give(p,'berry',3);
+    if(this.showcase)p.charmOpen=true; // try any pair of trinkets there
     if(this.showcase||this.arena){
       p.hp=100;p.hunger=100;p.courage=100;
       p.inventory.slots=p.inventory.slots.map(()=>null);p.inventory.revision++;
@@ -595,6 +596,23 @@ export class World {
     this.assertItems();return plan;
   }
   equip(p,uid,socket,inventoryRevision,equipmentRevision){
+    // Trinkets: the second socket (`charm`) takes one when the first is full and it is open (trinkets.mjs).
+    const moving=p.inventory.slots.find(stack=>stack?.uid===uid);
+    if(moving&&equipmentSlotFor(moving.itemId)==='trinket'){
+      if(socket==='charm'||(p.equipment.trinket&&p.charmOpen&&!p.equipment.charm))socket='charm';
+      const other=socket==='charm'?p.equipment.trinket:p.equipment.charm;
+      if(socket==='charm'&&!p.charmOpen){this.tell(p,`The second trinket socket opens at level ${CHARM.level}, or when a Warden or the Hollow King falls`);return {ok:false,code:'incompatibleSocket'};}
+      if(other?.itemId===moving.itemId){this.tell(p,'You already wear that trinket');return {ok:false,code:'incompatibleSocket'};}
+      if(socket==='charm'){
+        // planEquip knows only an item's natural socket; place it in the second one here.
+        if(inventoryRevision!==undefined&&p.inventory.revision!==inventoryRevision)return {ok:false,code:'staleRevision'};
+        if(equipmentRevision!==undefined&&p.equipmentRevision!==equipmentRevision)return {ok:false,code:'staleRevision'};
+        const index=p.inventory.slots.indexOf(moving),displaced=p.equipment.charm;
+        p.inventory.slots[index]=displaced||null;p.equipment.charm=moving;
+        p.inventory.revision++;p.equipmentRevision++;this.assertItems();
+        return {ok:true,code:'ok',socket:'charm',displacedUid:displaced?.uid||null};
+      }
+    }
     const plan=planEquip({
       inventory:p.inventory, equipment:p.equipment, inventoryRevision, equipmentRevision,
       currentEquipmentRevision:p.equipmentRevision, uid, socket,
@@ -888,7 +906,7 @@ export class World {
       for(const id of [...work.contributors.keys()].sort()){
         const p=this.player(id);
         const toolId=p&&NODES[node.type].tool&&this.hasTool(p, NODES[node.type].tool)?NODES[node.type].tool:null;
-        const rate=p?gatherRate(node.type, toolId):0;
+        const rate=p?gatherRate(node.type, toolId)*(isCache(node.type)?cacheRate(this,p):1):0;
         if(!(rate>0)){work.contributors.delete(id);continue;}
         const slot=toolId?equipmentSlotFor(toolId):null;
         parts.push({p, rate, slot, toolId, durability:slot?p.equipment[slot].durability:Infinity});
@@ -932,7 +950,7 @@ export class World {
       const rolls=rollLoot(NODES[node.type].table,this.lootRng,this.dungeon?dungeonLuck(this):tier>=2?.5:0);
       if(this.dungeon)this.dungeon.stats.caches++;
       this.spillLoot(rolls,node.x,node.z,finder?.name);
-      for(const id of ids)this.awardXp(this.player(id),rollXp(node.type));
+      for(const id of ids){this.awardXp(this.player(id),rollXp(node.type));cacheOpened(this,this.player(id));}
       this.event('impact',node.x,node.z,NODES[node.type].name);this.event('cache',node.x,node.z,'',{key:node.type});
       return;
     }
@@ -957,7 +975,7 @@ export class World {
     if(node.type==='grave'&&this.rng()<.45)this.spawnEnemy('wraith', node.x+1, node.z+1, {home:true,roamer:true,leash:ROAM.leash});
   }
   advanceRevive(dt){
-    const helpers=new Set();
+    const helpers=new Map();
     for(const p of this.players){
       if(!p.online||p.down||p.ghost||p.hp<=0||p.rest||p.dash>0)continue;
       const raw=this.freshInput(p);
@@ -966,13 +984,13 @@ export class World {
       const target=id
         ?this.players.find(q=>q.id===id&&q.down&&q.id!==p.id&&distance(p,q)<RULES.reach)
         :this.players.filter(q=>q.id!==p.id&&q.online&&q.down&&distance(p,q)<RULES.reach).sort((a,b)=>distance(p,a)-distance(p,b)||(a.id<b.id?-1:1))[0];
-      if(target)helpers.add(target.id);
+      if(target)helpers.set(target.id,Math.max(helpers.get(target.id)||0,reviveRate(this,p)));
     }
     for(const q of this.players){
       if(!q.down){this.reviveWork.delete(q.id);continue;}
       if(!helpers.has(q.id)){this.reviveWork.delete(q.id);q.revive=0;continue;}
       const channel=this.reviveWork.get(q.id)||{elapsed:0};
-      channel.elapsed+=dt;q.revive=channel.elapsed;this.reviveWork.set(q.id, channel);
+      channel.elapsed+=dt*helpers.get(q.id);q.revive=channel.elapsed;this.reviveWork.set(q.id, channel);
       if(channel.elapsed>=3-1e-9){this.revivePlayer(q);this.stats.revives++;this.reviveWork.delete(q.id);}
     }
   }
@@ -1228,11 +1246,13 @@ export class World {
     this.event('swing',p.x,p.z);
     this.consumeMagicPayloads(before, RULES.tick);
   }
+  /** Burning foes (a tinder pouch's fire) when no magic module is loaded to burn them (consumeMagicPayloads does otherwise). */
+  tickBurns(dt){for(const e of this.enemies){if(!(e.burn?.remaining>0)||isMagicAlly(e))continue;e.hp-=e.burn.dps*dt;e.burn.remaining-=dt;if(e.burn.remaining<=0)delete e.burn;}}
   magicSnapshot(){
     return new Map(this.enemies.filter(enemy=>!isMagicAlly(enemy)).map(enemy=>[enemy.id,{hp:enemy.hp,x:enemy.x,z:enemy.z,root:enemy.magicRootRemaining||0}]));
   }
   stepMagic(dt){
-    if(!magicModules.length)return;
+    if(!magicModules.length){this.tickBurns(dt);return;}
     const before=this.magicSnapshot();
     for(const mod of magicModules) mod.step(this, dt);
     this.consumeMagicPayloads(before, dt);
@@ -1527,6 +1547,7 @@ export class World {
     let leveled=false;
     while(p.level<MAX_LEVEL&&p.xp>=xpToNext(p.level)){p.xp-=xpToNext(p.level);p.level++;leveled=true;}
     if(p.level>=MAX_LEVEL)p.xp=0;
+    if(leveled&&p.level>=CHARM.level&&!this.arena)unlockCharm(this,p,`level ${CHARM.level}`);
     if(leveled){p.maxHp=maxHealth(p);p.hp=p.maxHp;p.courage=Math.max(p.courage,80);this.event('levelup',p.x,p.z,`Level ${p.level}`,{player:p.id});this.event('announce',p.x,p.z,`${p.name} reached level ${p.level}`);this.best.level=Math.max(this.best.level||1,p.level);}
   }
   shareXp(x,z,amount){for(const p of this.players)if(p.online&&!p.ghost&&Math.hypot(p.x-x,p.z-z)<SHARE_RADIUS)this.awardXp(p,amount);}
@@ -1602,7 +1623,7 @@ export class World {
         else if(this.time>p.actionUntil)p.action='idle';
       }
       p.vx=(p.x-x0)/Math.max(dt,1e-3);p.vz=(p.z-z0)/Math.max(dt,1e-3);
-      if(p.cooldown<=0){if(input.attack)this.attack(p);else if(input.act){const aimed=this.target(p, typeof input.target==='string'?input.target:null);if(aimed?.kind==='building')this.interact(p, aimed.entity.id);}}
+      if(p.cooldown<=0){if(input.attack){this.attack(p);const haste=trinketHaste(this,p);if(haste>1&&p.cooldown>0)p.cooldown/=haste;}else if(input.act){const aimed=this.target(p, typeof input.target==='string'?input.target:null);if(aimed?.kind==='building')this.interact(p, aimed.entity.id);}}
       if(this.showcase){p.hp=maxHealth(p);p.hunger=100;p.courage=100;p.down=0;p.ghost=false;}
     }
     if(!this.arena)stepCarts(this,dt,obstacles);
@@ -1620,7 +1641,7 @@ export class World {
       // The sun did most of the work (sunburn.mjs): no loot, experience or mastery, just ash.
       const burnt=sunTook(e);
       const loot=ENEMIES[e.type]?.loot;if(loot&&!burnt)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));
-      if(!isMagicAlly(e)){this.kills++;if(this.dungeon)dungeonKill(this,e);if(!this.showcase&&!burnt){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)+(e.warden?1:0)+dungeonLuck(this)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}
+      if(!isMagicAlly(e)){this.kills++;if(this.dungeon)dungeonKill(this,e);if((e.warden||e.type==='king')&&!this.showcase)for(const q of this.players)if(q.online&&!q.ghost)unlockCharm(this,q,e.type==='king'?'the Hollow King fell':'the Warden fell');if(!this.showcase&&!burnt){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)+(e.warden?1:0)+dungeonLuck(this)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}
       this.event('kill',e.x,e.z);if(burnt)this.event('ashes',e.x,e.z,'',{creature:e.type,king:e.type==='king'});
       if(e.type==='king'&&!this.dungeon){this.bossSlain=true;this.event('announce',e.x,e.z,burnt?'The Hollow King burns away in the daylight, and takes his treasure with him.':'The Hollow King falls. His treasure spills across the grass.');}
     }

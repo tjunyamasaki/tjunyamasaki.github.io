@@ -23,23 +23,24 @@ function foe(w, x = 1, z = 0, hp = 50){const e = w.spawnEnemy('crawler', x, z, {
 function slay(w, p, count = 1){for(let i = 0; i < count; i++){const e = foe(w, 3+i*.01, 3); e.hp = 0; e.lastHitBy = p.id;} w.tick(T);}
 function rng(seed){let s = seed >>> 0; return () => {s = Math.imul(s ^ s >>> 15, 1 | s); s ^= s+Math.imul(s ^ s >>> 7, 61 | s); s = (s+0x6D2B79F5) >>> 0; return ((s ^ s >>> 14) >>> 0)/4294967296;};}
 
-test('the ten trinkets are gear for the trinket socket, with their effect in the item text', () => {
-  assert.equal(TRINKET_IDS.length, 10);
+test('the twenty trinkets are gear for the trinket sockets, with their effect in the item text', () => {
+  assert.equal(TRINKET_IDS.length, 20);
   for(const id of TRINKET_IDS){
     assert.ok(EQUIPMENT[id], id);
     assert.ok(TRINKET_TEXT[id], id);
     assert.ok(effectLine(id).includes(TRINKET_TEXT[id]), `${id} explains itself`);
-    assert.ok(['rare', 'epic'].includes(rarityOf(id)), `${id} has a loot rarity`);
+    assert.ok(['uncommon', 'rare', 'epic', 'legendary'].includes(rarityOf(id)), `${id} has a loot rarity`);
   }
-  assert.equal(TRINKET_TEXT.nightfang, 'Kills at night heal 1');
+  assert.equal(TRINKET_TEXT.nightfang, 'Kills at night (or underground) heal 1');
   assert.equal(TRINKET_TEXT.frostanklet, 'Dodges leave a frost trail that slows foes');
-  assert.equal(TRINKET_IDS.filter(id => rarityOf(id) === 'rare').length, 6);
+  const count = rarity => TRINKET_IDS.filter(id => rarityOf(id) === rarity).length;
+  assert.deepEqual(['uncommon', 'rare', 'epic', 'legendary'].map(count), [3, 9, 6, 2]);
 });
 
 test('caches and elites can drop trinkets; the arena never offers them', () => {
   const found = new Set();
   const random = rng(7);
-  for(let i = 0; i < 3000; i++) for(const table of ['ironchest', 'moonchest']) for(const {itemId} of rollLoot(table, random)) if(TRINKET_IDS.includes(itemId)) found.add(itemId);
+  for(let i = 0; i < 3000; i++) for(const table of ['crate', 'ironchest', 'moonchest', 'reliquary']) for(const {itemId} of rollLoot(table, random)) if(TRINKET_IDS.includes(itemId)) found.add(itemId);
   assert.ok(LOOT_TABLES.moonchest);
   assert.equal(found.size, TRINKET_IDS.length, `found ${[...found]}`);
   for(const id of TRINKET_IDS){assert.equal(arenaWeapons().includes(id), false); assert.equal(WEAPON_STYLES[id], undefined);}

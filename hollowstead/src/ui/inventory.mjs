@@ -6,7 +6,7 @@ import {equipmentSlotFor} from '../inventory.mjs?v=harvest-18';
 import {itemDefinition} from '../contracts.mjs?v=harvest-18';
 
 export const SOCKET_LABELS = Object.freeze({
-  chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light', head: 'Head', back: 'Back', trinket: 'Trinket',
+  chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light', head: 'Head', back: 'Back', trinket: 'Trinket', charm: 'Trinket II',
 });
 
 const OP_LABELS = Object.freeze({
@@ -193,6 +193,7 @@ export function createInventoryPanel(root, hooks) {
     else { delete el.dataset.tip; el.removeAttribute('title'); }
     el.classList.toggle('is-selected', !!cell.selected);
     el.classList.toggle('is-equipped', !!cell.equipped);
+    el.classList.toggle('is-locked', !!cell.locked);
     el.setAttribute('aria-label', cell.aria);
     el.tabIndex = 0;
     if (el.dataset.sig === sig) return;

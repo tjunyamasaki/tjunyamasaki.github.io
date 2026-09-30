@@ -64,7 +64,7 @@ export async function loadTheme(url=new URL('../themes/harvest/theme.json',impor
 }
 /** Swarm fights spray numbers; old labels give way so the DOM stays light on phones. */
 /** Floater colours for 'strike' events: clean harvest strikes (rhythm.mjs) and trinket moments (trinkets.mjs). */
-export const STRIKE_COLORS=Object.freeze({clean:'#ffe6a3',perfect:'#f2c14e',find:'#9fcaff',ward:'#efe6d2',fang:'#b9e2ba',thorn:'#f5c2a9'});
+export const STRIKE_COLORS=Object.freeze({clean:'#ffe6a3',perfect:'#f2c14e',find:'#9fcaff',ward:'#efe6d2',fang:'#b9e2ba',thorn:'#f5c2a9',toll:'#f9dc8e',frenzy:'#ffae5c',choir:'#bfe0ff',veil:'#d7d0f0',key:'#b9e2ba'});
 /**
  * Ground telegraphs and hostile shots. Pooled meshes on shared unit geometries: a swarm winding up
  * and a sky full of orbs must not allocate textures every frame.

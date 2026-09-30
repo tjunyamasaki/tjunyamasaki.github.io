@@ -132,7 +132,8 @@ export function validateEquipment(equipment){
     if(stack==null)continue;
     const valid=validateStack(stack);
     if(!valid.ok)return {ok:false, code:valid.code};
-    if(equipmentSlotFor(stack.itemId)!==slot)return {ok:false, code:RESULT_CODES.incompatibleSocket};
+    // A socket takes the items listed for it (the second trinket socket takes any trinket).
+    if(equipmentSlotFor(stack.itemId)!==slot&&!EQUIPMENT_SLOT_ITEMS[slot]?.includes(stack.itemId))return {ok:false, code:RESULT_CODES.incompatibleSocket};
     if(seen.has(stack.uid))return {ok:false, code:'duplicate'};
     seen.add(stack.uid);
   }

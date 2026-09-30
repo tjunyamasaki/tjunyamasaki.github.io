@@ -6,6 +6,7 @@
 //   splitMagic    Split on the magic weapons that shoot: copies the cast's new shot at the next foe
 // Honed lives in powerOf (progression.mjs), Tempered in World.wearEquipped, Fervent in useSkill.
 // Host-authoritative like every world rule; the UI reads refineView() only to draw the panel.
+import {trinketHit} from './trinkets.mjs?v=harvest-18';
 import {label} from './content.mjs?v=harvest-18';
 import {equipmentSlotFor, inCraftRange} from './contracts.mjs?v=harvest-18';
 import {RARITIES, REFINE, maxHealth, rarityOf, refineStat, weaponStyle} from './progression.mjs?v=harvest-18';
@@ -170,13 +171,17 @@ function ownerOf(world, owner){
  */
 export function refineHit(world, owner, enemy, amount){
   const p = ownerOf(world, owner);
-  if(!p?.refine || !(amount > 0)) return {amount, crit: false};
+  if(!p || !(amount > 0)) return {amount, crit: false};
+  // Trinkets (trinkets.mjs) have their say after the refinement: grave chalk, the bell, the tinder pouch.
+  if(!p.refine){const t = trinketHit(world, p, enemy, amount, false); return {amount: t.amount, crit: t.crit};}
   let out = amount, crit = false;
   const bane = refineStat(p, 'bane');
   if(bane > 0 && (enemy?.elite || enemy?.type === 'king')) out *= 1+bane;
   const keen = refineStat(p, 'keen');
   if(keen > 0 && world.rng() < keen){crit = true; out *= REFINE.crit+refineStat(p, 'cruel');}
   const thirst = refineStat(p, 'thirst');
+  const t = trinketHit(world, p, enemy, out, crit);
+  out = t.amount; crit = t.crit;
   if(thirst > 0 && p.hp > 0 && !p.down && !p.ghost) p.hp = Math.min(maxHealth(p), p.hp+Math.min(REFINE.leechCap, out*thirst));
   return {amount: out, crit};
 }

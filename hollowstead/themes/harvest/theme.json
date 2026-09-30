@@ -1966,6 +1966,226 @@
       },
       "icon": "./sprites/thornknot-icon.svg?v=frontier1"
     },
+    "tinderpouch": {
+      "src": "./sprites/tinderpouch.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/tinderpouch-icon.svg?v=frontier2"
+    },
+    "crookedkey": {
+      "src": "./sprites/crookedkey.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/crookedkey-icon.svg?v=frontier2"
+    },
+    "soulstitch": {
+      "src": "./sprites/soulstitch.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/soulstitch-icon.svg?v=frontier2"
+    },
+    "gutteringcandle": {
+      "src": "./sprites/gutteringcandle.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/gutteringcandle-icon.svg?v=frontier2"
+    },
+    "gravechalk": {
+      "src": "./sprites/gravechalk.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/gravechalk-icon.svg?v=frontier2"
+    },
+    "redthread": {
+      "src": "./sprites/redthread.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/redthread-icon.svg?v=frontier2"
+    },
+    "hellspur": {
+      "src": "./sprites/hellspur.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/hellspur-icon.svg?v=frontier2"
+    },
+    "mournersveil": {
+      "src": "./sprites/mournersveil.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/mournersveil-icon.svg?v=frontier2"
+    },
+    "thirteenthbell": {
+      "src": "./sprites/thirteenthbell.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/thirteenthbell-icon.svg?v=frontier2"
+    },
+    "hollowmirror": {
+      "src": "./sprites/hollowmirror.svg?v=frontier2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/hollowmirror-icon.svg?v=frontier2"
+    },
     "glowsprout": {
       "src": "./sprites/glowsprout.svg?v=frontier1",
       "size": [
@@ -3694,4 +3914,4 @@
       }
     }
   }
-}
+}

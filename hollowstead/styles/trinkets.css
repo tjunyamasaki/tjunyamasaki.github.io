@@ -19,4 +19,27 @@
 .world-label.strike-thorn{font-size:11px}
 /* Inventory tooltips: a trinket's tip carries its effect on a second line. */
 .item-slot[data-tip][data-tip*="\A"]:is(.is-selected,:hover)::after{white-space:pre;text-align:center;line-height:1.35}
-body.arena .trinket-chip{display:none}
+body.arena .trinket-chip,body.arena .trinket-link{display:none}
+/* The second socket's chip sits beside the first; when the pair resonates the two are joined and named. */
+.trinket-chip[data-socket="charm"]{left:calc(max(9px,env(safe-area-inset-left)) + 40px)}
+.trinket-chip .trinket-count{position:absolute;right:-5px;bottom:-5px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#1d1824;color:var(--ring);font:700 9px/15px Arial,Helvetica,sans-serif;text-align:center;pointer-events:none;box-shadow:0 0 0 1px #ffffff22}
+.trinket-chip .trinket-count:empty{display:none}
+.trinket-chip.is-resonant{border-color:#f2c14e99;box-shadow:0 0 0 1px #18132266,0 0 12px #f2c14e44}
+.trinket-link{position:absolute;top:calc(12px + env(safe-area-inset-top) + 66px + 36px);left:max(9px,env(safe-area-inset-left));padding:1px 7px;border-radius:999px;background:#2c2732d9;border:1px solid #f2c14e66;color:#f2c14e;font:700 8px/1.4 Arial,Helvetica,sans-serif;letter-spacing:.8px;text-transform:uppercase;pointer-events:none;z-index:2;white-space:nowrap}
+.trinket-link[hidden]{display:none}
+.trinket-link::before{content:'';position:absolute;left:30px;top:-10px;width:14px;height:2px;border-radius:2px;background:#f2c14e;box-shadow:0 0 6px #f2c14e}
+.trinket-chip[data-trinket="hellspur"]{--ring:#ffae5c}
+.trinket-chip[data-trinket="thirteenthbell"]{--ring:#f9dc8e}
+.trinket-chip[data-trinket="gutteringcandle"]{--ring:#f0766a}
+.trinket-chip[data-trinket="mournersveil"]{--ring:#d7d0f0}
+/* Inventory: the second trinket socket before it opens. */
+.item-slot.is-locked{opacity:.55;border-style:dashed}
+.item-slot.is-locked .slot-mark::before{content:'🔒 ';font-size:.9em}
+/* Relic floaters (renderers: 'strike' events with these kinds). */
+.world-label.strike-toll{font-size:15px;letter-spacing:2px;color:#f9dc8e}
+.world-label.strike-frenzy,.world-label.strike-choir{font-size:12px;letter-spacing:.8px}
+.world-label.strike-veil{font-size:13px;letter-spacing:1px;color:#d7d0f0}
+.world-label.strike-key{font-size:11px}
+/* In a dungeon the objective badge sits under the vitals: the chips step down below it. */
+body.dungeon .trinket-chip{top:calc(12px + env(safe-area-inset-top) + 66px + 42px)}
+body.dungeon .trinket-link{top:calc(12px + env(safe-area-inset-top) + 66px + 42px + 36px)}

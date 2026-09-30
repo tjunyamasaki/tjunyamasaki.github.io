@@ -35,6 +35,7 @@ import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/la
 import {REFINE_CURRENCY, carriedWeapons, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
 import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
 import {createHurtFx} from './hurt-fx.mjs?v=harvest-18';
+import {CHARM} from './trinkets.mjs?v=harvest-18';
 import {dungeonStatus, layoutOf} from './dungeon/run.mjs?v=harvest-18';
 import {VARIANTS, isVariant} from './dungeon/variants.mjs?v=harvest-18';
 import {floorTones} from './dungeon/art.mjs?v=harvest-18';
@@ -521,7 +522,7 @@ function ensurePanel(){
 function itemTip(stack){
   const p=me(),m=masteryView(world,p,stack.itemId),mods=refineLines(p,stack.itemId);
   if(m||mods.length)return [label(stack.itemId),m?weaponAbout('',m,null):'',...mods].filter(Boolean).join('\n');
-  return trinketTip(stack.itemId);
+  return trinketTip(stack.itemId,p);
 }
 /** The inventory's detail line for a selected stack: name, rarity and what it does. */
 function itemInfo(stack){
@@ -545,7 +546,8 @@ function makeCell(key,stack,kind,index,mark=''){
 }
 function inventoryView(p){
   const chest=chestBuilding();
-  const sockets=EQUIPMENT_SLOTS.map(slot=>makeCell(`socket:${slot}`,p.equipment[slot], 'socket', 0, SOCKET_NAME[slot]));
+  // The second trinket socket shows locked until it opens (trinkets.mjs unlockCharm).
+  const sockets=EQUIPMENT_SLOTS.map(slot=>slot==='charm'&&!p.charmOpen&&!p.equipment.charm?{...makeCell(`socket:${slot}`,null,'socket',0,'Locked'),locked:true,accept:false,aria:`Second trinket socket, locked. Opens at level ${CHARM.level}, or when a Warden or the Hollow King falls`}:makeCell(`socket:${slot}`,p.equipment[slot], 'socket', 0, SOCKET_NAME[slot]));
   const slots=p.inventory.slots.map((stack,index)=>makeCell(`pack:${index}`,stack,'pack',index));
   const recovery=(p.recovery?.slots||[]).flatMap((stack,index)=>stack?[makeCell(`recovery:${index}`,stack,'recovery',index)]:[]);
   let chestView=null;
@@ -567,7 +569,7 @@ function inventoryView(p){
   const sprite=theme.sprites[p.character]||theme.sprites.ember;
   return {portraitHTML:`${portrait(p.character)}<small>${escapeHtml(p.name)}</small>`,occupied:p.inventory.slots.filter(Boolean).length,slotMax:p.inventory.slots.length,charm:!!p.charm,sockets,slots,recovery,chest:chestView,selection:detail,pending:actionPending||chestOpening,pendingText:chestOpening?'Opening chest…':actionPending?'Waiting for camp…':'',sprite};
 }
-const SOCKET_NAME={chop:'Chop',mine:'Mine',weapon:'Weapon',body:'Armor',light:'Light',head:'Head',back:'Back',trinket:'Trinket'};
+const SOCKET_NAME={chop:'Chop',mine:'Mine',weapon:'Weapon',body:'Armor',light:'Light',head:'Head',back:'Back',trinket:'Trinket',charm:'Trinket II'};
 function guideHTML(){
   const steps=[
     ['Gather before dusk','Move with the left stick, or tap the ground. Tap a tree or rock to walk over and harvest it. Hold the action until it falls. Wood and flint land on the ground. Stay beside a pile and it comes to you; step onto it and it is picked up at once. Walk away and it stays where it fell. Grass, berries, pumpkins, and mushrooms go into your pack.'],
@@ -580,6 +582,7 @@ function guideHTML(){
     ['Explore for treasure','The hollow is vast. Beyond the meadow lie the Autumn Woods and the Graveyard; farther still the Hollow Mire, the Moonshard Crags and the Barrow Fields. Crates, iron-bound chests, moonlit coffers and hollow reliquaries hide out there: hold Open beside one. Better caches sit farther from camp, and guardians watch them. Caches refill after a few days.'],
     ['Brave the frontier','The outer regions punish the unprepared, and every wanderer needs their own answer. The Hollow Mire’s spore fog drains courage, then health: wear a glowcap mask, made from blooms that sprout in the Autumn Woods only after dark. The Moonshard Crags are pitch dark even by day: only your own lit grave lantern, fed by wisp essence that drifts over the Graveyard at night, holds the dark back. The Barrow Fields’ grave-chill slows you: a bone-lined barrow cloak keeps it out. Masks and cloaks wear only inside their region.'],
     ['Grow stronger','Kills, caches, gathering and new regions give experience. Each level adds health and damage. Loot comes in five rarities: common, uncommon, rare, epic and legendary. Bows fire arrows at the nearest foe, staffs throw bursting bolts, broadswords cleave, and the Grimoire of Ash burns everything around you. Heartstones raise your health for good.'],
+    ['Wear two trinkets','Trinkets are small relics that each bend one rule. Wear one in the trinket socket; the second socket opens at level 10, or when a Warden or the Hollow King falls while you stand. Some pairs resonate and do something new together: a trinket’s tooltip names its partners, and the chips under your health light up and name the pair. The Hollow mirror strengthens whatever you wear beside it.'],
     ['Refine your weapons','Creatures drop Dread ichor, and only creatures: briarlings now and then, wraiths, bonewalkers and boglings more often, gravekeepers, golems and the Hollow King by the handful. Stand at a workbench and press Refine: each weapon holds three modifiers, each rolled with a rarity from common to legendary, from sharper crits and faster swings to an extra arrow or star. Reroll any of them with more ichor. Like mastery, refinement is yours, not the item’s. Spare gear can be dismantled from Inventory: loot melts into ichor (more the rarer it is), crafted gear gives back half its materials.'],
     ['Outlast the night','Every night is harder than the last, with more creatures and elder champions. Guard the Heartfire: losing it ends the expedition. How many nights can you survive?'],
     ['Go down into the dungeons','Dungeons on the title screen is a crawl of its own, alone or with up to three friends. Every floor is carved fresh: the Barrow Crypt, the Rootwarren and the Moonlit Ossuary each build theirs differently. Chambers wake as you come near; clear them, open their caches and find the Warden by the stairs. Slay it and the stairs open: the whole party stands in them to go down. Shrines bless you once a floor, the camp fire mends you and its workbench refines your weapons. Fallen friends rise when the Warden falls. Every fifth floor, the Hollow King waits. Weapons never wear down there, and a run is never saved: how deep can you go?'],
@@ -694,7 +697,7 @@ function drawMap(canvas,full=false){
   const known=e=>explored.has(Math.floor((e.z+R)/cell)*N+Math.floor((e.x+R)/cell));
   const cacheColor={crate:RARITY_COLORS.common,ironchest:RARITY_COLORS.rare,moonchest:RARITY_COLORS.epic,reliquary:RARITY_COLORS.legendary};
   for(const n of world.nodes){
-    if(!(known(n)||revealsCache(me_,n))||!vis(n.x,n.z))continue;
+    if(!(known(n)||revealsCache(me_,n,world))||!vis(n.x,n.z))continue;
     if(isCache(n.type)){const x=sx(n.x),y=sz(n.z),r=full?4.5:5;ctx.globalAlpha=n.ready?.35:1;ctx.fillStyle=cacheColor[n.type];ctx.strokeStyle='#1e1624';ctx.lineWidth=1.5;ctx.fillRect(x-r,y-r*.7,r*2,r*1.4);ctx.strokeRect(x-r,y-r*.7,r*2,r*1.4);ctx.globalAlpha=1;continue;}
     if(!full||n.ready||!nodeAwake(n,world.time))continue;
     ctx.fillStyle=n.type==='tree'?'#374f48':['grave','ore','shardrock'].includes(n.type)?'#d2c5d7':n.type==='pumpkin'?'#e8ae72':'#c1b993';ctx.beginPath();ctx.arc(sx(n.x),sz(n.z),1.6,0,Math.PI*2);ctx.fill();
@@ -722,7 +725,7 @@ function drawDungeonMap(ctx,size,full){
   for(const k of explored){const gx=k%N,gz=(k-gx)/N,x=gx*C-R,z=gz*C-R;const i=Math.max(0,Math.floor(x-L.ox)),j=Math.max(0,Math.floor(z-L.oz)),i1=Math.min(L.w,Math.floor(x+C-L.ox)),j1=Math.min(L.h,Math.floor(z+C-L.oz));if(i1<=i||j1<=j)continue;ctx.drawImage(image,i,j,i1-i,j1-j,sx(L.ox+i),sz(L.oz+j),(i1-i)*scale+.6,(j1-j)*scale+.6);}
   const seen=(x,z)=>explored.has(Math.floor((z+R)/C)*N+Math.floor((x+R)/C));
   const cacheColor={crate:RARITY_COLORS.common,ironchest:RARITY_COLORS.rare,moonchest:RARITY_COLORS.epic,reliquary:RARITY_COLORS.legendary};
-  for(const n of world.nodes){if(!seen(n.x,n.z))continue;const x=sx(n.x),y=sz(n.z),r=full?4.5:4;ctx.globalAlpha=n.ready?.3:1;ctx.fillStyle=cacheColor[n.type]||'#d8d2c2';ctx.strokeStyle='#1e1624';ctx.lineWidth=1.5;ctx.fillRect(x-r,y-r*.7,r*2,r*1.4);ctx.strokeRect(x-r,y-r*.7,r*2,r*1.4);ctx.globalAlpha=1;}
+  for(const n of world.nodes){if(!seen(n.x,n.z)&&!revealsCache(me_,n,world))continue;const x=sx(n.x),y=sz(n.z),r=full?4.5:4;ctx.globalAlpha=n.ready?.3:1;ctx.fillStyle=cacheColor[n.type]||'#d8d2c2';ctx.strokeStyle='#1e1624';ctx.lineWidth=1.5;ctx.fillRect(x-r,y-r*.7,r*2,r*1.4);ctx.strokeRect(x-r,y-r*.7,r*2,r*1.4);ctx.globalAlpha=1;}
   if(L.shrine&&seen(L.shrine.x,L.shrine.z)){ctx.fillStyle=d.shrine?'#6f7c91':'#bfe0ff';ctx.font=`${full?20:15}px Georgia`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('✧',sx(L.shrine.x),sz(L.shrine.z));}
   if(seen(L.portal.x,L.portal.z)||d.phase==='open'){ctx.fillStyle=d.phase==='open'?'#f2c14e':'#8a7f8c';ctx.font=`${full?20:15}px Georgia`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('▼',sx(L.portal.x),sz(L.portal.z));}
   for(const e of world.enemies){if(!(e.hp>0)||isMagicAlly(e)||!e.warden)continue;ctx.fillStyle='#e0776b';ctx.beginPath();ctx.arc(sx(e.x),sz(e.z),full?6:4.5,0,Math.PI*2);ctx.fill();}

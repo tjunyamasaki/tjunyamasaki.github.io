@@ -1,4 +1,5 @@
 // Authoritative chest leases and item moves. No browser, transport, or World import.
+import {socketsAllowed} from './trinkets.mjs?v=harvest-18';
 import {CHEST_LEASE_SECONDS, CHEST_SLOT_COUNT, EQUIPMENT_SLOTS, STORAGE_TYPES, inReach, storageSlotCount} from './contracts.mjs?v=harvest-18';
 import {cloneContainer, cloneSlots, cloneStack, containerId, planInsert, planMove, planSortSlots, validateEquipment} from './inventory.mjs?v=harvest-18';
 
@@ -89,8 +90,11 @@ function commit(player,loc,slots,revision){
   }
 }
 
-function validSockets(loc,slots){
-  return loc.kind!=='equipment'||validateEquipment(Object.fromEntries(EQUIPMENT_SLOTS.map((slot,i)=>[slot,slots[i]]))).ok;
+function validSockets(loc,slots,player){
+  if(loc.kind!=='equipment')return true;
+  const equipment=Object.fromEntries(EQUIPMENT_SLOTS.map((slot,i)=>[slot,slots[i]]));
+  // The second trinket socket only when open, and never the same trinket twice (trinkets.mjs).
+  return validateEquipment(equipment).ok&&socketsAllowed(player,equipment);
 }
 
 export function moveItems(world,player,cmd,chest=null){
@@ -134,7 +138,7 @@ export function moveItems(world,player,cmd,chest=null){
     });
   }
   if(!plan.ok){world.idCounter=counter;return result(plan.code);}
-  if(!validSockets(source,plan.sourceSlots)||!validSockets(dest,plan.destSlots)){
+  if(!validSockets(source,plan.sourceSlots,player)||!validSockets(dest,plan.destSlots,player)){
     world.idCounter=counter;return result('incompatibleSocket');
   }
   if(dest.kind==='chest'&&plan.destSlots.length!==storageSlotCount(chest)){world.idCounter=counter;return result('inventoryFull');}

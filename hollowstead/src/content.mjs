@@ -62,7 +62,7 @@ export const EQUIPMENT = {
   sporemask:{name:'Glowcap mask',icon:'sporemask',durability:900},
   gravelight:{name:'Grave lantern',icon:'gravelight',durability:600},
   barrowcloak:{name:'Barrow cloak',icon:'barrowcloak',durability:900},
-  // Trinkets: one worn at a time; they never wear out. Effects live in trinkets.mjs.
+  // Trinkets: two sockets (the second opens later); they never wear out. Effects live in trinkets.mjs.
   frostanklet:{name:'Frost anklet',icon:'frostanklet',durability:100},
   nightfang:{name:'Night fang',icon:'nightfang',durability:100},
   emberheart:{name:'Ember heart',icon:'emberheart',durability:100},
@@ -73,6 +73,17 @@ export const EQUIPMENT = {
   gravedust:{name:'Grave dust',icon:'gravedust',durability:100},
   moonlocket:{name:'Moon locket',icon:'moonlocket',durability:100},
   thornknot:{name:'Thorn knot',icon:'thornknot',durability:100},
+  // Relics: made for two sockets (combos in trinkets.mjs RESONANCES).
+  tinderpouch:{name:'Tinder pouch',icon:'tinderpouch',durability:100},
+  crookedkey:{name:'Crooked key',icon:'crookedkey',durability:100},
+  soulstitch:{name:'Soulstitch needle',icon:'soulstitch',durability:100},
+  gutteringcandle:{name:'Guttering candle',icon:'gutteringcandle',durability:100},
+  gravechalk:{name:'Grave chalk',icon:'gravechalk',durability:100},
+  redthread:{name:'Red thread',icon:'redthread',durability:100},
+  hellspur:{name:'Hellspur',icon:'hellspur',durability:100},
+  mournersveil:{name:'Mourner’s veil',icon:'mournersveil',durability:100},
+  thirteenthbell:{name:'Thirteenth bell',icon:'thirteenthbell',durability:100},
+  hollowmirror:{name:'Hollow mirror',icon:'hollowmirror',durability:100},
 };
 export const NODES = {
   tree:{name:'Crooked pine',hits:4,workSeconds:4,handRate:1,tool:'axe',toolRate:2,output:'floor',loot:{wood:5,fiber:1},regrow:420,radius:.55},

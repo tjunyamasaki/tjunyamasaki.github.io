@@ -78,6 +78,9 @@ const ITEM_RARITY = Object.freeze({
   // Trinkets (trinkets.mjs): six rare, four epic. Caches and elites drop them through the pools below.
   nightfang:'rare', emberheart:'rare', crowseye:'rare', harvestcharm:'rare', wispfeather:'rare', gravedust:'rare',
   frostanklet:'epic', boneward:'epic', moonlocket:'epic', thornknot:'epic',
+  // Relics (trinkets.mjs): three uncommon, three rare, two epic, two legendary.
+  tinderpouch:'uncommon', crookedkey:'uncommon', soulstitch:'uncommon', gutteringcandle:'rare', gravechalk:'rare', redthread:'rare',
+  hellspur:'epic', mournersveil:'epic', thirteenthbell:'legendary', hollowmirror:'legendary',
   // Refinement currency: only creatures drop it (LOOT_TABLES below, REFINE).
   ichor:'uncommon',
 });
@@ -88,10 +91,10 @@ export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
 // Each table: rolls of weighted entries. `n` is [min,max] quantity; `pick` picks one item
 // from a rarity pool so new gear only needs a rarity to join the tables.
 const POOLS = Object.freeze({
-  uncommon:['recurve','sword','elixir','elixir','torch','bandage'],
-  rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem','nightfang','emberheart','crowseye','harvestcharm','wispfeather','gravedust'],
-  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer','pallbearer','frostanklet','boneward','moonlocket','thornknot'],
-  legendary:['tome','everlantern','scythe','starfall','wighthorn','hollow-moon'],
+  uncommon:['recurve','sword','elixir','elixir','torch','bandage','tinderpouch','crookedkey','soulstitch'],
+  rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem','nightfang','emberheart','crowseye','harvestcharm','wispfeather','gravedust','gutteringcandle','gravechalk','redthread'],
+  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer','pallbearer','frostanklet','boneward','moonlocket','thornknot','hellspur','mournersveil'],
+  legendary:['tome','everlantern','scythe','starfall','wighthorn','hollow-moon','thirteenthbell','hollowmirror'],
 });
 export const LOOT_TABLES = Object.freeze({
   crate:{xp:12, rolls:[

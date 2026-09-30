@@ -72,10 +72,14 @@ export const CHEST_LEASE_SECONDS = 12;
 export const CHEST_RENEW_SECONDS = 3;
 export const DISMANTLE_HOLD_SECONDS = 0.8;
 
-/** Worn gear. head/back hold frontier gear (regions.mjs); trinket holds one trinket (trinkets.mjs). */
-export const EQUIPMENT_SLOTS = Object.freeze(['chop', 'mine', 'weapon', 'body', 'light', 'head', 'back', 'trinket']);
-/** The ten trinkets, in catalog order. */
-export const TRINKET_IDS = Object.freeze(['frostanklet', 'nightfang', 'emberheart', 'crowseye', 'harvestcharm', 'boneward', 'wispfeather', 'gravedust', 'moonlocket', 'thornknot']);
+/**
+ * Worn gear. head/back hold frontier gear (regions.mjs); trinket and charm hold trinkets (trinkets.mjs):
+ * the second one, `charm`, opens later (trinkets.mjs unlockCharm).
+ */
+export const EQUIPMENT_SLOTS = Object.freeze(['chop', 'mine', 'weapon', 'body', 'light', 'head', 'back', 'trinket', 'charm']);
+/** The trinkets, in catalog order: the first ten, then the ten relics that came with the second socket. */
+export const TRINKET_IDS = Object.freeze(['frostanklet', 'nightfang', 'emberheart', 'crowseye', 'harvestcharm', 'boneward', 'wispfeather', 'gravedust', 'moonlocket', 'thornknot',
+  'tinderpouch', 'crookedkey', 'soulstitch', 'gutteringcandle', 'gravechalk', 'redthread', 'hellspur', 'mournersveil', 'thirteenthbell', 'hollowmirror']);
 /** Quick-swap weapon slots. Each holds the uid of a weapon the wanderer carries or wears. */
 export const HOTBAR_SLOTS = 3;
 export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
@@ -88,6 +92,7 @@ export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
   head: Object.freeze(['sporemask']),
   back: Object.freeze(['barrowcloak']),
   trinket: TRINKET_IDS,
+  charm: TRINKET_IDS,
 });
 /** v1 saves that contain both weapons equip the sword and keep the spear in the backpack. */
 export const MIGRATION_PREFERRED_WEAPON = 'sword';

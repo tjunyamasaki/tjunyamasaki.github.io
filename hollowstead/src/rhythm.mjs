@@ -10,7 +10,7 @@
 // its own clock (current or previous beat, never twice, never stale) and judges the offset.
 
 import {NODES, label} from './content.mjs?v=harvest-18';
-import {trinketOf} from './trinkets.mjs?v=harvest-18';
+import {wears} from './trinkets.mjs?v=harvest-18';
 
 export const RHYTHM = Object.freeze({
   // Seconds per beat: trees swing steadily, stone is slower and heavier.
@@ -43,7 +43,7 @@ export const RARE_FINDS = Object.freeze({
 export function beatPeriod(type){return RHYTHM.beats[type] || 0;}
 
 /** The clean-strike window (seconds either side of the beat) for this wanderer. */
-export function strikeWindow(p){return trinketOf(p) === 'harvestcharm' ? RHYTHM.charmWindow : RHYTHM.window;}
+export function strikeWindow(p){return wears(p, 'harvestcharm') ? RHYTHM.charmWindow : RHYTHM.window;}
 
 /** Index of the beat nearest to `time` (may be negative before the first beat). */
 export function nearestBeat(beat, time){return Math.round((time - beat.at)/beat.period);}
@@ -162,7 +162,7 @@ export function harvestLoot(world, node, work, loot){
   let salt = 0;
   for(const row of score.rows){
     const p = world.player(row.id);
-    if(p && trinketOf(p) === 'harvestcharm' && main) out[main] += Math.min(RHYTHM.charmCap, row.clean);
+    if(p && wears(p, 'harvestcharm') && main) out[main] += Math.min(RHYTHM.charmCap, row.clean);
     // A perfect streak may turn up something rare that fits the node.
     const finds = RARE_FINDS[node.type];
     if(finds && row.beats >= RHYTHM.rareMin && row.clean >= row.beats && chance(world, node, salt++) < RHYTHM.rareChance){

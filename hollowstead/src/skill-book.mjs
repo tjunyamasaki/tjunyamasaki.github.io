@@ -8,6 +8,7 @@ import {mine, skyPath, summon} from './arsenal.mjs?v=harvest-18';
 import {FOXFIRE} from './magic/kitsune-lantern.mjs?v=harvest-18';
 import {ownedSkeletons, raiseSkeleton} from './magic/barrow-rattle.mjs?v=harvest-18';
 import {RITE, beginRite} from './magic/pallbearer.mjs?v=harvest-18';
+import {ECLIPSE, beginEclipse} from './magic/hollow-moon.mjs?v=harvest-18';
 import {gripAll} from './magic/gloomgrasp.mjs?v=harvest-18';
 import {finalChapter} from './grimoire.mjs?v=harvest-18';
 import {deathMark, deathReap} from './reaper.mjs?v=harvest-18';
@@ -267,6 +268,14 @@ export const SKILL_BOOK = Object.freeze({
       k.beat(0, {kind: 'call', fn: 'lastrites', fx: 'lastrites', tx: round(t.x), tz: round(t.z),
         line: k.dmg(1.5), slam: k.dmg(4), drag: k.dmg(1.2), land: k.dmg(2)});
     }},
+
+  'hollow-moon': {name: 'Eclipse', cooldown: 14, reach: ECLIPSE.reach, pose: 1.2,
+    blurb: 'The moon flies to your mark and swells full, dragging in everything around it; then it goes black and bursts in a supernova that stuns. It comes home full.',
+    cast(k){
+      const t = k.target(ECLIPSE.reach, 5);
+      // The moon's own module (src/magic/hollow-moon.mjs) rises, pulls, darkens and bursts.
+      k.beat(0, {kind: 'call', fn: 'eclipse', fx: 'eclipse', tx: round(t.x), tz: round(t.z), tick: k.dmg(.35), blast: k.dmg(5)});
+    }},
 });
 
 // ------------------------------------------------------------------ special beats
@@ -345,6 +354,8 @@ export const SKILL_CALLS = Object.freeze({
   },
   /** Last Rites: the flail's own module whirls, hurls, slams and yanks (src/magic/pallbearer.mjs). */
   lastrites(world, b, owner){return beginRite(world, owner, b);},
+  /** Eclipse: the Hollow Moon's own module rises, drags, goes dark and bursts (src/magic/hollow-moon.mjs). */
+  eclipse(world, b, owner){return beginEclipse(world, owner, b);},
   /** Abyssal Grip: the scepter's own hands rise under every foe near the mark (src/magic/gloomgrasp.mjs). */
   gloomhands(world, b, owner){return gripAll(world, owner, b);},
   /** Final Chapter: the grimoire's pages ring the mark and hang there (src/grimoire.mjs). */

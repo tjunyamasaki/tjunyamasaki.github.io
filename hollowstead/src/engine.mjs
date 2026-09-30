@@ -144,7 +144,7 @@ const MAGIC_AIM=Object.freeze({
   'kitsune-lantern':{reach:11,range:11},'plaguebeak':{reach:8.5,range:8.5},'gloomgrasp':{reach:8,range:8},
   'cinder-staff':{reach:11,speed:12*1.15,range:11},'widows-needle':{reach:9,speed:20*1.15,range:9},
   'spirit-fan':{reach:5.5,range:5.5},'barrow-rattle':{reach:10,range:10},'mourning-bell':{reach:5.2,range:5.2},
-  'pallbearer':{reach:3.1,range:3.1},
+  'pallbearer':{reach:3.1,range:3.1},'hollow-moon':{reach:9,range:9},
 });
 /**
  * Guests only draw creatures and shots, so the network copy rounds every number to centimetres and

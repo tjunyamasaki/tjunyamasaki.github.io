@@ -72,7 +72,7 @@ const ITEM_RARITY = Object.freeze({
   elixir:'uncommon', heartstone:'epic', stew:'uncommon', bandage:'common',
   sword:'uncommon', torch:'common', recurve:'uncommon', bonebow:'rare', broadsword:'rare', crookstaff:'rare',
   flamberge:'epic', skullstaff:'epic', tome:'legendary', bonemail:'rare', shardplate:'epic', everlantern:'legendary',
-  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic', 'kitsune-lantern':'epic', plaguebeak:'epic', gloomgrasp:'epic', pallbearer:'epic',
+  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic', 'kitsune-lantern':'epic', plaguebeak:'epic', gloomgrasp:'epic', pallbearer:'epic', 'hollow-moon':'legendary',
   fangs:'rare', wisplantern:'rare', crowtotem:'rare', soulchain:'epic', stormrod:'epic', jacklantern:'epic', censer:'epic',
   scythe:'legendary', starfall:'legendary', wighthorn:'legendary',
   // Trinkets (trinkets.mjs): six rare, four epic. Caches and elites drop them through the pools below.
@@ -91,7 +91,7 @@ const POOLS = Object.freeze({
   uncommon:['recurve','sword','elixir','elixir','torch','bandage'],
   rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem','nightfang','emberheart','crowseye','harvestcharm','wispfeather','gravedust'],
   epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer','pallbearer','frostanklet','boneward','moonlocket','thornknot'],
-  legendary:['tome','everlantern','scythe','starfall','wighthorn'],
+  legendary:['tome','everlantern','scythe','starfall','wighthorn','hollow-moon'],
 });
 export const LOOT_TABLES = Object.freeze({
   crate:{xp:12, rolls:[

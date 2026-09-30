@@ -10,6 +10,7 @@ const SPECS = [
   'spirit-fan.mjs',
   'mourning-bell.mjs',
   'pallbearer.mjs',
+  'hollow-moon.mjs',
 ];
 
 export async function loadMagicModules(){

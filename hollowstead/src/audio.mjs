@@ -61,6 +61,14 @@ export class Sound {
       }
       return;
     }
+    if(type.startsWith('lunar')){
+      // The Hollow Moon: a low whoosh as it leaves, a hollow gulp and a cold chime when it swallows, fuller as it waxes.
+      const phase=Math.max(0,Math.min(3,ev?.phase|0));
+      if(type==='lunarthrow'){this.sweep(140,420,.22,'triangle',.02+.006*phase);this.sweep(900,1400,.16,'sine',.006,.04);return;}
+      if(type==='lunarcrush'){const full=phase===3;this.sweep(260,55,full?.5:.32,'sine',full?.08:.05);this.sweep(640,160,.18,'triangle',.014);for(const [i,f] of [523,659,784,1047].slice(0,1+phase).entries())this.sweep(f,f*.985,.5,'sine',.012/(i+1),.06+i*.05);return;}
+      if(type==='lunarnova'){this.sweep(120,28,1.1,'sine',.1);this.sweep(420,70,.6,'sawtooth',.018);for(const [i,f] of [392,523,659,784,1047].entries())this.sweep(f,f*1.5,.9,'sine',.012,.1+i*.06);return;}
+      return;
+    }
     if(type.startsWith('coffin')){
       // The Pallbearer's Flail: a chain whoosh that rises with the spin, wooden thuds with an iron clank,
       // a wail when the lid bangs open, and a grave-shaking slam.

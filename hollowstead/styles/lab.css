@@ -3,10 +3,10 @@
 /* A brief wash of light on the biggest weapon moments (src/fx). Above the world, below the HUD. */
 #fx-flash{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:1;mix-blend-mode:screen;background:radial-gradient(ellipse at 50% 46%,var(--flash,#fff3cf) 0%,color-mix(in srgb,var(--flash,#fff3cf) 55%,transparent) 45%,transparent 85%)}
 
-/* The skill button: left of Attack. Its ring fills as the skill recharges; it glows when ready. */
-#action-cluster #skill{grid-column:1;grid-row:3;width:52px;height:52px;min-width:52px;min-height:52px;justify-self:start;align-self:end;font-size:18px;border-color:#b58cff66;background:radial-gradient(circle at 50% 38%,#4a3a66e6,#2e2638e6 70%)}
+/* Purple outer ring: cooldown remaining. Mint inner ring: stamina available. */
+#action-cluster #skill{grid-column:1;grid-row:3;width:var(--main-action-size);height:var(--main-action-size);min-width:var(--main-action-size);min-height:var(--main-action-size);justify-self:start;align-self:end;font-size:20px;border-color:#b58cff66;background:radial-gradient(circle at 50% 38%,#4a3a66e6,#2e2638e6 70%)}
 #action-cluster #skill .skill-glyph{font-size:19px;line-height:1;color:#ffe48e;text-shadow:0 0 8px #f2c14e88}
-#action-cluster #skill small{max-width:46px}
+#action-cluster #skill small{max-width:60px}
 #action-cluster #skill::after{content:"";position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(#b58cffcc calc(var(--cd,0) * 1turn),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));pointer-events:none}
 #action-cluster #skill::before{content:"";position:absolute;inset:3px;border-radius:50%;background:conic-gradient(from 180deg,#8fd3c066 calc(var(--fuel,1) * 1turn),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 2px),#000 calc(100% - 1px));mask:radial-gradient(farthest-side,transparent calc(100% - 2px),#000 calc(100% - 1px));pointer-events:none}
 #action-cluster #skill.ready{border-color:#ffe48e;box-shadow:0 0 0 1px #ffe48e55 inset,0 0 16px #f2c14e88,0 4px 20px #18132255;animation:skill-ready 1.6s ease-in-out infinite}

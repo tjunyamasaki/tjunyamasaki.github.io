@@ -66,7 +66,12 @@
     </div>
     <aside id="showcase-panel" hidden aria-label="Showcase spawns"></aside>
     <aside id="lab-panel" hidden aria-label="Weapon lab"><div id="lab-strip" class="lab-strip" role="toolbar" aria-label="Weapon lab tools"></div><div id="lab-meter" class="lab-meter" aria-live="off"></div><section id="lab-sheet" class="lab-sheet" hidden></section></aside>
-    <nav class="hotbar" aria-label="Game actions"><div id="weapon-bar" class="weapon-bar" role="group" aria-label="Weapons"><button type="button" class="weapon-slot" data-slot="0" aria-label="Weapon slot 1"></button><button type="button" class="weapon-slot" data-slot="1" aria-label="Weapon slot 2"></button><button type="button" class="weapon-slot" data-slot="2" aria-label="Weapon slot 3"></button></div><button type="button" id="hotbar-inventory" aria-label="Inventory"><span aria-hidden="true">▣</span><small>Pack <kbd>I</kbd></small></button><button type="button" id="hotbar-build" aria-label="Build"><span aria-hidden="true">⌂</span><small>Build <kbd>B</kbd></small></button></nav>
+    <nav class="hotbar" aria-label="Game actions">
+      <div id="weapon-bar" class="weapon-bar" role="group" aria-label="Weapons"><button type="button" class="weapon-slot" data-slot="0" aria-label="Weapon slot 1"></button><button type="button" class="weapon-slot" data-slot="1" aria-label="Weapon slot 2"></button><button type="button" class="weapon-slot" data-slot="2" aria-label="Weapon slot 3"></button></div>
+      <button type="button" id="hotbar-potion" class="potion-slot" aria-label="Drink Vigor draught" disabled><small>Potion <kbd>H</kbd></small></button>
+      <button type="button" id="hotbar-inventory" aria-label="Inventory"><span aria-hidden="true">▣</span><small>Pack <kbd>I</kbd></small></button>
+      <button type="button" id="hotbar-build" aria-label="Build"><span aria-hidden="true">⌂</span><small>Build <kbd>B</kbd></small></button>
+    </nav>
     <section id="arena-pick" hidden role="dialog" aria-modal="true" aria-labelledby="arena-pick-title"><button type="button" id="arena-menu" class="text-button arena-menu">Menu</button><div class="pick-card-wrap"><p class="eyebrow" id="arena-pick-kicker">THE ARENA</p><h2 id="arena-pick-title">Choose a weapon</h2><div id="arena-offers" class="arena-offers"></div><div id="arena-replace" class="arena-replace" hidden></div></div></section>
     <div id="downed" hidden><h2>A light is fading.</h2><p id="downed-text"></p><button id="use-charm" class="primary" type="button">Use your last charm</button></div>
   </div>

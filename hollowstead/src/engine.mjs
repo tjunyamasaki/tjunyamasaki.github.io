@@ -1,4 +1,5 @@
 import {slideMove, steer} from './pathing.mjs?v=harvest-18';
+import {dropLifetime} from './drops.mjs?v=harvest-18';
 import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, label, nodeAwake} from './content.mjs?v=harvest-18';
 import {
   CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2, SPILL_LIFETIME_SECONDS,
@@ -255,7 +256,7 @@ export class World {
   placeDrop(stack,x,z,life=DROP_LIFETIME_SECONDS){
     const made=makeStack(stack.uid, stack.itemId, stack.quantity, stack.durability);
     if(!made.ok)return null;
-    const drop={id:this.nextId('d'), stack:made.stack, x, z, until:this.time+life};
+    const drop={id:this.nextId('d'), stack:made.stack, x, z, until:this.time+dropLifetime(made.stack.itemId,life)};
     this.drops.push(drop);return drop;
   }
   dropNew(itemId,count,x,z){

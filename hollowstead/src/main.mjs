@@ -12,7 +12,7 @@ import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS,STORAGE_TYPE
 import {cartFacts} from './cart.mjs?v=harvest-18';
 import {
   allowsCombat,allowsMovement,clusterFor,escapeStep,isHarvestAction,keyboardAction,
-  keyboardPrimary,resolveMode,showsLantern,usableLantern,
+  keyboardPrimary,potionHotbar,resolveMode,showsLantern,usableLantern,
 } from './ui/actions.mjs?v=harvest-18';
 import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-18';
 import {actionNeedsConfirm,actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-18';
@@ -712,11 +712,21 @@ function paintCluster(modeName,p){
   $('hotbar-inventory').classList.toggle('active',sheet==='inventory'||sheet==='chest');
   $('hotbar-build').classList.toggle('active',sheet==='catalog'&&catalog.source==='field');
 }
-/**
- * Weapon hotbar buttons: icons, which is in hand, and ranks. On an expedition each also shows its
- * mastery (stars and a gold bar toward the next rank) and its condition (the orange bar).
- * Repainted only when something changed.
- */
+/** The potion shortcut always reflects the draughts currently carried in the pack. */
+function paintPotion(p){
+  const el=$('hotbar-potion'),view=potionHotbar(p,{mode:currentMode(),arena:!!world?.arena,pending:actionPending});
+  const sig=`${view.quantity}:${!!view.command}`;
+  if(el.dataset.state===sig)return;el.dataset.state=sig;
+  el.innerHTML=`${icon(view.itemId)}<small class="potion-count" aria-hidden="true">${view.quantity}</small><small>Potion <kbd>H</kbd></small>`;
+  el.disabled=!view.command;
+  el.setAttribute('aria-label',`Drink Vigor draught, ${view.quantity} potions available (H)`);
+  el.title=view.quantity?'Drink Vigor draught (H) · Restore 60 health and 20 courage':'No potions · Craft Vigor draughts at a workbench';
+}
+async function drinkPotion(){
+  const view=potionHotbar(me(),{mode:currentMode(),arena:!!world?.arena,pending:actionPending});
+  if(view.command)await withPending(view.command);
+}
+/** Weapon icons, mastery, condition and refinements, repainted only when changed. */
 function paintHotbar(p){
   const slots=hotbarView(p).map(slot=>({...slot,mastery:slot.itemId?masteryView(world,p,slot.itemId):null,condition:slot.stack&&!world.arena?conditionOf(slot.stack):null}));
   const refined=itemId=>refinesOf(p,itemId).map(entry=>`${entry.mod}${entry.tier}`).join(',');
@@ -833,7 +843,7 @@ function ui(){
     else{$('day-number').textContent=`DAY ${String(dayAt(world.time)).padStart(2,'0')}`;
     $('day-progress').style.left=`${(world.time%RULES.cycle)/RULES.cycle*100}%`;
     paintClock();}
-    paintHotbar(p);paintAttack(p);paintArenaPick(p);paintFeatureHud(featureContext(p));
+    paintHotbar(p);paintPotion(p);paintAttack(p);paintArenaPick(p);paintFeatureHud(featureContext(p));
     $('party').innerHTML=world.players.filter(q=>q.id!==localId).map(q=>`<div class="party-row"><span class="party-dot" style="background:${CHARACTERS.find(c=>c.id===q.character)?.color}"></span><b>${escapeHtml(q.name)}</b><span>${!q.online?'away':q.down?'needs help!':q.ghost?'returns at dawn':''}</span></div>`).join('');
     if(p.noticeAt&&p.noticeAt!==lastNotice){toast(p.notice);lastNotice=p.noticeAt;}
     for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(ev.type==='rare'&&distance(p,ev)<14)toast(`Found ${ev.text} · ${rarityOf(ev.itemId)}`);if(distance(p,ev)<20||ev.type==='phase')sound.play(ev.type,ev);}}
@@ -869,6 +879,7 @@ function setupControls(){
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   $('hotbar-inventory').onclick=toggleInventory;$('hotbar-build').onclick=toggleFieldBuild;
+  $('hotbar-potion').onclick=()=>void drinkPotion();
   // Weapon slots answer on press, like the action buttons: a swap mid-fight must not wait for a click.
   $('weapon-bar').addEventListener('pointerdown',event=>{
     const button=event.target.closest('.weapon-slot');if(!button)return;event.preventDefault();event.stopPropagation();sound?.unlock();
@@ -990,6 +1001,7 @@ function setupControls(){
       return;
     }
     if(named==='weapon-next'){event.preventDefault();cycleWeapon();return;}
+    if(named==='potion'){event.preventDefault();void drinkPotion();return;}
     if(named==='inventory'){if(world?.arena)return;toggleInventory();return;}
     if(named==='build'){if(world?.arena)return;toggleFieldBuild();return;}
     if(named==='map'){sheet==='map'?closeSheet():openSheet('map');return;}

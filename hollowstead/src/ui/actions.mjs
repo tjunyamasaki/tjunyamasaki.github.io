@@ -105,15 +105,27 @@ export function escapeStep({dragging = false, detailsOpen = false, panel = null,
   return 'open-menu';
 }
 
-/** Keys that still exist. C, Q, and G are intentionally absent. R and Tab cycle the weapon hotbar. */
+/** R and Tab cycle weapons; H drinks a potion from the pack. */
 export function keyboardAction(key) {
   const map = {
     i: 'inventory', b: 'build', m: 'map', f: 'lantern', e: 'primary',
     ' ': 'attack', q: 'skill', shift: 'dodge', enter: 'confirm', escape: 'escape',
     '1': 'action-1', '2': 'action-2', '3': 'action-3', '4': 'action-4',
-    r: 'weapon-next', tab: 'weapon-next',
+    r: 'weapon-next', tab: 'weapon-next', h: 'potion',
   };
   return map[key] || null;
+}
+
+/** Potions stay in the pack; the hotbar uses the same revision-checked consume intent as inventory. */
+export function potionHotbar(player, {mode = 'normal', arena = false, pending = false} = {}) {
+  const stacks = (player?.inventory?.slots || []).filter(stack => stack?.itemId === 'elixir' && stack.quantity > 0);
+  const quantity = stacks.reduce((total, stack) => total + stack.quantity, 0);
+  const usable = quantity > 0 && !arena && !pending && !player?.down && !player?.ghost
+    && ['normal', 'inventory', 'chest'].includes(mode);
+  return {
+    itemId: 'elixir', quantity,
+    command: usable ? {type: 'consumeItem', uid: stacks[0].uid, inventoryRevision: player.inventory.revision} : null,
+  };
 }
 
 export function keyboardPrimary(actions, mode) {

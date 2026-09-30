@@ -1,8 +1,9 @@
 """The camp at the centre of the hollow: two Heartfire designs, the magic plaza laid on the
 ground around each, and the standing props that ring it.
 
-  a  Moonwell: a well of stacked stones burning with a pale spirit-flame, crystal shards
-     circling above; a flagstone ring carved with glowing teal runes; rune menhirs.
+  a  Moonwell: a clean stone drum with one spiral keystone and a tall flame around a spirit core,
+     two floating shards; an even flagstone floor with a single mint rune ring. No standing props:
+     the plaza stays flat so buildings and dropped things read on it (the menhir is the arena's).
   b  Arcane brazier: an iron tripod brazier holding an amber flame inside a slowly turning
      golden rune halo; a gilded six-point sigil inlaid with amethyst; sigil lamps.
 
@@ -24,41 +25,49 @@ def spirit_flame(cx, base, w, h, phase, seed):
 
 
 # ------------------------------------------------------------------ Heartfire A: the moonwell
+# The selected concept (art-concepts/environment-2026-09-29, "A · Moonwell"): one clean stone drum,
+# a single spiral keystone, a tall layered flame with a spirit core, two small shards. Few, large shapes.
+MW_STONE = "#a29db5"; MW_TOP = "#bdb8cd"; MW_BED = "#5c485a"; MINT = "#a3e4cb"; MINT_L = "#ecf6d6"
+EMBER = "#f4ad55"; FLAME_O = "#e78343"; FLAME_M = "#f6b657"
+
+
 def hearth_a(phase):
     d = []; b = ""
     tau = 2 * math.pi * phase
-    # back half of the well
-    b += fill("M112 640 Q256 588 400 640 L400 660 Q256 612 112 660 Z", STONE_D, 7)
-    # flame: orange outside, spirit core
-    b += G(flame(256, 646, 150, 300 + 16 * math.sin(tau), phase, 5))
-    b += spirit_flame(256, 646, 92, 200 + 12 * math.sin(tau + 1), phase, 9)
-    # front of the well: two courses of stones
-    for row, (y0, y1, n, off) in enumerate([(640, 690, 6, 0), (686, 738, 7, .5)]):
-        for i in range(n):
-            t0 = (i + off) / n; t1 = (i + off + .92) / n
-            x0 = 104 + 304 * t0; x1 = 104 + 304 * t1
-            sag = lambda x: 22 * math.sin(math.pi * (x - 104) / 304)
-            stone = f"M{f(x0)} {f(y0 + sag(x0))} L{f(x1)} {f(y0 + sag(x1))} L{f(x1 + 2)} {f(y1 + sag(x1))} L{f(x0 - 2)} {f(y1 + sag(x0))} Z"
-            b += fill(stone, STONE if (i + row) % 2 else STONE_L, 7)
-    b += brush((130, 652), (256, 690), (380, 652), 6, "#ffffff", .25)
-    # runes on the well stones
-    for i, x in enumerate((168, 256, 344)):
-        glow = .55 + .45 * math.sin(tau + i * 2.1)
-        y = 700 + 22 * math.sin(math.pi * (x - 104) / 304)
-        r = f"M{x} {y - 18} L{x} {y + 18} M{x - 12} {y - 6} L{x} {y + 4} L{x + 12} {y - 6}"
-        b += line(r, 10) + line(r, 4, CR_L, f' opacity="{glow:.2f}"')
-    # crystal shards orbiting above
-    for i in range(3):
-        a = tau + i * 2 * math.pi / 3
-        x = 256 + math.cos(a) * 150; y = 330 + math.sin(a) * 36 - 10 * math.sin(tau * 2 + i)
-        s = .75 + .25 * (math.sin(a) + 1) / 2
-        shard = f"M{f(x)} {f(y - 42 * s)} L{f(x + 16 * s)} {f(y)} L{f(x)} {f(y + 30 * s)} L{f(x - 16 * s)} {f(y)} Z"
-        b += f'<circle cx="{f(x)}" cy="{f(y)}" r="{f(34 * s)}" fill="{CR}" opacity=".22" stroke="none"/>'
-        b += fill(shard, CR, 6) + fill_ns(f"M{f(x)} {f(y - 42 * s)} L{f(x + 16 * s)} {f(y)} L{f(x)} {f(y + 30 * s)} Z", CR_D)
-        b += fill(shard, "none", 6)
-    for i, (x, y) in enumerate([(210, 300), (300, 270), (250, 220), (320, 360)]):
-        t = (phase + i * .25) % 1
-        b += f'<circle cx="{f(x + 12 * math.sin(t * 6 + i))}" cy="{f(y - t * 90)}" r="{f(6 * (1 - t) + 1)}" fill="{SP_I if i % 2 else FL_I}" stroke="none" opacity="{1 - t:.2f}"/>'
+    tip = 14 * math.sin(tau); lift = -9 * math.sin(tau + 1.1); bob = 7 * math.sin(tau + 2.2)
+    # warm halo behind the flame (soft, no outline)
+    b += f'<ellipse cx="256" cy="430" rx="{f(190 + 8 * math.sin(tau))}" ry="220" fill="{EMBER}" opacity=".16" stroke="none"/>'
+    # the drum: one solid body, a masonry seam and a few joints
+    b += fill("M49 586 Q61 550 256 548 Q451 550 463 586 L461 665 Q458 729 256 740 Q54 729 51 665 Z", MW_STONE, 8)
+    b += line("M53 660 Q256 722 459 660", 6)
+    b += line("M121 623 L116 678 M389 623 L396 678 M160 694 L155 730 M352 694 L357 730", 6)
+    b += ell(256, 586, 207, 61, MW_TOP, 8)
+    b += line("M112 543 L144 562 M219 526 L224 553 M321 529 L308 554 M399 545 L369 564", 6)
+    b += ell(256, 590, 150, 35, MW_BED, 7)
+    b += f'<ellipse cx="256" cy="594" rx="132" ry="24" fill="{EMBER}" stroke="none"/>'
+    # the flame: orange, amber, then the spirit core and its white heart (squashed into the bowl)
+    fl = ""
+    fl += fill(f"M{f(243 + tip)} {f(220 + lift)} C{f(285 + tip)} 266 270 309 279 338 Q288 321 289 303 C339 345 311 389 329 413 Q347 391 344 365 "
+               f"C387 435 383 471 366 488 Q361 531 331 558 Q300 594 257 600 Q198 599 166 557 C129 512 138 464 163 427 Q160 465 187 474 "
+               f"Q192 457 182 420 C164 360 191 322 211 297 Q208 334 226 349 C212 298 222 257 {f(243 + tip)} {f(220 + lift)} Z", FLAME_O, 8)
+    fl += fill_ns(f"M{f(250 + tip * .4)} {f(339 + lift * .5)} C287 386 273 421 292 449 Q308 436 306 415 C342 464 332 509 307 541 Q288 572 255 584 "
+                  f"Q221 579 196 549 C171 522 179 494 191 482 Q194 507 210 510 C205 479 215 451 230 429 Q232 462 246 470 C232 424 239 379 {f(250 + tip * .4)} {f(339 + lift * .5)} Z", FLAME_M)
+    fl += fill(f"M{f(253 - tip * .3)} {f(441 + lift * .6)} Q288 474 279 505 Q291 495 294 480 C316 522 306 559 282 577 Q258 595 234 580 "
+               f"C210 566 201 538 218 506 Q218 529 234 535 C225 503 240 470 {f(253 - tip * .3)} {f(441 + lift * .6)} Z", MINT, 7)
+    fl += fill_ns("M255 511 Q271 536 266 550 Q277 545 277 538 Q286 567 259 582 Q235 578 233 563 Q230 549 240 539 Q239 555 248 557 Q241 534 255 511 Z", MINT_L)
+    b += f'<g transform="translate(0 102) scale(1 .83)">{fl}</g>'
+    # the keystone in front, carrying the one emblem; it breathes with the fire
+    b += fill("M201 639 Q256 646 311 639 L325 731 Q256 744 187 731 Z", MW_STONE, 8)
+    spiral = "M257 688 C252 678 241 681 242 690 C243 701 259 704 267 695 C282 679 267 662 251 665 C230 668 222 687 232 704 Q240 718 256 718"
+    glow = .7 + .3 * math.sin(tau)
+    b += f'<path d="{spiral}" fill="none" stroke="{MINT}" stroke-width="{sw(9)}" opacity="{glow:.2f}"/>'
+    # two shards floating either side, a few sparks
+    for x, y, s in ((107, 398 + bob, 1), (399, 416 - bob, -1)):
+        b += f'<circle cx="{x}" cy="{f(y)}" r="30" fill="{MINT}" opacity=".18" stroke="none"/>'
+        b += fill(f"M{x} {f(y - 31)} L{x + 17} {f(y)} L{x} {f(y + 29)} L{x - 15} {f(y)} Z", MINT, 7)
+    for i, (x, y) in enumerate([(206, 250), (300, 230), (248, 180)]):
+        t = (phase + i / 3) % 1
+        b += f'<circle cx="{f(x + 10 * math.sin(t * 6 + i))}" cy="{f(y - t * 110)}" r="{f(7 * (1 - t) + 1.5)}" fill="{MINT_L if i % 2 else EMBER}" stroke="none" opacity="{1 - t:.2f}"/>'
     return d, b
 
 
@@ -158,26 +167,41 @@ def glyph(x, y, a, s, kind):
 
 
 def plaza_a(glow_only=False):
+    """A calm, even flagstone floor so buildings and dropped things read on it: one curb, two courses
+    of paving with quiet joints, and a single mint rune ring close around the Moonwell (the glow layer).
+    Drawn in the PLAZA_WU decal (80 px per world unit); centred OFFSET units behind the Heartfire's
+    ground point, under the middle of the well rather than its front lip. Ink matches lib.LINE_WU."""
+    U = 1024 / PLAZA_WU; C = 512; Y = 512 - OFFSET * U; ink = 5
+    R = 4.6 * U; CURB0 = 4.2 * U; RUNE = 2.45 * U
+    rings = ((RUNE, 3.35 * U, 16, .0), (3.35 * U, CURB0, 22, .5))
     body = ""
     if not glow_only:
-        body += f'<circle cx="512" cy="512" r="470" fill="#6f5e4c" opacity=".55" stroke="none"/>'
-        body += ring_stones(390, 470, 28, 3, [STONE, STONE_L, STONE_D])
-        rnd = random.Random(8)
-        for i in range(34):
-            a = rnd.uniform(0, 2 * math.pi); r = rnd.uniform(130, 370)
-            x, y = 512 + math.cos(a) * r, 512 + math.sin(a) * r
-            body += fill(blob(x, y, rnd.uniform(18, 34), rnd.uniform(14, 24), 7, .2, i), [STONE_D, STONE, "#7a7590"][i % 3], 5)
-        body += f'<circle cx="512" cy="512" r="340" fill="none" stroke="{INK_D}" stroke-width="22"/>'
-        body += f'<circle cx="512" cy="512" r="286" fill="none" stroke="{INK_D}" stroke-width="16"/>'
-    col = CR if glow_only else CR
-    w = 1.0
-    body += f'<g stroke="{col}" stroke-width="{10 * w}" fill="none"><circle cx="512" cy="512" r="340"/><circle cx="512" cy="512" r="286"/></g>'
-    runes = "".join(glyph(512 + math.cos(2 * math.pi * i / 16) * 313, 512 + math.sin(2 * math.pi * i / 16) * 313, 2 * math.pi * i / 16, 1.1, i) for i in range(16))
-    body += f'<g stroke="{col}" stroke-width="7">{runes}</g>'
-    for i in range(4):
-        a = math.pi / 4 + i * math.pi / 2
-        body += f'<path d="M{f(512 + math.cos(a) * 120)} {f(512 + math.sin(a) * 120)} L{f(512 + math.cos(a) * 270)} {f(512 + math.sin(a) * 270)}" stroke="{col}" stroke-width="8" fill="none"/>'
+        body += f'<circle cx="{C}" cy="{f(Y)}" r="{f(R)}" fill="{PLAZA}" stroke="none"/>'
+        body += f'<circle cx="{C}" cy="{f(Y)}" r="{f(RUNE)}" fill="{PLAZA_IN}" stroke="none"/>'
+        for r0, r1, n, off in rings:
+            body += f'<circle cx="{C}" cy="{f(Y)}" r="{f(r1)}" fill="none" stroke="{JOINT}" stroke-width="4"/>'
+            for i in range(n):
+                a = 2 * math.pi * (i + off) / n
+                body += (f'<path d="M{f(C + math.cos(a) * r0)} {f(Y + math.sin(a) * r0)} L{f(C + math.cos(a) * r1)} {f(Y + math.sin(a) * r1)}" '
+                         f'stroke="{JOINT}" stroke-width="4" fill="none"/>')
+        for i in range(40):
+            a0 = 2 * math.pi * i / 40 + .012; a1 = 2 * math.pi * (i + 1) / 40 - .012
+            pts = [(C + math.cos(a) * R, Y + math.sin(a) * R) for a in (a0, (a0 + a1) / 2, a1)]
+            pts += [(C + math.cos(a) * CURB0, Y + math.sin(a) * CURB0) for a in (a1, (a0 + a1) / 2, a0)]
+            body += f'<path d="M{" L".join(f"{f(x)} {f(y)}" for x, y in pts)} Z" fill="{(CURB, CURB_L)[i % 2]}" stroke-width="{ink}"/>'
+        body += f'<circle cx="{C}" cy="{f(Y)}" r="{f(RUNE)}" fill="none" stroke="{O}" stroke-width="13"/>'
+    # the rune ring: one line with small evenly spaced studs
+    body += f'<circle cx="{C}" cy="{f(Y)}" r="{f(RUNE)}" fill="none" stroke="{MINT}" stroke-width="6"/>'
+    for i in range(12):
+        a = 2 * math.pi * i / 12 + math.pi / 12
+        x, y = C + math.cos(a) * RUNE, Y + math.sin(a) * RUNE
+        body += f'<circle cx="{f(x)}" cy="{f(y)}" r="9" fill="{MINT_L if glow_only else MINT}" stroke="{"none" if glow_only else O}" stroke-width="{ink}"/>'
     return body
+
+
+PLAZA_WU = 12.8     # world units across the plaza decal (theme.json plaza size)
+OFFSET = 1.1        # the well's footprint centre sits this far behind the Heartfire's ground point
+PLAZA = "#8a8497"; PLAZA_IN = "#817b8f"; JOINT = "#716b83"; CURB = "#77718a"; CURB_L = "#8e88a0"
 
 
 def plaza_b(glow_only=False):
@@ -207,7 +231,10 @@ def write_decals(out_dir):
     for key, fn in (("plaza-a", plaza_a), ("plaza-b", plaza_b)):
         for suffix, glow in (("", False), ("-glow", True)):
             body = fn(glow)
-            svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 1024 1024"><g stroke="{O}" stroke-linejoin="round" stroke-linecap="round">{body}</g></svg>'
+            if key == "plaza-b":   # drawn for the old 9.6-unit decal: same size inside the PLAZA_WU one
+                k = 9.6 / PLAZA_WU
+                body = f'<g transform="translate({f(512 * (1 - k))} {f(512 * (1 - k))}) scale({k:.4f})">{body}</g>'
+            svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><g stroke="{O}" stroke-linejoin="round" stroke-linecap="round">{body}</g></svg>'
             open(os.path.join(out_dir, f"{key}{suffix}.svg"), "w").write(svg)
 
 

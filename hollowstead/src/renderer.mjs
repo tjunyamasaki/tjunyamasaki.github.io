@@ -15,8 +15,8 @@ import {SceneryLayer} from './scenery.mjs?v=harvest-18';
 import {groundColors, walkableAt} from './worldgen.mjs?v=harvest-18';
 import {nodeAwake} from './content.mjs?v=harvest-18';
 import {RopeLayer} from './cart-rope.mjs?v=harvest-18';
-/** Standing stones or lamps ringing the Heartfire plaza (presentation only). */
-export function plazaProps(world,theme){const hearth=world.buildings.find(b=>b.type==='hearth');if(!hearth||!theme.sprites['plaza-prop'])return [];return [0,1,2,3,4,5].map(i=>{const a=i*Math.PI/3;return {e:{id:'plaza'+i,x:hearth.x+Math.cos(a)*4.7,z:hearth.z+Math.sin(a)*4.7*.92},key:'plaza-prop',kind:'prop'};});}
+/** The Heartfire plaza is kept flat (no standing props) so buildings and drops read on it; the arena keeps its runestones. */
+export function plazaProps(){return [];}
 /** Runestones ringing the battle arena's wall (presentation only; nothing collides with them). */
 export function arenaProps(world,theme){if(!world?.arena||!theme.sprites['plaza-prop'])return [];const R=world.radius-.35,n=22;return [...Array(n)].map((_,i)=>{const a=i/n*Math.PI*2;return {e:{id:'arena-stone'+i,x:Math.cos(a)*R,z:Math.sin(a)*R},key:'plaza-prop',kind:'prop'};});}
 /** Arena floor colour at x,z: flagstone bands and spokes inside the wall, dark beyond it. */

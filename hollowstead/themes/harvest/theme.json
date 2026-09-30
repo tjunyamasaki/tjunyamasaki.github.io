@@ -3511,8 +3511,8 @@
     "plaza": {
       "src": "./sprites/plaza-a.svg?v=art4",
       "size": [
-        9.6,
-        9.6
+        12.8,
+        12.8
       ],
       "anchor": [
         0.5,
@@ -3532,8 +3532,8 @@
     "plaza-glow": {
       "src": "./sprites/plaza-a-glow.svg?v=art4",
       "size": [
-        9.6,
-        9.6
+        12.8,
+        12.8
       ],
       "anchor": [
         0.5,

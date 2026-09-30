@@ -216,15 +216,17 @@ test('hollow fangs rend on every fourth cut: extra damage, a bleed and a lunge',
   const hp=e.hp;sim(w,1);assert.ok(e.hp<hp);
 });
 
-test('soulchain lashes a whole line and drags it in; the scythe heals per foe',()=>{
+test('soulchain lashes a whole line and drags it in; the scythe dooms, then reaps and heals',()=>{
   const {w,p}=camp();p.x=0;p.z=0;p.dx=1;p.dz=0;arm(w,p,'soulchain');
   const line=foes(w,[[2,0],[3.5,.3],[5,-.3]]),off=foes(w,[[2,3]])[0];
   const far=line[2].x;w.attack(p);
   for(const e of line)assert.equal(e.hp,500-EQUIPMENT.soulchain.damage);
   assert.equal(off.hp,500);assert.ok(line[2].x<far);
   w.enemies=[];arm(w,p,'scythe');ready(p);p.hp=50;
-  foes(w,[[2,0],[0,2],[1,-2]]);w.attack(p);
-  assert.ok(p.hp>50);assert.ok(w.enemies.every(e=>e.hp<500));
+  const doomed=foes(w,[[2,0],[0,2],[1,-2]]);w.attack(p);
+  assert.ok(doomed.every(e=>e.hp<500&&e.doom?.n===1));assert.equal(p.hp,50);
+  doomed[0].hp=40;ready(p);w.attack(p);
+  assert.ok(doomed[0].hp<=0);assert.ok(p.hp>50);
 });
 
 test('wisps home in on separate foes and the storm rod chains between them',()=>{

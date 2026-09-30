@@ -20,9 +20,9 @@ export class Sound {
     }
     if(type==='starfall'||type==='mark')return false;
     const fx=type==='fx'?ev.fx:type;
-    const BOOM=['meteor','heartstar','smash','slam','eruption','graveburst','soulburst','gloomfist','foxspirit','boneburst','gale','fireball','pumpkin','shatter','frostnova','hornblast','ashcollapse','vial','web'];
+    const BOOM=['meteor','heartstar','smash','slam','eruption','graveburst','soulburst','gloomfist','deathreap','foxspirit','boneburst','gale','fireball','pumpkin','shatter','frostnova','hornblast','ashcollapse','vial','web'];
     if(BOOM.includes(fx)){
-      const big=fx==='heartstar'||fx==='smash'||fx==='gloomfist'||fx==='ashcollapse'||fx==='foxspirit';
+      const big=fx==='heartstar'||fx==='smash'||fx==='gloomfist'||fx==='deathreap'||fx==='ashcollapse'||fx==='foxspirit';
       this.sweep(big?120:150,big?32:45,big?.8:.4,'sine',big?.09:.055);this.sweep(big?80:110,40,big?.6:.3,'triangle',.04);
       if(fx==='meteor'||fx==='heartstar')for(let i=0;i<Math.min(4,rank);i++)this.sweep(1480+i*420,2200+i*300,.25,'sine',.012,.02+i*.03);
       if(fx==='frostnova'||fx==='shatter')this.sweep(2600,1800,.3,'triangle',.015,.02);
@@ -30,7 +30,7 @@ export class Sound {
     }
     if(fx==='skybolt'){this.sweep(1800,120,.2,'sawtooth',.03);this.sweep(90,40,.35,'triangle',.05,.02);return true;}
     if(fx==='toll'){for(const [f,v] of [[196,.04],[392,.022],[587,.014]])this.sweep(f,f*.985,1.1,'sine',v);return true;}
-    if(['spin','cut','xslash','reap','moonwave','lance','charge','lanceshot','flock','chains','tempest','cyclone'].includes(fx)){
+    if(['spin','cut','xslash','moonwave','lance','charge','lanceshot','flock','chains','tempest','cyclone'].includes(fx)){
       if(ev.end)return true;
       this.sweep(900,280,.18,'sawtooth',.02);this.sweep(420,160,.2,'triangle',.02,.01);return true;
     }
@@ -77,6 +77,9 @@ export class Sound {
     if(type==='ashthrow'||type==='ashchapterthrow'){const n=Math.min(7,ev?.n||3);for(let i=0;i<Math.min(4,n);i++)this.sweep(2400-i*200,900,.07,'square',.004,i*.04);this.sweep(300,700,.25,'triangle',.014);if(type==='ashchapterthrow')this.sweep(180,520,.4,'sawtooth',.014,.05);return;}
     if(type==='pagetear'){this.sweep(3200,1400,.09,'square',.006);this.sweep(1800,900,.06,'square',.004,.04);return;}
     if(type==='ashchapter'){this.sweep(120,40,.6,'sine',.08);this.sweep(420,120,.5,'sawtooth',.03);for(let i=0;i<3;i++)this.sweep(900+i*300,1600+i*300,.4,'triangle',.01,.05+i*.05);return;}
+    // The Reaper's scythe: a cold whoosh; a reap is a wet cut and a soul's shriek falling away; Last Harvest tolls.
+    if(type==='reaperswing'){this.sweep(700,180,.22,'sawtooth',.018);this.sweep(1600,500,.16,'triangle',.008,.02);return;}
+    if(type==='soulreap'){this.sweep(260,70,.18,'square',.03);this.sweep(1900,420,.5,'sine',.014,.05);return;}
     if(type==='gloomsqueeze'){const g=Math.max(1,ev?.grip|0);this.sweep(120+g*30,50,.22,'sawtooth',.03+.01*g);this.sweep(420,180,.1,'square',.012,.02);return;}
     if(type==='gloomcrush'){this.sweep(90,28,.55,'sine',.08);this.sweep(260,60,.3,'sawtooth',.03);for(let i=0;i<4;i++)this.sweep(1400-i*180,500,.06,'square',.006,.03+i*.03);return;}
     if(type==='gloomcast'||type==='gloomgrab'){

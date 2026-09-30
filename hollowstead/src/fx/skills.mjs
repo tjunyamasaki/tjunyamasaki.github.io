@@ -130,19 +130,6 @@ export const SKILL_EVENTS = {
     burst(d, ev.x, ev.z, ev.r || 2.6, age, ev.rank, seed, h, {life: .5, y: 1});
     if(T.r >= 3) d.stain(ev.x, ev.z, 1.6, '#5a0c16', .3*fade(k, .6));
   }},
-  'fx:reap': {life: () => .9, kick: kickOf(.8, '#ff9a9a'), paint(d, ev, age, seed){
-    const h = hue('scythe'), T = tier(ev.rank), k = age/.55, r = ev.r || 4.6, pull = !(ev.v);
-    if(k < 1){
-      const sweep = easeOut(k*1.3), dir = pull ? -1 : 1;
-      d.crescent(ev.x, ev.z, .5, r*(pull ? 1-.15*k : .85+.15*k), dir*sweep*TAU*1.05, TAU*.95, 1+.1*T.r, pull ? '#d8283c' : h.glow, .7*(1-k), {glow: true});
-      d.crescent(ev.x, ev.z, .51, r*(pull ? 1-.15*k : .85+.15*k)*.97, dir*sweep*TAU*1.05, TAU*.5, .25, '#ffffff', 1-k, {light: true});
-    }
-    // A blood moon rises over the wielder.
-    if(T.r >= 3){const m = bump(age/.9); d.bloom(ev.x, ev.z, 4, 1.4, '#ff3c4c', .45*m); d.orb(ev.x, ev.z, 4, .7, '#ff8a7a', .8*m, {glow: true});}
-    if(T.r >= 2) d.sparks(ev.x, ev.z, .8, T.sparks, age, pull ? '#ff7a7a' : h.main, 1, seed, {speed: pull ? -3 : 6, up: 2});
-    if(T.r >= 4) d.shock(ev.x, ev.z, r*(pull ? 1-easeOut(k) : easeOut(k)), .08, pull ? '#ff5a6a' : h.alt, fade(k));
-    d.pool(ev.x, ev.z, r*.8, pull ? '#8a1020' : h.glow, .3*fade(age/.9));
-  }},
   'fx:chains': {life: () => .8, paint(d, ev, age, seed){
     const h = hue('soulchain'), T = tier(ev.rank), k = age/.8;
     for(const [i, [px, pz]] of (ev.pts || []).entries()){

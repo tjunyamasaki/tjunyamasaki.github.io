@@ -10,6 +10,7 @@ import {ownedSkeletons, raiseSkeleton} from './magic/barrow-rattle.mjs?v=harvest
 import {RITE, beginRite} from './magic/pallbearer.mjs?v=harvest-18';
 import {gripAll} from './magic/gloomgrasp.mjs?v=harvest-18';
 import {finalChapter} from './grimoire.mjs?v=harvest-18';
+import {deathMark, deathReap} from './reaper.mjs?v=harvest-18';
 import {isMagicAlly, ownerPower} from './magic/registry.mjs?v=harvest-18';
 
 const TAU = Math.PI*2;
@@ -58,11 +59,12 @@ export const SKILL_BOOK = Object.freeze({
       k.beat(marks.length*.09+.16, {kind: 'blast', fx: 'xslash', follow: true, r: 2.6, dmg: k.dmg(1.6), push: .5});
     }},
 
-  scythe: {name: 'Harvest Moon', cooldown: 12, reach: 5, pose: .95,
-    blurb: 'Two full reaps under a blood moon: the first drags foes in, the second hurls them out. Each foe heals you.',
+  scythe: {name: 'Last Harvest', cooldown: 12, reach: 6, pose: 1.1,
+    blurb: 'Death steps out behind you and dooms everything around to the full three marks; then one great reap executes all it can. Your souls reach deeper, and are spent.',
     cast(k){
-      k.beat(.18, {kind: 'arc', fx: 'reap', follow: true, r: 4.6, arc: 360, dmg: k.dmg(1.8), push: -1.4, leech: .03, leechCap: 5, spin: 0});
-      k.beat(.58, {kind: 'arc', fx: 'reap', follow: true, r: 5.2, arc: 360, dmg: k.dmg(2.4), push: 1.3, leech: .03, leechCap: 5, spin: 1});
+      // The scythe's own Doom (src/reaper.mjs): mark everything, then reap it.
+      k.beat(.1, {kind: 'call', fn: 'deathmark', fx: 'deathmark', follow: true, r: 6});
+      k.beat(.75, {kind: 'call', fn: 'deathreap', fx: 'deathreap', follow: true, r: 6, dmg: k.dmg(2.2)});
     }},
 
   soulchain: {name: 'Soul Prison', cooldown: 11, reach: 7.5, pose: 1,
@@ -347,4 +349,7 @@ export const SKILL_CALLS = Object.freeze({
   gloomhands(world, b, owner){return gripAll(world, owner, b);},
   /** Final Chapter: the grimoire's pages ring the mark and hang there (src/grimoire.mjs). */
   finalchapter(world, b, owner){return finalChapter(world, owner, b);},
+  /** Last Harvest: Death dooms everything in reach, then reaps it (src/reaper.mjs). */
+  deathmark(world, b, owner){return deathMark(world, owner, b);},
+  deathreap(world, b, owner, obstacles, {hit}){return deathReap(world, owner, b, e => hit(world, owner, e, b, owner.x, owner.z, obstacles));},
 });

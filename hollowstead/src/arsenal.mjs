@@ -8,6 +8,7 @@ import {ALLIES, REFINE, maxHealth, powerOf, rankOf} from './progression.mjs?v=ha
 import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {splitMarks} from './refine.mjs?v=harvest-18';
 import {grimoire, stepGrimoire} from './grimoire.mjs?v=harvest-18';
+import {reap} from './reaper.mjs?v=harvest-18';
 import {slideMove, steer} from './pathing.mjs?v=harvest-18';
 
 const dist = (a, b) => Math.hypot((a.x||0)-(b.x||0), (a.z||0)-(b.z||0));
@@ -79,22 +80,7 @@ const lash = (w, p, {style, damage}) => {
   if(hits) w.wearEquipped(p, 'weapon', 1);
 };
 
-const reap = (w, p, {style, damage}) => {
-  const f = facing(p); let hits = 0;
-  for(const e of hostiles(w)){
-    const d = dist(e, p); if(d >= style.range) continue;
-    const dot = d < .6 ? 1 : ((e.x-p.x)*f.x + (e.z-p.z)*f.z)/d;
-    if(dot < Math.cos(style.arc*Math.PI/360)) continue;
-    w.strike(p, e, damage, 0); hits++;
-  }
-  w.event('cleave', p.x, p.z, '', {dx: f.x, dz: f.z, arc: style.arc, range: style.range, rank: rankOf(p), itemId: p.equipment?.weapon?.itemId, player: p.id});
-  if(hits){
-    const heal = Math.round(Math.min(hits, style.leechCap)*style.leech*maxHealth(p));
-    const before = p.hp; p.hp = Math.min(maxHealth(p), p.hp+heal);
-    if(p.hp > before) w.event('heal', p.x, p.z, `+${Math.round(p.hp-before)}`, {player: p.id});
-    w.wearEquipped(p, 'weapon', 1);
-  }
-};
+// The Reaper's scythe (`reap`) lives in src/reaper.mjs.
 
 // ------------------------------------------------------------------ magic ranged
 const wisps = (w, p, {style, damage}) => {

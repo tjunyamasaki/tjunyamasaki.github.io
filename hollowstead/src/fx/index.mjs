@@ -9,6 +9,7 @@ import {KITSUNE_FX} from './kitsune.mjs?v=harvest-18';
 import {PALLBEARER_FX} from './pallbearer.mjs?v=harvest-18';
 import {GLOOM_FX} from './gloomgrasp.mjs?v=harvest-18';
 import {GRIMOIRE_FX} from './grimoire.mjs?v=harvest-18';
+import {REAPER_FX} from './reaper.mjs?v=harvest-18';
 import {magicItems} from '../magic/registry.mjs?v=harvest-18';
 import {rankOf} from '../progression.mjs?v=harvest-18';
 
@@ -18,6 +19,7 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
  *   events, beats      painters keyed like EVENTS/BEATS below (merged in)
  *   look(owner)        extra fields for its events and beats (a rolled colour...), optional
  *   lists              {magicBolts: (d, entry, owner, ctx) => ..., ...}: world-list entries of this pack
+ *   foes               (d, enemy, ctx): marks a weapon leaves on foes (the scythe's Doom), every frame, every foe
  *   skillCast          (d, cast, owner, age): replaces the generic skill-cast burst
  *   magicCast          (d, p, cast, age): replaces the generic cast flourish (false: none)
  *   rig                (d, world, p, anchor, motion, clock, time) => {origin?, keep?}: drawn around the
@@ -25,7 +27,8 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
  *                      behind the body); `keep` is handed back to its list painters as ctx.rig(ownerId).
  * Starfall predates this and is wired in by hand below.
  */
-export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX];
+export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAPER_FX];
+const FOE_FX = WEAPON_FX.filter(fx => fx.foes);
 const FX_BY_ID = new Map(WEAPON_FX.map(fx => [fx.id, fx]));
 
 const EVENTS = Object.assign({...FLAIR_EVENTS, ...STARFALL_EVENTS, ...SKILL_EVENTS}, ...WEAPON_FX.map(fx => fx.events || {}));
@@ -92,13 +95,14 @@ export class WeaponFx {
       else if(spec.lasting && b.started && !b.done) spec.lasting(d, b, tt-b.at, clock, lead);
     }
     for(const shot of world.projectiles || []) paintProjectile(d, shot, lead, clock);
-    const ctx = {lead, clock, time: frame?.time ?? world.time, world, rig: id => this.rigs.get(id)};
+    const ctx = {lead, clock, time: frame?.time ?? world.time, world, rig: id => this.rigs.get(id), player: id => players.get(id)};
     for(const fx of WEAPON_FX) for(const [list, paint] of Object.entries(fx.lists || {})){
       for(const e of world[list] || []) if(e?.packId === fx.id) paint(d, e, players.get(e.ownerId), ctx);
     }
     for(const e of world.enemies || []){
       if(e.frostUntil) paintFrozen(d, e, frame?.time ?? world.time);
       if(e.sunburn) paintSunburn(d, e, clock);
+      for(const fx of FOE_FX) fx.foes(d, e, ctx);
     }
     for(const p of world.players || []){
       if(!p.online) continue;

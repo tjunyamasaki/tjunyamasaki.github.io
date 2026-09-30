@@ -45,7 +45,7 @@ Taken auto attacks (weapon: pattern):
 | tome | burning pages orbit you (contact) and fly out and back like boomerangs; throws and kills tear more pages, a full book throws a Chapter that ignites over the mark |
 | fangs | three-hit dagger combo |
 | soulchain | lash that pulls |
-| scythe | reaping arc that heals you |
+| scythe | reaping arc that marks Doom (1–3); a doomed foe under its threshold is executed by the next swing and its soul heals you; Death's shade grows behind you with souls |
 | wisplantern | homing wisps |
 | stormrod | chain lightning between foes |
 | starfall | meteor strike on the target |
@@ -62,7 +62,7 @@ Taken auto attacks (weapon: pattern):
 | mourning-bell | delayed expanding ring |
 | pallbearer | coffin on a chain with rope physics: heaves build momentum, damage scales with speed, a dodge whips it |
 
-Taken skills: leap slam + stun; line lunge + thorn roots; spinning crescents + wave; leap smash + ground split; fire cyclone on you; blink between foes; pull-then-push reaps; chain-bind + burst; fanned volleys + arrow rain; piercing lance; seeking salvo; drifting drain orb; page circle round the mark that collapses into it (tome); wisp swarm; lightning storm; constellation star shower; flock sweep; bomb barrage; horn push + knight charge; freeze + shatter; hands under every foe + a colossal hand whose clench crushes them all (gloomgrasp); miasma vials; foxfire rings + pounce; bone eruption + more summons; fireball rain; web pin + needle rain; cyclone → gale; triple toll; whirl-up, hurl, slam, and the chain yanks you in (pallbearer).
+Taken skills: leap slam + stun; line lunge + thorn roots; spinning crescents + wave; leap smash + ground split; fire cyclone on you; blink between foes; Death dooms everything around, then one great reap executes the doomed (scythe); chain-bind + burst; fanned volleys + arrow rain; piercing lance; seeking salvo; drifting drain orb; page circle round the mark that collapses into it (tome); wisp swarm; lightning storm; constellation star shower; flock sweep; bomb barrage; horn push + knight charge; freeze + shatter; hands under every foe + a colossal hand whose clench crushes them all (gloomgrasp); miasma vials; foxfire rings + pounce; bone eruption + more summons; fireball rain; web pin + needle rain; cyclone → gale; triple toll; whirl-up, hurl, slam, and the chain yanks you in (pallbearer).
 
 Fresh ground (pick one, or invent): a held tether or beam that drags or links foes, blades orbiting the wielder, a boomerang with a return path, ricochets off foes and walls, marks that stack and detonate, hold-to-charge and release, a trail on the ground that hurts or closes shapes, a gravity well, echoes that repeat your last attack, a decoy or mirror, swapping places with a projectile, reflecting enemy shots, stance switching, timing windows, grow-with-kills, foe-triggered traps, throwing one foe into others, spending health for power.
 

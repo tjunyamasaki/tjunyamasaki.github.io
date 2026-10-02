@@ -51,6 +51,17 @@ export function themeChoice(theme, name){
   try{picked=new URLSearchParams(globalThis.location?.search||'').get(name)||globalThis.localStorage?.getItem(`hollowstead.${name}`);}catch{}
   return choice.options[picked]?picked:choice.default;
 }
+/**
+ * Every wanderer can wear every look: `ember-hood`, `ember-mask`, `ember-witch`… are their own sprite keys
+ * (the character id carries the look, so co-op friends see it too). They are loaded only when someone
+ * wears them (`lazy`), so phones keep four sheets in memory, not twelve.
+ */
+export function registerLooks(theme){
+  const choice=theme.choices?.look;if(!choice)return theme;
+  for(const key of choice.keys){const def=theme.sprites[key];if(!def)continue;
+    for(const [id,option] of Object.entries(choice.options)){const name=`${key}-${id}`;if(theme.sprites[name])continue;theme.sprites[name]={...def,src:option.suffix?def.src.replace(/\.svg(\?|$)/,`${option.suffix}.svg$1`):def.src,lazy:true,base:key};}}
+  return theme;
+}
 export function applyThemeChoices(theme){
   for(const [name,choice] of Object.entries(theme.choices||{})){
     const option=choice.options[themeChoice(theme,name)]||{};
@@ -59,7 +70,7 @@ export function applyThemeChoices(theme){
   return theme;
 }
 export async function loadTheme(url=new URL('../themes/harvest/theme.json',import.meta.url)){
-  const theme=await loadJson(url);theme.url=url;applyThemeChoices(theme);for(const def of Object.values(theme.sprites)){def.src=new URL(def.src,url).href;if(def.icon)def.icon=new URL(def.icon,url).href;}
+  const theme=await loadJson(url);theme.url=url;registerLooks(theme);applyThemeChoices(theme);for(const def of Object.values(theme.sprites)){def.src=new URL(def.src,url).href;if(def.icon)def.icon=new URL(def.icon,url).href;}
   for(const[k,v]of Object.entries(theme.audio))theme.audio[k]=new URL(v,url).href;return theme;
 }
 /** Swarm fights spray numbers; old labels give way so the DOM stays light on phones. */
@@ -168,15 +179,25 @@ export class Renderer {
     const channel=byte=>linearFromDisplay(Math.min(1, Math.max(0, display*(byte/255))));
     material.color.setRGB(channel(tint.r), channel(tint.g), channel(tint.b));
   }
-  async preload(){await preloadThemeAssets(this.theme);preloadDropArt(this.theme);await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{const map=new THREE.Texture(await loadImage(def.src));map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;map.minFilter=THREE.LinearFilter;map.magFilter=THREE.LinearFilter;this.textures.set(key,map);}));}
+  async preload(){await preloadThemeAssets(this.theme);preloadDropArt(this.theme);await Promise.all(Object.entries(this.theme.sprites).filter(([,def])=>!def.lazy).map(([key])=>this.ensureTexture(key)));}
+  /** Load one sprite sheet into a texture (once); lazy looks come in when a wanderer first wears them. */
+  ensureTexture(key){
+    this.loadingTextures??=new Map();if(this.textures.has(key))return Promise.resolve(this.textures.get(key));
+    const def=this.theme.sprites[key];if(!def)return Promise.resolve(null);
+    // The default look and its named twin (`ember`, `ember-hood`) are one file: share the texture.
+    for(const [other,map] of this.textures)if(this.theme.sprites[other]?.src===def.src){this.textures.set(key,map);return Promise.resolve(map);}
+    let pending=this.loadingTextures.get(key);
+    if(!pending){pending=loadImage(def.src).then(image=>{const map=new THREE.Texture(image);map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;map.minFilter=THREE.LinearFilter;map.magFilter=THREE.LinearFilter;this.textures.set(key,map);return map;});this.loadingTextures.set(key,pending);if(def.lazy)pending.catch(()=>this.loadingTextures.delete(key));}
+    return pending;
+  }
   resize(){const size=viewSize(this.canvas);const w=size.width,h=size.height;this.viewWidth=w;this.viewHeight=h;this.gl.setSize(w,h,false);const aspect=w/Math.max(1,h),half=orthographicHalf(w,h);this.camera.left=-half*aspect/this.zoom;this.camera.right=half*aspect/this.zoom;this.camera.top=half/this.zoom;this.camera.bottom=-half/this.zoom;this.camera.updateProjectionMatrix();}
   setZoom(value){this.zoom=Math.max(.65,Math.min(1.6,value));this.resize();}
   sprite(key,id){
-    const def=this.theme.sprites[key]||this.theme.sprites.ember;const texture=(this.textures.get(key)||this.textures.get('ember')).clone();texture.needsUpdate=true;
+    const def=this.theme.sprites[key]||this.theme.sprites.ember,ready=this.textures.has(key);if(!ready&&this.theme.sprites[key])void this.ensureTexture(key).catch(()=>{});const texture=(this.textures.get(key)||this.textures.get(def.base)||this.textures.get('ember')).clone();texture.needsUpdate=true;
     texture.repeat.set(1/(def.columns||1),1/(def.rows||1));
     const material=new THREE.SpriteMaterial({map:texture,transparent:true,alphaTest:.04,depthWrite:false});const sprite=new THREE.Sprite(material);sprite.center.set(...(def.anchor||[.5,0]));sprite.scale.set(...def.size,1);
     this.scene.add(sprite);const shadow=new THREE.Mesh(this.shadowGeo,this.shadowMat);shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;shadow.scale.setScalar(def.size[0]*.26);this.scene.add(shadow);
-    const o={id,key,sprite,shadow,def,x:0,z:0,initialized:false};this.objects.set(id,o);return o;
+    const o={id,key,sprite,shadow,def,x:0,z:0,initialized:false,fallback:!ready};this.objects.set(id,o);return o;
   }
   /** A dropped item: its icon as a rimmed sticker (drop-art.mjs). Null while the icon decodes. */
   dropSprite(key,id,e){
@@ -375,7 +396,7 @@ export class Renderer {
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
-      const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key){if(o)this.remove(o);o=kind==='drop'?this.dropSprite(key,id,e):this.sprite(key,id);if(!o){alive.delete(id);continue;}}o.sprite.visible=o.shadow.visible=visible;if(o.beacon&&!visible)this.syncBeacon(o,null,e,null,0,false);if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.eyes)o.eyes.visible=visible;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
+      const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key||(o.fallback&&this.textures.has(key))){if(o)this.remove(o);o=kind==='drop'?this.dropSprite(key,id,e):this.sprite(key,id);if(!o){alive.delete(id);continue;}}o.sprite.visible=o.shadow.visible=visible;if(o.beacon&&!visible)this.syncBeacon(o,null,e,null,0,false);if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.eyes)o.eyes.visible=visible;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
       const present=kind==='drop'?this.dropMotion.sample(e,world,this.clock,dt,id=>{const body=this.objects.get('player'+id);return body?.initialized?{x:body.x,z:body.z}:null;}):null;
       const tx=present?present.x:e.x, tz=present?present.z:e.z;
       const smooth=(['player','enemy','magic','ally'].includes(kind)||key==='cart')&&!demo?Math.min(1,dt*(e.id===localId||(key==='cart'&&e.towedBy===localId)?22:13)):1;

@@ -34,7 +34,9 @@ export class CanvasRenderer {
     this.images=new Map();this.zoom=1;this.clock=0;this.lastEvent=0;this.seed=null;this.effects=[];this.floaters=[];this.focus={x:0,z:0,set:(x,y,z)=>{this.focus.x=x;this.focus.z=z;}};this.dropMotion=createDropMotion();this.view=null;this.localId=null;
     this.onResize=()=>this.resize();watchViewport(this.onResize);this.resize();
   }
-  async preload(){await preloadThemeAssets(this.theme);preloadDropArt(this.theme);await Promise.all(Object.entries(this.theme.sprites).map(async([key,def])=>{try{this.images.set(key,await loadImage(def.src));}catch{throw new Error(`Missing sprite: ${key}`);}}));}
+  async preload(){await preloadThemeAssets(this.theme);preloadDropArt(this.theme);await Promise.all(Object.entries(this.theme.sprites).filter(([,def])=>!def.lazy).map(async([key,def])=>{try{this.images.set(key,await loadImage(def.src));}catch{throw new Error(`Missing sprite: ${key}`);}}));}
+  /** A look worn for the first time (lazy sprite): load it once, draw the default until it arrives. */
+  ensureImage(key){this.loadingImages??=new Set();const def=this.theme.sprites[key];if(!def||this.images.has(key)||this.loadingImages.has(key))return;this.loadingImages.add(key);loadImage(def.src).then(img=>this.images.set(key,img)).catch(()=>this.loadingImages.delete(key));}
   resize(){const size=viewSize(this.canvas);this.width=size.width;this.height=size.height;const dpr=Math.min(devicePixelRatio||1,1.6);this.canvas.width=Math.round(this.width*dpr);this.canvas.height=Math.round(this.height*dpr);this.ctx.setTransform(dpr,0,0,dpr,0,0);const half=orthographicHalf(this.width,this.height);this.scale=this.height/(2*half/this.zoom);}
   setZoom(value){this.zoom=Math.max(.65,Math.min(1.6,value));this.resize();}
   screenPoint(x,z,y=0){return{x:(x-this.focus.x)*this.scale+this.width/2,y:(z-this.focus.z)*this.scale*.72-y*this.scale*.694+this.height/2};}
@@ -90,7 +92,7 @@ export class CanvasRenderer {
       const rig=this.weaponFx.rig(world,e,{x:e.x,z:e.z,y:bob},this.clock,this.magicFrame.time);
       if(rig){const list=[...rig.groundGlow,...rig.groundNormal,...rig.normal,...rig.glow];if(rig.origin.z>e.z)rigAfter=list;else drawMagicCanvas(this.ctx,list,(x,z,y)=>this.screenPoint(x,z,y));}
     }
-    const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||this.images.get('ember'),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
+    const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||(this.ensureImage(key),this.images.get(def.base)||this.images.get('ember')),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
     const special=kind==='ally'?(e.anim||'idle'):magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0||e.act>0?'attack':'walk'):e.action||'idle'),clip=def.clips[clipName]||def.clips.walk||def.clips.attack||def.clips.idle;
     const cols=def.columns||1,rows=def.rows||1,frameIndex=key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
     let w=def.size[0]*this.scale,h=def.size[1]*this.scale;if(e.down||e.ghost){w*=.8;h*=.65;}if(kind==='enemy'&&e.elite){w*=1.3;h*=1.3;}if(kind==='enemy'&&e.warden){w*=1.12;h*=1.12;}if(kind==='prop'&&e.scale){w*=e.scale;h*=e.scale;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(kind==='zone'&&e.kind==='frost'){w*=e.radius/1.3;h*=e.radius/1.3;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);

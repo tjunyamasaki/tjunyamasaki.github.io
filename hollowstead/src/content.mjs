@@ -192,6 +192,12 @@ export const CHARACTERS = [
   {id:'vesper',name:'Vesper',detail:'The moonlit wanderer',color:'#bea1e0'},
   {id:'cinder',name:'Cinder',detail:'The reluctant grave robber',color:'#de817b'},
 ];
+/**
+ * Looks every wanderer can wear (theme.json choices.look). The character id carries the look, `moss-mask`,
+ * so saves and co-op friends see it with no new field; a bare `moss` wears the theme's default look.
+ */
+export const LOOKS = Object.freeze([{id:'hood',name:'Hooded'},{id:'mask',name:'Masked'},{id:'witch',name:'Witch'}]);
+for(const base of CHARACTERS.slice()) for(const look of LOOKS) CHARACTERS.push({...base,id:`${base.id}-${look.id}`,base:base.id,look:look.id});
 export const label = key => ITEMS[key]?.name || EQUIPMENT[key]?.name || magicItems[key]?.name || STRUCTURES[key]?.name || ENEMIES[key]?.name || key;
 /**
  * Day and night schedules, in seconds. An expedition keeps the standard one. The Vigil (a single save

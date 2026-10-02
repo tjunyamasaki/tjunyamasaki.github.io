@@ -1,6 +1,6 @@
 import {World,clamp,distance,biome,EXPLORE_CELL,EXPLORE_SIZE} from './engine.mjs?v=harvest-18';
 import {RARITIES,RARITY_COLORS,REGIONS,isCache,maxHealth,rarityOf,regionAt,xpToNext} from './progression.mjs?v=harvest-18';
-import {RULES,ITEMS,EQUIPMENT,NODES,STRUCTURES,RECIPES,ENEMIES,CHARACTERS,label,phaseAt,dayAt,phaseOf,dayOf,hollowTime,scheduleOf,nodeAwake} from './content.mjs?v=harvest-18';
+import {RULES,ITEMS,EQUIPMENT,NODES,STRUCTURES,RECIPES,ENEMIES,CHARACTERS,LOOKS,label,phaseAt,dayAt,phaseOf,dayOf,hollowTime,scheduleOf,nodeAwake} from './content.mjs?v=harvest-18';
 import {Renderer,loadTheme} from './renderer.mjs?v=harvest-18';
 import {CanvasRenderer} from './canvas-renderer.mjs?v=harvest-18';
 import {createNetwork} from './network.mjs?v=harvest-18';
@@ -28,7 +28,7 @@ import {hotbarView,offerMarkup,rankStars,replaceMarkup} from './ui/arena.mjs?v=h
 import {DASH, MEND} from './progression.mjs?v=harvest-18';
 import {conditionOf, masteryView, mendPlan} from './mastery.mjs?v=harvest-18';
 import {clampShowcaseMobCount, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-18';
-import {cachedSrc} from './assets.mjs?v=harvest-18';
+import {cachedSrc,loadImage} from './assets.mjs?v=harvest-18';
 import {bindFeatureHud, frameFeatureHud, paintFeatureHud} from './ui/features.mjs?v=harvest-18';
 import {revealsCache, trinketTip} from './ui/trinkets.mjs?v=harvest-18';
 import {exploredGround} from './ui/worldmap.mjs?v=harvest-18';
@@ -95,7 +95,11 @@ function toast(text){const now=performance.now();if(text&&now<achievementUntil){
 function achievement(title,line,note=''){const el=$('achievement');el.replaceChildren();for(const [tag,text] of [['b',title],['span',line],['small',note]])if(text){const part=document.createElement(tag);part.textContent=text;el.append(part);}el.classList.add('visible');clearTimeout(achievementTimer);achievementUntil=performance.now()+5200;achievementTimer=setTimeout(()=>el.classList.remove('visible'),5200);}
 function announce(text){$('announcement').textContent=text;$('announcement').classList.add('visible');clearTimeout(announceTimer);announceTimer=setTimeout(()=>$('announcement').classList.remove('visible'),4100);}
 function icon(key){const spriteKey=itemSpriteKey(key)||(STRUCTURES[key]?key:null),src=spriteKey&&(theme.sprites[spriteKey]?.icon||theme.sprites[spriteKey]?.src);if(!src)return '';const rarity=STRUCTURES[key]&&!itemSpriteKey(key)?'common':rarityOf(key);return `<img class="item-icon rarity-${rarity}" src="${escapeHtml(cachedSrc(src))}" alt="" draggable="false">`;}
-function portrait(key){return `<span class="portrait" style="background-image:url('${cachedSrc(theme.sprites[key]?.src||theme.sprites.ember.src)}');background-size:${(theme.sprites[key]?.columns||1)*100}% ${(theme.sprites[key]?.rows||1)*100}%"></span>`;}
+const portraitReady=new Map();
+function portrait(key){
+  const still=portraitReady.get(key);if(still)return `<span class="portrait portrait--still"><img src="${still}" alt="" draggable="false"></span>`;
+  if(theme?.sprites?.[key])void portraitStill(key).then(src=>{if(src&&!portraitReady.has(key)){portraitReady.set(key,src);dirty=true;}});
+  return `<span class="portrait" style="background-image:url('${cachedSrc(theme.sprites[key]?.src||theme.sprites.ember.src)}');background-size:${(theme.sprites[key]?.columns||1)*100}% ${(theme.sprites[key]?.rows||1)*100}%"></span>`;}
 function me(){return world?.player(localId);}
 const hurtFx=createHurtFx(typeof document!=='undefined'?document.getElementById('hurt-fx'):null,{reduceMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
 function commandError(result){return result?.message||({chestInUse:'Chest in use',sessionExpired:'Chest access ended',wrongSession:'Chest access changed',outOfRange:'Move closer',inventoryFull:'No room for that',staleRevision:'Items changed. Try again.',notOwner:'That item is not available',unknownItem:'That item is no longer here',incompatibleSocket:'That item does not fit this equipment slot',pending:'Wait for the current action',timeout:'Action not confirmed. Check the current inventory before trying again.',disconnected:'Connection closed',worldChanged:'The expedition changed',rateLimited:'Please wait a moment',notReady:'Waiting for the camp',paused:'The host has paused the expedition',stationRequired:'That needs the right station',missingFuel:'The fire needs wood',invalidQuantity:'Choose a smaller amount'})[result?.code]||'That action is not available';}
@@ -1010,9 +1014,44 @@ function aimEntity(){
   if(maintenance&&maintenanceTarget)return world.buildings.find(b=>b.id===maintenanceTarget)||null;
   return currentTarget()?.entity||null;
 }
+/** Title screen wanderer: who (four) and which look (hooded, masked, witch). The id carries both: `moss-mask`. */
+function baseOf(id){return CHARACTERS.find(c=>c.id===id)?.base||id;}
+function lookOf(id){return CHARACTERS.find(c=>c.id===id)?.look||theme?.choices?.look?.default||'hood';}
+function pickWanderer(base,look){
+  const id=`${base}-${look}`;if(!CHARACTERS.some(c=>c.id===id))return;
+  character=id;if(mode==='front'&&world?.players?.[0])world.players[0].character=character;storeProfile();paintWanderers();
+}
+/**
+ * Portraits are small canvas stills cut from the same decoded sheet the game draws, not the whole sprite
+ * sheet as a CSS background: they appear as soon as the sheet is in, every time.
+ */
+const portraitStills=new Map();
+function portraitStill(key){
+  const def=theme?.sprites?.[key]||theme?.sprites?.ember;if(!def)return Promise.resolve('');
+  let pending=portraitStills.get(key);
+  if(!pending){
+    pending=loadImage(def.src).then(img=>{
+      const cols=def.columns||1,rows=def.rows||1,fw=img.naturalWidth/cols,fh=img.naturalHeight/rows,scale=Math.min(1,180/fh);
+      const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(fw*scale));canvas.height=Math.max(1,Math.round(fh*scale));
+      canvas.getContext('2d').drawImage(img,0,0,fw,fh,0,0,canvas.width,canvas.height);return canvas.toDataURL();
+    }).catch(()=>{portraitStills.delete(key);return '';});
+    portraitStills.set(key,pending);
+  }
+  return pending;
+}
+function fillStill(img,key){img.dataset.key=key;void portraitStill(key).then(src=>{if(src&&img.dataset.key===key)img.src=src;});}
+function paintWanderers(){
+  const base=baseOf(character),look=lookOf(character),bases=CHARACTERS.filter(c=>!c.look);
+  const who=$('characters'),how=$('looks');
+  if(who.children.length!==bases.length)who.innerHTML=bases.map(c=>`<button class="character" type="button" data-character="${c.id}" aria-label="${c.name}, ${c.detail}"><img class="still" alt="" draggable="false"><small>${c.name}</small></button>`).join('');
+  if(how.children.length!==LOOKS.length)how.innerHTML=LOOKS.map(l=>`<button class="look" type="button" data-look="${l.id}" aria-label="${l.name} look"><img class="still" alt="" draggable="false"><small>${l.name}</small></button>`).join('');
+  for(const el of who.children){const on=el.dataset.character===base;el.setAttribute('aria-pressed',String(on));fillStill(el.querySelector('img'),`${el.dataset.character}-${look}`);}
+  for(const el of how.children){const on=el.dataset.look===look;el.setAttribute('aria-pressed',String(on));fillStill(el.querySelector('img'),`${base}-${el.dataset.look}`);}
+}
 function setupControls(){
-  $('characters').innerHTML=CHARACTERS.map(c=>`<button class="character" type="button" data-character="${c.id}" aria-label="${c.name}, ${c.detail}" aria-pressed="${c.id===character}">${portrait(c.id)}<small>${c.name}</small></button>`).join('');
-  $('characters').onclick=e=>{const b=e.target.closest('[data-character]');if(!b)return;character=b.dataset.character;for(const el of $('characters').children)el.setAttribute('aria-pressed',el===b);if(mode==='front')world.players[0].character=character;storeProfile();};
+  paintWanderers();
+  $('characters').onclick=e=>{const b=e.target.closest('[data-character]');if(!b)return;pickWanderer(b.dataset.character,lookOf(character));};
+  $('looks').onclick=e=>{const b=e.target.closest('[data-look]');if(!b)return;pickWanderer(baseOf(character),b.dataset.look);};
   $('mode-expedition').onclick=()=>{if(!busy){syncSaveOption();showFrontPanel('expedition-panel');}};$('expedition-back').onclick=()=>showFrontPanel('home-panel');
   $('mode-join').onclick=()=>{if(!busy){showFrontPanel('join-panel');$('room-input').focus();}};$('join-back').onclick=()=>showFrontPanel('home-panel');
   $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');

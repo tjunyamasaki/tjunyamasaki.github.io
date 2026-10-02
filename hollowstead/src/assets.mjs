@@ -85,6 +85,7 @@ export function loadImage(url) {
 export function themeAssetUrls(theme) {
   const urls = [];
   for (const def of Object.values(theme?.sprites || {})) {
+    if (def?.lazy) continue; // loaded when first needed (a wanderer's alternate look)
     if (typeof def?.src === 'string') urls.push(def.src);
     if (typeof def?.icon === 'string') urls.push(def.icon);
   }

@@ -143,3 +143,23 @@
 #front .room-code>span{font-size:26px;letter-spacing:7px}
 #front .room-code small{font-size:10px}
 #front #launch{flex:none}
+
+/* Wanderer stills (canvas cuts of frame 0, src/main.mjs portraitStill) and the look row. */
+.menu-characters .character .still{flex:none;width:30px;height:46px;object-fit:contain;pointer-events:none}
+.menu-characters .character .still:not([src]){visibility:hidden}
+.menu-looks{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.menu-looks .look{min-height:0;height:34px;padding:0 8px 0 4px;display:flex;align-items:center;justify-content:center;gap:4px;border-radius:10px;background:#ffffff0a;border:1px solid transparent;color:var(--muted)}
+.menu-looks .look .still{flex:none;width:20px;height:30px;object-fit:contain;pointer-events:none}
+.menu-looks .look .still:not([src]){visibility:hidden}
+.menu-looks .look small{font-size:11px}
+.menu-looks .look[aria-pressed=true]{border-color:var(--orange);background:#edb47a26;color:var(--cream)}
+.portrait--still{background:none!important}
+.portrait--still img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
+@media(max-height:520px) and (orientation:landscape){
+  .menu-characters .character{padding:4px 2px 3px}
+  .menu-characters .character .still{width:26px;height:38px}
+  .menu-looks .look{height:30px}
+  .menu-looks .look .still{width:16px;height:24px}
+  .menu-brand h1{font-size:clamp(42px,6.6vw,56px)}
+}
+@media(min-width:1000px) and (min-height:620px){.menu-characters .character .still{width:36px;height:54px}}

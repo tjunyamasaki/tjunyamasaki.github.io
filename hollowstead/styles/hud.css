@@ -68,16 +68,16 @@ body.dungeon .trinket-chip,body.dungeon .trinket-link{top:auto}
 #action-cluster>.stamina-track{left:auto;right:calc(var(--atk) + var(--gap));bottom:-7px;width:var(--skill);height:3px}
 
 /* Nearby actions: pills above the arc, the main one nearest the thumb (right). */
-.context-row{position:absolute;right:0;bottom:calc(100% + 12px);display:flex;flex-direction:row-reverse;align-items:flex-end;gap:8px;width:max-content;max-width:min(78vw,520px);pointer-events:none}
-#action-cluster .context-row .round{position:relative;right:auto;bottom:auto;width:auto;height:44px;min-width:0;min-height:44px;padding:0 14px 0 11px;border-radius:999px;display:flex;flex-direction:row;align-items:center;gap:7px;pointer-events:auto;white-space:nowrap;line-height:1}
+.context-row{position:absolute;right:0;bottom:calc(100% + 12px);display:flex;flex-direction:row-reverse;align-items:center;gap:6px;width:max-content;max-width:min(78vw,520px);pointer-events:none}
+#action-cluster .context-row .round{position:relative;right:auto;bottom:auto;width:auto;height:36px;min-width:0;min-height:36px;padding:0 12px 0 9px;border-radius:999px;display:flex;flex-direction:row;align-items:center;gap:6px;box-shadow:0 3px 10px #18132255;pointer-events:auto;white-space:nowrap;line-height:1}
 #action-cluster .context-row .round.is-off{display:none}
-#action-cluster .context-row .round>span{font-size:17px;line-height:1}
-#action-cluster .context-row .round small{font:12px Arial,Helvetica,sans-serif;letter-spacing:.2px;margin:0;max-width:none;overflow:visible}
-#action-cluster .context-row #context-0{height:52px;min-height:52px;padding:0 18px 0 14px;font-size:inherit}
-#action-cluster .context-row #context-0 small{font-size:13px;font-weight:700}
-#action-cluster .context-row #context-0>span{font-size:20px}
+#action-cluster .context-row .round>span{font-size:15px;line-height:1}
+#action-cluster .context-row .round small{font:11px Arial,Helvetica,sans-serif;letter-spacing:.2px;margin:0;max-width:none;overflow:visible}
+#action-cluster .context-row #context-0{height:36px;min-height:36px;padding:0 13px 0 10px;font-size:inherit;border-width:1px;box-shadow:0 3px 10px #18132255}
+#action-cluster .context-row #context-0 small{font-size:12px;font-weight:700}
+#action-cluster .context-row #context-0>span{font-size:16px}
 #action-cluster .context-row .context-extra{background:#382e3eee;color:var(--cream);border:1px solid #dac29a55}
-#action-cluster .context-row .confirming::after{inset:auto 12px 4px;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--orange) calc(var(--hold,0) * 100%),#ffffff22 0);-webkit-mask:none;mask:none}
+#action-cluster .context-row .confirming::after{inset:auto 10px 3px;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--orange) calc(var(--hold,0) * 100%),#ffffff22 0);-webkit-mask:none;mask:none}
 #action-cluster #context-0.rhythm-live::before{border-radius:inherit}
 
 /* Portrait phones: a touch smaller so the arc clears the weapons. */

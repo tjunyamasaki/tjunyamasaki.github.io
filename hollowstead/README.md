@@ -8,13 +8,17 @@ Creating a weapon? Start with the focused [weapon authoring guide](WEAPON_AUTHOR
 
 ## Enter the woods
 
-- **Venture alone** starts immediately, without a connection service.
-- **Gather your friends** opens a waiting camp. Share its invite link or five-character code, then select **Enter the woods**. Friends can join an expedition already underway.
-- **Continue expedition** resumes the last save on this browser. Select **Host my saved expedition** before opening a camp to resume it with friends.
+Pick a wanderer and a name on the left of the title screen, then a card on the right.
+
+- **Expedition**: **New expedition** starts alone at once, without a connection service. **Gather your friends** opens a waiting camp: share its invite link or five-character code, then select **Enter the woods**. Friends can join an expedition already underway. When this browser holds a save, the card is marked *Saved* and **Continue expedition** resumes it; tick **Bring my saved expedition** before gathering friends to resume it together.
+- **Join a camp** takes a friend's five-character code (an invite link fills it in for you).
 - **The Vigil** is one long save in its own slot, kept until you end it. See [The Vigil](#the-vigil).
 - **Dungeons** is a crawl through floors carved fresh every time, alone or with up to three friends. See [Dungeons](#dungeons).
-- **Battle arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
+- **Arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
 - **Weapon lab** is the arena without rounds, for trying and balancing weapons. See [Weapon lab](#weapon-lab).
+- **Showcase** is a sandbox clearing for placing anything in the game.
+
+The icons at the top right open the field guide, fullscreen and sound.
 
 The host keeps the shared save and must keep the game tab open. Switching away pauses the expedition for everyone. Returning to the title closes that camp. Reopen the saved expedition and share its new code to continue. A guest rejoining from the same browser tab keeps their equipment and supplies. A different tab joins as a new wanderer.
 
@@ -78,7 +82,7 @@ The map and minimap show only what the party has walked near. The HUD badge unde
 
 ## Battle arena
 
-**Battle arena** on the title screen (or `?arena` in the address) starts a solo run in a small walled clearing with nothing in it but creatures. It is not saved.
+**Arena** on the title screen (or `?arena` in the address) starts a solo run in a small walled clearing with nothing in it but creatures. It is not saved.
 
 1. Pick one of three weapons. The prototype always offers the **Nine-Tail Lantern** first, alongside a close and a ranged choice. Its nine homing foxfires burn foes, and the ninth bursts in an area.
 2. Survive the wave. Creatures pour in from the wall in packs; each wave brings more of them, a little stronger. Every fifth wave brings champions; every tenth, the Hollow King.

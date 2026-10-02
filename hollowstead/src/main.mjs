@@ -82,6 +82,12 @@ function continuePlan(){return planContinue({v2:readStored(SAVE_KEYS.expeditionV
 /** The Vigil's own slot (SAVE_KEYS.vigil): read like an expedition save, never shared with one. */
 function vigilPlan(){const doc=readStored(SAVE_KEYS.vigil);return doc?planContinue({v2:doc,v1:null}):{ok:false,code:'none',message:'No vigil is kept on this browser.'};}
 function storeProfile(){try{localStorage.setItem(PROFILE,JSON.stringify({name:$('player-name').value,character,sound:sound.enabled,autoAttack}));}catch{}}
+/** Title screen: one panel at a time on the right (modes, expedition, join, dungeons, vigil, waiting camp). */
+const FRONT_PANELS=['home-panel','expedition-panel','join-panel','dungeon-panel','vigil-panel','room-panel'];
+function showFrontPanel(id){for(const name of FRONT_PANELS){const el=$(name);if(el)el.hidden=name!==id;}}
+function syncSoundButton(){const el=$('front-sound');if(!el)return;const on=!!sound?.enabled;el.classList.toggle('is-off',!on);el.setAttribute('aria-pressed',String(on));el.setAttribute('aria-label',on?'Sound on':'Sound off');el.title=on?'Sound on':'Sound off';}
+/** Mode cards show the theme's own art (hearth, moon, stairs, blade…). */
+function paintModeIcons(){for(const card of document.querySelectorAll('#front [data-icon]')){const key=card.dataset.icon,sprite=theme?.sprites?.[key],src=sprite&&(sprite.icon||sprite.src),slot=card.querySelector('.mode-icon');if(slot&&src&&!slot.firstChild)slot.innerHTML=`<img src="${escapeHtml(cachedSrc(src))}" alt="" draggable="false">`;}}
 function showStatus(text,error=false){const el=$('front-status');if(el){el.textContent=text;el.style.color=error?'var(--red)':'var(--orange)';}connectionText=text;dirty=true;}
 let achievementTimer=0,achievementUntil=0;
 function toast(text){const now=performance.now();if(text&&now<achievementUntil){setTimeout(()=>toast(text),achievementUntil-now+60);return;}if(text&&text===lastToast.text&&now-lastToast.at<2500)return;lastToast={text,at:now};$('toast').textContent=text;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3200);}
@@ -149,7 +155,7 @@ function save(manual=false){if(world?.showcase||world?.arena||isRun(world)){if(m
   // A Vigil writes only to its own slot; an expedition never touches it.
   const vigil=world.mode==='vigil',key=vigil?SAVE_KEYS.vigil:SAVE_KEYS.expeditionV2;
   try{localStorage.setItem(key,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));saveText=vigil?'Vigil kept on this browser':'Saved on this browser';if(manual)toast(vigil?'Vigil saved':'Expedition saved');dirty=true;}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
-function syncSaveOption(){const plan=continuePlan(),visible=!!(plan.ok||plan.recoverable);$('continue').hidden=!visible;$('saved-option').hidden=!visible;}
+function syncSaveOption(){const plan=continuePlan(),visible=!!(plan.ok||plan.recoverable);$('continue').hidden=!visible;$('saved-option').hidden=!visible;const badge=$('expedition-badge');if(badge)badge.hidden=!visible;$('solo').classList.toggle('primary',!visible);}
 function resetInput(){keys.clear();stick={x:0,z:0};hold={act:false,attack:false};pointer=null;const stickEl=$('stick');if(stickEl)stickEl.style.transform='';const player=world?.player(localId);if(player)world.input(localId,{x:0,z:0,act:false,attack:false});network?.input({x:0,z:0,act:false,attack:false});}
 function endContextHold(){
   const kind=holdKind,target=holdTarget;holdKind=null;holdTarget=null;holdSource=null;dismantleStarted=0;hold.act=false;
@@ -211,15 +217,15 @@ function enterGame(){
 }
 async function goHome(){
   leaveArena();
-  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;$('room-panel').hidden=true;$('dungeon-panel').hidden=true;$('vigil-panel').hidden=true;$('home-panel').hidden=false;$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();syncVigilHint();demoWorld();
+  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;showFrontPanel('home-panel');$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();syncVigilHint();demoWorld();
   void checkForUpdate();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
-function setBusy(value){busy=value;for(const id of ['host','join','solo','continue','showcase','arena','lab','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
-function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status,wasDeep=!!world.dungeon;world=World.restore(data);dirty=true;if(!!world.dungeon!==wasDeep&&!$('room-panel').hidden)roomLabels();if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');$('home-panel').hidden=true;$('room-panel').hidden=false;$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
+function setBusy(value){busy=value;for(const id of ['mode-expedition','mode-join','host','join','solo','continue','showcase','arena','lab','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
+function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status,wasDeep=!!world.dungeon;world=World.restore(data);dirty=true;if(!!world.dungeon!==wasDeep&&!$('room-panel').hidden)roomLabels();if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');showFrontPanel('room-panel');$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
 async function hostCamp(dungeon=null,vigil=null){
   if(busy)return;if(dungeon&&(typeof dungeon!=='object'||(typeof Event!=='undefined'&&dungeon instanceof Event)))dungeon=null;if(typeof vigil!=='string')vigil=null;setBusy(true);sound.unlock();storeProfile();showStatus(dungeon?'Opening the dungeon doors…':vigil?'Lighting the vigil fire…':'Opening the camp…');
-  try{prepareWorld(!dungeon&&!vigil&&$('host-save').checked,dungeon,vigil);world.status='lobby';mode='host';network=makeNetwork();room=await bounded(network.host());if(!room)return;$('home-panel').hidden=true;$('dungeon-panel').hidden=true;$('vigil-panel').hidden=true;$('room-panel').hidden=false;roomLabels();$('room-code').textContent=room;$('launch').hidden=false;$('room-note').textContent='Friends can also join after you start.';showStatus('Camp ready');dirty=true;setBusy(false);}
+  try{prepareWorld(!dungeon&&!vigil&&$('host-save').checked,dungeon,vigil);world.status='lobby';mode='host';network=makeNetwork();room=await bounded(network.host());if(!room)return;showFrontPanel('room-panel');roomLabels();$('room-code').textContent=room;$('launch').hidden=false;$('room-note').textContent='Friends can also join after you start.';showStatus('Camp ready');dirty=true;setBusy(false);}
   catch(error){await network?.stop();network=null;mode='front';setBusy(false);showStatus(`Could not open the camp. ${error.message} Solo play is always available.`,true);}
 }
 /** The waiting-camp panel speaks of the woods or of the dungeon, whichever the host opened. */
@@ -232,7 +238,7 @@ function solo(resume=false,vigil=null){sound.unlock();storeProfile();try{prepare
 /** Title screen: the Vigil panel. A kept vigil shows its record; ending it takes two taps. */
 let vigilConfirm=0;
 function showVigilPanel(open){
-  $('vigil-panel').hidden=!open;$('home-panel').hidden=open;vigilConfirm=0;
+  showFrontPanel(open?'vigil-panel':'home-panel');vigilConfirm=0;
   if(open)paintVigilPanel();
 }
 function paintVigilPanel(){
@@ -255,7 +261,7 @@ function deleteVigil(){
   try{localStorage.removeItem(SAVE_KEYS.vigil);}catch{}
   showStatus('The vigil is over. Its fire is out.');paintVigilPanel();syncVigilHint();
 }
-function syncVigilHint(){const doc=readStored(SAVE_KEYS.vigil),hint=$('vigil-hint');if(!hint)return;if(!doc){hint.textContent='One fire, one save, for as long as you last';return;}const w=doc.world||{},day=Math.floor((Math.max(0,(w.time||0)-(w.below||0)))/430)+1;hint.textContent=`Kept · day ${day} · dread ${Math.floor(w.saga?.dread||1)}`;}
+function syncVigilHint(){const doc=readStored(SAVE_KEYS.vigil),hint=$('vigil-hint');if(!hint)return;if(!doc){hint.textContent='Endless save';return;}const w=doc.world||{},day=Math.floor((Math.max(0,(w.time||0)-(w.below||0)))/430)+1;hint.textContent=`Day ${day} · dread ${Math.floor(w.saga?.dread||1)}`;}
 function showShowcase(open){
   const panel=$('showcase-panel');if(!panel)return;
   if(!open){
@@ -314,7 +320,7 @@ function startDungeon(variant=dungeonPick){
 function dungeonWelcome(){const status=dungeonStatus(world);return status?`Floor ${status.depth} · ${status.name}. Find the Warden and take the stairs down.`:'';}
 /** Title screen: the Dungeons panel, with a card for each variation. */
 function showDungeonPanel(open){
-  $('dungeon-panel').hidden=!open;$('home-panel').hidden=open;
+  showFrontPanel(open?'dungeon-panel':'home-panel');
   if(!open)return;
   $('dungeon-floors').innerHTML=[{id:'',name:'Any depths',blurb:'A new variation on every floor.'},...VARIANTS].map(v=>`<button type="button" class="dungeon-floor" data-variant="${v.id}" aria-pressed="${dungeonPick===v.id}"><b>${escapeHtml(v.name)}</b><small>${escapeHtml(v.blurb)}</small></button>`).join('');
 }
@@ -642,7 +648,7 @@ function fullscreenElement(){return document.fullscreenElement||document.webkitF
 function isFullscreen(){return !!fullscreenElement();}
 function syncFullscreenUi(){
   const button=$('front-fullscreen');
-  if(button)button.textContent=isFullscreen()?'EXIT FULLSCREEN':'FULLSCREEN';
+  if(button){const on=isFullscreen();button.classList.toggle('is-on',on);button.setAttribute('aria-label',on?'Exit fullscreen':'Fullscreen');button.title=on?'Exit fullscreen':'Fullscreen';}
   const note=$('front-fullscreen-note');
   if(note){note.hidden=!fullscreenNote;note.textContent=fullscreenNote||'';}
   if(sheet==='menu'){sheetMarkup='';dirty=true;renderSheet();}
@@ -1007,8 +1013,10 @@ function aimEntity(){
 function setupControls(){
   $('characters').innerHTML=CHARACTERS.map(c=>`<button class="character" type="button" data-character="${c.id}" aria-label="${c.name}, ${c.detail}" aria-pressed="${c.id===character}">${portrait(c.id)}<small>${c.name}</small></button>`).join('');
   $('characters').onclick=e=>{const b=e.target.closest('[data-character]');if(!b)return;character=b.dataset.character;for(const el of $('characters').children)el.setAttribute('aria-pressed',el===b);if(mode==='front')world.players[0].character=character;storeProfile();};
+  $('mode-expedition').onclick=()=>{if(!busy){syncSaveOption();showFrontPanel('expedition-panel');}};$('expedition-back').onclick=()=>showFrontPanel('home-panel');
+  $('mode-join').onclick=()=>{if(!busy){showFrontPanel('join-panel');$('room-input').focus();}};$('join-back').onclick=()=>showFrontPanel('home-panel');
   $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
-  $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;sound.unlock();storeProfile();};
+  $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;syncSoundButton();sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   // Pack, Build and Light answer on release over the same button (pointer events, so a held joystick does not swallow the tap).
   const tools=$('top-tools');let toolPress=null;
@@ -1207,9 +1215,9 @@ function frame(now){
 async function init(){
   if(await checkForUpdate())return;
   await loadMagicModules();
-  theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;autoAttack=prefs.autoAttack!==false;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;
-  paintClock();demoWorld();setupControls();bindFeatureHud(featureContext(null));syncSaveOption();syncVigilHint();const params=new URLSearchParams(location.search);
-  const code=params.has('showcase')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showStatus('A place by the fire is waiting. Choose a name and join.');}
+  theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;autoAttack=prefs.autoAttack!==false;syncSoundButton();
+  paintClock();demoWorld();setupControls();paintModeIcons();syncSoundButton();bindFeatureHud(featureContext(null));syncSaveOption();syncVigilHint();const params=new URLSearchParams(location.search);
+  const code=params.has('showcase')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showFrontPanel('join-panel');showStatus('A place by the fire is waiting. Choose a name and join.');}
   const showcasePanel=$('showcase-panel');
   showcasePanel?.addEventListener('pointerdown',event=>event.stopPropagation());
   showcasePanel?.addEventListener('pointerup',event=>event.stopPropagation());

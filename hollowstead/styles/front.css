@@ -1,0 +1,145 @@
+/* Title screen (index.html #front, src/main.mjs showFrontPanel): the live camp behind, the name and
+   wanderer on the left, one panel on the right: mode cards, or the chosen mode's few buttons. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+#front.menu{display:grid;grid-template-columns:minmax(230px,1fr) minmax(0,600px);grid-template-rows:auto minmax(0,1fr) auto;column-gap:clamp(16px,4vw,56px);row-gap:12px;
+  padding:max(14px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));
+  background:linear-gradient(90deg,#211d28e6 0,#211d2899 30%,#211d2826 52%,#211d2899 72%,#211d28d9 100%);overflow:hidden}
+
+/* Top bar: icons only. */
+.menu-bar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between}
+.menu-tools{display:flex;gap:8px}
+.menu-icon{width:42px;height:42px;min-width:42px;min-height:42px;padding:0;display:grid;place-items:center;border-radius:12px;border:1px solid #dac29a33;background:#2b2532b3;color:var(--cream);backdrop-filter:blur(8px)}
+.menu-icon:hover{background:#3d3342;border-color:#dac29a66}
+.menu-icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#front-sound .snd-off,#front-sound.is-off .snd-on{display:none}
+#front-sound.is-off .snd-off{display:inline}
+#front-sound.is-off{color:var(--muted)}
+#front-fullscreen .fs-exit,#front-fullscreen.is-on .fs-enter{display:none}
+#front-fullscreen.is-on .fs-exit{display:inline}
+#front .fullscreen-note{top:calc(max(14px,env(safe-area-inset-top)) + 50px);bottom:auto}
+
+/* Brand. */
+.menu-brand{grid-column:1;grid-row:2;align-self:start;padding-left:4px}
+.menu-brand h1{font:normal clamp(52px,6.4vw,104px)/.84 Georgia,serif;letter-spacing:-.05em;margin:4px 0 12px;color:#f1ddba;text-shadow:0 4px 30px #120e1866}
+.menu-brand h1>span{display:block;margin-left:.42em}
+.menu-brand .title-star{font-size:.32em;color:var(--orange);vertical-align:top;margin-left:6px}
+.menu-tagline{font:italic clamp(15px,1.6vw,22px)/1.3 Georgia,serif;color:#d3b895;margin:0}
+
+/* Your wanderer: four portraits and a name. */
+.menu-wanderer{grid-column:1;grid-row:3;align-self:end;justify-self:start;display:flex;flex-direction:column;gap:8px;width:min(100%,300px);padding:10px;border:1px solid #d8bd953b;border-radius:16px;background:#2b2532cc;backdrop-filter:blur(12px)}
+.menu-characters{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.menu-characters .character{height:auto;min-height:0;padding:6px 2px 5px;margin:0;border-radius:12px;background:#ffffff0a;border:1px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px}
+.menu-characters .character .portrait{flex:none;width:30px;height:44px}
+.menu-characters .character small{font-size:10px;margin:0;color:var(--muted)}
+.menu-characters .character[aria-pressed=true]{border-color:var(--orange);background:#edb47a26}
+.menu-characters .character[aria-pressed=true] small{color:var(--cream)}
+.menu-name input{width:100%;min-height:40px;padding:8px 12px;border-radius:10px;font:15px Georgia,serif;background:#1d1a24aa}
+
+/* The right-hand stage holds one panel at a time. */
+.menu-stage{grid-column:2;grid-row:2/4;min-height:0;display:flex;flex-direction:column;justify-content:flex-end}
+
+/* Mode cards: Expedition is the big one; the rest sit in a 3 × 2 grid beside it. */
+.menu-modes{display:grid;grid-template-columns:1.25fr repeat(3,1fr);grid-template-rows:repeat(2,minmax(96px,1fr));gap:10px;max-height:100%}
+.menu-modes .mode-hero{grid-row:1/3}
+.mode-card{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px 8px;text-align:center;border-radius:16px;border:1px solid #d8bd953b;background:#2b2532d9;backdrop-filter:blur(12px);box-shadow:0 10px 30px #120e1840;color:var(--cream);transition:transform .12s ease,border-color .15s ease,background .15s ease}
+.mode-card:hover{border-color:#edb47a99;background:#3a3040e6}
+.mode-card:active{transform:scale(.97)}
+.mode-card:disabled{opacity:.5}
+.mode-icon{flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center}
+.mode-icon img{display:block;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 3px 6px #0008);pointer-events:none}
+.mode-card b{font:normal 15px/1.15 Georgia,serif;color:#f1ddba}
+.mode-card small{font-size:10.5px;line-height:1.25;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mode-hero{background:radial-gradient(ellipse at 50% 30%,#edb47a33,transparent 65%),#2b2532e6;border-color:#edb47a66}
+.mode-hero .mode-icon{width:clamp(64px,9vw,104px);height:clamp(64px,9vw,104px)}
+.mode-hero b{font-size:clamp(18px,2vw,24px)}
+.mode-badge{position:absolute;top:10px;right:10px;padding:2px 8px;border-radius:999px;background:var(--orange);color:#332b31;font:700 10px/1.5 Arial,Helvetica,sans-serif;font-style:normal;letter-spacing:.3px}
+.mode-badge[hidden]{display:none}
+.mode-vigil{background:radial-gradient(ellipse at 50% 20%,#b99bd633,transparent 70%),#2b2532d9;border-color:#b99bd655}
+.mode-vigil small{color:#cdb4ef}
+.mode-deep{background:radial-gradient(ellipse at 50% 20%,#9d8fd02e,transparent 70%),#2b2532d9}
+.mode-arena{background:radial-gradient(ellipse at 50% 20%,#e0776b2a,transparent 70%),#2b2532d9}
+
+/* Mode panels. */
+.menu-sheet{min-height:0;max-height:100%;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:10px;padding:14px 16px 16px;border:1px solid #d8bd953b;border-radius:18px;background:#2b2532ee;backdrop-filter:blur(14px);box-shadow:0 14px 50px #120e1866;scrollbar-width:thin;scrollbar-color:#99806766 transparent}
+.menu-sheet[hidden]{display:none}
+.menu-sheet>header{display:flex;align-items:center;gap:10px}
+.menu-sheet h2{margin:0;font:normal 24px/1.1 Georgia,serif;color:#f1ddba}
+.menu-back{width:38px;height:38px;min-width:38px;min-height:38px;padding:0;border-radius:10px;font-size:18px;line-height:1;background:#ffffff0d}
+.menu-lede{margin:0;font-size:12px;line-height:1.45;color:var(--muted)}
+.menu-lede.small{font-size:11px}
+.menu-actions{display:flex;flex-direction:column;gap:8px}
+.menu-actions--row{flex-direction:row}
+.menu-actions--row>button{flex:1;min-width:0}
+#front .menu-sheet .wide{min-height:48px;border-radius:12px;font-size:15px;padding:10px 16px}
+#front .menu-sheet .wide span{font-size:20px}
+#front .menu-sheet .wide:not(.primary){background:#ffffff0d}
+#front .saved-option{font-size:12px;color:var(--muted);gap:8px;padding:2px 4px}
+#front .saved-option[hidden]{display:none}
+.menu-join{display:flex;gap:8px}
+.menu-join input{flex:1;min-width:0;min-height:56px;text-align:center;font:24px ui-monospace,monospace;letter-spacing:8px;text-transform:uppercase;border-radius:12px}
+.menu-join button{min-width:110px;min-height:56px;border-radius:12px;font-size:16px}
+#front #dungeon-panel .dungeon-floors{margin:0;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+#front #dungeon-panel .dungeon-actions{display:none}
+#front .vigil-save{margin:0}
+#front .vigil-delete{align-self:flex-start;min-height:32px;padding:4px 0}
+#front .room-code{margin:0;padding:10px;border-radius:12px}
+#front #roster{margin:0}
+#front #room-note{margin:0}
+
+/* Status line (connection, errors, the camp-link hint). */
+.menu-status{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;margin:0;max-width:min(460px,90vw);padding:7px 14px;border-radius:999px;background:#211d28f0;border:1px solid #dac29a40;font-size:12px;text-align:center;pointer-events:none}
+.menu-status:empty{display:none}
+
+/* Short landscape phones: everything a size down. */
+@media(max-height:520px) and (orientation:landscape){
+  #front.menu{row-gap:8px;padding-top:max(10px,env(safe-area-inset-top));padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  .menu-icon{width:38px;height:38px;min-width:38px;min-height:38px;border-radius:10px}
+  .menu-icon svg{width:18px;height:18px}
+  .menu-brand h1{font-size:clamp(46px,7.5vw,64px);margin:0 0 8px}
+  .menu-tagline{font-size:15px}
+  .menu-wanderer{padding:8px;gap:6px;width:min(100%,270px)}
+  .menu-characters .character .portrait{width:26px;height:38px}
+  .menu-name input{min-height:36px;font-size:14px}
+  .menu-modes{gap:8px;grid-template-rows:repeat(2,minmax(84px,1fr))}
+  .mode-card{padding:8px 6px;border-radius:14px}
+  .mode-icon{width:38px;height:38px}
+  .mode-card b{font-size:14px}
+  .mode-card small{font-size:10px}
+  .menu-sheet{padding:10px 12px 12px;gap:8px}
+  .menu-sheet h2{font-size:20px}
+  #front .menu-sheet .wide{min-height:44px;font-size:14px}
+  #front .vigil-save{padding:8px 10px}
+  #front .room-code>span{font-size:26px}
+}
+
+/* Portrait phones: one column that scrolls. */
+@media(max-width:700px) and (orientation:portrait){
+  #front.menu{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(4,max-content);overflow-y:auto;align-content:start;background:linear-gradient(#211d28b3,#211d2840 30%,#211d28d9 60%,#211d28)}
+  .menu-brand{grid-column:1;grid-row:2;margin-top:8px}
+  .menu-brand h1{font-size:64px}
+  .menu-stage{grid-column:1;grid-row:4;display:block;min-height:auto}
+  .menu-modes,.menu-sheet{max-height:none}
+  .menu-wanderer{grid-column:1;grid-row:3;width:100%;justify-self:stretch}
+  .menu-modes{grid-template-columns:repeat(2,1fr);grid-template-rows:none;grid-auto-rows:minmax(96px,auto)}
+  .menu-modes .mode-hero{grid-row:auto;grid-column:1/-1}
+  .menu-status{position:static;transform:none;grid-column:1;max-width:none}
+}
+
+/* Roomy screens: bigger cards. */
+@media(min-width:1000px) and (min-height:620px){
+  .menu-modes{gap:12px;grid-template-rows:repeat(2,minmax(140px,1fr))}
+  .mode-icon{width:56px;height:56px}
+  .mode-card b{font-size:17px}
+  .mode-card small{font-size:11.5px}
+  .menu-wanderer{width:340px}
+  .menu-characters .character .portrait{width:36px;height:54px}
+}
+
+/* Waiting camp: the roster in two columns so the start button stays in view. */
+#front #roster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px}
+#front .roster-row{min-height:32px;padding:2px 4px;font-size:12px}
+#front .room-code{flex-direction:row;justify-content:center;gap:14px;padding:8px 12px}
+#front .room-code>span{font-size:26px;letter-spacing:7px}
+#front .room-code small{font-size:10px}
+#front #launch{flex:none}

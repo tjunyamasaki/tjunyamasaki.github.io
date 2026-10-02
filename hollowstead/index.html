@@ -9,30 +9,82 @@
   <meta name="theme-color" content="#292532"><meta name="description" content="Gather by day. Keep the fire alive at night. Go down into dungeons carved anew every floor. A Halloween co-op survival expedition for 1–4 players.">
   <title>Hollowstead — A little light. A long night.</title>
   <link rel="icon" type="image/svg+xml" href="./themes/harvest/sprites/pumpkin.svg"><link rel="stylesheet" href="./style.css?v=harvest-18">
-  <link rel="stylesheet" href="./styles/moon.css?v=harvest-18"><link rel="stylesheet" href="./styles/frontier.css?v=harvest-18"><link rel="stylesheet" href="./styles/cart.css?v=harvest-18"><link rel="stylesheet" href="./styles/rhythm.css?v=harvest-18"><link rel="stylesheet" href="./styles/trinkets.css?v=harvest-18"><link rel="stylesheet" href="./styles/lab.css?v=harvest-18"><link rel="stylesheet" href="./styles/refine.css?v=harvest-18"><link rel="stylesheet" href="./styles/floaters.css?v=harvest-18"><link rel="stylesheet" href="./styles/hurt.css?v=harvest-18"><link rel="stylesheet" href="./styles/dungeon.css?v=harvest-18"><link rel="stylesheet" href="./styles/hud.css?v=harvest-18">
+  <link rel="stylesheet" href="./styles/moon.css?v=harvest-18"><link rel="stylesheet" href="./styles/frontier.css?v=harvest-18"><link rel="stylesheet" href="./styles/cart.css?v=harvest-18"><link rel="stylesheet" href="./styles/rhythm.css?v=harvest-18"><link rel="stylesheet" href="./styles/trinkets.css?v=harvest-18"><link rel="stylesheet" href="./styles/lab.css?v=harvest-18"><link rel="stylesheet" href="./styles/refine.css?v=harvest-18"><link rel="stylesheet" href="./styles/floaters.css?v=harvest-18"><link rel="stylesheet" href="./styles/hurt.css?v=harvest-18"><link rel="stylesheet" href="./styles/dungeon.css?v=harvest-18"><link rel="stylesheet" href="./styles/hud.css?v=harvest-18"><link rel="stylesheet" href="./styles/front.css?v=harvest-18">
 </head>
 <body>
   <canvas id="world" aria-label="Hollowstead survival world"></canvas><div id="fx-flash" aria-hidden="true"></div><div class="vignette" aria-hidden="true"></div><div id="hurt-fx" aria-hidden="true"><i class="hurt-danger"></i><i class="hurt-flash"></i></div><div id="world-labels" aria-hidden="true"></div>
   <div id="loading"><span class="flame-mark">♧</span><p>Lighting the way…</p><small id="load-status">Waking the Hollow Harvest</small></div>
-  <main id="front" hidden>
-    <header class="front-header"><a href="../links/" aria-label="Back to games">← GAMES</a><span>THE HOLLOW HARVEST · 01</span><div class="front-tools"><button id="front-fullscreen" class="text-button" type="button">FULLSCREEN</button><button id="front-sound" class="text-button" aria-label="Toggle sound">SOUND ON</button></div></header>
+  <main id="front" class="menu" hidden>
+    <header class="menu-bar">
+      <a class="menu-icon" href="../links/" aria-label="Back to games"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+      <div class="menu-tools">
+        <button id="front-guide" class="menu-icon" type="button" aria-label="A wanderer’s field guide" title="Field guide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5C6.5 4 9.5 4 12 6c2.5-2 5.5-2 8-.5V19c-2.5-1.5-5.5-1.5-8 .5-2.5-2-5.5-2-8-.5z"/><path d="M12 6v13.5"/></svg></button>
+        <button id="front-fullscreen" class="menu-icon" type="button" aria-label="Fullscreen" title="Fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fs-enter" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><path class="fs-exit" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
+        <button id="front-sound" class="menu-icon" type="button" aria-label="Sound on" aria-pressed="true" title="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="snd-on" d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"/><path class="snd-off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+      </div>
+    </header>
     <p id="front-fullscreen-note" class="fullscreen-note" hidden></p>
-    <section class="hero"><p class="eyebrow"><span class="tiny-dot"></span> 1–4 WANDERERS · CO-OP SURVIVAL</p><h1>Hollow<span>stead<span class="title-star">✦</span></span></h1><p class="tagline">A little light.<br>A long night.</p><p class="hero-description">Explore the hollow. Crack open its caches.<br>Grow stronger. Outlast every night.</p></section>
-    <section class="front-panel" id="home-panel">
-      <div class="panel-heading"><span class="eyebrow">WHO WILL YOU BE?</span><span class="edition">AUTUMN ’26</span></div>
-      <div id="characters" class="characters" aria-label="Choose your wanderer"></div>
-      <label class="name-field"><span>YOUR NAME</span><input id="player-name" maxlength="18" value="Wanderer" autocomplete="nickname" aria-label="Your name"></label>
-      <button id="host" class="primary wide">Gather your friends <span>↗</span></button>
-      <button id="vigil" class="wide vigil-button" type="button"><b>The Vigil<small id="vigil-hint">One fire, one save, for as long as you last</small></b><span>☾</span></button>
-      <div class="join-row"><input id="room-input" placeholder="CAMP CODE" maxlength="5" autocomplete="off" autocapitalize="characters" aria-label="Camp code"><button id="join">Join camp →</button></div>
-      <div class="front-secondary"><button id="solo" class="text-button">Venture alone</button><button id="dungeon" class="text-button">Dungeons</button><button id="arena" class="text-button">Battle arena</button><button id="lab" class="text-button">Weapon lab</button><button id="showcase" class="text-button">Showcase</button><button id="continue" class="text-button" hidden>Continue expedition ↗</button></div>
-      <label id="saved-option" class="saved-option" hidden><input type="checkbox" id="host-save"> Host my saved expedition</label>
-      <p class="status" id="front-status" role="status"></p>
+
+    <section class="menu-brand" aria-label="Hollowstead">
+      <h1>Hollow<span>stead<span class="title-star" aria-hidden="true">✦</span></span></h1>
+      <p class="menu-tagline">A little light. A long night.</p>
     </section>
-    <section class="front-panel" id="dungeon-panel" hidden><div class="panel-heading"><span class="eyebrow">BELOW THE HOLLOW</span><span class="edition">DUNGEONS</span></div><h2>The deep doors.</h2><p class="muted">Every floor is carved anew. Slay the Warden by the stairs and go deeper, alone or with up to three friends.</p><div id="dungeon-floors" class="dungeon-floors" role="group" aria-label="Which depths"></div><div class="dungeon-actions"><button id="dungeon-host" class="primary wide">Gather a party <span>↗</span></button><button id="dungeon-solo" class="wide">Descend alone →</button><button id="dungeon-back" class="text-button">← Back</button></div></section>
-    <section class="front-panel vigil-panel" id="vigil-panel" hidden><div class="panel-heading"><span class="eyebrow">THE LONG HAUL</span><span class="edition">THE VIGIL</span></div><h2>Keep the vigil.</h2><p class="muted">One expedition, kept until you choose to end it. Days and nights run longer. The hollow grows with your strength, not the days: its Dread rises as you level, find better gear and slay its bosses. A fallen fire is rekindled and a fallen party wakes by it. Nothing ends this save but you.</p><div id="vigil-save" class="vigil-save"></div><div class="vigil-actions"><button id="vigil-solo" class="primary wide" type="button">Begin the vigil <span>→</span></button><button id="vigil-host" class="wide" type="button">Keep it with friends <span>↗</span></button><button id="vigil-delete" class="text-button vigil-delete" type="button" hidden>End this vigil…</button><button id="vigil-back" class="text-button" type="button">← Back</button></div></section>
-    <section class="front-panel" id="room-panel" hidden><p class="eyebrow">THE CAMP IS OPEN</p><h2 id="room-heading">Better together.</h2><p class="muted" id="room-lede">Invite your friends, then enter the woods.</p><button id="copy-room" class="room-code" title="Copy invite link"><span id="room-code">·····</span><small>TAP TO COPY INVITE ↗</small></button><div id="roster"></div><button id="launch" class="primary wide">Enter the woods <span>→</span></button><p id="room-note" class="muted small">Friends can also join after you start.</p><button id="cancel-room" class="text-button">← Leave camp</button></section>
-    <footer class="front-footer"><span>ENDLESS NIGHTS. ONE SHARED FIRE.</span><button id="front-guide" class="text-button">A wanderer’s field guide ↗</button></footer>
+
+    <section class="menu-wanderer" aria-label="Your wanderer">
+      <div id="characters" class="menu-characters" aria-label="Choose your wanderer"></div>
+      <label class="menu-name"><span class="sr-only">Your name</span><input id="player-name" maxlength="18" value="Wanderer" placeholder="Your name" autocomplete="nickname" aria-label="Your name"></label>
+    </section>
+
+    <div class="menu-stage">
+      <section class="menu-modes" id="home-panel" aria-label="Choose how to play">
+        <button id="mode-expedition" class="mode-card mode-hero" type="button" data-icon="hearth"><span class="mode-icon" aria-hidden="true"></span><b>Expedition</b><small>Solo or with friends</small><em id="expedition-badge" class="mode-badge" hidden>Saved</em></button>
+        <button id="vigil" class="mode-card mode-vigil" type="button" data-icon="moon-waxing"><span class="mode-icon" aria-hidden="true"></span><b>The Vigil</b><small id="vigil-hint">Endless save</small></button>
+        <button id="dungeon" class="mode-card mode-deep" type="button" data-icon="delve"><span class="mode-icon" aria-hidden="true"></span><b>Dungeons</b><small>Ever deeper</small></button>
+        <button id="mode-join" class="mode-card" type="button" data-icon="lantern"><span class="mode-icon" aria-hidden="true"></span><b>Join a camp</b><small>Enter a code</small></button>
+        <button id="arena" class="mode-card mode-arena" type="button" data-icon="broadsword"><span class="mode-icon" aria-hidden="true"></span><b>Arena</b><small>Waves of foes</small></button>
+        <button id="lab" class="mode-card" type="button" data-icon="starfall"><span class="mode-icon" aria-hidden="true"></span><b>Weapon lab</b><small>Try any weapon</small></button>
+        <button id="showcase" class="mode-card" type="button" data-icon="jacklantern"><span class="mode-icon" aria-hidden="true"></span><b>Showcase</b><small>Sandbox</small></button>
+      </section>
+
+      <section class="menu-sheet" id="expedition-panel" hidden aria-labelledby="expedition-title">
+        <header><button id="expedition-back" class="menu-back" type="button" aria-label="Back">←</button><h2 id="expedition-title">Expedition</h2></header>
+        <div class="menu-actions">
+          <button id="continue" class="primary wide" type="button" hidden>Continue expedition <span>→</span></button>
+          <button id="solo" class="wide" type="button">New expedition <span>→</span></button>
+          <button id="host" class="wide" type="button">Gather your friends <span>↗</span></button>
+          <label id="saved-option" class="saved-option" hidden><input type="checkbox" id="host-save"> Bring my saved expedition</label>
+        </div>
+      </section>
+
+      <section class="menu-sheet" id="join-panel" hidden aria-labelledby="join-title">
+        <header><button id="join-back" class="menu-back" type="button" aria-label="Back">←</button><h2 id="join-title">Join a camp</h2></header>
+        <div class="menu-join"><input id="room-input" placeholder="CODE" maxlength="5" autocomplete="off" autocapitalize="characters" aria-label="Camp code"><button id="join" class="primary" type="button">Join <span>→</span></button></div>
+      </section>
+
+      <section class="menu-sheet" id="dungeon-panel" hidden aria-labelledby="dungeon-title">
+        <header><button id="dungeon-back" class="menu-back" type="button" aria-label="Back">←</button><h2 id="dungeon-title">Dungeons</h2></header>
+        <div id="dungeon-floors" class="dungeon-floors" role="group" aria-label="Which depths"></div>
+        <div class="menu-actions menu-actions--row"><button id="dungeon-solo" class="primary wide" type="button">Descend alone <span>→</span></button><button id="dungeon-host" class="wide" type="button">Gather a party <span>↗</span></button></div>
+      </section>
+
+      <section class="menu-sheet vigil-panel" id="vigil-panel" hidden aria-labelledby="vigil-title">
+        <header><button id="vigil-back" class="menu-back" type="button" aria-label="Back">←</button><h2 id="vigil-title">The Vigil</h2></header>
+        <p class="menu-lede">One endless save. The hollow grows with you.</p>
+        <div id="vigil-save" class="vigil-save"></div>
+        <div class="menu-actions menu-actions--row"><button id="vigil-solo" class="primary wide" type="button">Begin the vigil <span>→</span></button><button id="vigil-host" class="wide" type="button">Keep it with friends <span>↗</span></button></div>
+        <button id="vigil-delete" class="text-button vigil-delete" type="button" hidden>End this vigil…</button>
+      </section>
+
+      <section class="menu-sheet" id="room-panel" hidden aria-labelledby="room-heading">
+        <header><button id="cancel-room" class="menu-back" type="button" aria-label="Leave camp">←</button><h2 id="room-heading">Better together.</h2></header>
+        <p class="menu-lede" id="room-lede">Invite your friends, then enter the woods.</p>
+        <button id="copy-room" class="room-code" type="button" title="Copy invite link"><span id="room-code">·····</span><small>Tap to copy the invite</small></button>
+        <div id="roster"></div>
+        <button id="launch" class="primary wide" type="button">Enter the woods <span>→</span></button>
+        <p id="room-note" class="menu-lede small">Friends can also join after you start.</p>
+      </section>
+    </div>
+    <p class="menu-status status" id="front-status" role="status"></p>
   </main>
   <div id="game" hidden>
     <header class="game-top">

@@ -12,6 +12,11 @@ export const GLYPHS = Object.freeze({
   till: svg('<path d="M7 27 L22 8" stroke-width="3.4"/><path d="M7 27 L22 8" stroke="#b88a62" stroke-width="1.6"/><path d="M18 6 L27 7 L26 13 Z" fill="#9aa0b4"/>'),
   plank: svg('<rect x="4" y="6" width="24" height="6" rx="1.5" fill="#a3734c"/><rect x="4" y="13" width="24" height="6" rx="1.5" fill="#8d603f"/><rect x="4" y="20" width="24" height="6" rx="1.5" fill="#9a6b47"/><path d="M14 6v6M22 13v6M10 20v6" stroke-width="1.6"/>'),
   flagstone: svg('<rect x="4" y="5" width="11" height="10" rx="3" fill="#9a95aa"/><rect x="17" y="5" width="11" height="10" rx="3" fill="#857f94"/><rect x="4" y="17" width="14" height="10" rx="3" fill="#8f8a9e"/><rect x="20" y="17" width="8" height="10" rx="3" fill="#a29db2"/>'),
+  boards: svg('<rect x="4" y="4" width="8" height="24" rx="1.5" fill="#87553a"/><rect x="12" y="4" width="8" height="24" rx="1.5" fill="#7b4b33"/><rect x="20" y="4" width="8" height="24" rx="1.5" fill="#6f4330"/><path d="M4 17 H12 M12 11 H20 M20 21 H28" stroke-width="2"/><circle cx="8" cy="14" r="1.4" fill="#d9c09a" stroke="none"/><circle cx="16" cy="8" r="1.4" fill="#d9c09a" stroke="none"/><circle cx="24" cy="18" r="1.4" fill="#d9c09a" stroke="none"/>'),
+  roughplank: svg('<path d="M6 5 H27 V12 H4 Z" fill="#ab8f6d"/><path d="M3 12 H25 V19 H7 Z" fill="#93785a"/><path d="M5 19 H29 V27 H2 Z" fill="#a08463"/><path d="M14 5v7 M19 12v7 M11 19v8" stroke-width="1.8"/>'),
+  slabs: svg('<rect x="2" y="3" width="28" height="26" rx="3" fill="#4f4a5c" stroke="none"/><rect x="3.5" y="4.5" width="14" height="11" rx="2.5" fill="#a19cb3"/><rect x="18.5" y="4.5" width="10" height="11" rx="2.5" fill="#8a869d"/><rect x="3.5" y="16.5" width="10" height="11" rx="2.5" fill="#928ea6"/><rect x="14.5" y="16.5" width="14" height="11" rx="2.5" fill="#aca8bd"/><path d="M7 9 L10 11 L13 10" stroke-width="1.6"/>'),
+  cobble: svg('<rect x="2" y="3" width="28" height="26" rx="4" fill="#3d3946" stroke="none"/><ellipse cx="9" cy="9" rx="6" ry="5" fill="#9b97ad"/><ellipse cx="22" cy="9" rx="6" ry="5" fill="#837f95"/><ellipse cx="15.5" cy="17" rx="6" ry="5" fill="#a5a1b6"/><ellipse cx="5" cy="17" rx="3.5" ry="5" fill="#8e8aa0"/><ellipse cx="27" cy="17" rx="3.5" ry="5" fill="#8e8aa0"/><ellipse cx="9" cy="25" rx="6" ry="4" fill="#8e8aa0"/><ellipse cx="22" cy="25" rx="6" ry="4" fill="#9b97ad"/>'),
+  fieldstone: svg('<path d="M4 6 L14 4 L16 13 L6 15 Z" fill="#a8a08a"/><path d="M18 5 L28 8 L26 15 L17 14 Z" fill="#8d8672"/><path d="M5 18 L15 16 L17 27 L7 28 Z" fill="#9b947f"/><path d="M19 17 L27 18 L28 27 L20 26 Z" fill="#b1aa95"/>'),
   fence: svg('<path d="M3 13 H29 M3 21 H29" stroke-width="4.6"/><path d="M3 13 H29 M3 21 H29" stroke="#8a5a3c" stroke-width="2"/><path d="M9 28 V8 L11 5 L13 8 V28 Z M19 28 V8 L21 5 L23 8 V28 Z" fill="#6e4630"/>'),
   wall: svg('<path d="M4 28 V10 L6.5 5 L9 10 V28 Z M10 28 V8 L12.5 3 L15 8 V28 Z M16 28 V9 L18.5 4 L21 9 V28 Z M22 28 V10 L24.5 5 L27 10 V28 Z" fill="#7d5238"/><path d="M4 14 H27 M4 22 H27" stroke-width="1.6"/>'),
   stonewall: svg('<rect x="3" y="7" width="26" height="20" rx="2" fill="#9a95ab"/><path d="M3 14 H29 M3 21 H29 M11 7v7 M21 7v7 M16 14v7 M8 21v6 M24 21v6" stroke-width="1.8"/><rect x="2" y="4" width="28" height="4" rx="1.5" fill="#b7b2c6"/>'),
@@ -22,14 +27,16 @@ export const GLYPHS = Object.freeze({
 });
 
 const FARM = ['till', ...CROP_TYPES.map(id => `plant:${id}`), 'harvest', 'remove'];
-const BUILD = ['plank', 'flagstone', 'fence', 'wall', 'stonewall', 'gate', 'remove'];
+const FLOORS = ['plank', 'boards', 'roughplank', 'flagstone', 'slabs', 'cobble', 'fieldstone', 'remove'];
+const WALLS = ['fence', 'wall', 'stonewall', 'gate', 'remove'];
 const CAMP = [...OBJECT_TYPES.map(id => `obj:${id}`), 'remove'];
-const TABS = [['farm', 'Farm', FARM], ['build', 'Build', BUILD], ['camp', 'Camp', CAMP]];
+const TABS = [['farm', 'Farm', FARM], ['floors', 'Floors', FLOORS], ['walls', 'Walls', WALLS], ['camp', 'Camp', CAMP]];
 const ROTATES = new Set(['fence', 'wall', 'stonewall', 'gate']);
 const DRAGS = new Set(['till', 'plank', 'flagstone', 'fence', 'wall', 'stonewall', 'harvest', 'remove', ...CROP_TYPES.map(id => `plant:${id}`)]);
 const HINT = {
   till: 'Drag to till a bed. Joined soil merges into one patch.',
-  plank: 'Drag to lay planks.', flagstone: 'Drag to lay flagstones.',
+  plank: 'Drag to lay planks.', flagstone: 'Drag to lay flagstones.', slabs: 'Drag to lay big stone slabs.', boards: 'Drag to lay broad boards.', cobble: 'Drag to lay cobbles.',
+  roughplank: 'Drag to lay rough planks. Their outer edge is left ragged.', fieldstone: 'Drag to lay a fieldstone path. Its edge follows the stones.',
   fence: 'Drag to run a fence. Pieces join their neighbours.', wall: 'Drag a palisade line.', stonewall: 'Drag a stone wall.',
   gate: 'Tap between two fence pieces. Tap a gate with no tool to open it.',
   harvest: 'Drag over ripe crops.', remove: 'Drag to pull up crops, floors and walls.',

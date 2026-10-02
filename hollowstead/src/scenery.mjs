@@ -11,6 +11,7 @@
 // Canvas2D: the same props culled to the view from a pre-rasterised atlas, darkened with a tinted copy.
 
 import {UPRIGHT_DEPTH} from './camera.mjs?v=harvest-18';
+import {CELL} from './homestead.mjs?v=harvest-18';
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
 import {SCENERY_ATLAS} from './scenery-atlas.mjs?v=harvest-18';
 import {CHUNK, PROPS, SceneryModel, chunkKey, propCovered, syntheticShape} from './scenery-layout.mjs?v=harvest-18';
@@ -28,6 +29,20 @@ const CANVAS_LIFT = 1 / .694;
 
 function cellOf(kind){return ATLAS.cells[kind] || null;}
 function hashXZ(x, z){const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;return h - Math.floor(h);}
+/**
+ * What hides scenery props: the buildings, plus every homestead tile (homestead.mjs), so grass and
+ * flowers never grow up through a floor or a bed of soil. A tile counts as a building with no radius.
+ */
+const COVER = {buildings: null, rev: -1, n: -1, list: []};
+function coverOf(world){
+  const buildings = world?.buildings || [], cells = world?.tiles?.cells;
+  if(!cells)return buildings;
+  if(COVER.buildings !== buildings || COVER.rev !== world.tiles.rev || COVER.n !== buildings.length){
+    COVER.buildings = buildings;COVER.rev = world.tiles.rev;COVER.n = buildings.length;
+    COVER.list = buildings.concat(Object.keys(cells).map(key => {const [i, j] = key.split(',').map(Number);return {type: 'tile', x: (i + .5) * CELL, z: (j + .5) * CELL};}));
+  }
+  return COVER.list;
+}
 function buildingSig(buildings, x0, z0, x1, z1){
   let n = 0, s = 0;
   for(const b of buildings){if(b.type === 'cart' || b.type === 'hearth' || b.x < x0 || b.x > x1 || b.z < z0 || b.z > z1)continue;n++;s = (s * 31 + Math.round(b.x * 4) * 7 + Math.round(b.z * 4)) % 1000003;}
@@ -182,7 +197,7 @@ export class SceneryLayer {
   }
   /** One chunk: its upright props and border pieces in one mesh, its flat decals in another. */
   buildChunk(c){
-    const buildings = this.world?.buildings || [];
+    const buildings = coverOf(this.world);
     const ups = new QuadWriter(c.props.length + c.pieces.length, true), decals = new QuadWriter(c.props.length, false);
     let flatIndex = 0;
     for(const p of c.props){
@@ -226,7 +241,7 @@ export class SceneryLayer {
     // Chunks in view are built at once; the ring beyond is prefetched a couple per frame so walking never hitches.
     const {cx0, cz0, cx1, cz1} = this.model.range(view.x0 - PREFETCH, view.z0 - PREFETCH, view.x1 + PREFETCH, view.z1 + PREFETCH);
     this.coverClock -= dt;const recheck = this.coverClock <= 0;if(recheck)this.coverClock = COVER_EVERY;
-    const buildings = world.buildings || [];let fresh = 0, quads = 0, shown = 0;
+    const buildings = coverOf(world);let fresh = 0, quads = 0, shown = 0;
     for(const m of this.meshes.values()){if(m.up)m.up.visible = false;if(m.decal)m.decal.visible = false;}
     for(let cz = cz0; cz <= cz1; cz++)for(let cx = cx0; cx <= cx1; cx++){
       const x0 = cx * CHUNK, z0 = cz * CHUNK, visible = x0 < view.x1 && x0 + CHUNK > view.x0 && z0 < view.z1 && z0 + CHUNK > view.z0;
@@ -333,7 +348,7 @@ class CanvasScenery {
       this.clock += dt;
       const {cx0, cz0, cx1, cz1} = this.model.range(view.x0, view.z0, view.x1, view.z1), ups = this.ups;ups.length = 0;
       this.coverClock -= dt;const recheck = this.coverClock <= 0;if(recheck)this.coverClock = COVER_EVERY;
-      const buildings = world.buildings || [];
+      const buildings = coverOf(world);
       for(let cz = cz0; cz <= cz1; cz++)for(let cx = cx0; cx <= cx1; cx++){
         const ch = this.model.chunk(cx, cz);
         if(recheck || !this.hidden.has(ch.key)){const x0 = cx * CHUNK, z0 = cz * CHUNK, sig = buildingSig(buildings, x0 - 1, z0 - 1, x0 + CHUNK + 1, z0 + CHUNK + 1), was = this.hidden.get(ch.key);if(!was || was.sig !== sig)this.hidden.set(ch.key, {sig, set:sig ? new Set(ch.props.filter(p => propCovered(p, buildings))) : null});}

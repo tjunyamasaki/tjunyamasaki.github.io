@@ -23,6 +23,11 @@ export const GROUNDS = Object.freeze({
   soil: {name: 'Tilled soil', cost: {}},
   plank: {name: 'Plank floor', cost: {wood: 1}},
   flagstone: {name: 'Flagstone floor', cost: {stone: 1}},
+  boards: {name: 'Broad boards', cost: {wood: 1}},
+  roughplank: {name: 'Rough planks', cost: {wood: 1}},
+  slabs: {name: 'Stone slabs', cost: {stone: 1}},
+  cobble: {name: 'Cobblestone', cost: {stone: 1}},
+  fieldstone: {name: 'Fieldstone path', cost: {stone: 1}},
 });
 
 /** Building types placed on the grid. `wall` and `gate` keep their old ids, so creatures still go for them. */
@@ -80,6 +85,11 @@ export const TOOLS = Object.freeze({
   till: {kind: 'ground', ground: 'soil', name: 'Till soil'},
   plank: {kind: 'ground', ground: 'plank', name: 'Plank floor'},
   flagstone: {kind: 'ground', ground: 'flagstone', name: 'Flagstone'},
+  boards: {kind: 'ground', ground: 'boards', name: 'Broad boards'},
+  roughplank: {kind: 'ground', ground: 'roughplank', name: 'Rough planks'},
+  slabs: {kind: 'ground', ground: 'slabs', name: 'Stone slabs'},
+  cobble: {kind: 'ground', ground: 'cobble', name: 'Cobblestone'},
+  fieldstone: {kind: 'ground', ground: 'fieldstone', name: 'Fieldstone'},
   fence: {kind: 'barrier', type: 'fence', name: 'Fence'},
   wall: {kind: 'barrier', type: 'wall', name: 'Palisade'},
   stonewall: {kind: 'barrier', type: 'stonewall', name: 'Stone wall'},

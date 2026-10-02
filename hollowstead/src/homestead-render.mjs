@@ -19,7 +19,16 @@ export const GROUND_LOOK = Object.freeze({
   soil: {fill: '#6b4836', rim: '#8c6248', edge: '#4a3127', flat: '#6b4836'},
   plank: {fill: '#9a6b47', rim: '#6b4330', edge: '#5f3a2a', flat: '#9a6b47'},
   flagstone: {fill: '#5b5666', rim: '#6c6679', edge: '#4a4656', flat: '#8f8a9e'},
+  slabs: {fill: '#4f4a5c', rim: '#6c6679', edge: '#4f4a5c', flat: '#9b97ad'},
+  boards: {fill: '#7b4b33', rim: '#4f2f22', edge: '#3a2420', flat: '#7b4b33'},
+  roughplank: {fill: '#a08463', rim: '#6e5640', edge: '#4d3c2e', flat: '#a08463', rough: true},
+  cobble: {fill: '#4f4a5c', rim: '#6c6679', edge: '#4f4a5c', flat: '#9b97ad'},
+  fieldstone: {fill: '#5a4a40', rim: '#6b5a4e', edge: '#5a4a40', flat: '#a39b84', rough: true},
 });
+/** How many texture variants each ground has (picked per cell by a hash of its position). */
+const VARIANTS = {soil: 3, plank: 4, flagstone: 4, slabs: 4, boards: 4, roughplank: 4, cobble: 4, fieldstone: 4};
+/** Seam and outline weights for the newer floors: bold, so they read at play size like the sprites. */
+const SEAM = TEX * .026, LINE = TEX * .022;
 const WOOD = new THREE.Color('#8a5a3c'), WOOD_D = new THREE.Color('#6e4630'), WOOD_L = new THREE.Color('#a7744c');
 const STAKE = new THREE.Color('#7d5238'), STONE = new THREE.Color('#9a95ab'), STONE_L = new THREE.Color('#b7b2c6');
 
@@ -112,6 +121,68 @@ function paintPlank(g, S, variant){
     }
   }
 }
+/** Broad boards: three wide boards running north-south, heavy seams, big nail heads and a knot or two. */
+function paintBoards(g, S, variant){
+  const n = 3, w = S / n, tones = ['#7b4b33', '#87553a', '#6f4330', '#80503a'];
+  const ends = [[.62], [.24], [.8], [.44]];
+  for(let k = 0; k < n; k++){
+    const x = k * w, tone = tones[(k + variant) % tones.length];
+    g.fillStyle = tone;g.fillRect(x, 0, w, S);
+    g.fillStyle = 'rgba(255,214,170,.16)';g.fillRect(x + SEAM * .6, 0, w * .2, S);
+    g.fillStyle = 'rgba(40,20,14,.18)';g.fillRect(x + w * .72, 0, w * .28, S);
+    // Grain: a few long confident strokes, not hairlines.
+    g.strokeStyle = 'rgba(52,28,20,.45)';g.lineWidth = 2.6;g.lineCap = 'round';
+    const r = rng(41 + k * 13 + variant * 7);
+    for(let q = 0; q < 2; q++){const gx = x + w * (.36 + q * .26) + (r() - .5) * 6;g.beginPath();g.moveTo(gx, 0);g.bezierCurveTo(gx + 6, S * .3, gx - 6, S * .65, gx + 2, S);g.stroke();}
+    if(r() < .55){const kx = x + w * (.3 + r() * .4), ky = S * (.2 + r() * .6);g.fillStyle = '#5a3424';g.beginPath();g.ellipse(kx, ky, w * .12, w * .17, 0, 0, 7);g.fill();g.strokeStyle = INK;g.lineWidth = LINE * .8;g.stroke();g.fillStyle = 'rgba(255,214,170,.25)';g.beginPath();g.ellipse(kx - 2, ky - 3, w * .04, w * .06, 0, 0, 7);g.fill();}
+    // Butt joint across the board, with a pair of nails either side.
+    const jy = ends[(k + variant) % ends.length][0] * S;
+    g.fillStyle = INK;g.fillRect(x, jy - SEAM / 2, w, SEAM);
+    for(const dy of [-1, 1])for(const dx of [.28, .72]){g.fillStyle = INK;g.beginPath();g.arc(x + w * dx, jy + dy * SEAM * 2.2, 5.2, 0, 7);g.fill();g.fillStyle = '#d9c09a';g.beginPath();g.arc(x + w * dx - 1, jy + dy * SEAM * 2.2 - 1, 3, 0, 7);g.fill();}
+    g.fillStyle = INK;g.fillRect(x + w - SEAM / 2, 0, SEAM, S);
+    if(k === 0)g.fillRect(-SEAM / 2, 0, SEAM, S);
+  }
+}
+/** Rough planks: weathered grey-brown boards of uneven width, chunky grain; the floor's edge is ragged. */
+function paintRoughPlank(g, S, variant){
+  const rows = [.36, .3, .34], tones = ['#a08463', '#93785a', '#ab8f6d', '#8a6f52'];
+  let y = 0;
+  for(let k = 0; k < rows.length; k++){
+    const h = rows[k] * S, tone = tones[(k + variant) % tones.length], r = rng(77 + k * 19 + variant * 11);
+    g.fillStyle = tone;g.fillRect(0, y, S, h);
+    g.fillStyle = 'rgba(255,240,210,.18)';g.fillRect(0, y + SEAM * .5, S, h * .22);
+    g.strokeStyle = 'rgba(60,44,32,.5)';g.lineWidth = 2.8;g.lineCap = 'round';
+    for(let q = 0; q < 2; q++){const gy = y + h * (.45 + q * .25), x0 = r() * S * .3, x1 = S * (.55 + r() * .45);g.beginPath();g.moveTo(x0, gy);g.quadraticCurveTo((x0 + x1) / 2, gy + (r() - .5) * 8, x1, gy + (r() - .5) * 4);g.stroke();}
+    if(r() < .5){const kx = S * (.2 + r() * .6), ky = y + h * .55;g.fillStyle = '#6e5640';g.beginPath();g.ellipse(kx, ky, 9, 6, 0, 0, 7);g.fill();g.strokeStyle = INK;g.lineWidth = LINE * .7;g.stroke();}
+    g.fillStyle = INK;g.fillRect(0, y + h - SEAM / 2, S, SEAM);
+    const jx = S * [.38, .7, .18, .58][(k + variant) % 4];g.fillRect(jx - SEAM / 2, y, SEAM, h);
+    for(const nx of [jx - 9, jx + 9]){g.fillStyle = INK;g.beginPath();g.arc(nx, y + h / 2, 4.6, 0, 7);g.fill();g.fillStyle = '#d9c09a';g.beginPath();g.arc(nx - 1, y + h / 2 - 1, 2.4, 0, 7);g.fill();}
+    g.fillStyle = INK;
+    y += h;
+  }
+  g.fillStyle = INK;g.fillRect(0, -SEAM / 2, S, SEAM);
+}
+// ---- stone floors: chunky stones, a bold ink line round every one, lit from the top left.
+const STONE_LINE = TEX * .032;          // ink round each stone: about 2 px on screen, like the sprites
+const STONE_TONES = ['#a19cb3', '#928ea6', '#aca8bd', '#8a869d', '#9b97ad'];
+/** One stone: fill, a light cap along its top, a shadow along its foot, then the ink line. */
+function stone(g, path, tone, {x0, y0, x1, y1}){
+  path();g.fillStyle = tone;g.fill();
+  g.save();path();g.clip();
+  const h = y1 - y0;
+  g.fillStyle = 'rgba(255,255,255,.26)';g.fillRect(x0, y0, x1 - x0, h * .2);
+  g.fillStyle = 'rgba(255,255,255,.12)';g.fillRect(x0, y0, (x1 - x0) * .14, h);
+  g.fillStyle = 'rgba(28,20,40,.26)';g.fillRect(x0, y1 - h * .2, x1 - x0, h * .2);
+  g.restore();
+  path();g.strokeStyle = INK;g.lineWidth = STONE_LINE;g.lineJoin = 'round';g.stroke();
+}
+function roundedRect(g, x, y, w, h, r){return () => {g.beginPath();g.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2));};}
+/** A bold crack: three strokes, never hairlines. */
+function crack(g, x, y, s, r){
+  g.beginPath();g.moveTo(x, y);g.lineTo(x + s * (.4 + r() * .3), y + s * (.2 + r() * .3));g.lineTo(x + s * (.8 + r() * .3), y + s * (.1 + r() * .2));
+  g.strokeStyle = INK;g.lineWidth = STONE_LINE * .8;g.lineCap = 'round';g.lineJoin = 'round';g.stroke();
+}
+/** Flagstone (the original): small dressed stones in two courses, fine joints. */
 function paintFlagstone(g, S, variant){
   g.fillStyle = '#4d4a57';g.fillRect(0, 0, S, S);
   const r = rng(301 + variant * 13), tones = ['#8f8a9e', '#9a95aa', '#857f94', '#a29db2'];
@@ -127,12 +198,122 @@ function paintFlagstone(g, S, variant){
     g.strokeStyle = 'rgba(43,34,51,.55)';g.lineWidth = 1.6;g.beginPath();g.roundRect(x, y, w, hh, rad);g.stroke();
   }
 }
-const PAINT = {soil: paintSoil, plank: paintPlank, flagstone: paintFlagstone};
+/**
+ * Stone slabs: a few big cut slabs per tile, each inked, with the odd bold crack. Every tile edge is a
+ * joint (half a gap on each side), so slabs never get sliced where two tiles meet.
+ */
+function paintSlabs(g, S, variant){
+  g.fillStyle = '#4f4a5c';g.fillRect(0, 0, S, S);
+  const layouts = [
+    [[0, 0, .55, .5], [.55, 0, .45, .5], [0, .5, .4, .5], [.4, .5, .6, .5]],
+    [[0, 0, .4, .46], [.4, 0, .6, .46], [0, .46, .62, .54], [.62, .46, .38, .54]],
+    [[0, 0, 1, .42], [0, .42, .48, .58], [.48, .42, .52, .58]],
+    [[0, 0, .5, .58], [.5, 0, .5, .58], [0, .58, 1, .42]],
+  ];
+  const r = rng(301 + variant * 13), gap = S * .02;
+  for(const [fx, fy, fw, fh] of layouts[variant % layouts.length]){
+    const x = fx * S + gap, y = fy * S + gap, w = fw * S - gap * 2, h = fh * S - gap * 2;
+    stone(g, roundedRect(g, x, y, w, h, S * .06), STONE_TONES[Math.floor(r() * STONE_TONES.length)], {x0: x, y0: y, x1: x + w, y1: y + h});
+    if(r() < .4)crack(g, x + w * (.2 + r() * .3), y + h * (.25 + r() * .3), Math.min(w, h) * .5, r);
+  }
+}
+/** Cobblestone: three rows of fat, squarish cobbles in a running bond; half cobbles close each row at the tile edge. */
+function paintCobble(g, S, variant){
+  g.fillStyle = '#4f4a5c';g.fillRect(0, 0, S, S);
+  const rows = 3, h = S / rows, r = rng(500 + variant * 29), gap = S * .018;
+  for(let k = 0; k < rows; k++){
+    const odd = (k + variant) % 2 === 1, cuts = odd ? [0, 1 / 6, 1 / 2, 5 / 6, 1] : [0, 1 / 3, 2 / 3, 1];
+    for(let q = 0; q < cuts.length - 1; q++){
+      const jx = (r() - .5) * S * .015, jy = (r() - .5) * S * .015;
+      const x = cuts[q] * S + gap + jx, y = k * h + gap + jy, w = (cuts[q + 1] - cuts[q]) * S - gap * 2, hh = h - gap * 2;
+      stone(g, roundedRect(g, x, y, w, hh, Math.min(w, hh) * .38), STONE_TONES[Math.floor(r() * STONE_TONES.length)], {x0: x, y0: y, x1: x + w, y1: y + hh});
+    }
+  }
+}
+/** Fieldstone: rounded stones bedded in earth, the odd crack, and grass in the gaps. */
+function paintFieldstone(g, S, variant){
+  g.fillStyle = '#5a4a40';g.fillRect(0, 0, S, S);
+  const r = rng(900 + variant * 37);
+  g.fillStyle = 'rgba(40,28,22,.35)';for(let n = 0; n < 6; n++){g.beginPath();g.ellipse(r() * S, r() * S, S * .06, S * .035, r() * 3, 0, 7);g.fill();}
+  // Layouts in tile fractions: centre x, centre y, radius. Kept inside the tile so a seam never cuts a stone.
+  const layouts = [
+    [[.27, .27, .22], [.73, .29, .2], [.28, .74, .2], [.72, .72, .22]],
+    [[.32, .34, .29], [.78, .22, .16], [.76, .66, .2], [.27, .8, .16]],
+    [[.24, .22, .18], [.66, .3, .24], [.3, .66, .22], [.76, .78, .17]],
+    [[.5, .3, .26], [.22, .76, .19], [.72, .74, .21], [.14, .3, .12]],
+  ];
+  const tones = ['#b3ab93', '#a39b84', '#bdb59e', '#968f7a'];
+  for(const [fx, fy, fr] of layouts[variant % layouts.length]){
+    const cx = fx * S, cy = fy * S, R = fr * S, n = 9, rad = Array.from({length: n}, () => R * (.82 + r() * .24)), tilt = r() * Math.PI;
+    const pts = rad.map((rr, k) => {const a = tilt + k / n * Math.PI * 2;return [cx + Math.cos(a) * rr * 1.08, cy + Math.sin(a) * rr * .9];});
+    const path = () => {g.beginPath();for(let k = 0; k < n; k++){const a = pts[k], b = pts[(k + 1) % n], m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];if(!k){const z = pts[n - 1];g.moveTo((z[0] + a[0]) / 2, (z[1] + a[1]) / 2);}g.quadraticCurveTo(a[0], a[1], m[0], m[1]);}g.closePath();};
+    stone(g, path, tones[Math.floor(r() * tones.length)], {x0: cx - R * 1.2, y0: cy - R, x1: cx + R * 1.2, y1: cy + R});
+    if(r() < .35)crack(g, cx - R * .4, cy - R * .1, R * .9, r);
+  }
+  // Grass in the gaps: two chunky blades with an ink edge.
+  for(let t = 0; t < 2; t++){
+    const x = S * (.5 + (r() - .5) * .2), y = S * (t ? .52 : .12 + r() * .1);
+    g.beginPath();g.moveTo(x - 10, y + 6);g.quadraticCurveTo(x - 6, y - 8, x - 12, y - 16);g.quadraticCurveTo(x - 2, y - 6, x, y + 6);
+    g.moveTo(x - 2, y + 6);g.quadraticCurveTo(x + 4, y - 10, x + 12, y - 14);g.quadraticCurveTo(x + 6, y - 2, x + 8, y + 6);
+    g.fillStyle = '#7f9a5a';g.fill();g.strokeStyle = INK;g.lineWidth = STONE_LINE * .7;g.lineJoin = 'round';g.stroke();
+  }
+}
+const PAINT = {soil: paintSoil, plank: paintPlank, flagstone: paintFlagstone, slabs: paintSlabs, boards: paintBoards, roughplank: paintRoughPlank, cobble: paintCobble, fieldstone: paintFieldstone};
+
+/**
+ * Ragged outline for the natural floors. Each open edge is pushed in by a wobbly amount; the wobble
+ * is pinned to the same depth at both ends of every edge, so whatever variant a neighbour draws,
+ * edges and corners always meet. Returns the polygon and, per segment, whether it lies on an open
+ * edge (only those get the ink line).
+ */
+function roughShape(S, m, variant, kind){
+  const plank = kind === 'roughplank', base = S * .07, amp = S * (plank ? .12 : .11), pin = base + amp * .5, ch = S * .12;
+  const r = rng(1000 + variant * 97 + (plank ? 0 : 7));
+  // Profile of one open edge, t in 0..1 along it: pinned to `pin` at both ends.
+  const smooth = () => {const v = [0, ...Array.from({length: 5}, () => (r() - .5) * 2), 0];return t => {const f = t * 6, k = Math.min(5, Math.floor(f)), u = f - k, e = u * u * (3 - 2 * u);return pin + amp * .5 * (v[k] + (v[k + 1] - v[k]) * e);};};
+  // Plank ends: each board stops at its own length, a square step per board row (rows as in paintRoughPlank).
+  const ends = () => {const cut = [0, .36, .66, 1], off = cut.slice(1).map(() => (r() - .5) * 2);return t => {
+    const k = Math.max(0, cut.findIndex(c => c > t) - 1), edge = Math.min(t, 1 - t), fade = Math.min(1, edge / .06);
+    return pin + amp * .55 * off[Math.min(off.length - 1, k)] * fade;};};
+  const gentle = () => {const f = smooth();return t => pin + (f(t) - pin) * .5;};
+  const o = {n: !m.n, e: !m.e, s: !m.s, w: !m.w}, flat = () => 0;
+  // Profiles are drawn for every side (so a variant always rolls the same numbers); a joined side lies flat on the border.
+  const prof = {n: plank ? gentle() : smooth(), e: plank ? ends() : smooth(), s: plank ? gentle() : smooth(), w: plank ? ends() : smooth()};
+  const d = {n: o.n ? prof.n : flat, e: o.e ? prof.e : flat, s: o.s ? prof.s : flat, w: o.w ? prof.w : flat};
+  const NW = o.n && o.w ? [[pin, pin + ch], [pin + ch, pin]] : [[o.w ? pin : 0, o.n ? pin : 0]];
+  const NE = o.n && o.e ? [[S - pin - ch, pin], [S - pin, pin + ch]] : [[S - (o.e ? pin : 0), o.n ? pin : 0]];
+  const SE = o.s && o.e ? [[S - pin, S - pin - ch], [S - pin - ch, S - pin]] : [[S - (o.e ? pin : 0), S - (o.s ? pin : 0)]];
+  const SW = o.s && o.w ? [[pin + ch, S - pin], [pin, S - pin - ch]] : [[o.w ? pin : 0, S - (o.s ? pin : 0)]];
+  const pts = [], N = 28;
+  // Each point carries whether the segment that starts at it lies on an open (inked) edge.
+  const corner = (list, next) => list.forEach((p, k) => pts.push([p[0], p[1], k < list.length - 1 ? true : next]));
+  const run = (from, to, at, open) => {for(let k = 1; k < N; k++){const v = from + (to - from) * k / N;pts.push([...at(v), open]);}};
+  corner(NW, o.n);run(NW.at(-1)[0], NE[0][0], x => [x, d.n(x / S)], o.n);
+  corner(NE, o.e);run(NE.at(-1)[1], SE[0][1], y => [S - d.e(y / S), y], o.e);
+  corner(SE, o.s);run(SE.at(-1)[0], SW[0][0], x => [x, S - d.s(x / S)], o.s);
+  corner(SW, o.w);run(SW.at(-1)[1], NW[0][1], y => [d.w(y / S), y], o.w);
+  return {pts, pin};
+}
+function roughPath(g, shape){g.beginPath();shape.pts.forEach(([x, y], k) => k ? g.lineTo(x, y) : g.moveTo(x, y));g.closePath();}
+function roughStroke(g, shape, width, color){
+  const P = shape.pts;g.save();g.strokeStyle = color;g.lineWidth = width;g.lineCap = 'round';g.lineJoin = 'round';g.beginPath();
+  for(let k = 0; k < P.length; k++){const a = P[k], b = P[(k + 1) % P.length];if(!a[2])continue;g.moveTo(a[0], a[1]);g.lineTo(b[0], b[1]);}
+  g.stroke();g.restore();
+}
 
 function maskKey(m){return ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'].map(k => m[k] ? 1 : 0).join('');}
 function groundCanvas(kind, m, variant){
   const S = TEX, c = document.createElement('canvas');c.width = c.height = S;
   const g = c.getContext('2d'), s = tileShape(S, m), L = GROUND_LOOK[kind];
+  if(L.rough){
+    const shape = roughShape(S, m, variant, kind);
+    g.save();roughPath(g, shape);g.clip();PAINT[kind](g, S, variant);
+    roughStroke(g, shape, S * .12, L.rim);
+    g.restore();
+    cutInner(g, S, {p: shape.pin}, m);
+    roughStroke(g, shape, S * .05, INK);
+    return c;
+  }
   g.save();shapePath(g, s);g.clip();PAINT[kind](g, S, variant);
   // A rim just inside the open edges: a raised lip of earth, a skirting beam, a kerb of stone.
   g.lineWidth = S * (kind === 'soil' ? .1 : .085);g.strokeStyle = L.rim;
@@ -142,7 +323,7 @@ function groundCanvas(kind, m, variant){
   g.globalAlpha = 1;
   g.restore();
   cutInner(g, S, s, m);
-  strokeOpen(g, S, s, m, S * .045, INK);
+  strokeOpen(g, S, s, m, S * (kind === 'boards' || kind === 'cobble' || kind === 'slabs' ? .055 : .045), INK);
   return c;
 }
 
@@ -331,7 +512,7 @@ export class HomesteadLayer {
     for(const [key, tile] of Object.entries(cells)){
       if(!tile?.g || !GROUND_LOOK[tile.g])continue;
       const [i, j] = key.split(',').map(Number), m = groundLinks(world, i, j, tile.g);
-      const variant = tile.g === 'soil' ? Math.floor(hash(i, j) * 3) : Math.floor(hash(i, j, 1) * 4);
+      const variant = Math.floor(hash(i, j, tile.g === 'soil' ? 0 : 1) * (VARIANTS[tile.g] || 1));
       const {key: mk, mat} = this.groundMaterial(tile.g, m, variant);
       let b = buckets.get(mk);if(!b){b = {mat, pos: [], uv: []};buckets.set(mk, b);}
       const x0 = i * CELL, x1 = x0 + CELL, z0 = j * CELL, z1 = z0 + CELL, y = tile.g === 'soil' ? FLOOR_Y : FLOOR_Y + .004;

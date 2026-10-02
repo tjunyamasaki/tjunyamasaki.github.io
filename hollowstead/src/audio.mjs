@@ -84,6 +84,7 @@ export class Sound {
     // Omens, moons and the vigil.
     if(type==='omen'){for(const [i,f] of [659,880,1319].entries())this.sweep(f,f*1.01,.7,'sine',.014,i*.12);return;}
     if(type==='riftclose'){this.sweep(880,110,.9,'sine',.04);return;}
+    if(type==='omenfulfilled'){for(const [i,f] of [523,659,784,1047,1319].entries())this.sweep(f,f,i===4?1.1:.32,'triangle',.05,i*.13);this.sweep(1568,1580,1.2,'sine',.02,.65);return;}
     if(type==='mimic'){this.sweep(300,80,.15,'square',.05);this.sweep(260,60,.15,'square',.05,.12);return;}
     if(type==='brew'){for(let i=0;i<4;i++)this.sweep(300+i*90,600+i*90,.1,'sine',.015,i*.07);return;}
     if(type==='gilded'||type==='gildfall'){for(let i=0;i<(type==='gildfall'?6:3);i++)this.sweep(1800+i*220,2600+i*220,.12,'sine',.01,i*.05);return;}

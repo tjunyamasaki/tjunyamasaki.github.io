@@ -14,7 +14,7 @@
 // p.charmOpen (the second socket). Foes remember whose chalk marked them in e.chalk (host only).
 
 import {TRINKET_IDS} from './contracts.mjs?v=harvest-18';
-import {DASH, ELITE, isCache, maxHealth, powerOf, rollLoot, weaponStyle} from './progression.mjs?v=harvest-18';
+import {DASH, ELITE, isCache, maxHealth, powerOf, weaponStyle} from './progression.mjs?v=harvest-18';
 import {EQUIPMENT} from './content.mjs?v=harvest-18';
 import {magicItems} from './magic/registry.mjs?v=harvest-18';
 export {TRINKET_IDS};
@@ -296,7 +296,7 @@ export function trinketEvent(world, p, type, data){
     // gravedust: a second roll of the creature's loot table for the wearer's kills.
     if(wears(p, 'gravedust') && enemy && !world.showcase && world.lootRng && world.lootRng() < Math.min(1, TRINKET.lootChance*potency(p, 'gravedust'))){
       const luck = (enemy.elite ? ELITE.luck : 0) + (enemy.guardOf ? .5 : 0);
-      const rolls = rollLoot(enemy.type, world.lootRng, luck);
+      const rolls = world.roll(enemy.type, luck);
       if(rolls.length) world.spillLoot(rolls, enemy.x, enemy.z, p.name);
     }
     if(wears(p, 'soulstitch') && p.skillCd > 0){

@@ -59,7 +59,7 @@ export function createContainer(id, slotCount, revision=0){
   return {id, revision, slots:Array.from({length:count}, ()=>null)};
 }
 
-export function createBackpack(ownerId){return createContainer(containerId('backpack', ownerId), BACKPACK_SLOT_COUNT);}
+export function createBackpack(ownerId, slotCount=BACKPACK_SLOT_COUNT){return createContainer(containerId('backpack', ownerId), slotCount);}
 export function createChest(ownerId){return createContainer(containerId('chest', ownerId), CHEST_SLOT_COUNT);}
 export function createRecovery(ownerId, slotCount){return createContainer(containerId('recovery', ownerId), Math.max(0, slotCount|0));}
 

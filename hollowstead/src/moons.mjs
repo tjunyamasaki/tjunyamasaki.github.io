@@ -6,7 +6,6 @@
 // Pure simulation: import only content/progression/blasts. Never engine.mjs, a renderer or the DOM.
 
 import {phaseOf} from './content.mjs?v=harvest-18';
-import {rollLoot} from './progression.mjs?v=harvest-18';
 import {addBlast} from './blasts.mjs?v=harvest-18';
 
 /**
@@ -75,7 +74,7 @@ export function starLoot(world, x, z){
   if(roll < .62) world.dropNew('shard', 1+Math.floor(rng()*2), x, z);
   else if(roll < .84) world.dropNew('ember', 1+Math.floor(rng()*2), x, z);
   else if(roll < .95) world.dropNew('ichor', 1, x, z);
-  else world.spillLoot(rollLoot('fallenstar', rng, 0).filter(r => !['shard', 'ember', 'ore'].includes(r.itemId)).slice(0, 1), x, z, null);
+  else world.spillLoot(world.roll('starshard', 0).slice(0, 1), x, z, null);
 }
 
 /** Loot luck a kill gets from tonight's moon. */
@@ -83,7 +82,7 @@ export function moonLuck(world){return world?.night?.moon === 'gilded' && phaseO
 
 /** A gilded creature fell: its treasure. */
 export function gildedLoot(world, e){
-  const rolls = rollLoot('moonchest', world.lootRng, 1);
+  const rolls = world.roll('moonchest', 1);
   rolls.push({itemId: 'ichor', count: 2+Math.floor(world.lootRng()*2)});
   if(world.lootRng() < .2) rolls.push({itemId: 'heartstone', count: 1});
   world.spillLoot(rolls, e.x, e.z, world.player(e.lastHitBy)?.name);

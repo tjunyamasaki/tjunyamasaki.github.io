@@ -97,6 +97,7 @@ const ITEM_RARITY = Object.freeze({
   // Refinement currency: only creatures drop it (LOOT_TABLES below, REFINE).
   ichor:'uncommon',
   rime:'uncommon', emberglass:'uncommon',
+  haversack:'uncommon',
 });
 export const rarityOf = itemId=>ITEM_RARITY[itemId]||'common';
 export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
@@ -138,16 +139,35 @@ export const LOOT_TABLES = Object.freeze({
   bonewalker:{xp:11, rolls:[{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.35, entries:[['ichor',[1,1],1]]}]},
   bogling:{xp:10, rolls:[{chance:.08, entries:[['uncommon',1,3],['elixir',[1,1],2]]},{chance:.4, entries:[['ichor',[1,1],1]]}]},
   golem:{xp:52, rolls:[{chance:.34, entries:[['rare',1,3],['epic',1,1]]},{entries:[['ichor',[3,4],1]]}]},
-  // Omens (omens.mjs).
-  fallenstar:{xp:60, rolls:[
-    {count:[2,3], entries:[['shard',[2,4],3],['ember',[2,3],2],['rime',[1,2],1],['emberglass',[1,2],1],['ore',[2,3],1]]},
+  // Omens (omens.mjs): rare, hard won, and worth it. Each is a little hoard.
+  fallenstar:{xp:120, rolls:[
+    {count:[3,4], entries:[['shard',[3,5],3],['ember',[3,4],2],['rime',[2,3],1],['emberglass',[2,3],1],['ore',[3,4],1]]},
+    {entries:[['epic',1,1]]},
     {entries:[['rare',1,2],['epic',1,1]]},
-    {chance:.12, entries:[['legendary',1,1]]},
+    {chance:.2, entries:[['legendary',1,1]]},
+    {chance:.35, entries:[['heartstone',[1,1],1]]},
   ]},
-  goldpumpkin:{xp:40, rolls:[
-    {entries:[['heartstone',[1,1],1],['epic',1,1.4],['elixir',[2,3],1]]},
+  soulrift:{xp:150, rolls:[
+    {count:[3,4], entries:[['shard',[3,5],2],['ember',[4,6],2],['elixir',[1,2],1],['ore',[3,5],1]]},
+    {entries:[['epic',1,1]]},
+    {entries:[['legendary',1,1]]},
+    {entries:[['ichor',[6,9],1]]},
+    {chance:.5, entries:[['heartstone',[1,1],1]]},
+  ]},
+  mimic:{xp:100, rolls:[
+    {count:[2,3], entries:[['shard',[2,4],2],['ember',[2,4],2],['elixir',[1,2],1]]},
+    {entries:[['epic',1,1]]},
+    {chance:.3, entries:[['legendary',1,1]]},
+    {entries:[['ichor',[4,6],1]]},
+  ]},
+  goldpumpkin:{xp:60, rolls:[
+    {entries:[['heartstone',[1,1],1]]},
+    {entries:[['epic',1,1]]},
+    {entries:[['elixir',[2,3],1]]},
     {count:[1,2], entries:[['pumpkin',[2,4],1],['seed',[2,3],1]]},
   ]},
+  // A falling star's rare gift under Star Rain (moons.mjs starLoot).
+  starshard:{xp:0, rolls:[{entries:[['rare',1,2],['epic',1,1]]},{chance:.06, entries:[['legendary',1,1]]}]},
   briarmother:{xp:700, rolls:[]},
   unblinking:{xp:820, rolls:[]},
   king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]},{entries:[['ichor',[10,14],1]]}]},
@@ -161,11 +181,18 @@ function weighted(rng,entries){
 }
 const upgrade={uncommon:'rare',rare:'epic',epic:'legendary',legendary:'legendary'};
 
+/**
+ * Duplicate guard for gear picked from a rarity pool: a pick the party already holds (`held`, World.heldGear)
+ * or that this roll already gave is redrawn up to `rerolls` times. Repeats stay possible, just rare: with
+ * one legendary held, the chance of rolling it again drops from 1 in 8 to about 1 in 500.
+ */
+export const LOOT_GUARD=Object.freeze({rerolls:2, stack:Object.freeze(['heartstone','elixir'])});
 /** Rolls a table. `luck` (0..) upgrades pooled rarities and raises roll chances. Returns merged [{itemId,count}]. */
-export function rollLoot(tableId, rng, luck=0){
+export function rollLoot(tableId, rng, luck=0, held=null){
   const table=LOOT_TABLES[tableId];if(!table)return [];
   const out=new Map();
   const add=(itemId,count)=>{if(count>0)out.set(itemId,(out.get(itemId)||0)+count);};
+  const owned=itemId=>out.has(itemId)||!!held?.has(itemId);
   for(const roll of table.rolls){
     if(roll.chance!==undefined&&rng()>Math.min(1,roll.chance*(1+luck*.8)))continue;
     const times=roll.count?between(rng,roll.count):1;
@@ -173,7 +200,9 @@ export function rollLoot(tableId, rng, luck=0){
       const [id,qty]=weighted(rng,roll.entries);
       if(POOLS[id]){
         let tier=id;if(luck>0&&rng()<.18*luck)tier=upgrade[tier];
-        const pool=POOLS[tier];add(pool[Math.floor(rng()*pool.length)],1);
+        const pool=POOLS[tier];let pick=pool[Math.floor(rng()*pool.length)];
+        for(let k=0;k<LOOT_GUARD.rerolls&&owned(pick)&&rarityRank(pick)>=2&&!LOOT_GUARD.stack.includes(pick);k++)pick=pool[Math.floor(rng()*pool.length)];
+        add(pick,1);
       }else add(id,Array.isArray(qty)?between(rng,qty):qty);
     }
   }

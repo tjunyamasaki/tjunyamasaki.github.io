@@ -62,6 +62,8 @@ export const FRONTIER_LINES = Object.freeze({
   wispdust: 'Night-only: drifts over the Graveyard after dark',
   rime: 'Mined from rime crystals in Frostmere · awakens the Heartfire past its third level',
   emberglass: 'Mined from vents in the Ashen Scar · awakens the Heartfire past its third level',
+  satchel: 'Bag · six more pack slots while you wear it',
+  haversack: 'Bag · twelve more pack slots while you wear it',
 });
 
 const LABELS = Object.freeze({

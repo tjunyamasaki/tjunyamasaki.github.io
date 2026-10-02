@@ -10,7 +10,7 @@ import {
   supplyLoad, wearStack,
 } from './inventory.mjs?v=harvest-18';
 import {repairIdCounter, settleStorage, validateV2World} from './serialization.mjs?v=harvest-18';
-import {DISMANTLE_HOLD_SECONDS, HOTBAR_SLOTS, INTENTS, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-18';
+import {BACKPACK_SLOT_COUNT, BAG_SLOTS, DISMANTLE_HOLD_SECONDS, HOTBAR_SLOTS, INTENTS, packSlots, inCraftRange, inSupplyChestRange, phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-18';
 import {collectLightSources, inSafeLight} from './lighting.mjs?v=harvest-18';
 import {pruneChests, releaseChests} from './chests.mjs?v=harvest-18';
 import {inventoryIntent} from './transactions.mjs?v=harvest-18';
@@ -23,7 +23,8 @@ import {
 import {stepSkills, useSkill} from './skills.mjs?v=harvest-18';
 import {creditKill, mendWeapon, syncMastery, warnWear} from './mastery.mjs?v=harvest-18';
 import {refineHit as refinedHit, refineWeapon, refinedStyle, sanitizeRefine, splitBefore, splitMagic, splitMarks} from './refine.mjs?v=harvest-18';
-import {stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
+import {HEARTH_MEND, stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
+import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
 import {stepMobs} from './mobs.mjs?v=harvest-18';
@@ -141,7 +142,13 @@ export function createDropMotion(){
   }
   return {sample, retain};
 }
-export function random(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
+/**
+ * Mulberry32. Its position is kept on the function (`rng.state`) so a save can carry it on: without
+ * that, every reload replayed the same loot, spawns and omens from the start of the seed.
+ */
+export function random(seed){const next=()=>{next.state=(next.state+0x6D2B79F5)>>>0;let t=next.state;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};next.state=seed>>>0;return next;}
+/** The four host streams a save carries on (World.snapshot / restore). */
+const RNG_STREAMS=Object.freeze(['rng','mobRng','spawnRng','lootRng']);
 export function biome(x,z){return regionAt(x,z);}
 /** A fed Heartfire spits embers at anything clawing at it: enough for early nights, not for later ones. */
 const HEARTH_FLARE={range:3,damage:14,period:1.5};
@@ -512,6 +519,7 @@ export class World {
     if(this.players.some(q=>q.online&&!q.ghost&&Math.hypot(q.x-x,q.z-z)<radius+.4))return 'A wanderer is standing here';
     if(this.buildings.some(b=>Math.hypot(b.x-x,b.z-z)<Math.max(.65,STRUCTURES[b.type].radius)+radius+.1))return 'Too close to another structure';
     if(this.nodes.some(n=>!n.ready&&NODES[n.type].radius>.3&&Math.hypot(n.x-x,n.z-z)<NODES[n.type].radius+radius))return 'Clear these resources first';
+    if(type==='hushstone'&&hushReason(this))return hushReason(this);
     if(RECIPES[type].station&&!this.stationBuilding(p, type, stationId,true))return 'Build this at a workbench';
     return this.recipeReason(p,type,stationId,true);
   }
@@ -603,7 +611,30 @@ export class World {
     if(!plan.same){destination.slots=plan.destSlots;destination.revision=plan.destRevision;}
     this.assertItems();return plan;
   }
+  /**
+   * A worn bag grows the pack (contracts.mjs BAG_SLOTS). Grow with empty slots; shrink by moving what sat
+   * in the bag's slots into free ones, and drop at the wanderer's feet whatever still does not fit.
+   */
+  fitPack(p){
+    const slots=p?.inventory?.slots,size=packSlots(p);
+    if(!slots||slots.length===size)return;
+    let spilled=0;
+    if(slots.length<size)while(slots.length<size)slots.push(null);
+    else for(const stack of slots.splice(size).filter(Boolean)){const free=slots.indexOf(null);if(free>=0)slots[free]=stack;else{this.placeDrop(stack,p.x,p.z,SPILL_LIFETIME_SECONDS);spilled++;}}
+    if(spilled)this.tell(p,'Your pack shrank: what no longer fit lies at your feet');
+    p.inventory.revision++;
+  }
+  /** Taking off (or swapping down) a bag: refused while the smaller pack could not hold everything. */
+  bagRoom(p,nextBag){
+    const size=BACKPACK_SLOT_COUNT+(BAG_SLOTS[nextBag]||0),held=p.inventory.slots.filter(Boolean).length+(nextBag?0:1);
+    if(held<=size)return true;
+    this.tell(p,`Make room first: the pack would hold ${size} and you carry ${held}`);
+    return false;
+  }
   equip(p,uid,socket,inventoryRevision,equipmentRevision){
+    // Bags: swapping to a smaller one needs the room for it.
+    const bag=p.inventory.slots.find(stack=>stack?.uid===uid);
+    if(bag&&BAG_SLOTS[bag.itemId]&&!this.bagRoom(p,bag.itemId))return {ok:false,code:'inventoryFull'};
     // Trinkets: the second socket (`charm`) takes one when the first is full and it is open (trinkets.mjs).
     const moving=p.inventory.slots.find(stack=>stack?.uid===uid);
     if(moving&&equipmentSlotFor(moving.itemId)==='trinket'){
@@ -630,9 +661,11 @@ export class World {
     p.inventory.slots=plan.slots;p.inventory.revision=plan.inventoryRevision;
     p.equipment=plan.equipment;p.equipmentRevision=plan.equipmentRevision;
     if(plan.socket==='light'&&p.equipment.light?.uid!==previous)p.lantern=false;
+    if(plan.socket==='bag'){this.fitPack(p);this.tell(p,`Your pack holds ${p.inventory.slots.length} now`);}
     this.assertItems();return plan;
   }
   unequip(p,socket,uid,inventoryRevision,equipmentRevision){
+    if((socket==='bag'||(uid&&p.equipment.bag?.uid===uid))&&p.equipment.bag&&!this.bagRoom(p,null))return {ok:false,code:'inventoryFull'};
     const plan=planUnequip({
       inventory:p.inventory, equipment:p.equipment, inventoryRevision, equipmentRevision,
       currentEquipmentRevision:p.equipmentRevision, uid, socket,
@@ -641,6 +674,7 @@ export class World {
     if(plan.socket==='light')p.lantern=false;
     p.inventory.slots=plan.slots;p.inventory.revision=plan.inventoryRevision;
     p.equipment=plan.equipment;p.equipmentRevision=plan.equipmentRevision;
+    if(plan.socket==='bag')this.fitPack(p);
     this.assertItems();return plan;
   }
   action(id,cmd){
@@ -732,7 +766,7 @@ export class World {
     if(revive)return {kind:'revive',entity:revive,label:'Revive teammate'};
     return candidates.sort((a,b)=>distance(p,a.entity)-distance(p,b.entity)||(a.entity.id<b.entity.id?-1:1))[0]||null;
   }
-  buildingLabel(b){return ({hearth:'Feed heartfire',fire:'Feed fire',bench:'Workbench',chest:'Open supplies',wall:'Repair wall',gate:b.open?'Close gate':'Open gate',trap:b.charges<3?'Rearm trap':'Briar trap',farm:b.planted?(b.growth>=100?'Harvest pumpkins':'Growing…'):'Plant seed',pot:'Cook a feast',lantern:'Soul lantern',bed:'Rest',ward:'Warding totem',cart:b.type==='cart'?cartLabel(b):''})[b.type];}
+  buildingLabel(b){return ({hearth:'Feed heartfire',fire:'Feed fire',bench:'Workbench',chest:'Open supplies',wall:'Repair wall',gate:b.open?'Close gate':'Open gate',trap:b.charges<3?'Rearm trap':'Briar trap',farm:b.planted?(b.growth>=100?'Harvest pumpkins':'Growing…'):'Plant seed',pot:'Cook a feast',lantern:'Soul lantern',bed:'Rest',ward:'Warding totem',hushstone:'Hushing stone',cart:b.type==='cart'?cartLabel(b):''})[b.type];}
   interact(p,target){
     const explicit=typeof target==='string'?target:null;
     const t=this.target(p, explicit);if(!t)return {ok:false,code:'rejected'};
@@ -967,7 +1001,7 @@ export class World {
     const finder=this.player(ids[0]);
     if(NODES[node.type].table){
       const tier=this.dungeon?0:(REGIONS[this.regionOf(node.x,node.z)]?.tier||0);
-      const rolls=rollLoot(NODES[node.type].table,this.lootRng,this.dungeon?dungeonLuck(this):tier>=2?.5:0);
+      const rolls=this.roll(NODES[node.type].table,this.dungeon?dungeonLuck(this):tier>=2?.5:0);
       if(this.dungeon)this.dungeon.stats.caches++;
       this.spillLoot(rolls,node.x,node.z,finder?.name);
       for(const id of ids){this.awardXp(this.player(id),rollXp(node.type));cacheOpened(this,this.player(id));}
@@ -1511,7 +1545,7 @@ export class World {
       return;
     }const guarded=trinketEvent(this,p,'hurt',{amount,source});if(Number.isFinite(guarded))amount=guarded;if(!(amount>0))return;
     this.damagedAt.set(p.id,this.time);const armor=p.equipment.body;if(armor&&ARMOR_REDUCTION[armor.itemId]&&armor.durability>0){this.wearEquipped(p,'body',amount);amount*=1-ARMOR_REDUCTION[armor.itemId];}p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
-  revivePlayer(p){p.down=0;p.ghost=false;p.hp=Math.round(maxHealth(p)/2);p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}this.event('heal',p.x,p.z,'Back on your feet');}
+  revivePlayer(p){p.down=0;p.ghost=false;p.hp=Math.round(maxHealth(p)/2);p.mendAfter=this.time+HEARTH_MEND.calm;p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}this.event('heal',p.x,p.z,'Back on your feet');}
   /** Strength of a new creature: by day survived (and region tier) on an expedition, by wave in the arena. */
   mobScale(tier=0){
     if(this.arena){const wave=Math.max(1,this.arena.wave||1);return {scale:arenaScale(wave),level:wave,elite:arenaEliteChance(wave),boss:1+.3*Math.max(0,Math.floor(wave/10)-1)};}
@@ -1554,14 +1588,14 @@ export class World {
     if(this.showcase||!this.ambient)return;
     this.roamTimer-=dt;if(this.roamTimer>0)return;this.roamTimer=ROAM.interval;
     for(const p of this.players){
-      if(!p.online||p.down||p.ghost)continue;
+      if(!p.online||p.down||p.ghost||hushedAt(this,p.x,p.z))continue;
       const region=this.regionOf(p.x,p.z),tier=REGIONS[region].tier;if(!tier)continue;
       const near=this.enemies.filter(e=>e.roamer&&distance(e,p)<30).length;
       if(near>=ROAM.cap[tier]||this.spawnRng()>ROAM.chance[tier])continue;
       const pool=RESIDENTS[region];if(!pool.length)continue;
       for(let tries=0;tries<6;tries++){
         const a=this.spawnRng()*Math.PI*2,r=ROAM.spawnMin+this.spawnRng()*(ROAM.spawnMax-ROAM.spawnMin),x=p.x+Math.cos(a)*r,z=p.z+Math.sin(a)*r;
-        if(!this.walkable(x,z)||!(REGIONS[this.regionOf(x,z)]?.tier>=1))continue;
+        if(!this.walkable(x,z)||!(REGIONS[this.regionOf(x,z)]?.tier>=1)||hushedAt(this,x,z))continue;
         if(this.players.some(q=>q.online&&distance(q,{x,z})<ROAM.spawnMin-2))continue;
         const type=pool[Math.floor(this.spawnRng()*pool.length)],[lo,hi]=ROAM.pack[type]||[1,1],n=lo+Math.floor(this.spawnRng()*(hi-lo+1));
         for(let k=0;k<n;k++){const b=this.spawnRng()*Math.PI*2,s=k?.8+this.spawnRng()*1.2:0;this.spawnEnemy(type,x+Math.cos(b)*s,z+Math.sin(b)*s,{home:true,roamer:true,tier:tier-1,leash:ROAM.leash});}
@@ -1582,6 +1616,16 @@ export class World {
   }
   shareXp(x,z,amount){for(const p of this.players)if(p.online&&!p.ghost&&Math.hypot(p.x-x,p.z-z)<SHARE_RADIUS)this.awardXp(p,amount);}
   /** Scatter rolled loot around a point, announcing anything rare or better. */
+  /** Gear of rare or better the party already holds anywhere (packs, sockets, chests, the ground, a delve's stash): loot redraws it (progression.mjs LOOT_GUARD). */
+  heldGear(){
+    const held=new Set(),note=stack=>{if(stack&&rarityRank(stack.itemId)>=2)held.add(stack.itemId);};
+    for(const row of collectLocations(this))note(row.stack);
+    for(const b of this.surface?.buildings||[]){b.store?.slots?.forEach(note);b.overflow?.slots?.forEach(note);}
+    for(const d of this.surface?.drops||[])note(d.stack);
+    return held;
+  }
+  /** Rolls a loot table on the loot stream, redrawing gear the party already holds. */
+  roll(tableId,luck=0){return rollLoot(tableId,this.lootRng,luck,this.heldGear());}
   spillLoot(rolls,x,z,finder){
     rolls.forEach(({itemId,count},index)=>{
       if(!itemDefinition(itemId))return;
@@ -1601,6 +1645,8 @@ export class World {
     const before=phaseOf(this),oldDay=dayOf(this);this.time+=dt;phase=phaseOf(this);
     if(before!==phase){const survived=dayOf(this)-1;this.event('phase',0,0,phase==='day'?(survived>0?`Dawn. ${survived} ${survived===1?'night':'nights'} survived.`:'Dawn. You made it.'):phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='day')this.best.day=Math.max(this.best.day||1,dayOf(this));if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);if(isVigil(this))for(const p of this.players)if(!(p.charm>0))p.charm=1;this.enemies=this.enemies.filter(e=>e.type==='king'||e.home||isMagicAlly(e));this.hostile=[];}}
     if(!this.showcase&&dayOf(this)!==oldDay&&this.bossSlain&&!this.endless){this.status='victory';this.event('announce',0,0,'The curse is broken. Your fire still burns.');return;}
+    // A bag taken off any other way (dismantled, spilled) still leaves the pack its right size.
+    for(const p of this.players)this.fitPack(p);
     stepSaga(this,dt);stepNight(this,dt,before,phase);stepSunburn(this,dt,phase);
     this.maintainGuards();this.roam(dt);stepAreas(this,dt,phase);stepOmens(this,dt);
     for(const n of this.nodes)if(n.ready&&n.ready<this.time){n.ready=0;n.hits=NODES[n.type].hits;}
@@ -1680,7 +1726,7 @@ export class World {
       // The sun did most of the work (sunburn.mjs): no loot, experience or mastery, just ash.
       const burnt=sunTook(e);
       const loot=ENEMIES[e.type]?.loot;if(loot&&!burnt)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));
-      if(!isMagicAlly(e)){this.kills++;if(this.dungeon)dungeonKill(this,e);if(e.mimic&&!burnt)omenKill(this,e);if(e.gilded&&!burnt)gildedLoot(this,e);if((e.warden||e.type==='king')&&!this.showcase)for(const q of this.players)if(q.online&&!q.ghost)unlockCharm(this,q,e.type==='king'?'the Hollow King fell':'the Warden fell');if(!this.showcase&&!burnt){this.spillLoot(rollLoot(e.type,this.lootRng,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)+(e.warden?1:0)+dungeonLuck(this)+moonLuck(this)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}
+      if(!isMagicAlly(e)){this.kills++;if(this.dungeon)dungeonKill(this,e);if(e.mimic&&!burnt)omenKill(this,e);if(e.gilded&&!burnt)gildedLoot(this,e);if((e.warden||e.type==='king')&&!this.showcase)for(const q of this.players)if(q.online&&!q.ghost)unlockCharm(this,q,e.type==='king'?'the Hollow King fell':'the Warden fell');if(!this.showcase&&!burnt){this.spillLoot(this.roll(e.type,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)+(e.warden?1:0)+dungeonLuck(this)+moonLuck(this)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}
       this.event('kill',e.x,e.z);if(burnt)this.event('ashes',e.x,e.z,'',{creature:e.type,king:e.type==='king'});
       if((e.type==='king'||ENEMIES[e.type]?.boss)&&!burnt){const times=noteBossKill(this,e.type);areaBossFell(this,e);if(ENEMIES[e.type]?.boss)bossLoot(this,e,times);}
       if(e.type==='king'&&!this.dungeon){this.bossSlain=true;this.event('announce',e.x,e.z,burnt?'The Hollow King burns away in the daylight, and takes his treasure with him.':'The Hollow King falls. His treasure spills across the grass.');}
@@ -1723,9 +1769,11 @@ export class World {
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
       projectiles:this.projectiles, allies:this.allies, zones:this.zones, beats:this.beats, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
-      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, omens:this.omens, omenT:this.omenT,
+      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone,
       ...magicSnapshotFields(this),
     };
+    // Where each random stream stands, so a reloaded save carries on rather than replaying the seed.
+    if(purpose==='save')data.rngState=Object.fromEntries(RNG_STREAMS.map(key=>[key,this[key].state>>>0]));
     if(purpose==='network'){pruneChests(this);data.chestBusy=[...this.chestSessions.values()].map(s=>({...s}));data.worldId=this.networkId;data.transactionRevision=this.transactionRevision;}
     return data;
   }
@@ -1734,7 +1782,7 @@ export class World {
     if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
     // A dungeon floor is rebuilt from its seed (dungeon/layout.mjs), never from the hollow's map.
     const world=new World(data.seed,data.dungeon?{bare:true}:{});
-    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','below','saga','surface','delves','lair','omens','omenT'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','below','saga','surface','delves','lair','omens','omenT','omensDone'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     if(world.arena){world.nodes=[];}if(world.dungeon)world.nodes=dungeonNodes(world);if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||(!world.arena&&!world.dungeon))world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
     for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);sanitizeRefine(p);}
@@ -1746,6 +1794,9 @@ export class World {
     world.transactionRevision=data.transactionRevision||0;
     for(const session of data.chestBusy||[])world.chestSessions.set(session.chestId,{...session});
     restoreMagicFields(world, data);
+    // Saves from before rngState: step each stream off by how far the save had come, so they stop replaying the seed.
+    const stride=Math.imul((Math.round((Number(data.time)||0)*1000)|0)^(Number(data.kills)|0), 0x9E3779B1);
+    for(const key of RNG_STREAMS)world[key].state=Number.isInteger(data.rngState?.[key])?data.rngState[key]>>>0:(world[key].state+stride)>>>0;
     repairIdCounter(world);world.assertItems();return world;
   }
   static fromSave(document){

@@ -6,7 +6,7 @@ import {RECIPES} from '../content.mjs?v=harvest-18';
 import {contextRecipeIds} from '../interactions.mjs?v=harvest-18';
 
 const BUILD_CAMP = new Set(['fire', 'bench', 'chest', 'lantern', 'bed']);
-const BUILD_DEFENSE = new Set(['wall', 'gate', 'trap', 'ward']);
+const BUILD_DEFENSE = new Set(['wall', 'gate', 'trap', 'ward', 'hushstone']);
 const BUILD_FOOD = new Set(['farm', 'pot']);
 
 function escape(value) {

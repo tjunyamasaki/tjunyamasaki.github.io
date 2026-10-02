@@ -82,7 +82,8 @@ test('nightfang: kills at night heal 1, only the wearer, not by day', () => {
   assert.equal(Math.round(p.hp*100)/100, 51);
   assert.equal(Math.round(q.hp*100)/100, 50);
   assert.ok(w.events.some(ev => ev.type === 'strike' && ev.kind === 'fang' && ev.player === p.id));
-  w.time = 20; p.hp = 50;
+  // By day: away from the Heartfire, whose light mends by day (sunburn.mjs HEARTH_MEND).
+  w.time = 20; p.hp = 50; p.x = 40; p.z = 0;
   slay(w, p);
   assert.equal(Math.round(p.hp*100)/100, 50);
 });

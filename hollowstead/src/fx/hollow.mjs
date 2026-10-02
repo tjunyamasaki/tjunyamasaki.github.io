@@ -6,6 +6,7 @@ import {INK, TAU, at, bump, clamp01, easeIn, easeOut, fade, rnd} from './kit.mjs
 import {ENEMIES} from '../content.mjs?v=harvest-18';
 import {areasOf} from '../worldgen.mjs?v=harvest-18';
 import {OMENS} from '../omens.mjs?v=harvest-18';
+import {HUSH} from '../hush.mjs?v=harvest-18';
 
 const STYLE = Object.freeze({
   vent:    {main: '#ff8a3a', core: '#ffe2a0', glow: '#ff5a1e', dark: '#3a1d14'},
@@ -164,6 +165,13 @@ export const HOLLOW_EVENTS = {
   bossroar: {life: () => .6, paint(d, ev, age){const t = age/.6, c = ev.boss === 'unblinking' ? STYLE.gaze : STYLE.thorn; d.ring(ev.x, ev.z, 1.5+3*t, .1, c.glow, .6*fade(t), {glow: true});}},
   omen: {life: () => 3, paint(d, ev, age){const t = age/3, c = OMENS[ev.kind]?.color || '#ffd27a'; d.beam(ev.x, ev.z, 0, 18, 1.2*fade(t), c, .7*fade(t)); d.pool(ev.x, ev.z, 3, c, .5*fade(t));}},
   riftclose: {life: () => 1.2, kick: () => ({shake: .4}), paint(d, ev, age, seed){const t = age/1.2; d.shock(ev.x, ev.z, 3*(1-easeOut(t))+.2, .25, '#c49bff', fade(t), '#ffffff'); d.sparks(ev.x, ev.z, 1, 16, t, '#e6d0ff', fade(t), seed);}},
+  omenfulfilled: {life: () => 2.6, kick: () => ({shake: .35, flash: .14, color: '#ffe7a8'}), paint(d, ev, age, seed){
+    const t = age/2.6, c = OMENS[ev.kind]?.color || '#ffd27a';
+    d.beam(ev.x, ev.z, 0, 24, 1.8*fade(t), '#ffd27a', .8*fade(t));
+    for(let i = 0; i < 3; i++) d.ring(ev.x, ev.z, 1+i*1.6+easeOut(Math.min(1, t*1.6))*5, .14, i ? c : '#ffe7a8', .85*fade(t), {glow: true});
+    d.sparks(ev.x, ev.z, 1.2, 26, t, '#ffe7a8', fade(t), seed, {up: 9, speed: 5});
+    d.light(ev.x, ev.z, 9*fade(t));
+  }},
   mimic: {life: () => .8, kick: () => ({shake: .35}), paint(d, ev, age){const t = age/.8; d.ring(ev.x, ev.z, 1+2*t, .14, '#f2c14e', fade(t), {glow: true});}},
   brew: {life: () => 1.4, paint(d, ev, age, seed){const t = age/1.4, c = ev.kind === 'hex' ? '#9a5cff' : ev.kind === 'fury' ? '#ff7a5c' : ev.kind === 'swift' ? '#8fd3ff' : '#8fd3a0'; d.motes(ev.x, ev.z, 14, t, 1.2, c, fade(t), seed, {rise: 2.2, size: .12}); d.ring(ev.x, ev.z, .8+t, .08, c, fade(t), {glow: true});}},
   gilded: {life: () => 1, paint(d, ev, age, seed){const t = age/1; d.sparks(ev.x, ev.z, .8, 12, t, '#ffe08a', fade(t), seed, {up: 4});}},
@@ -190,6 +198,15 @@ export function paintHollow(d, world, lead, clock){
       }
       d.bloom(o.x, o.z, 1.3, 1.6*open, '#8a3dff', .5);
     }
+  }
+  // Hushing stones (hush.mjs): a soft hum of light, and a faint line where their song ends.
+  for(const b of world.buildings || []){
+    if(b.type !== 'hushstone' || !(b.hp > 0) || !d.near(b.x, b.z, HUSH.radius+6)) continue;
+    const breath = .5+.5*Math.sin(clock*1.3+b.x);
+    d.ring(b.x, b.z, HUSH.radius, .07, '#9fd6c8', .1+.05*breath, {glow: true});
+    d.pool(b.x, b.z, 1.4, '#9fd6c8', .22+.1*breath);
+    d.motes(b.x, b.z, 3, (clock*.35+b.z*.1)%1, .8, '#cfeee6', .6, Number(String(b.id).slice(1)) || 3, {rise: 1.6, size: .06});
+    d.light(b.x, b.z, 2.4);
   }
   for(const e of world.enemies || []){
     if(!(e.hp > 0) || !d.near(e.x, e.z, 4)) continue;

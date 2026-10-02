@@ -5,7 +5,7 @@
 
 import {
   CLOCK_V1, CLOCK_V2, EQUIPMENT_SLOTS, SAVE_KEYS, SAVE_VERSION_V1, SAVE_VERSION_V2, STORAGE_TYPES, SUPPLY_ITEM_IDS, V2_PHASE,
-  legacyEquipmentPlan, storageSlotCount, nextNightWaveTime, phaseMigrationDelta, phaseProgress, remapPhaseTime,
+  legacyEquipmentPlan, packSlots, storageSlotCount, nextNightWaveTime, phaseMigrationDelta, phaseProgress, remapPhaseTime,
 } from './contracts.mjs?v=harvest-18';
 import {
   BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, collectLocations, cloneStack, createBackpack, createContainer, createRecovery,
@@ -51,10 +51,12 @@ export function repairIdCounter(world){
 
 function settleBackpack(player, mint){
   const inventory=player?.inventory;
-  if(!inventory?.slots||inventory.slots.length===BACKPACK_SLOT_COUNT)return false;
+  // A worn bag grows the pack (contracts.mjs packSlots): that size is the current shape too.
+  const size=packSlots(player);
+  if(!inventory?.slots||inventory.slots.length===size)return false;
   const stacks=inventory.slots.filter(Boolean);
   const prior=(player.recovery?.slots||[]).filter(Boolean).map(cloneStack);
-  const pack=createBackpack(player.id);
+  const pack=createBackpack(player.id, size);
   const overflow=[];
   for(const stack of stacks){
     const plan=planInsert(pack, stack, {supplyCapacity:null, allowPartial:true, grow:false, acceptsItems:true, mintUid:mint});
@@ -169,7 +171,7 @@ export function validateV2World(data){
     if(!player||typeof player.id!=='string'||player.id.length===0)return {ok:false, code:'corrupt'};
     if(playerIds.has(player.id)||player.inventory?.id!==containerId('backpack',player.id))return {ok:false,code:'duplicate-owner'};
     playerIds.add(player.id);
-    const inventory=validateContainer(player.inventory, {exactSlots:BACKPACK_SLOT_COUNT});
+    const inventory=validateContainer(player.inventory, {exactSlots:packSlots(player)});
     if(!inventory.ok)return inventory;
     const equipment=validateEquipment(player.equipment);
     if(!equipment.ok)return equipment;

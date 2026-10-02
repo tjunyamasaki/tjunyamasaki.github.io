@@ -12,6 +12,7 @@
 
 import {RULES, STRUCTURES, dayAt, dayOf, hollowTime, scheduleOf} from './content.mjs?v=harvest-18';
 import {isVigil, threatOf} from './vigil.mjs?v=harvest-18';
+import {hushedAt} from './hush.mjs?v=harvest-18';
 import {STARRAIN, stepMoon} from './moons.mjs?v=harvest-18';
 import {NIGHT_CAP, REGIONS, RESIDENTS, nightRoster, pickWeighted, regionAt, waveSize} from './progression.mjs?v=harvest-18';
 import {phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-18';
@@ -236,6 +237,8 @@ export function huntRate(world, p, night=tonight(world), hearth=world.buildings.
   const day=isVigil(world)?Math.floor(threatOf(world)):night.day,tier=REGIONS[zoneOf(world,p.x,p.z)]?.tier??0,moon=dark?night.moon:'waxing';
   const home=!!hearth&&Math.hypot(p.x-hearth.x,p.z-hearth.z)<hearthReach(hearth)+HUNT.homeGap;
   if(home&&(moon==='new'||moon==='gilded'))return 0;
+  // A hushing stone's song (hush.mjs): no hunter comes for a wanderer inside it. Raids still do.
+  if(hushedAt(world,p.x,p.z))return 0;
   let mean=(HUNT.mean[tier]??HUNT.mean[HUNT.mean.length-1])/Math.min(HUNT.dayMax,1+HUNT.perDay*(day-1));
   if(home)mean*=HUNT.home;else if(moon==='blood')mean/=HUNT.blood;
   return (dark?HUNT.night:1)/Math.max(HUNT.minMean,mean);

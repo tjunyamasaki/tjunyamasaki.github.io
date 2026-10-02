@@ -14,7 +14,6 @@
 // Pure simulation: import only content/progression/blasts. Never engine.mjs, a renderer or the DOM.
 
 import {ENEMIES} from './content.mjs?v=harvest-18';
-import {rollLoot} from './progression.mjs?v=harvest-18';
 import {addBlast} from './blasts.mjs?v=harvest-18';
 
 const TAU = Math.PI*2, SS = 1.15;
@@ -190,7 +189,7 @@ export function bossLoot(world, e, times){
   const spec = BOSS_LOOT[e.type]; if(!spec) return;
   const rng = world.lootRng, rolls = [];
   if(times <= 1 || rng() < spec.again) rolls.push({itemId: spec.weapon, count: 1});
-  for(const r of rollLoot('king', rng, 1.2)) rolls.push(r);
+  for(const r of world.roll('king', 1.2)) rolls.push(r);
   rolls.push({itemId: 'heartstone', count: 1});
   for(const [itemId, count] of spec.extra) rolls.push({itemId, count});
   world.spillLoot(rolls, e.x, e.z, world.player(e.lastHitBy)?.name);

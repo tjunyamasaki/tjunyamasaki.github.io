@@ -52,6 +52,10 @@ export const NIGHT_WAVE_FRACTIONS = Object.freeze([0, 0.4, 0.8]);
 const PHASE_EDGE_EPSILON = 1e-8;
 
 export const BACKPACK_SLOT_COUNT = 12;
+/** Pack slots a worn bag adds (the `bag` socket). The pack grows and shrinks with it (World.fitPack). */
+export const BAG_SLOTS = Object.freeze({satchel: 6, haversack: 12});
+/** How many slots a wanderer's pack has with what they wear now. */
+export function packSlots(player){return BACKPACK_SLOT_COUNT+(BAG_SLOTS[player?.equipment?.bag?.itemId]||0);}
 export const STACK_LIMIT = 64;
 /** Legacy v1 supply counter. A backpack is limited by its slots and stack size, not this number. */
 export const SUPPLY_CAPACITY = RULES.capacity;
@@ -76,9 +80,9 @@ export const DISMANTLE_HOLD_SECONDS = 0.8;
 
 /**
  * Worn gear. head/back hold frontier gear (regions.mjs); trinket and charm hold trinkets (trinkets.mjs):
- * the second one, `charm`, opens later (trinkets.mjs unlockCharm).
+ * the second one, `charm`, opens later (trinkets.mjs unlockCharm); bag holds a bag that grows the pack (BAG_SLOTS).
  */
-export const EQUIPMENT_SLOTS = Object.freeze(['chop', 'mine', 'weapon', 'body', 'light', 'head', 'back', 'trinket', 'charm']);
+export const EQUIPMENT_SLOTS = Object.freeze(['chop', 'mine', 'weapon', 'body', 'light', 'head', 'back', 'trinket', 'charm', 'bag']);
 /** The trinkets, in catalog order: the first ten, then the ten relics that came with the second socket. */
 export const TRINKET_IDS = Object.freeze(['frostanklet', 'nightfang', 'emberheart', 'crowseye', 'harvestcharm', 'boneward', 'wispfeather', 'gravedust', 'moonlocket', 'thornknot',
   'tinderpouch', 'crookedkey', 'soulstitch', 'gutteringcandle', 'gravechalk', 'redthread', 'hellspur', 'mournersveil', 'thirteenthbell', 'hollowmirror']);
@@ -95,6 +99,7 @@ export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
   back: Object.freeze(['barrowcloak']),
   trinket: TRINKET_IDS,
   charm: TRINKET_IDS,
+  bag: Object.freeze(Object.keys(BAG_SLOTS)),
 });
 /** v1 saves that contain both weapons equip the sword and keep the spear in the backpack. */
 export const MIGRATION_PREFERRED_WEAPON = 'sword';
@@ -121,8 +126,8 @@ export const CATALOG_CONTEXT_FIELDS = Object.freeze(['source', 'stationId', 'tab
 export const FIRE_STATION_TYPES = Object.freeze(['hearth', 'fire']);
 
 export const FIELD_BUILD_RECIPES = Object.freeze(['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed', 'cart']);
-export const WORKBENCH_BUILD_RECIPES = Object.freeze([...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward']);
-export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir', 'sporemask', 'gravelight', 'barrowcloak']);
+export const WORKBENCH_BUILD_RECIPES = Object.freeze([...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone']);
+export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack']);
 export const FIRE_COOK_RECIPES = Object.freeze(['roast', 'roastMeat', 'roastCaps']);
 export const CAULDRON_COOK_RECIPES = Object.freeze(['stew']);
 
@@ -156,6 +161,7 @@ export const CONTEXT_ACTIONS = Object.freeze({
   bed: Object.freeze(['rest', 'repair']),
   lantern: Object.freeze(['repair']),
   ward: Object.freeze(['repair']),
+  hushstone: Object.freeze(['repair']),
   player: Object.freeze(['revive']),
   tree: Object.freeze(['chop']),
   rock: Object.freeze(['mine']),

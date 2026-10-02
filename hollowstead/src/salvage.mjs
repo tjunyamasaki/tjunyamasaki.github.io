@@ -41,9 +41,12 @@ export function salvageItem(world, p, cmd){
   if(loc.kind === 'equipment' && cmd.equipmentRevision !== p.equipmentRevision) return {ok: false, code: 'staleRevision'};
   const itemId = loc.stack.itemId, out = salvageYield(itemId);
   if(!out) return {ok: false, code: 'rejected'};
+  // A worn bag: the pack must fit in what is left without it.
+  if(loc.kind === 'equipment' && loc.slot === 'bag' && world.bagRoom && !world.bagRoom(p, null)) return {ok: false, code: 'inventoryFull'};
   if(loc.kind === 'equipment'){
     if(loc.slot === 'light') p.lantern = false;
     p.equipment[loc.slot] = null; p.equipmentRevision++;
+    if(loc.slot === 'bag') world.fitPack?.(p);
   }else{
     loc.container.slots[loc.slot] = null; loc.container.revision++;
   }

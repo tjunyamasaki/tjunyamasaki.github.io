@@ -104,7 +104,7 @@ test('runtime clock is 180/30/100 while the protocol is hollowstead-2', () => {
 });
 
 test('shared schema names equipment, intents, recipes, and ranges', () => {
-  assert.deepEqual(EQUIPMENT_SLOTS, ['chop', 'mine', 'weapon', 'body', 'light', 'head', 'back', 'trinket', 'charm']);
+  assert.deepEqual(EQUIPMENT_SLOTS, ['chop', 'mine', 'weapon', 'body', 'light', 'head', 'back', 'trinket', 'charm', 'bag']);
   assert.deepEqual(EQUIPMENT_SLOT_ITEMS.weapon, ['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome',
     'fangs', 'soulchain', 'scythe', 'wisplantern', 'stormrod', 'starfall', 'crowtotem', 'jacklantern', 'wighthorn', 'censer']);
   assert.equal(MIGRATION_PREFERRED_WEAPON, 'sword');
@@ -138,8 +138,8 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(legacyEquipmentPlan({spear: 8}).sockets.weapon.itemId, 'spear');
 
   assert.deepEqual(FIELD_BUILD_RECIPES, ['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed', 'cart']);
-  assert.deepEqual(WORKBENCH_BUILD_RECIPES, [...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward']);
-  assert.deepEqual(WORKBENCH_CRAFT_RECIPES, ['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir', 'sporemask', 'gravelight', 'barrowcloak']);
+  assert.deepEqual(WORKBENCH_BUILD_RECIPES, [...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone']);
+  assert.deepEqual(WORKBENCH_CRAFT_RECIPES, ['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack']);
   assert.deepEqual(FIRE_COOK_RECIPES, ['roast', 'roastMeat', 'roastCaps']);
   assert.deepEqual(CAULDRON_COOK_RECIPES, ['stew']);
   assert.equal(RECIPE_CONTEXTS.fieldBuild.source, 'field');

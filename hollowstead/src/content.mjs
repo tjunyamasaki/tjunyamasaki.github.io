@@ -64,6 +64,9 @@ export const EQUIPMENT = {
   sporemask:{name:'Glowcap mask',icon:'sporemask',durability:900},
   gravelight:{name:'Grave lantern',icon:'gravelight',durability:600},
   barrowcloak:{name:'Barrow cloak',icon:'barrowcloak',durability:900},
+  // Bags: worn in the bag socket, they grow the pack (contracts.mjs BAG_SLOTS). They never wear out.
+  satchel:{name:'Forager’s satchel',icon:'satchel',durability:999},
+  haversack:{name:'Delver’s haversack',icon:'haversack',durability:999},
   // Trinkets: two sockets (the second opens later); they never wear out. Effects live in trinkets.mjs.
   frostanklet:{name:'Frost anklet',icon:'frostanklet',durability:100},
   nightfang:{name:'Night fang',icon:'nightfang',durability:100},
@@ -125,7 +128,7 @@ export const STRUCTURES = {
   wall:{name:'Palisade',hp:280,radius:.72},gate:{name:'Camp gate',hp:240,radius:.7},
   trap:{name:'Briar trap',hp:100,radius:0},farm:{name:'Pumpkin patch',hp:120,radius:0},
   pot:{name:'Cauldron',hp:160,radius:.55},lantern:{name:'Soul lantern',hp:140,radius:.3,light:6},
-  bed:{name:'Bedroll',hp:100,radius:0},ward:{name:'Warding totem',hp:200,radius:.55},
+  bed:{name:'Bedroll',hp:100,radius:0},ward:{name:'Warding totem',hp:200,radius:.55},hushstone:{name:'Hushing stone',hp:220,radius:.6},
   cart:{name:'Hand cart',hp:220,radius:.55},
 };
 export const RECIPES = {
@@ -154,6 +157,7 @@ export const RECIPES = {
   shardplate:{kind:'tool',cost:{shard:8,ore:4,bone:4},station:'bench',desc:'Absorb 65% of damage until it breaks.'},
   elixir:{kind:'item',cost:{spore:2,berry:2},station:'bench',desc:'Restore 60 health and 20 courage.'},
   ward:{kind:'build',cost:{stone:5,ore:2,ember:4},station:'bench',desc:'A soul-powered defense. Damages nearby enemies.'},
+  hushstone:{kind:'build',cost:{stone:8,ore:2,ember:3},station:'bench',desc:'No creature rises or comes hunting within 18 paces, so you can build in peace. Raids and moons still come. Two at most.'},
   roast:{kind:'cook',cost:{pumpkin:1},station:'fire',desc:'Cook a pumpkin into a restorative supper.'},
   roastMeat:{kind:'cook',result:'roast',cost:{meat:1},station:'fire',desc:'Cook a raw morsel safely.'},
   roastCaps:{kind:'cook',result:'roast',cost:{mushroom:2},station:'fire',desc:'Cook away the mushrooms’ unsettling effects.'},
@@ -162,6 +166,8 @@ export const RECIPES = {
   gravelight:{kind:'tool',cost:{wispdust:3,ore:3,ember:2},station:'bench',desc:'A wisp-fed lantern bright enough for the Moonshard Crags.'},
   barrowcloak:{kind:'tool',cost:{bone:8,fiber:6,meat:2},station:'bench',desc:'Bone-lined warmth against the Barrow Fields’ grave-chill.'},
   cart:{kind:'build',cost:{wood:8,fiber:4,stone:2},desc:'A chest on wheels. Pull it along, open it anywhere.'},
+  satchel:{kind:'tool',cost:{fiber:8,wood:3},station:'bench',desc:'Wear it in the bag socket: six more pack slots.'},
+  haversack:{kind:'tool',cost:{fiber:12,bone:6,shard:5,ember:4},station:'bench',desc:'Wear it in the bag socket: twelve more pack slots.'},
 };
 /**
  * Hostiles. Small melee creatures are weak and come in numbers; big slow ones wind up long and hit

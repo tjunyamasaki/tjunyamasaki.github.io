@@ -6,7 +6,7 @@ import {equipmentSlotFor} from '../inventory.mjs?v=harvest-18';
 import {itemDefinition} from '../contracts.mjs?v=harvest-18';
 
 export const SOCKET_LABELS = Object.freeze({
-  chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light', head: 'Head', back: 'Back', trinket: 'Trinket', charm: 'Trinket II',
+  chop: 'Chop', mine: 'Mine', weapon: 'Weapon', body: 'Armor', light: 'Light', head: 'Head', back: 'Back', trinket: 'Trinket', charm: 'Trinket II', bag: 'Bag',
 });
 
 const OP_LABELS = Object.freeze({

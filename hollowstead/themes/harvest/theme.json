@@ -4206,6 +4206,75 @@
           "fps": 4
         }
       }
+    },
+    "satchel": {
+      "src": "./sprites/satchel.svg?v=haul1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/satchel-icon.svg?v=haul1"
+    },
+    "haversack": {
+      "src": "./sprites/haversack.svg?v=haul1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/haversack-icon.svg?v=haul1"
+    },
+    "hushstone": {
+      "src": "./sprites/hushstone.svg?v=haul1",
+      "size": [
+        3.0,
+        4.5
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 4
+        }
+      },
+      "icon": "./sprites/hushstone-icon.svg?v=haul1"
     }
   },
   "motion": {

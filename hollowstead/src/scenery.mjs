@@ -10,6 +10,7 @@
 // lighting comes from renderer.bindNight(); props also take the cool unlit / warm lamp tint sprites get.
 // Canvas2D: the same props culled to the view from a pre-rasterised atlas, darkened with a tinted copy.
 
+import {UPRIGHT_DEPTH} from './camera.mjs?v=harvest-18';
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
 import {SCENERY_ATLAS} from './scenery-atlas.mjs?v=harvest-18';
 import {CHUNK, PROPS, SceneryModel, chunkKey, propCovered, syntheticShape} from './scenery-layout.mjs?v=harvest-18';
@@ -34,7 +35,7 @@ function buildingSig(buildings, x0, z0, x1, z1){
 }
 
 /** Vertex/fragment additions on top of renderer.bindNight(): wind sway, see-through near the local wanderer, night tint. */
-function sceneryShader(material, renderer, uniforms, {sway = false, peek = false, tint = true, floor = 0, key}){
+function sceneryShader(material, renderer, uniforms, {sway = false, peek = false, tint = true, floor = 0, upright = false, key}){
   renderer.bindNight(material);
   const night = material.onBeforeCompile;
   material.onBeforeCompile = (shader, gl) => {
@@ -48,6 +49,8 @@ function sceneryShader(material, renderer, uniforms, {sway = false, peek = false
       // Big props in front of the local wanderer thin out (a dithered hole) so nobody is ever hidden.
       fs = fs.replace('void main() {', 'void main() {\nif(uSceneryPeek.z>0.0&&vSceneryBase.y>.5&&vSceneryBase.x>uSceneryPeek.w){vec2 dp=gl_FragCoord.xy-uSceneryPeek.xy;if(dot(dp,dp)<uSceneryPeek.z*uSceneryPeek.z&&mod(floor(gl_FragCoord.x)+floor(gl_FragCoord.y),2.0)<1.0)discard;}');
     }
+    // Standing props get the same upright depth as sprites (camera.mjs), so wanderers and props sort the same way against walls.
+    if(upright)vs = vs.replace('#include <project_vertex>', `#include <project_vertex>\n${UPRIGHT_DEPTH(`(position.y / ${UP_Y.toFixed(6)})`)}`);
     shader.vertexShader = vHead.join('\n') + '\n' + vs;
     if(tint)fs = fs.replace('#include <color_fragment>', '#include <color_fragment>\n{vec2 sluv=(vNightWorld.xz-uNightOrigin)/uNightSpan;float slamp=texture2D(uNightLight,clamp(sluv,0.0,1.0)).r;diffuseColor.rgb*=mix(vec3(1.0),mix(uSceneryUnlit,uScenerySource,slamp),uNightCover*uSceneryTintMix);}');
     // Fliers catch the moonlight: never darker than `floor` of their own (cooled) colour, so bats read against the dark ground.
@@ -136,7 +139,7 @@ export class SceneryLayer {
     if(!image)return false;
     const map = new THREE.Texture(image);map.colorSpace = THREE.SRGBColorSpace;map.minFilter = THREE.LinearFilter;map.magFilter = THREE.LinearFilter;map.generateMipmaps = false;map.needsUpdate = true;
     const r = this.renderer, u = this.uniforms;
-    const up = sceneryShader(new THREE.MeshBasicMaterial({map, vertexColors:true, alphaTest:.5, alphaToCoverage:true, side:THREE.DoubleSide}), r, u, {sway:true, peek:true, key:'up'});
+    const up = sceneryShader(new THREE.MeshBasicMaterial({map, vertexColors:true, alphaTest:.5, alphaToCoverage:true, side:THREE.DoubleSide}), r, u, {sway:true, peek:true, upright:true, key:'up'});
     const decal = sceneryShader(new THREE.MeshBasicMaterial({map, vertexColors:true, transparent:true, depthWrite:false, side:THREE.DoubleSide}), r, u, {key:'decal'});
     const ground = sceneryShader(new THREE.MeshBasicMaterial({map, vertexColors:true, alphaTest:.5, alphaToCoverage:true, side:THREE.DoubleSide}), r, u, {key:'ground'});
     const air = sceneryShader(new THREE.MeshBasicMaterial({map, vertexColors:true, transparent:true, depthWrite:false, side:THREE.DoubleSide}), r, u, {floor:.95, key:'air'});

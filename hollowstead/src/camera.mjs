@@ -42,3 +42,17 @@ export function watchViewport(onResize){
   document.addEventListener('webkitfullscreenchange', schedule);
   return schedule;
 }
+
+/**
+ * Depth for things drawn as camera-facing cards (sprites, scenery props). A card leans back with the
+ * camera, so its top sits far behind its feet in depth and sinks into any real geometry behind it:
+ * a wanderer standing in front of a wall or a dungeon wall had their head cut off by it. This GLSL
+ * gives each point of the card the depth it would have if the card stood upright on its base, so
+ * walls behind stay behind and walls in front still cover. `height` is the view-space distance
+ * above the card's base; it changes depth only, never where anything lands on screen.
+ */
+export const UPRIGHT_DEPTH = (height) => `{
+  vec3 hsUp = mat3( viewMatrix ) * vec3( 0.0, 1.0, 0.0 );
+  if ( hsUp.y > 0.01 ) mvPosition.z += max( ${height}, 0.0 ) * hsUp.z / hsUp.y + 0.05;
+  gl_Position = projectionMatrix * mvPosition;
+}`;

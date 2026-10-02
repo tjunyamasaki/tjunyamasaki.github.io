@@ -38,7 +38,12 @@ import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harve
 import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-18';
 import {MagicMesh} from './magic/effects-three.mjs?v=harvest-18';
 import {WeaponFx, dropBlink} from './fx/index.mjs?v=harvest-18';
-import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-18';
+import {UPRIGHT_DEPTH, orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-18';
+// Every sprite gets upright depth (camera.mjs UPRIGHT_DEPTH): walls and other real geometry behind a
+// wanderer, a creature or a building stay behind it. Patched once, before any sprite compiles.
+if(!THREE.ShaderLib.sprite.vertexShader.includes('hsUp')){
+  THREE.ShaderLib.sprite.vertexShader=THREE.ShaderLib.sprite.vertexShader.replace('\tgl_Position = projectionMatrix * mvPosition;','\tgl_Position = projectionMatrix * mvPosition;\n'+UPRIGHT_DEPTH('alignedPosition.y'));
+}
 import {RARITY_COLORS, rarityOf} from './progression.mjs?v=harvest-18';
 import {
   LIGHT_FIELD_ORIGIN, LIGHT_FIELD_SIZE, LIGHT_FIELD_SPAN, brightnessAt, canInspect, entityBrightness,

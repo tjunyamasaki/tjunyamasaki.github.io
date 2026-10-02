@@ -19,7 +19,8 @@ test('the hollow is larger, ringed by six regions whose danger rises outward',()
   assert.equal(regionAt(0,0),'meadow');
   const seen=new Set();
   for(let x=-138;x<=138;x+=3)for(let z=-138;z<=138;z+=3)if(Math.hypot(x,z)<140)seen.add(regionAt(x,z));
-  assert.deepEqual([...seen].sort(),Object.keys(REGIONS).sort());
+  // Seeded areas (worldgen.mjs areaAt) lie over the rings; the rings themselves are the six regions.
+  assert.deepEqual([...seen].sort(),Object.keys(REGIONS).filter(id=>!REGIONS[id].area).sort());
   assert.equal(tierAt(0,0),0);
   assert.equal(tierAt(85,0)>=1,true);
   assert.equal(biome(40,-10),regionAt(40,-10));

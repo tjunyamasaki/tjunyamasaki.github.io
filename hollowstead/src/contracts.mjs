@@ -17,6 +17,8 @@ export const SAVE_KEYS = Object.freeze({
   profile: 'hollowstead.profile.v1',
   expeditionV1: 'hollowstead.expedition.v1',
   expeditionV2: 'hollowstead.expedition.v2',
+  // The Vigil keeps its own slot: nothing but its own Delete button ever clears it (src/vigil.mjs).
+  vigil: 'hollowstead.vigil.v1',
 });
 
 export const SAVE_VERSION_V1 = 1;
@@ -172,6 +174,15 @@ export const CONTEXT_ACTIONS = Object.freeze({
   ironchest: Object.freeze(['unlock']),
   moonchest: Object.freeze(['unlock']),
   reliquary: Object.freeze(['unlock']),
+  rimecrystal: Object.freeze(['mine']),
+  embervent: Object.freeze(['mine']),
+  delve: Object.freeze(['descend']),
+  briarthrone: Object.freeze([]),
+  fallenstar: Object.freeze(['unlock']),
+  soulrift: Object.freeze([]),
+  mimic: Object.freeze(['unlock']),
+  witchcauldron: Object.freeze(['sip']),
+  goldpumpkin: Object.freeze(['gather']),
   drop: Object.freeze([]),
 });
 

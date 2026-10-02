@@ -42,6 +42,9 @@ export function repairIdCounter(world){
   for(const drop of world.drops||[]){visit(drop.id);if(drop.stack)visit(drop.stack.uid);}
   for(const enemy of world.enemies||[])visit(enemy.id);
   for(const node of world.nodeChanges||[])visit(node.id);
+  // A delve keeps the hollow aside (delve.mjs world.surface): its ids still count.
+  const surface=world.surface;
+  if(surface){for(const b of surface.buildings||[]){visit(b.id);b.store?.slots?.forEach(st=>{if(st)visit(st.uid);});b.overflow?.slots?.forEach(st=>{if(st)visit(st.uid);});}for(const d of surface.drops||[]){visit(d.id);if(d.stack)visit(d.stack.uid);}for(const e of surface.enemies||[])visit(e.id);}
   world.idCounter=next;
   return world;
 }

@@ -63,6 +63,33 @@ export class Sound {
       }
       return;
     }
+    // Thornmother's Heart: a whip crack as a vine flies, a crunching burst where vines cross (a deep thud for the heart).
+    if(type==='vinelash'){this.sweep(2600,700,.07,'square',.008);this.sweep(320,140,.14,'triangle',.02,.02);return;}
+    if(type==='thornbloom'){const big=!!ev?.heart;this.sweep(big?110:190,40,big?.6:.25,'sine',big?.08:.04);for(let i=0;i<3;i++)this.sweep(1600-i*250,600,.05,'square',.006,.02+i*.03);return;}
+    // The Eye of the Deep: a rising hum as the gaze locks, a zap when it leaps, a swell and a fold for the abyss.
+    if(type==='gaze'){this.sweep(220,440,.3,'sine',.018);return;}
+    if(type==='gazejump'){this.sweep(1800,300,.12,'sawtooth',.012);return;}
+    if(type==='abyss'){this.sweep(60,180,1.4,'sawtooth',.03);this.sweep(440,880,1.5,'sine',.01);return;}
+    if(type==='abyssfold'){this.sweep(140,30,.8,'sine',.1);this.sweep(600,80,.4,'sawtooth',.02);return;}
+    // Blasts on the ground (blasts.mjs): vents hiss and burst, stars whistle down, roots crack, the gaze sears.
+    if(type==='blast'){const st=ev?.style;
+      if(st==='vent'){this.sweep(160,50,.35,'sine',.05);this.sweep(2400,900,.18,'square',.004);return;}
+      if(st==='star'){this.sweep(120,30,.6,'sine',.09);this.sweep(900,200,.3,'triangle',.02);return;}
+      if(st==='gaze'){this.sweep(1400,500,.1,'sawtooth',.01);return;}
+      if(st==='void'||st==='tendril'){this.sweep(90,40,.35,'sine',.05);return;}
+      this.sweep(260,70,.18,'square',.02);this.sweep(1200,500,.06,'square',.005,.02);return;}
+    // The great bosses: a roar when they rise or change, a rumble before their big patterns.
+    if(type==='bossrise'||type==='bossphase'){this.sweep(70,40,1.4,'sawtooth',.06);this.sweep(140,60,1.2,'square',.02,.05);this.sweep(320,90,.9,'sine',.03,.1);return;}
+    if(type==='bossroar'){this.sweep(110,50,.7,'sawtooth',.035);return;}
+    // Omens, moons and the vigil.
+    if(type==='omen'){for(const [i,f] of [659,880,1319].entries())this.sweep(f,f*1.01,.7,'sine',.014,i*.12);return;}
+    if(type==='riftclose'){this.sweep(880,110,.9,'sine',.04);return;}
+    if(type==='mimic'){this.sweep(300,80,.15,'square',.05);this.sweep(260,60,.15,'square',.05,.12);return;}
+    if(type==='brew'){for(let i=0;i<4;i++)this.sweep(300+i*90,600+i*90,.1,'sine',.015,i*.07);return;}
+    if(type==='gilded'||type==='gildfall'){for(let i=0;i<(type==='gildfall'?6:3);i++)this.sweep(1800+i*220,2600+i*220,.12,'sine',.01,i*.05);return;}
+    if(type==='rekindle'){this.sweep(80,320,.9,'sawtooth',.03);this.sweep(200,600,.8,'triangle',.02,.1);return;}
+    if(type==='dread'){this.sweep(98,96,1.4,'sine',.05);this.sweep(147,145,1.2,'sine',.02,.05);return;}
+    if(type==='ascend'){for(const [i,f] of [392,523,659,784].entries())this.sweep(f,f*1.01,.5,'sine',.014,i*.12);return;}
     if(type.startsWith('lunar')){
       // The Hollow Moon: a low whoosh as it leaves, a hollow gulp and a cold chime when it swallows, fuller as it waxes.
       const phase=Math.max(0,Math.min(3,ev?.phase|0));

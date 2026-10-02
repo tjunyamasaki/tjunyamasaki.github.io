@@ -23,12 +23,14 @@
       <div id="characters" class="characters" aria-label="Choose your wanderer"></div>
       <label class="name-field"><span>YOUR NAME</span><input id="player-name" maxlength="18" value="Wanderer" autocomplete="nickname" aria-label="Your name"></label>
       <button id="host" class="primary wide">Gather your friends <span>↗</span></button>
+      <button id="vigil" class="wide vigil-button" type="button"><b>The Vigil<small id="vigil-hint">One fire, one save, for as long as you last</small></b><span>☾</span></button>
       <div class="join-row"><input id="room-input" placeholder="CAMP CODE" maxlength="5" autocomplete="off" autocapitalize="characters" aria-label="Camp code"><button id="join">Join camp →</button></div>
       <div class="front-secondary"><button id="solo" class="text-button">Venture alone</button><button id="dungeon" class="text-button">Dungeons</button><button id="arena" class="text-button">Battle arena</button><button id="lab" class="text-button">Weapon lab</button><button id="showcase" class="text-button">Showcase</button><button id="continue" class="text-button" hidden>Continue expedition ↗</button></div>
       <label id="saved-option" class="saved-option" hidden><input type="checkbox" id="host-save"> Host my saved expedition</label>
       <p class="status" id="front-status" role="status"></p>
     </section>
     <section class="front-panel" id="dungeon-panel" hidden><div class="panel-heading"><span class="eyebrow">BELOW THE HOLLOW</span><span class="edition">DUNGEONS</span></div><h2>The deep doors.</h2><p class="muted">Every floor is carved anew. Slay the Warden by the stairs and go deeper, alone or with up to three friends.</p><div id="dungeon-floors" class="dungeon-floors" role="group" aria-label="Which depths"></div><div class="dungeon-actions"><button id="dungeon-host" class="primary wide">Gather a party <span>↗</span></button><button id="dungeon-solo" class="wide">Descend alone →</button><button id="dungeon-back" class="text-button">← Back</button></div></section>
+    <section class="front-panel vigil-panel" id="vigil-panel" hidden><div class="panel-heading"><span class="eyebrow">THE LONG HAUL</span><span class="edition">THE VIGIL</span></div><h2>Keep the vigil.</h2><p class="muted">One expedition, kept until you choose to end it. Days and nights run longer. The hollow grows with your strength, not the days: its Dread rises as you level, find better gear and slay its bosses. A fallen fire is rekindled and a fallen party wakes by it. Nothing ends this save but you.</p><div id="vigil-save" class="vigil-save"></div><div class="vigil-actions"><button id="vigil-solo" class="primary wide" type="button">Begin the vigil <span>→</span></button><button id="vigil-host" class="wide" type="button">Keep it with friends <span>↗</span></button><button id="vigil-delete" class="text-button vigil-delete" type="button" hidden>End this vigil…</button><button id="vigil-back" class="text-button" type="button">← Back</button></div></section>
     <section class="front-panel" id="room-panel" hidden><p class="eyebrow">THE CAMP IS OPEN</p><h2 id="room-heading">Better together.</h2><p class="muted" id="room-lede">Invite your friends, then enter the woods.</p><button id="copy-room" class="room-code" title="Copy invite link"><span id="room-code">·····</span><small>TAP TO COPY INVITE ↗</small></button><div id="roster"></div><button id="launch" class="primary wide">Enter the woods <span>→</span></button><p id="room-note" class="muted small">Friends can also join after you start.</p><button id="cancel-room" class="text-button">← Leave camp</button></section>
     <footer class="front-footer"><span>ENDLESS NIGHTS. ONE SHARED FIRE.</span><button id="front-guide" class="text-button">A wanderer’s field guide ↗</button></footer>
   </main>
@@ -44,7 +46,7 @@
           <div class="vital courage" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Courage 100"><span aria-hidden="true">✦</span><i><em id="courage-bar"></em></i></div>
         </div>
       </section>
-      <div class="clock"><div class="clock-meta"><small id="region-name">THE MEADOW</small><span id="day-number">DAY 01</span></div><div class="day-track" id="day-track"><i id="day-progress"></i></div></div>
+      <div class="clock"><div class="clock-meta"><small id="region-name">THE MEADOW</small><span id="day-number">DAY 01</span><small id="dread-chip" class="dread-chip" hidden></small></div><div class="day-track" id="day-track"><i id="day-progress"></i></div></div>
       <button id="minimap-button" type="button" aria-label="Open world map"><canvas id="minimap" width="200" height="200"></canvas></button>
     </header>
     <div id="party" class="party"></div>

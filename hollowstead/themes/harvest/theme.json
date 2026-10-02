@@ -18,10 +18,15 @@
     "water": "#3f5566",
     "shore": "#6f7a6a",
     "thicket": "#3c4a40",
-    "void": "#1f1d27"
+    "void": "#1f1d27",
+    "frostmere": "#97a3ad",
+    "ashscar": "#4d4340",
+    "briarlair": "#4f5c3c",
+    "ice": "#b4d3e2",
+    "lava": "#e8662a"
   },
   "lighting": {
-    "ambientNight": 0.20,
+    "ambientNight": 0.2,
     "litBrightness": 0.92,
     "transitionSeconds": 7,
     "dawnSeconds": 4,
@@ -3836,6 +3841,371 @@
         }
       },
       "icon": "./sprites/ichor-icon.svg?v=refine1"
+    },
+    "briarmother": {
+      "src": "./sprites/briarmother.svg?v=vigil1",
+      "size": [
+        5.6,
+        8.4
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 5
+        }
+      }
+    },
+    "unblinking": {
+      "src": "./sprites/unblinking.svg?v=vigil1",
+      "size": [
+        5.2,
+        7.8
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 5
+        }
+      }
+    },
+    "rimecrystal": {
+      "src": "./sprites/rimecrystal.svg?v=vigil1",
+      "size": [
+        3.0,
+        4.5
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "embervent": {
+      "src": "./sprites/embervent.svg?v=vigil1",
+      "size": [
+        2.8,
+        4.2
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "briarthrone": {
+      "src": "./sprites/briarthrone.svg?v=vigil1",
+      "size": [
+        4.4,
+        6.6
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "delve": {
+      "src": "./sprites/delve.svg?v=vigil1",
+      "size": [
+        3.8,
+        5.7
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "fallenstar": {
+      "src": "./sprites/fallenstar.svg?v=vigil1",
+      "size": [
+        2.7,
+        4.05
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "soulrift": {
+      "src": "./sprites/soulrift.svg?v=vigil1",
+      "size": [
+        2.6,
+        3.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 6
+        }
+      }
+    },
+    "goldpumpkin": {
+      "src": "./sprites/goldpumpkin.svg?v=vigil1",
+      "size": [
+        1.6,
+        2.4
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/goldpumpkin-icon.svg?v=vigil1"
+    },
+    "rime": {
+      "src": "./sprites/rime.svg?v=vigil1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/rime-icon.svg?v=vigil1"
+    },
+    "emberglass": {
+      "src": "./sprites/emberglass.svg?v=vigil1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/emberglass-icon.svg?v=vigil1"
+    },
+    "moon-gilded": {
+      "src": "./sprites/moon-gilded-icon.svg?v=vigil1",
+      "size": [
+        1.0,
+        1.0
+      ],
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moon-gilded-icon.svg?v=vigil1"
+    },
+    "moon-starrain": {
+      "src": "./sprites/moon-starrain-icon.svg?v=vigil1",
+      "size": [
+        1.0,
+        1.0
+      ],
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moon-starrain-icon.svg?v=vigil1"
+    },
+    "mimic": {
+      "src": "./sprites/moonchest.svg?v=art3",
+      "size": [
+        2.262,
+        3.393
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        }
+      }
+    },
+    "witchcauldron": {
+      "src": "./sprites/pot.svg?v=art3",
+      "size": [
+        2.5,
+        3.75
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 4
+        }
+      }
     }
   },
   "motion": {
@@ -3914,4 +4284,4 @@
       }
     }
   }
-}
+}

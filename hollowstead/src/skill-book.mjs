@@ -9,6 +9,8 @@ import {FOXFIRE} from './magic/kitsune-lantern.mjs?v=harvest-18';
 import {ownedSkeletons, raiseSkeleton} from './magic/barrow-rattle.mjs?v=harvest-18';
 import {RITE, beginRite} from './magic/pallbearer.mjs?v=harvest-18';
 import {ECLIPSE, beginEclipse} from './magic/hollow-moon.mjs?v=harvest-18';
+import {heartbloom} from './magic/thornheart.mjs?v=harvest-18';
+import {ABYSS, openAbyss} from './magic/deepeye.mjs?v=harvest-18';
 import {gripAll} from './magic/gloomgrasp.mjs?v=harvest-18';
 import {finalChapter} from './grimoire.mjs?v=harvest-18';
 import {deathMark, deathReap} from './reaper.mjs?v=harvest-18';
@@ -276,6 +278,19 @@ export const SKILL_BOOK = Object.freeze({
       // The moon's own module (src/magic/hollow-moon.mjs) rises, pulls, darkens and bursts.
       k.beat(0, {kind: 'call', fn: 'eclipse', fx: 'eclipse', tx: round(t.x), tz: round(t.z), tick: k.dmg(.35), blast: k.dmg(5)});
     }},
+
+  thornheart: {name: 'Heartbloom', cooldown: 14, reach: 7, pose: 1.2,
+    blurb: 'Ten vines burst out of you and a ring of vine closes round them: every crossing blooms, one after another, then the heart blooms where you stand.',
+    cast(k){
+      // The heart's own module (src/magic/thornheart.mjs) lays the vines and queues the blooms.
+      k.beat(.1, {kind: 'call', fn: 'heartbloom', fx: 'heartbloom', power: round(k.strength), vine: k.dmg(1), bloom: k.dmg(2.6), heart: k.dmg(6)});
+    }},
+
+  deepeye: {name: 'Open the Abyss', cooldown: 15, reach: ABYSS.radius, pose: 1.7,
+    blurb: 'The eye swells and its beam sweeps a full circle round you, burning everything it crosses; then the dark it opened folds shut on whatever stands close, stunning it.',
+    cast(k){
+      k.beat(.05, {kind: 'call', fn: 'abyss', fx: 'abyss', dmg: k.dmg(14), fold: k.dmg(20)});
+    }},
 });
 
 // ------------------------------------------------------------------ special beats
@@ -356,6 +371,10 @@ export const SKILL_CALLS = Object.freeze({
   lastrites(world, b, owner){return beginRite(world, owner, b);},
   /** Eclipse: the Hollow Moon's own module rises, drags, goes dark and bursts (src/magic/hollow-moon.mjs). */
   eclipse(world, b, owner){return beginEclipse(world, owner, b);},
+  /** Heartbloom: Thornmother's Heart lays its spokes and ring and blooms at every crossing (src/magic/thornheart.mjs). */
+  heartbloom(world, b, owner){return heartbloom(world, owner, b);},
+  /** Open the Abyss: the Eye of the Deep sweeps its beam round and folds the dark shut (src/magic/deepeye.mjs). */
+  abyss(world, b, owner){return openAbyss(world, owner, b);},
   /** Abyssal Grip: the scepter's own hands rise under every foe near the mark (src/magic/gloomgrasp.mjs). */
   gloomhands(world, b, owner){return gripAll(world, owner, b);},
   /** Final Chapter: the grimoire's pages ring the mark and hang there (src/grimoire.mjs). */

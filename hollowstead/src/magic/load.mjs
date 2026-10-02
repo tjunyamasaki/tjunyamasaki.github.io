@@ -11,6 +11,8 @@ const SPECS = [
   'mourning-bell.mjs',
   'pallbearer.mjs',
   'hollow-moon.mjs',
+  'thornheart.mjs',
+  'deepeye.mjs',
 ];
 
 export async function loadMagicModules(){

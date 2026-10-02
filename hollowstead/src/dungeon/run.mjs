@@ -69,7 +69,9 @@ export function dungeonNodes(world){
 }
 /** Creature strength by depth (and a chamber's tier). */
 export function dungeonScale(world, tier = 0){
-  const depth = Math.max(1, world?.dungeon?.depth || 1), step = 1 + (depth - 1)*1.6 + tier*2, scale = enemyScale(step);
+  // A delve (delve.mjs) starts from the threat the party brought down; a standalone run from nothing.
+  const d = world?.dungeon, depth = Math.max(1, d?.depth || 1), base = d?.base > 0 ? d.base + (depth - 1)*1.25 : 1 + (depth - 1)*1.6, step = base + tier*2, scale = enemyScale(step);
+  if(d?.base > 0) return {scale, level: Math.round(step), elite: Math.min(.3, .02*step + tier*.05), boss: 1 + .25*Math.floor(step/6)};
   // The first two floors bite a little softer while the party finds its feet.
   if(depth < 3) scale.damage *= depth === 1 ? .8 : .9;
   return {scale, level: Math.round(step), elite: Math.min(.3, .025*(depth - 1) + tier*.05), boss: 1 + .3*Math.floor((depth - 1)/DUNGEON.kingEvery)};
@@ -234,14 +236,17 @@ function ambushWave(world, L, room){
 /** The Warden and its escort rise by the stairs. Every fifth floor it is the Hollow King himself. */
 function wakeWarden(world, L, room){
   const d = world.dungeon, v = variantOf(d.variant), depth = d.depth, humans = people(world);
-  const king = depth % DUNGEON.kingEvery === 0, type = king ? 'king' : v.warden(depth);
+  // A delve's last floor is guarded by its finale (bosses.mjs) instead of a Warden.
+  const finale = d.finale && d.floors && depth - d.first + 1 >= d.floors ? d.finale : null;
+  const king = !finale && depth % DUNGEON.kingEvery === 0, type = finale || (king ? 'king' : v.warden(depth));
   const at = walkableNear(L, room.x, room.z - 2.2, 3) || {x: room.x, z: room.z};
   world.event('portal', at.x, at.z, '', {radius: 2.6});
   // An elder from the third floor down; before that, a plain one with a Warden's stamina.
   const warden = spawnIn(world, room, type, at, {home: true, leash: room.r + 12, tier: depth >= 3 ? 1 : 0, elite: !king && depth >= 3});
   if(warden){
     warden.warden = true; warden.aggro = true;
-    warden.hp = warden.maxHp = Math.round(warden.maxHp*(king ? 1 : DUNGEON.wardenHp));
+    if(finale){warden.boss = true; warden.home = {x: room.x, z: room.z}; warden.leash = room.r + 6;}
+    warden.hp = warden.maxHp = Math.round(warden.maxHp*(king || finale ? 1 : DUNGEON.wardenHp));
     // The first Wardens hit a little softer: the party is still finding its feet.
     if(depth < 3) warden.power = +(warden.power*.75).toFixed(3);
   }
@@ -251,7 +256,8 @@ function wakeWarden(world, L, room){
     spawnIn(world, room, escort[n % escort.length], spot, {home: true, leash: room.r + 10, tier: 1});
   }
   d.waves[room.id] = 0;
-  world.event('announce', at.x, at.z, king ? 'The Hollow King waits by the stairs' : `The ${ENEMIES[type]?.name || 'Warden'} Warden rises`);
+  if(finale) world.event('bossrise', at.x, at.z, '', {boss: finale});
+  world.event('announce', at.x, at.z, finale ? `${ENEMIES[type]?.name || 'Something'} opens its eye.` : king ? 'The Hollow King waits by the stairs' : `The ${ENEMIES[type]?.name || 'Warden'} Warden rises`);
 }
 
 function reviveAll(world){
@@ -365,10 +371,11 @@ export function dungeonStatus(world){
   const cleared = L.rooms.filter((r, i) => r.kind !== 'start' && d.rooms[i] === 2).length;
   const party = world.players.filter(p => p.online && !p.down && !p.ghost).length;
   const warden = world.enemies.find(e => e.warden && e.hp > 0);
-  const king = d.depth % DUNGEON.kingEvery === 0;
-  let objective = king ? 'Find the Hollow King' : 'Find the Warden';
-  if(warden) objective = king ? 'Slay the Hollow King' : `Slay the ${ENEMIES[warden.type]?.name || ''} Warden`;
-  if(d.phase === 'open') objective = party > 1 ? `Gather at the stairs · ${d.ready || 0}/${party}` : 'Take the stairs down';
+  const finale = d.finale && d.floors && d.depth - d.first + 1 >= d.floors;
+  const king = !finale && d.depth % DUNGEON.kingEvery === 0;
+  let objective = finale ? 'Find what waits at the bottom' : king ? 'Find the Hollow King' : 'Find the Warden';
+  if(warden) objective = finale ? `Slay ${ENEMIES[warden.type]?.name || 'it'}` : king ? 'Slay the Hollow King' : `Slay the ${ENEMIES[warden.type]?.name || ''} Warden`;
+  if(d.phase === 'open') objective = finale ? (party > 1 ? `Climb out together · ${d.ready || 0}/${party}` : 'Take the stairs back up') : party > 1 ? `Gather at the stairs · ${d.ready || 0}/${party}` : 'Take the stairs down';
   if(d.phase === 'complete') objective = 'The deep is conquered';
   return {depth: d.depth, name: v.name, short: v.short, objective, cleared, total, phase: d.phase, ready: d.ready || 0, party, portal: d.portal || 0,
     shrine: L.shrine ? {x: L.shrine.x, z: L.shrine.z, used: !!d.shrine, charge: d.shrineT || 0, blessing: d.blessing} : null, warden: warden || null, best: d.best, stats: d.stats};

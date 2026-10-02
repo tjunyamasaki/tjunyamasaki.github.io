@@ -4,7 +4,7 @@
 // stand. Pure (no THREE, no DOM) so both renderers share it and node can test it.
 // Every frame fills pooled records (ground / air / glow) that the renderers read before the next update.
 
-import {RULES} from './content.mjs?v=harvest-18';
+import {RULES, hollowTime, scheduleOf} from './content.mjs?v=harvest-18';
 
 export const LIFE = Object.freeze({
   scare:4, crowAway:[18, 34], crowReturnClear:7, crowFlight:2.2, crowReturn:2.4, crowsDark:.5,
@@ -21,8 +21,9 @@ export function idHash(id){let h = 2166136261;for(let i = 0; i < id.length; i++)
 function numHash(a, b){let h = Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1);h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);return ((h ^ (h >>> 16)) >>> 0) / 4294967296;}
 
 /** 0..1 how many fireflies are out at this world time (dusk and the first half of the night). */
-export function fireflyStrength(time){
-  const f = LIFE.firefly, t = ((time % RULES.cycle) + RULES.cycle) % RULES.cycle;
+export function fireflyStrength(time, schedule = RULES){
+  // Times are set on the standard clock; a longer day (the Vigil) stretches them to match.
+  const f = LIFE.firefly, cycle = schedule.cycle || RULES.cycle, k = cycle / RULES.cycle, t = (((time % cycle) + cycle) % cycle) / k;
   if(t < f.start || t > f.end)return 0;
   if(t < f.full)return smooth((t - f.start) / (f.full - f.start));
   if(t > f.hold)return 1 - smooth((t - f.hold) / (f.end - f.hold));
@@ -87,7 +88,7 @@ export class AmbientLife {
       this.addGround(`ripple-${Math.min(2, Math.floor(rp.t / LIFE.ripple * 3))}`, rp.x, rp.z, 0, false, 1, true);
     }
     // ---- fireflies over meadow and woods patches
-    const ff = fireflyStrength(world.time || 0) * (world.showcase ? 0 : 1);
+    const ff = fireflyStrength(hollowTime(world), scheduleOf(world)) * (world.showcase ? 0 : 1);
     if(ff > 0){
       let n = 0;const cap = reduced ? caps.fireflies / 2 : caps.fireflies;
       for(const c of chunks)for(const sw of c.swarms){

@@ -3,7 +3,7 @@
 // The badge lives in .game-top .clock-meta; the card floats under it; the veil sits first in #game, under every HUD control.
 
 import {cachedSrc} from '../assets.mjs?v=harvest-18';
-import {phaseAt} from '../content.mjs?v=harvest-18';
+import {phaseOf} from '../content.mjs?v=harvest-18';
 import {MOON_LIGHT, MOONS, moonLighting, nightStatus} from '../night.mjs?v=harvest-18';
 
 const CARD_SECONDS = 5.5;
@@ -96,7 +96,7 @@ export function paint(ctx){
   }
   if(!card.hidden){const line = announcement(); if(line && line !== cardAnnounce) hideCard();}
   status = nightStatus(world);
-  const omen = status.moon === 'blood' && phaseAt(world.time || 0) !== 'day';
+  const omen = status.moon === 'blood' && phaseOf(world) !== 'day';
   const next = `${status.moon}|${status.next}|${status.day}|${omen}`;
   if(next !== sig){
     sig = next;

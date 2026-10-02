@@ -9,7 +9,13 @@ export const REGIONS = Object.freeze({
   mire:{name:'Hollow Mire', tier:2},
   crags:{name:'Moonshard Crags', tier:2},
   barrow:{name:'Barrow Fields', tier:2},
+  // Areas (worldgen.mjs areaAt): seeded places laid over the rings, somewhere new in every hollow.
+  frostmere:{name:'Frostmere', tier:2, area:true},
+  ashscar:{name:'The Ashen Scar', tier:2, area:true},
+  briarlair:{name:'The Briar Throne', tier:2, area:true, boss:'briarmother'},
 });
+/** Region ids that are seeded areas rather than rings. */
+export const AREA_IDS = Object.freeze(Object.keys(REGIONS).filter(id=>REGIONS[id].area));
 
 const hash=(x,z)=>{let h=Math.imul(x|0,374761393)+Math.imul(z|0,668265263);h=Math.imul(h^(h>>>13),1274126177);return ((h^(h>>>16))>>>0)/4294967296;};
 const smooth=t=>t*t*(3-2*t);
@@ -41,6 +47,9 @@ export const NODE_POOLS = Object.freeze({
   mire:['glowcap','glowcap','glowcap','grass','grass','tree','bush','mushroom'],
   crags:['shardrock','shardrock','shardrock','rock','rock','ore','ore','grass'],
   barrow:['bones','bones','bones','grave','grave','ore','tree','rock'],
+  frostmere:['rimecrystal','rimecrystal','rimecrystal','shardrock','rock','grass','tree'],
+  ashscar:['embervent','embervent','embervent','rock','ore','bones','grave'],
+  briarlair:['bush','bush','bush','tree','tree','grass','mushroom'],
 });
 
 /** Creatures that live in a region by day and guard its caches. */
@@ -51,6 +60,10 @@ export const RESIDENTS = Object.freeze({
   mire:['bogling','bogling','crawler'],
   crags:['golem','bonewalker','wraith'],
   barrow:['bonewalker','bonewalker','brute'],
+  frostmere:['wraith','wraith','golem','bonewalker'],
+  ashscar:['bonewalker','brute','crawler','crawler'],
+  // Mother Briar's brood: her lair crawls with briarlings.
+  briarlair:['crawler','crawler','crawler'],
 });
 
 export const CACHE_LAYOUT = Object.freeze([
@@ -72,7 +85,7 @@ const ITEM_RARITY = Object.freeze({
   elixir:'uncommon', heartstone:'epic', stew:'uncommon', bandage:'common',
   sword:'uncommon', torch:'common', recurve:'uncommon', bonebow:'rare', broadsword:'rare', crookstaff:'rare',
   flamberge:'epic', skullstaff:'epic', tome:'legendary', bonemail:'rare', shardplate:'epic', everlantern:'legendary',
-  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic', 'kitsune-lantern':'epic', plaguebeak:'epic', gloomgrasp:'epic', pallbearer:'epic', 'hollow-moon':'legendary',
+  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic', 'kitsune-lantern':'epic', plaguebeak:'epic', gloomgrasp:'epic', pallbearer:'epic', 'hollow-moon':'legendary', thornheart:'legendary', deepeye:'legendary',
   fangs:'rare', wisplantern:'rare', crowtotem:'rare', soulchain:'epic', stormrod:'epic', jacklantern:'epic', censer:'epic',
   scythe:'legendary', starfall:'legendary', wighthorn:'legendary',
   // Trinkets (trinkets.mjs): six rare, four epic. Caches and elites drop them through the pools below.
@@ -83,6 +96,7 @@ const ITEM_RARITY = Object.freeze({
   hellspur:'epic', mournersveil:'epic', thirteenthbell:'legendary', hollowmirror:'legendary',
   // Refinement currency: only creatures drop it (LOOT_TABLES below, REFINE).
   ichor:'uncommon',
+  rime:'uncommon', emberglass:'uncommon',
 });
 export const rarityOf = itemId=>ITEM_RARITY[itemId]||'common';
 export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
@@ -124,6 +138,18 @@ export const LOOT_TABLES = Object.freeze({
   bonewalker:{xp:11, rolls:[{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.35, entries:[['ichor',[1,1],1]]}]},
   bogling:{xp:10, rolls:[{chance:.08, entries:[['uncommon',1,3],['elixir',[1,1],2]]},{chance:.4, entries:[['ichor',[1,1],1]]}]},
   golem:{xp:52, rolls:[{chance:.34, entries:[['rare',1,3],['epic',1,1]]},{entries:[['ichor',[3,4],1]]}]},
+  // Omens (omens.mjs).
+  fallenstar:{xp:60, rolls:[
+    {count:[2,3], entries:[['shard',[2,4],3],['ember',[2,3],2],['rime',[1,2],1],['emberglass',[1,2],1],['ore',[2,3],1]]},
+    {entries:[['rare',1,2],['epic',1,1]]},
+    {chance:.12, entries:[['legendary',1,1]]},
+  ]},
+  goldpumpkin:{xp:40, rolls:[
+    {entries:[['heartstone',[1,1],1],['epic',1,1.4],['elixir',[2,3],1]]},
+    {count:[1,2], entries:[['pumpkin',[2,4],1],['seed',[2,3],1]]},
+  ]},
+  briarmother:{xp:700, rolls:[]},
+  unblinking:{xp:820, rolls:[]},
   king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]},{entries:[['ichor',[10,14],1]]}]},
 });
 
@@ -156,6 +182,8 @@ export function rollLoot(tableId, rng, luck=0){
 
 // ------------------------------------------------------------------ experience
 export const MAX_LEVEL=40;
+/** The Vigil (vigil.mjs) is played for a long time: levels go on to VIGIL_MAX_LEVEL. */
+export const VIGIL_MAX_LEVEL=60;
 export const xpToNext = level=>Math.round(40*Math.pow(Math.max(1,level),1.45));
 export const GATHER_XP=2, DISCOVER_XP=35, SHARE_RADIUS=26;
 export const enemyXp = type=>LOOT_TABLES[type]?.xp??8;

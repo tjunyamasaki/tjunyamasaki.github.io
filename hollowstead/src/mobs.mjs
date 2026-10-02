@@ -25,6 +25,10 @@ import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {landBlow, preyFor} from './arsenal.mjs?v=harvest-18';
 import {cartTargets} from './cart.mjs?v=harvest-18';
 import {slideMove, steer} from './pathing.mjs?v=harvest-18';
+import {addBlast} from './blasts.mjs?v=harvest-18';
+import {GILDED, starLoot} from './moons.mjs?v=harvest-18';
+import {BOSS_ATTACKS, BOSS_MOVES, bossRelease, bossTick} from './bosses.mjs?v=harvest-18';
+export {addBlast};
 
 /** Creatures chew through camp structures at half their bite, so a lone explorer's fire survives an early night. */
 // Creature damage (content.mjs ENEMIES) doubled; these halve with it so walls and the fire take what they did.
@@ -49,6 +53,8 @@ export const ATTACKS = Object.freeze({
   kingSlam:   {shape: 'ring', windup: 1.3, trigger: 3.6, radius: 4.3, push: 1.8, dmg: 1},
   kingNova:   {shape: 'ring', windup: .85, trigger: 12, radius: 1.8, shots: 18, speed: 4.6*1.15, life: 4.2, dmg: .45},
   kingSummon: {shape: 'ring', windup: .9, trigger: 14, radius: 2.4, summon: 5, dmg: 0},
+  // Mother Briar and The Unblinking (bosses.mjs).
+  ...BOSS_ATTACKS,
 });
 
 /**
@@ -65,6 +71,7 @@ export const MOVES = Object.freeze({
   brute:      {body: .8, accel: 4, flank: 10, attacks: ['slam']},
   golem:      {body: 1, accel: 3, attacks: ['quake']},
   king:       {body: 1.5, accel: 3, attacks: ['kingSlam', 'kingNova', 'kingSummon'], rotate: true},
+  ...BOSS_MOVES,
 });
 const DEFAULT_MOVE = {body: .5, accel: 8, attacks: ['bite']};
 export const moveOf = type => MOVES[type] || DEFAULT_MOVE;
@@ -244,11 +251,40 @@ export function telegraphOf(e){
   return null;
 }
 
-/** Hostile shots and lobbed spores, for renderers: {x, z, radius, kind, fill} (fill only for spores). */
+/** Hostile shots and lobbed spores, for renderers: {x, z, radius, kind, fill} (fill only for spores). Blasts carry their ground telegraph. */
 export function hostileShots(world){
   return (world?.hostile || []).map(s => s.kind === 'spore'
     ? {kind: 'spore', x: s.x, z: s.z, radius: s.r, fill: Math.max(0, Math.min(1, 1-s.fuse/Math.max(.05, s.flight))), sx: s.sx, sz: s.sz}
+    : s.kind === 'blast' ? {kind: 'blast', id: s.id, style: s.style, x: s.x, z: s.z, radius: s.r || 1, telegraph: blastTelegraph(s)}
     : {id: s.id, kind: s.kind, x: s.x, z: s.z, radius: s.r, vx: s.vx, vz: s.vz});
+}
+
+function blastTelegraph(s){
+  const fill = s.fuse > s.flight ? 0 : Math.max(0, Math.min(1, 1-s.fuse/Math.max(.05, s.flight)));
+  const base = {shape: s.shape === 'line' ? 'line' : s.shape === 'ring' ? 'ring' : 'circle', x: s.x, z: s.z, angle: s.ang || 0, fill, heavy: s.heavy, style: s.style, waiting: s.fuse > s.flight};
+  if(s.shape === 'line') return {...base, length: s.len, width: s.w};
+  return {...base, radius: s.r, inner: s.inner || 0};
+}
+function inBlast(s, x, z, pad){
+  const dx = x-s.x, dz = z-s.z;
+  if(s.shape === 'line'){
+    const ca = Math.cos(s.ang), sa = Math.sin(s.ang), along = dx*ca+dz*sa, across = Math.abs(-dx*sa+dz*ca);
+    return along > -pad && along < s.len+pad && across < s.w/2+pad;
+  }
+  const d = Math.hypot(dx, dz);
+  if(s.shape === 'ring' && s.inner > 0 && d < s.inner-pad) return false;
+  return d < s.r+pad;
+}
+function detonate(world, s, people, guards){
+  for(const p of people) if(inBlast(s, p.x, p.z, .3)){
+    world.hurt(p, s.dmg, null);
+    if(s.push && !(p.iframes > 0)) world.shove(p, p.x-s.x, p.z-s.z, s.push);
+  }
+  for(const a of guards) if(inBlast(s, a.x, a.z, .35)) a.hp -= s.dmg*(ALLIES[a.type]?.guard ?? 1);
+  if(s.all){for(const e of world.enemies) if(e.hp > 0 && !isMagicAlly(e) && e.id !== s.owner && !ENEMIES[e.type]?.boss && inBlast(s, e.x, e.z, bodyOf(e)*.6)){e.hp -= s.dmg*1.5; world.event('damage', e.x, e.z, String(Math.round(s.dmg*1.5)));}}
+  else for(const b of world.buildings) if(b.hp > 0 && !b.fixed && inBlast(s, b.x, b.z, Math.max(.3, STRUCTURES[b.type]?.radius || .3))) b.hp -= s.dmg*structureHit(b);
+  if(s.loot === 'star') starLoot(world, s.x, s.z);
+  world.event('blast', s.x, s.z, '', {style: s.style, shape: s.shape, radius: s.r, inner: s.inner || 0, angle: s.ang, length: s.len, width: s.w});
 }
 
 function inShape(e, spec, x, z, pad){
@@ -305,6 +341,12 @@ function release(world, e, target){
   e.windup = 0; e.cooldown = cadence(world, e, def);
   if(!spec){e.atk = ''; return;}
   world.event('impact', e.tx, e.tz, '', {mob: e.type});
+  if(BOSS_ATTACKS[id]){
+    // A boss's own patterns (bosses.mjs). A cone wind-up lands where it was telegraphed first.
+    if(spec.shape === 'cone'){strikeArea(world, e, spec, amount, (x, z, pad) => inShape(e, spec, x, z, pad)); world.event('quake', e.tx, e.tz, '', {radius: spec.radius, arc: spec.arc, angle: e.ang});}
+    bossRelease(world, e, id, target, amount);
+    e.atk = ''; return;
+  }
   if(id === 'bite' || id === 'swipe'){
     const d = Math.max(.01, Math.hypot(e.tx-e.x, e.tz-e.z));
     world.move(e, (e.tx-e.x)/d*spec.lunge/.05, (e.tz-e.z)/d*spec.lunge/.05, .05, world.frameObstacles);
@@ -363,10 +405,11 @@ function cadence(world, e, def){
 function chooseAttack(world, e, target, d, reach){
   const move = moveOf(e.type);
   if(move.rotate){
-    // The Hollow King cycles his patterns, skipping one that cannot land from here.
-    for(let tries = 0; tries < move.attacks.length; tries++){
-      const id = move.attacks[(e.pat || 0) % move.attacks.length];
-      e.pat = ((e.pat || 0)+1) % move.attacks.length;
+    // The Hollow King cycles his patterns, skipping one that cannot land from here. The great bosses change cycle by phase.
+    const list = move.phases ? move.phases[Math.max(0, Math.min(move.phases.length-1, (e.phase || 1)-1))] : move.attacks;
+    for(let tries = 0; tries < list.length; tries++){
+      const id = list[(e.pat || 0) % list.length];
+      e.pat = ((e.pat || 0)+1) % list.length;
       if(d <= ATTACKS[id].trigger+reach) return id;
     }
     return null;
@@ -389,6 +432,11 @@ export function stepHostile(world, dt){
   const guards = [...(world.allies || []), ...(world.magicSummons || [])].filter(a => a && a.hp > 0 && Number.isFinite(a.x));
   const carts = cartTargets(world);
   for(const s of list){
+    if(s.kind === 'blast'){
+      s.fuse -= dt;
+      if(s.fuse <= 0){s.done = true; detonate(world, s, people, guards);}
+      continue;
+    }
     if(s.kind === 'spore'){
       s.fuse -= dt;
       if(s.fuse <= 0){
@@ -439,6 +487,7 @@ export function stepMobs(world, dt, obstacles){
     // Weapon lab dummies: they stand, take hits and get knocked about, and never strike back.
     if(world.arena?.dummies){e.vx = e.vz = 0; e.act = 0; e.windup = 0; e.slowed = Math.max(0, (e.slowed || 0)-dt); continue;}
     const move = moveOf(e.type);
+    if(def.boss) bossTick(world, e, dt);
     e.cooldown = (e.cooldown || 0)-dt; e.slowed = Math.max(0, (e.slowed || 0)-dt);
     const sx = e.x, sz = e.z;
 
@@ -467,9 +516,14 @@ export function stepMobs(world, dt, obstacles){
       continue;
     }
 
-    // Choose prey.
+    // Choose prey. A gilded creature (moons.mjs) never fights: it runs from the nearest wanderer.
     let target = null;
-    if(e.home){
+    if(e.gilded){
+      let near = null, nd = GILDED.flee;
+      for(const p of people){const d = dist(p, e); if(d < nd){nd = d; near = p;}}
+      if(near){const d = Math.max(.01, nd); target = {x: e.x+(e.x-near.x)/d*6, z: e.z+(e.z-near.z)/d*6, homing: true, id: 'flee:'+e.id};}
+      else{e.vx *= .8; e.vz *= .8; continue;}
+    }else if(e.home){
       let prey = [preyFor(world, e, quarry, e.aggro ? ROAM.aggro+6 : ROAM.aggro)].find(q => q && Math.hypot(q.x-e.home.x, q.z-e.home.z) < e.leash+8) || null;
       // Underground a resting creature has to see you first: no waking a whole floor through the rock.
       if(prey && !e.aggro && world.dungeon && !world.canSee(e, prey)) prey = null;
@@ -573,7 +627,7 @@ export function stepMobs(world, dt, obstacles){
       if(od < gap && od > 1e-3){const w = (gap-od)/gap; pushX += ox/od*w*2; pushZ += oz/od*w*2;}
     }
 
-    const top = def.speed*(e.slowed > 0 ? .35 : 1)*(e.minion ? 1.1 : 1);
+    const top = (e.gilded ? GILDED.speed : def.speed)*(e.slowed > 0 ? .35 : 1)*(e.minion ? 1.1 : 1);
     const wantVX = dirX*top+pushX*3, wantVZ = dirZ*top+pushZ*3;
     const k = Math.min(1, move.accel*dt/Math.max(.5, top));
     e.vx = (e.vx || 0)+(wantVX-(e.vx || 0))*Math.min(1, k*2);

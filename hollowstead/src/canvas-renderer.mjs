@@ -42,7 +42,7 @@ export class CanvasRenderer {
   pick(x,y,world){
     const viewer=this.localId&&world.player?world.player(this.localId):null;
     let best=null,dist=44;
-    for(const e of [...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)),...world.buildings,...world.drops,...world.enemies,...magicVisuals(world).map(entry=>entry.entity)]){
+    for(const e of [...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)),...world.buildings,...world.drops,...world.enemies,...magicVisuals(world).map(entry=>entry.entity)]){
       if(this.view&&!canInspect(this.view, e.x, e.z, viewer, RULES.reach))continue;
       const s=this.screenPoint(e.x,e.z,.6),d=Math.hypot(x-s.x,y-s.y);if(d<dist){best=e;dist=d;}
     }
@@ -113,7 +113,7 @@ export class CanvasRenderer {
       c.rotate(-tilt);
     }
     if(kind==='building'&&key==='gate'&&e.open)w*=.35;
-    if(kind!=='preview')c.filter=`brightness(${Math.min(1, Math.max(0, display))})`+(kind==='enemy'&&e.stunned>0?' saturate(.35) hue-rotate(160deg)':'');
+    if(kind!=='preview')c.filter=`brightness(${Math.min(1, Math.max(0, display))})`+(kind==='enemy'&&e.stunned>0?' saturate(.35) hue-rotate(160deg)':'')+(kind==='enemy'&&e.gilded?' sepia(1) saturate(3) brightness(1.25)':'');
     c.drawImage(img,(frameIndex%cols)*sw,Math.floor(frameIndex/cols)*sh,sw,sh,-w*def.anchor[0],-h*(1-def.anchor[1]),w,h);c.filter='none';
     const glowImg=kind==='enemy'&&this.images.get('glow-'+key);if(glowImg){const gw=glowImg.naturalWidth/cols,gh=glowImg.naturalHeight/rows;c.globalCompositeOperation='lighter';c.globalAlpha=glowStrength(frame.darkness,e,this.clock);c.drawImage(glowImg,(frameIndex%cols)*gw,Math.floor(frameIndex/cols)*gh,gw,gh,-w*def.anchor[0],-h*(1-def.anchor[1]),w,h);c.globalCompositeOperation='source-over';}
     c.restore();
@@ -130,7 +130,8 @@ export class CanvasRenderer {
   drawTelegraph(tg,alpha){
     const c=this.ctx,poly=scale=>{
       const pts=[];
-      if(tg.shape==='circle'||tg.shape==='ring'){for(let i=0;i<32;i++){const a=i/32*Math.PI*2;pts.push([tg.x+Math.cos(a)*tg.radius*scale,tg.z+Math.sin(a)*tg.radius*scale]);}}
+      if(tg.shape==='ring'&&tg.inner>0){const ro=tg.inner+(tg.radius-tg.inner)*scale;for(let i=0;i<=40;i++){const a=i/40*Math.PI*2;pts.push([tg.x+Math.cos(a)*ro,tg.z+Math.sin(a)*ro]);}for(let i=40;i>=0;i--){const a=i/40*Math.PI*2;pts.push([tg.x+Math.cos(a)*tg.inner,tg.z+Math.sin(a)*tg.inner]);}}
+      else if(tg.shape==='circle'||tg.shape==='ring'){for(let i=0;i<32;i++){const a=i/32*Math.PI*2;pts.push([tg.x+Math.cos(a)*tg.radius*scale,tg.z+Math.sin(a)*tg.radius*scale]);}}
       else if(tg.shape==='cone'){const arc=tg.arc*Math.PI/180;pts.push([tg.x,tg.z]);for(let i=0;i<=16;i++){const a=tg.angle-arc/2+arc*i/16;pts.push([tg.x+Math.cos(a)*tg.radius*scale,tg.z+Math.sin(a)*tg.radius*scale]);}}
       else{const ca=Math.cos(tg.angle),sa=Math.sin(tg.angle),w=tg.width/2,l=tg.length*scale;pts.push([tg.x-sa*w,tg.z+ca*w],[tg.x+ca*l-sa*w,tg.z+sa*l+ca*w],[tg.x+ca*l+sa*w,tg.z+sa*l-ca*w],[tg.x+sa*w,tg.z-ca*w]);}
       c.beginPath();pts.forEach(([x,z],i)=>{const q=this.screenPoint(x,z);if(i)c.lineTo(q.x,q.y);else c.moveTo(q.x,q.y);});c.closePath();
@@ -186,11 +187,13 @@ export class CanvasRenderer {
     if(p.goal){const fade=Math.max(this.reveal(p.goal.x, p.goal.z), distance(p, p.goal)<8?.28:0);if(fade>0.04){c.save();c.globalAlpha=fade;this.ellipse(p.goal.x,p.goal.z,.2,'#eadaba',false);c.restore();}}
     for(const e of world.enemies){const tg=telegraphOf(e);if(!tg||Math.abs(tg.x-this.focus.x)>halfX+6||Math.abs(tg.z-this.focus.z)>halfZ+6)continue;if(!warningVisible(frame, tg.x, tg.z, tg.radius||tg.length||2, p))continue;this.drawTelegraph(tg,frame.darkness>0.5?.75:1);}
     for(const s of hostileShots(world))if(s.kind==='spore'&&Math.abs(s.x-this.focus.x)<halfX+4&&Math.abs(s.z-this.focus.z)<halfZ+4)this.drawTelegraph({shape:'circle',x:s.x,z:s.z,radius:s.radius,fill:s.fill,heavy:false},.9);
+    // Blasts (blasts.mjs): vents, falling stars, a boss's roots and gaze. Their look is drawn by src/fx/hollow.mjs.
+    for(const s of hostileShots(world))if(s.kind==='blast'&&!s.telegraph.waiting&&Math.abs(s.x-this.focus.x)<halfX+14&&Math.abs(s.z-this.focus.z)<halfZ+14)this.drawTelegraph(s.telegraph,.9);
     const hearthB=world.buildings.find(b=>b.type==='hearth')||(world.arena?{x:0,z:0,level:1}:null),plazaImg=this.images.get('plaza');if(hearthB&&plazaImg){const size=this.theme.sprites.plaza.size[0]*this.scale,q=this.screenPoint(hearthB.x,hearthB.z,0);c.save();c.filter=`brightness(${Math.min(1,entityBrightness(frame,hearthB.x,hearthB.z,{emissive:true}))})`;c.drawImage(plazaImg,q.x-size/2,q.y-size*.36,size,size*.72);c.filter='none';const g=this.images.get('plaza-glow');if(g){c.globalCompositeOperation='lighter';c.globalAlpha=(.12+.5*frame.darkness)*(.75+.25*Math.sin(this.clock*1.6));c.drawImage(g,q.x-size/2,q.y-size*.36,size,size*.72);}c.restore();}
     paintScenery(this,c,world,frame,dt,'ground');
     if(weapon&&(weapon.groundNormal.length||weapon.groundGlow.length))drawMagicCanvas(c,[...weapon.groundNormal,...weapon.groundGlow],(x,z,y)=>this.screenPoint(x,z,y));
     paintRopes(this,c,world,frame,this.theme,true);
-    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world.time)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
+    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
     const drawn=entities.map(entry=>{
       if(entry.key==='gravecraft-skeleton'){
         const last=this.magicActors.get(entry.e.id)||{x:entry.e.x,z:entry.e.z};
@@ -207,9 +210,9 @@ export class CanvasRenderer {
     this.dropMotion.retain(new Set(world.drops.map(drop=>drop.id)));
     const summonIds=new Set((world.magicSummons||[]).map(e=>e.id));for(const id of this.magicActors.keys())if(!summonIds.has(id))this.magicActors.delete(id);
     for(const s of hostileShots(world)){
-      if(Math.abs(s.x-this.focus.x)>halfX+4||Math.abs(s.z-this.focus.z)>halfZ+4)continue;
+      if(s.kind==='blast'||Math.abs(s.x-this.focus.x)>halfX+4||Math.abs(s.z-this.focus.z)>halfZ+4)continue;
       const t=s.fill||0,x=s.kind==='spore'?s.sx+(s.x-s.sx)*t:s.x,z=s.kind==='spore'?s.sz+(s.z-s.sz)*t:s.z,y=s.kind==='spore'?.5+Math.sin(Math.PI*t)*3.2:.5;
-      const q=this.screenPoint(x,z,y),r=Math.max(3,(s.kind==='spore'?.5:s.radius*1.5)*this.scale),color={orb:'176,108,255',shard:'110,184,255',spore:'120,196,76'}[s.kind]||'176,108,255';
+      const q=this.screenPoint(x,z,y),r=Math.max(3,(s.kind==='spore'?.5:s.radius*1.5)*this.scale),color={orb:'176,108,255',shard:'110,184,255',spore:'120,196,76',thorn:'214,82,60',void:'120,40,200'}[s.kind]||'176,108,255';
       if(s.kind!=='spore')this.ellipse(x,z,s.radius*.95,'rgba(26,18,36,.3)');
       const g=c.createRadialGradient(q.x,q.y,0,q.x,q.y,r);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(.35,`rgba(${color},.85)`);g.addColorStop(1,`rgba(${color},0)`);c.fillStyle=g;c.beginPath();c.arc(q.x,q.y,r,0,Math.PI*2);c.fill();
     }

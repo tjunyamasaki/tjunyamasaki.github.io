@@ -1,6 +1,6 @@
 # Hollowstead
 
-**A little light. A long night.** An endless Halloween survival RPG for 1–4 friends. Explore a wide hollow by day, crack open loot caches, grow stronger, and keep the Heartfire burning through nights that get harder every day. Every night has a moon: most are new moons (about 60%), a dark night for foraging with no raid; waxing moons (about 30%) bring raids on the fire; and blood moons (about 10%) bring the Hollow King.
+**A little light. A long night.** An endless Halloween survival RPG for 1–4 friends. Explore a wide hollow by day, crack open loot caches, grow stronger, and keep the Heartfire burning through nights that get harder every day. Every night has a moon: most are new moons (a little over half), a dark night for foraging with no raid; waxing moons (about a quarter) bring raids on the fire; blood moons (about 10%) bring the Hollow King; and now and then a rare moon rises: the **Gilded Moon** or **Star Rain** (about 5% each). For a save you keep for as long as you like, play the [Vigil](#the-vigil).
 
 Play at **[tjunyamasaki.github.io/hollowstead/](https://tjunyamasaki.github.io/hollowstead/)**.
 
@@ -11,6 +11,7 @@ Creating a weapon? Start with the focused [weapon authoring guide](WEAPON_AUTHOR
 - **Venture alone** starts immediately, without a connection service.
 - **Gather your friends** opens a waiting camp. Share its invite link or five-character code, then select **Enter the woods**. Friends can join an expedition already underway.
 - **Continue expedition** resumes the last save on this browser. Select **Host my saved expedition** before opening a camp to resume it with friends.
+- **The Vigil** is one long save in its own slot, kept until you end it. See [The Vigil](#the-vigil).
 - **Dungeons** is a crawl through floors carved fresh every time, alone or with up to three friends. See [Dungeons](#dungeons).
 - **Battle arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
 - **Weapon lab** is the arena without rounds, for trying and balancing weapons. See [Weapon lab](#weapon-lab).
@@ -32,7 +33,7 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 6. Hold **Revive** beside a fallen friend for about three seconds. Each wanderer has one last-chance charm. Fallen players return at dawn if the camp survives; their dropped supplies remain recoverable. Open **Build**, then **Maintain camp**, to repair a damaged structure or hold **Dismantle**. The Heartfire cannot be dismantled, and a chest someone else has open cannot either.
 7. Awaken the Heartfire with soul embers (the same embers mend weapons, so choose). A blood moon brings the Hollow King, stronger each time; tap the moon by the clock to see tonight's moon and the next.
 
-Losing the Heartfire ends the expedition. If everyone falls and has spent their charm, the expedition also ends.
+Losing the Heartfire ends the expedition. If everyone falls and has spent their charm, the expedition also ends. (Not on a Vigil: see below.)
 
 ## Explore and grow
 
@@ -45,7 +46,21 @@ The hollow is ringed by six regions. The Meadow around camp is safe; the Autumn 
 - **Weapons.** Twenty-four weapons in all. Craft spears, swords, bows, a broadsword and a crook at the workbench. Everything stronger is loot: twin daggers that rend, a soulchain that drags foes in, a reaper's scythe that heals, homing wisps, chain lightning, a falling star, carrion crows, a pumpkin sentry, a taunting Grave Knight, a freezing censer, and the five Gravecraft weapons. The Nine-Tail Lantern wakes a kitsune: its tails hang behind you while it is equipped (three, up to five at ★5; nine in its skill), their tips burn hotter as its volleys build from three foxfires to six to nine, and its colour (gold, red or violet) changes each time you equip it. Armour goes from bark to bonemail to moonshard plate. The everburning lantern never runs out. See `docs/WEAPONS.md` for every weapon and how they are balanced.
 - **The curve.** Night 1 is a handful of briarlings. Each day adds many more creatures, a little more health and damage, new kinds and more elites: the nights get more crowded faster than any one creature gets tougher. The Heartfire mends by day and spits embers at whatever claws at it, but it will not hold alone for long.
 
-See `docs/GAMEPLAY_PLAN.md` for the full design.
+- **Wild places.** Each hollow hides three places of its own, set by the seed. **Frostmere** is a frozen lake where you slide on the ice, with rime crystals to mine. The **Ashen Scar** is burnt ground and lava pools where vents erupt under your feet (they burn creatures too), with emberglass to mine. Rime and emberglass awaken the Heartfire to levels 4 and 5. **The Briar Throne** sits against the edge of the map behind a wall of bramble: step inside and **Mother Briar** wakes. She returns a few days after she falls.
+- **The Sunken Stair.** Somewhere in the outer ring a stair leads down. The whole standing party gathers on it and holds **Descend**: five floors below with your own gear (weapons wear), deeper and harder, and on the last floor **The Unblinking** waits. While you are below, the hollow stands still: no day passes up there. Climb out at any floor's camp fire, or win and come up with experience for everyone.
+- **Great bosses.** Mother Briar and The Unblinking are huge, three-phase fights: every attack is telegraphed on the ground, and each phase brings new patterns and minions. Each drops its own legendary weapon the first time it falls (and sometimes after): **Thornmother's Heart** and **The Eye of the Deep**. Each is stronger every time it returns.
+- **Omens.** Something happens somewhere in the hollow every few minutes: a fallen star with guards around it, a soul rift that pours out creatures until it seals, a lonely chest (sometimes a mimic), a witch's cauldron with one strange brew for each of you until dawn, a golden pumpkin. Each is announced with a direction, marked on the map and lit by a beam you can see from afar.
+- **Rare moons.** Under the **Gilded Moon** no raid comes: gilded creatures appear in the wilds and run from you, and each one you catch drops treasure. Under **Star Rain** smaller waves come while stars fall around everyone: dodge them, then pick up what they leave.
+
+See `docs/GAMEPLAY_PLAN.md` for the full design and `docs/VIGIL.md` for the places, bosses, delve, omens and rare moons.
+
+## The Vigil
+
+**The Vigil** on the title screen is one long hollow kept in its own save slot, separate from expeditions: nothing overwrites it, and it is gone only when you tap **End this vigil…** (twice). **Keep it alone** plays it solo; **Keep it with friends** opens a camp for it.
+
+- **Longer days and nights** (about seven minutes a day).
+- **Dread, not days.** Creatures do not grow stronger as days pass. They grow with you: your highest level, the best gear you have held, and the bosses you have slain. The HUD shows the Dread beside the day.
+- **No game over.** A destroyed Heartfire is rekindled, weaker by one level, and the raid leaves. A fallen party wakes by the fire; packs stay where they fell. The last-chance charm returns every dawn. Levels go to 60.
 
 ## Dungeons
 

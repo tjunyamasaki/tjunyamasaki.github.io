@@ -60,6 +60,8 @@ export const FRONTIER_LINES = Object.freeze({
   barrowcloak: 'Back · keeps out the Barrow Fields’ grave-chill · wears only there',
   glowbloom: 'Night-only: found in the Autumn Woods after dark',
   wispdust: 'Night-only: drifts over the Graveyard after dark',
+  rime: 'Mined from rime crystals in Frostmere · awakens the Heartfire past its third level',
+  emberglass: 'Mined from vents in the Ashen Scar · awakens the Heartfire past its third level',
 });
 
 const LABELS = Object.freeze({
@@ -69,7 +71,8 @@ const LABELS = Object.freeze({
 });
 
 /** The hazardous region (a REGION_GEAR key) at a position, or null. */
-export function hazardAt(x, z){const id=regionAt(x, z);return Object.hasOwn(REGION_GEAR, id)?id:null;}
+/** `world` (optional) lets a seeded area (worldgen.mjs areaAt) override the ring beneath it. */
+export function hazardAt(x, z, world=null){const id=typeof world?.regionOf==='function'?world.regionOf(x, z):regionAt(x, z);return Object.hasOwn(REGION_GEAR, id)?id:null;}
 
 /** True when wanderer `p`'s own gear answers region `id`: the worn mask or cloak, or their own lit grave lantern. */
 export function geared(p, id){
@@ -80,7 +83,7 @@ export function geared(p, id){
 }
 
 /** True when `p` stands in the Crags without their own lit grave lantern: to them it is an unlit night. */
-export function regionUnlit(world, p){return !!p&&!world?.arena&&!world?.dungeon&&!world?.showcase&&hazardAt(p.x, p.z)==='crags'&&!geared(p, 'crags');}
+export function regionUnlit(world, p){return !!p&&!world?.arena&&!world?.dungeon&&!world?.showcase&&hazardAt(p.x, p.z, world)==='crags'&&!geared(p, 'crags');}
 
 /** A night-only node's halo colour, or null for every other node. */
 export function nightGlow(node){return NODES[node?.type]?.night?NIGHT_GLOW[node.type]||'#d4fff5':null;}
@@ -88,7 +91,7 @@ export function nightGlow(node){return NODES[node?.type]?.night?NIGHT_GLOW[node.
 /** Called by World.tick() for each living wanderer outside the arena and showcase, every tick. */
 export function applyRegions(world, p, dt, phase){
   noteFinds(world, p, dt);
-  const id=hazardAt(p.x, p.z);
+  const id=hazardAt(p.x, p.z, world);
   if(!id)return;
   const gear=REGION_GEAR[id];
   if(geared(p, id)){
@@ -131,7 +134,7 @@ function noteFinds(world, p, dt){
 /** Walk speed multiplier from the region (grave-chill). */
 export function regionSpeed(world, p){
   if(!p||world?.arena||world?.dungeon||world?.showcase)return 1;
-  return hazardAt(p.x, p.z)==='barrow'&&!geared(p, 'barrow')?HAZARDS.barrow.speed:1;
+  return hazardAt(p.x, p.z, world)==='barrow'&&!geared(p, 'barrow')?HAZARDS.barrow.speed:1;
 }
 
 // Offsets sampled around the viewer: the centre and two rings, so the darkness ramps in over
@@ -139,8 +142,8 @@ export function regionSpeed(world, p){
 const SAMPLES=(()=>{const out=[[0,0]];for(const r of [HAZARDS.ramp/2, HAZARDS.ramp])for(let i=0;i<8;i++){const a=(i+(r<HAZARDS.ramp?0:.5))/8*Math.PI*2;out.push([Math.cos(a)*r, Math.sin(a)*r]);}return out;})();
 const smooth=t=>{const x=t<0?0:t>1?1:t;return x*x*(3-2*x);};
 /** Fraction of the samples around x,z that lie in the Crags, eased: 0 well outside, 1 a couple of units in. */
-export function cragsCover(x, z){
-  let inside=0;for(const [dx, dz] of SAMPLES)if(regionAt(x+dx, z+dz)==='crags')inside++;
+export function cragsCover(x, z, world=null){
+  let inside=0;for(const [dx, dz] of SAMPLES)if(hazardAt(x+dx, z+dz, world)==='crags')inside++;
   return smooth((inside/SAMPLES.length-.15)/.6);
 }
 // Per-frame cache: the viewer usually has not moved far since the last frame.
@@ -150,7 +153,7 @@ const lastDark={x:NaN, z:NaN, value:0};
 export function regionDarkness(world, viewer){
   if(!world||!viewer||world.arena||world.dungeon||world.showcase||!Number.isFinite(viewer.x)||!Number.isFinite(viewer.z))return 0;
   if(Math.abs(viewer.x-lastDark.x)<.08&&Math.abs(viewer.z-lastDark.z)<.08)return lastDark.value;
-  lastDark.x=viewer.x;lastDark.z=viewer.z;lastDark.value=cragsCover(viewer.x, viewer.z);
+  lastDark.x=viewer.x;lastDark.z=viewer.z;lastDark.value=cragsCover(viewer.x, viewer.z, world);
   return lastDark.value;
 }
 
@@ -160,7 +163,7 @@ export function regionDarkness(world, viewer){
  */
 export function regionStatus(world, p){
   if(!world||!p||world.arena||world.dungeon||world.showcase||p.down||p.ghost)return null;
-  const region=hazardAt(p.x, p.z);if(!region)return null;
+  const region=hazardAt(p.x, p.z, world);if(!region)return null;
   const gear=REGION_GEAR[region],safe=geared(p, region),worn=p.equipment?.[gear.slot];
   let state='worn';
   if(!safe){

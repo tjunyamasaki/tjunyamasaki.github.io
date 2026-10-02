@@ -39,7 +39,7 @@ function huntFor(w, seconds, dt=.05){
 }
 
 test('the moon is fixed by the seed and the night, and lands near 60/30/10 new/waxing/blood over 200 nights', () => {
-  const tally={waxing:0, new:0, blood:0};
+  const tally={waxing:0, new:0, blood:0, gilded:0, starrain:0};
   const sequences=SEEDS.map(seed=>moons(seed));
   for(const [i, seed] of SEEDS.entries()){
     assert.deepEqual(moons(seed), sequences[i], 'same seed, same moons');
@@ -50,10 +50,13 @@ test('the moon is fixed by the seed and the night, and lands near 60/30/10 new/w
   assert.ok(sequences.some((s, i) => i && s.join() !== sequences[0].join()), 'seeds give different skies');
   const total=SEEDS.length*200;
   const share=k=>tally[k]/total;
-  assert.ok(share('new')>.52&&share('new')<.68, `new ${share('new')}`);
-  assert.ok(share('waxing')>.23&&share('waxing')<.37, `waxing ${share('waxing')}`);
+  // The rare moons (moons.mjs) take about one night in nine from the new and waxing ones.
+  assert.ok(share('new')>.45&&share('new')<.62, `new ${share('new')}`);
+  assert.ok(share('waxing')>.2&&share('waxing')<.34, `waxing ${share('waxing')}`);
   assert.ok(share('blood')>.06&&share('blood')<.14, `blood ${share('blood')}`);
-  assert.deepEqual(Object.keys(MOONS).sort(), ['blood', 'new', 'waxing']);
+  assert.ok(share('gilded')>.03&&share('gilded')<.09, `gilded ${share('gilded')}`);
+  assert.ok(share('starrain')>.03&&share('starrain')<.09, `starrain ${share('starrain')}`);
+  assert.deepEqual(Object.keys(MOONS).sort(), ['blood', 'gilded', 'new', 'starrain', 'waxing']);
 });
 
 test('nights 1-2 are waxing; no blood moon before night 4 or twice running; one comes at least every MOON_RULES.pity nights', () => {

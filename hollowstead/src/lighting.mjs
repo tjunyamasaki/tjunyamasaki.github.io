@@ -3,7 +3,7 @@
 // feathering; it cannot change who is safe.
 // This module must not import Three.js or a renderer.
 
-import {EQUIPMENT, RULES, STRUCTURES} from './content.mjs?v=harvest-18';
+import {EQUIPMENT, RULES, STRUCTURES, hollowTime, scheduleOf} from './content.mjs?v=harvest-18';
 import {RANGES} from './contracts.mjs?v=harvest-18';
 import {equippedLanternLit} from './inventory.mjs?v=harvest-18';
 import {moonLighting} from './night.mjs?v=harvest-18';
@@ -212,7 +212,7 @@ export function dungeonLights(world, viewer, sources){
 export function frameLighting(world, theme, viewer=null){
   let lighting=resolveLighting(theme);
   // The battle arena keeps no clock: it is always lit enough to read every telegraph.
-  let darkness=world?.arena?0:phaseDarkness(world?.time||0, clockSchedule(), lighting);
+  let darkness=world?.arena?0:phaseDarkness(hollowTime(world), scheduleOf(world), lighting);
   if(world&&!world.arena&&!world.dungeon){
     // Tonight's moon may tint or deepen the dark; some regions are dark even by day (per viewer).
     const moon=moonLighting(world);

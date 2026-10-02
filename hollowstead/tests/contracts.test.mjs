@@ -110,7 +110,7 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(MIGRATION_PREFERRED_WEAPON, 'sword');
   assert.equal(equipmentSlotFor('torch'), 'light');
   assert.equal(equipmentSlotFor('berry'), null);
-  assert.deepEqual(SUPPLY_ITEM_IDS, ['wood', 'stone', 'fiber', 'ore', 'ember', 'seed', 'berry', 'pumpkin', 'mushroom', 'meat', 'roast', 'stew', 'bandage', 'shard', 'bone', 'spore', 'elixir', 'heartstone', 'glowbloom', 'wispdust', 'ichor']);
+  assert.deepEqual(SUPPLY_ITEM_IDS, ['wood', 'stone', 'fiber', 'ore', 'ember', 'seed', 'berry', 'pumpkin', 'mushroom', 'meat', 'roast', 'stew', 'bandage', 'shard', 'bone', 'spore', 'elixir', 'heartstone', 'glowbloom', 'wispdust', 'ichor', 'rime', 'emberglass']);
   assert.equal(itemDefinition('wood').stackLimit, STACK_LIMIT);
   assert.equal(itemDefinition('wood').supplyUnits, 1);
   assert.equal(itemDefinition('axe').supplyUnits, 0);

@@ -35,9 +35,12 @@ const SPECS = Object.freeze({
   pull: {icon: '⇢', label: 'Pull', activation: 'tap'},
   upgrade: {icon: '⇧', label: 'Upgrade', activation: 'tap'},
   refine: {icon: '◈', label: 'Refine', activation: 'tap'},
+  descend: {icon: '⇩', label: 'Descend', activation: 'hold'},
+  sip: {icon: '♨', label: 'Sip', activation: 'hold'},
+  ascend: {icon: '⇧', label: 'Climb out', activation: 'tap'},
 });
 
-const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock']);
+const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock', 'descend', 'sip']);
 /** Context buttons the action cluster can show at once (main.mjs CONTEXT_BUTTONS). */
 const CONTEXT_SLOTS = 4;
 
@@ -230,6 +233,10 @@ export function describeContext(facts) {
   const id = facts.id;
   const repair = repairAction(facts);
   const list = [];
+  if (facts.type === 'fire' && facts.delve) {
+    // A delve's camp fire (delve.mjs): the way back up for the whole party.
+    list.push(make('ascend', {targetId: id, command: buildingCommand('ascend', id)}));
+  }
   if (facts.type === 'hearth' || facts.type === 'fire') {
     const fed = !(facts.fuel > 320);
     list.push(make('feed', {
@@ -243,7 +250,7 @@ export function describeContext(facts) {
       command: buildingCommand('cook', id),
       panel: {tab: 'craft', stationType: facts.type, stationId: id},
     }));
-    if (facts.type === 'hearth' && facts.level < 3) {
+    if (facts.type === 'hearth' && facts.level < (facts.maxLevel || 3)) {
       list.push(make('awaken', {
         targetId: id,
         enabled: !!facts.canAwaken,

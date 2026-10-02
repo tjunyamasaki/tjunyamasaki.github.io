@@ -12,6 +12,9 @@ import {GRIMOIRE_FX} from './grimoire.mjs?v=harvest-18';
 import {REAPER_FX} from './reaper.mjs?v=harvest-18';
 import {HORN_FX} from './wightcaller.mjs?v=harvest-18';
 import {MOON_FX} from './hollow-moon.mjs?v=harvest-18';
+import {THORNHEART_FX} from './thornheart.mjs?v=harvest-18';
+import {DEEPEYE_FX} from './deepeye.mjs?v=harvest-18';
+import {HOLLOW_EVENTS, paintHollow} from './hollow.mjs?v=harvest-18';
 import {magicItems} from '../magic/registry.mjs?v=harvest-18';
 import {rankOf} from '../progression.mjs?v=harvest-18';
 
@@ -29,11 +32,11 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
  *                      behind the body); `keep` is handed back to its list painters as ctx.rig(ownerId).
  * Starfall predates this and is wired in by hand below.
  */
-export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAPER_FX, HORN_FX, MOON_FX];
+export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAPER_FX, HORN_FX, MOON_FX, THORNHEART_FX, DEEPEYE_FX];
 const FOE_FX = WEAPON_FX.filter(fx => fx.foes);
 const FX_BY_ID = new Map(WEAPON_FX.map(fx => [fx.id, fx]));
 
-const EVENTS = Object.assign({...FLAIR_EVENTS, ...STARFALL_EVENTS, ...SKILL_EVENTS}, ...WEAPON_FX.map(fx => fx.events || {}));
+const EVENTS = Object.assign({...FLAIR_EVENTS, ...STARFALL_EVENTS, ...SKILL_EVENTS, ...HOLLOW_EVENTS}, ...WEAPON_FX.map(fx => fx.events || {}));
 const BEATS = Object.assign({...SKILL_BEATS, ...STARFALL_BEATS}, ...WEAPON_FX.map(fx => fx.beats || {}));
 /** Which weapon an event belongs to, for events that name the wielder but not the item. */
 const EVENT_OWNER = new Map(WEAPON_FX.flatMap(fx => Object.keys(fx.events || {}).map(key => [key, fx])));
@@ -97,6 +100,8 @@ export class WeaponFx {
       else if(spec.lasting && b.started && !b.done) spec.lasting(d, b, tt-b.at, clock, lead);
     }
     for(const shot of world.projectiles || []) paintProjectile(d, shot, lead, clock);
+    // The hollow's own effects: blasts, omens, gilded creatures, the great bosses, lava (src/fx/hollow.mjs).
+    paintHollow(d, world, lead, clock);
     const ctx = {lead, clock, time: frame?.time ?? world.time, world, rig: id => this.rigs.get(id), player: id => players.get(id)};
     for(const fx of WEAPON_FX) for(const [list, paint] of Object.entries(fx.lists || {})){
       for(const e of world[list] || []) if(e?.packId === fx.id) paint(d, e, players.get(e.ownerId), ctx);

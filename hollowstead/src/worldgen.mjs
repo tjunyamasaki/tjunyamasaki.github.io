@@ -20,7 +20,7 @@
 //     shores, fence ends, stone rings, lone heath) and props for the scenery layer.
 
 import {NODES, RULES} from './content.mjs?v=harvest-18';
-import {CACHE_LAYOUT, INNER_RING, NODE_POOLS, OUTER_RING, regionAt, valueNoise} from './progression.mjs?v=harvest-18';
+import {CACHE_LAYOUT, INNER_RING, NODE_POOLS, OUTER_RING, REGIONS, regionAt, valueNoise} from './progression.mjs?v=harvest-18';
 
 /** Terrain kinds. Only 'ground' is walkable. */
 export const TERRAIN = Object.freeze({ground:0, water:1, thicket:2, fence:3, void:4});
@@ -29,7 +29,7 @@ export const TERRAIN_NAMES = Object.freeze(['ground', 'water', 'thicket', 'fence
 export const PATCH = Object.freeze({heath:0, meadow:1, rocky:2, forest:3});
 export const PATCH_NAMES = Object.freeze(['heath', 'meadow', 'rocky', 'forest']);
 /** Presentation flags on walkable cells (shape.detail): a ford through water, a worn trail. */
-export const DETAIL = Object.freeze({ford:1, trail:2});
+export const DETAIL = Object.freeze({ford:1, trail:2, ice:4, lava:8});
 
 /** The terrain grid: square cells of CELL units covering [-EXTENT, EXTENT) on both axes. */
 export const CELL = .5, EXTENT = RULES.radius+8, GRID_SIZE = Math.round(EXTENT*2/CELL);
@@ -155,6 +155,89 @@ function regionBias(){
   return REGION_BIAS={bias,rbias};
 }
 
+// ------------------------------------------------------------------ areas
+/**
+ * Areas: places laid over the rings from the seed (their own RNG stream), so every hollow hides them
+ * somewhere new. Each is a disc with a wobbly edge (the throne's wall is exact).
+ *   frostmere  a frozen lake in the middle or outer ring: its water turns to ice you slide across
+ *   ashscar    a burnt crater in the outer ring: no thickets or fences, lava pooled in its low places
+ *   briarlair  Mother Briar's throne against the wild edge, walled in thorn with one gate facing home
+ */
+export const AREAS = Object.freeze({
+  frostmere: Object.freeze({ring:[58, 100], radius:[16, 20], sheet:.58}),
+  ashscar: Object.freeze({ring:[72, 106], radius:[17, 21], pools:[3, 5]}),
+  briarlair: Object.freeze({radius:13.5, wall:3, gate:6, inset:20, approach:12}),
+});
+/** Disc membership with a soft, noisy edge (the throne keeps an exact one). */
+function inArea(a, x, z, pad=0){
+  const dx=x-a.x, dz=z-a.z, d2=dx*dx+dz*dz, r=a.r+pad+(a.id==='briarlair'?a.wall:0);
+  if(d2>(r+3)*(r+3))return false;
+  if(a.id==='briarlair')return d2<r*r;
+  const wob=(valueNoise(x*.11+a.x*.01+31, z*.11-a.z*.01-17)-.5)*5;
+  return Math.sqrt(d2)+wob<r;
+}
+function makeAreas(grid,detail,outlineR,lakes,O,seed){
+  const rng=rngFor((seed>>>0)^0xa4ea5),out=[];
+  const apart=(p,min)=>out.every(a=>arcGap(a.p,p)>=min);
+  const each=(x,z,reach,fn)=>{
+    const i0=Math.max(1,Math.floor((x-reach+EXTENT)*INV)),i1=Math.min(N-2,Math.floor((x+reach+EXTENT)*INV)),j0=Math.max(1,Math.floor((z-reach+EXTENT)*INV)),j1=Math.min(N-2,Math.floor((z+reach+EXTENT)*INV));
+    for(let j=j0;j<=j1;j++){const cz=-EXTENT+(j+.5)*CELL;for(let i=i0;i<=i1;i++){const cx=-EXTENT+(i+.5)*CELL;fn(j*N+i,cx,cz,Math.sqrt((cx-x)*(cx-x)+(cz-z)*(cz-z)));}}
+  };
+  // The Briar Throne, against the wild edge.
+  {const A=AREAS.briarlair,p=rng()*4,[dx,dz]=pseudoDir(p),R=outlineR(dx,dz),d=R-A.inset,x=dx*d,z=dz*d,gx=-dx,gz=-dz;
+    const lair={id:'briarlair',x,z,r:A.radius,wall:A.wall,p,gx,gz};out.push(lair);
+    const rOut=A.radius+A.wall;
+    each(x,z,rOut+.6,(k,cx,cz,dist)=>{
+      if(dist<A.radius){grid[k]=G;detail[k]&=~DETAIL.ford;return;}
+      if(dist<rOut){
+        // The gate faces home: a gap in the thorn wall, then a worn way out through whatever lies beyond.
+        const ox=(cx-x)/dist,oz=(cz-z)/dist,along=ox*gx+oz*gz,across=Math.abs(ox*gz-oz*gx)*dist;
+        if(along>0&&across<A.gate/2){grid[k]=G;detail[k]|=DETAIL.trail;}else grid[k]=T;
+      }
+    });
+    const ax=x+gx*(A.radius-1),az=z+gz*(A.radius-1),bx=x+gx*(rOut+A.approach),bz=z+gz*(rOut+A.approach);
+    capsule(grid,ax,az,bx,bz,2.3,G,[0,1,1,1,0]);capsule(grid,ax,az,bx,bz,1.1,0,[1,0,0,0,0],detail,DETAIL.trail);
+  }
+  // Frostmere: the biggest lake in its ring (far enough from the throne), or a new one.
+  {const A=AREAS.frostmere;let pick=null,x,z,rad;
+    for(const l of lakes){const r=Math.sqrt(l.x*l.x+l.z*l.z);if(l.r<6||r<A.ring[0]||r>A.ring[1]||!apart(pseudoAngle(l.x,l.z),.9))continue;if(!pick||l.r>pick.r)pick=l;}
+    if(pick){x=pick.x;z=pick.z;rad=Math.min(A.radius[1],Math.max(A.radius[0],pick.r+7));}
+    else{
+      for(let t=0;t<80&&x===undefined;t++){const p=rng()*4,[dx,dz]=pseudoDir(p),r=A.ring[0]+rng()*(A.ring[1]-A.ring[0]);if(apart(p,.9)){x=dx*r;z=dz*r;}}
+      if(x===undefined){const [dx,dz]=pseudoDir(out[0].p+2);x=dx*80;z=dz*80;}
+      rad=A.radius[0]+rng()*(A.radius[1]-A.radius[0]);blob(grid,x,z,9,W,O,91);lakes.push({x,z,r:9});
+    }
+    const mere={id:'frostmere',x,z,r:rad,p:pseudoAngle(x,z)};out.push(mere);
+    // Its water freezes, and a broad sheet of ice spreads from the middle whatever lay there.
+    each(x,z,rad+3,(k,cx,cz,dist)=>{const code=grid[k];if(code===V||code===F)return;const wob=(valueNoise(cx*.13-x*.01+5,cz*.13+z*.01+9)-.5)*4;
+      if((code===W&&inArea(mere,cx,cz,-.5))||((code===G||code===T)&&dist+wob<rad*A.sheet)){grid[k]=G;detail[k]=(detail[k]&~(DETAIL.ford|DETAIL.trail))|DETAIL.ice;}});
+  }
+  // The Ashen Scar: burnt open, lava in its hollows.
+  {const A=AREAS.ashscar;let x,z;
+    for(let t=0;t<120&&x===undefined;t++){const p=rng()*4,[dx,dz]=pseudoDir(p),r=A.ring[0]+rng()*(A.ring[1]-A.ring[0]);if(apart(p,t<80?.85:.55)){x=dx*r;z=dz*r;}}
+    if(x===undefined){const [dx,dz]=pseudoDir(out[0].p+1.3);x=dx*90;z=dz*90;}
+    const rad=A.radius[0]+rng()*(A.radius[1]-A.radius[0]),scar={id:'ashscar',x,z,r:rad,p:pseudoAngle(x,z),pools:[]};out.push(scar);
+    each(x,z,rad+3,(k,cx,cz)=>{const code=grid[k];if((code===T||code===F||code===W)&&inArea(scar,cx,cz,-1)){grid[k]=G;detail[k]&=~DETAIL.ford;}});
+    const n=A.pools[0]+Math.floor(rng()*(A.pools[1]-A.pools[0]+1));
+    for(let t=0;t<60&&scar.pools.length<n;t++){
+      const [dx,dz]=randomDir(rng),off=(.2+rng()*.5)*rad,px=x+dx*off,pz=z+dz*off,pr=1.4+rng()*1.3;
+      if(scar.pools.some(q=>(q.x-px)*(q.x-px)+(q.z-pz)*(q.z-pz)<(q.r+pr+3)*(q.r+pr+3)))continue;
+      scar.pools.push({x:px,z:pz,r:pr});
+      each(px,pz,pr+1.4,(k,cx,cz,dist)=>{const wob=(valueNoise(cx*.5+px,cz*.5-pz)-.5)*.9;if(grid[k]===G&&dist+wob<pr){grid[k]=W;detail[k]=(detail[k]&~DETAIL.trail)|DETAIL.lava;}});
+    }
+  }
+  return out;
+}
+/** How an area leans the density and rockiness fields (built after the terrain settles). */
+function areaFields(a,density,rock){
+  const reach=a.r+(a.wall||0)+4;
+  for(let j=0;j<LN;j++){const z=-EXTENT+j*LATTICE;if(Math.abs(z-a.z)>reach)continue;for(let i=0;i<LN;i++){const x=-EXTENT+i*LATTICE;if(Math.abs(x-a.x)>reach)continue;
+    const d=Math.sqrt((x-a.x)*(x-a.x)+(z-a.z)*(z-a.z)),k=j*LN+i,t=1-smooth(a.r-3,a.r+3,d);if(t<=0)continue;
+    if(a.id==='frostmere'){density[k]=density[k]*(1-.65*t);rock[k]+=.08*t;}
+    else if(a.id==='ashscar'){density[k]=density[k]*(1-.92*t);rock[k]+=.3*t;}
+    else if(a.id==='briarlair'&&d<a.r){density[k]=.5+(density[k]-.5)*.4;}}}
+}
+
 const SHAPES=new Map();let lastShape=null;
 function shapeFor(seed){
   if(lastShape!==null&&lastShape.seed===seed)return lastShape;
@@ -253,6 +336,8 @@ function buildShape(seed){
       }
       for(const points of lines){for(let s=0;s+1<points.length;s++)capsule(grid,points[s][0],points[s][1],points[s+1][0],points[s+1][1],.6,F,overGround);fences.push({points,border:false});}
     }}
+  // ---- 3b. areas: Frostmere, the Ashen Scar and the Briar Throne, somewhere new in every hollow
+  const areas=makeAreas(grid,detail,outlineR,lakes,O,seed);
   // ---- 4. reachability: everything walkable is reached from the Heartfire
   const S=scratch(),{seen,queue}=S,hearthCell=cellOf(0,0);
   seen.fill(0);flood(grid,seen,queue,hearthCell,1);
@@ -274,6 +359,8 @@ function buildShape(seed){
     for(let j=0;j<LN;j++)for(let i=0;i<LN;i++){const k=cellOf(-EXTENT+i*LATTICE,-EXTENT+j*LATTICE);if(k<0)continue;if(grid[k]===T)nearT[j*LN+i]=0;else if(grid[k]===W)nearW[j*LN+i]=0;}
     latticeDistance(nearT);latticeDistance(nearW);
     for(let k=0;k<LN*LN;k++){let d=density[k];d=Math.max(d,(1-nearT[k]/9)*.92);d*=.62+.38*smooth(0,7,nearW[k]);density[k]=d;}}
+  // The areas lean their own way: the mere lies open under snow, the scar is burnt bare, the throne is overgrown.
+  for(const a of areas)areaFields(a,density,rock);
   const clearOf=k=>blocked[k]*DIST_UNIT;
   const clearings=[];{const picks=[];for(let j=0;j<LN;j++)for(let i=0;i<LN;i++){const x=-EXTENT+i*LATTICE,z=-EXTENT+j*LATTICE,r=Math.sqrt(x*x+z*z),k=cellOf(x,z);if(density[j*LN+i]>=.72&&r>26&&r<132&&k>=0&&grid[k]===G&&clearOf(k)>=6)picks.push([x,z]);}
     for(const [x,z] of shuffle(picks,rng)){if(clearings.length>=16)break;if(clearings.some(c=>(c.x-x)**2+(c.z-z)**2<22*22))continue;clearings.push({x,z,r:3.5+rng()*2.5});}
@@ -283,7 +370,7 @@ function buildShape(seed){
   const water=chamfer(grid,[0,1,0,0,0],S.dist);
   const spots=makeSpots(grid,detail,blocked,water,density,fences,clearings,rng);
   const shape={seed, radius:RULES.radius, extent:EXTENT, cell:CELL, size:N, lattice:LATTICE, latticeSize:LN,
-    grid, detail, density, rock, blocked, features:null, lakes, clumps, fences, trails, clearings, spots, arcs:arcs.map(a=>({p0:a.p0,p1:a.p1,kind:TERRAIN_NAMES[a.kind],depth:a.depth})), stats:null};
+    grid, detail, density, rock, blocked, features:null, lakes, clumps, fences, trails, clearings, spots, areas, arcs:arcs.map(a=>({p0:a.p0,p1:a.p1,kind:TERRAIN_NAMES[a.kind],depth:a.depth})), stats:null};
   const counts=[0,0,0,0,0];
   shape.features=makeFeatures(shape,rngFor((seed>>>0)^0xfea7),chamfer(grid,[1,0,0,0,0],S.dist),counts);
   shape.stats={ms:Date.now()-started, land:counts[G]*CELL*CELL, water:counts[W]*CELL*CELL, fords, filled};
@@ -370,10 +457,19 @@ function makeFeatures(shape,rng,land,counts){
     for(let t=s===0?0:1;t<=steps;t++){const x=x0+dx*t/steps,z=z0+dz*t/steps,k=cellOf(x,z);if(k<0||grid[k]!==F)continue;add({kind:'fence',x,z,angle,scale:1});}}}
   const lim=(RULES.radius-2)**2;
   for(let j=2;j<N-2;j++)for(let i=2;i<N-2;i++){const k=j*N+i,code=grid[k];counts[code]++;
-    if(code===W){if(grid[k-1]!==G&&grid[k+1]!==G&&grid[k-N]!==G&&grid[k+N]!==G)continue;const x=cellX(k),z=cellZ(k);if(valueNoise(x*.21+11,z*.21-7)<.4||!room(x,z,2.1))continue;add({kind:'reeds',x,z,angle:rng()*Math.PI*2,scale:+(.75+rng()*.5).toFixed(2)});}
+    if(code===W){if(shape.detail[k]&DETAIL.lava)continue;if(grid[k-1]!==G&&grid[k+1]!==G&&grid[k-N]!==G&&grid[k+N]!==G)continue;const x=cellX(k),z=cellZ(k);if(valueNoise(x*.21+11,z*.21-7)<.4||!room(x,z,2.1))continue;add({kind:'reeds',x,z,angle:rng()*Math.PI*2,scale:+(.75+rng()*.5).toFixed(2)});}
     else if(code===T){const d=land[k]*DIST_UNIT;if(d>4.6||(i+j)%2)continue;const x=cellX(k),z=cellZ(k);if(x*x+z*z>lim)continue;const gap=d<1.3?2.3:3.1;if(!room(x,z,gap))continue;add({kind:'thicket',x,z,angle:rng()*Math.PI*2,scale:+(.9+Math.min(1,d/4.6)*.4+rng()*.25).toFixed(2)});}}
   return features;
 }
+
+/** The seeded area (AREAS) at a world position, or null. Cheap: three disc tests on the cached shape. */
+export function areaAt(seed, x, z){const s=lastShape!==null&&lastShape.seed===seed?lastShape:shapeFor(seed);for(const a of s.areas)if(inArea(a,x,z))return a.id;return null;}
+/** Region or area at a world position: what the HUD names, what lives and grows there. */
+export function zoneAt(seed, x, z){return areaAt(seed,x,z)||regionAt(x,z);}
+/** The areas of a hollow: [{id, x, z, r, ...}] (the throne also has its wall, gate direction gx/gz; the scar its lava pools). */
+export function areasOf(seed){return shapeFor(seed).areas;}
+/** True on ice (Frostmere): walkers slide. */
+export function iceAt(seed, x, z){const s=lastShape!==null&&lastShape.seed===seed?lastShape:shapeFor(seed);const k=cellOf(x,z);return k>=0&&(s.detail[k]&DETAIL.ice)!==0;}
 
 /** Terrain kind code (TERRAIN) at a world position. */
 export function terrainAt(seed, x, z){const s=lastShape!==null&&lastShape.seed===seed?lastShape:shapeFor(seed);const i=(x+EXTENT)*INV|0,j=(z+EXTENT)*INV|0;return x+EXTENT>=0&&z+EXTENT>=0&&i<N&&j<N?s.grid[j*N+i]:V;}
@@ -412,9 +508,10 @@ export function landNear(seed, x, z, maxR=6){
 }
 
 // ------------------------------------------------------------------ ground colours
-const SAND=[196,184,150],FOAM=[168,188,190],EARTH=[88,70,54];
-const TONE_KEYS=['meadow','woods','graveyard','mire','crags','barrow','path','water','shore','thicket','void'];
-const DEFAULT_TONES={meadow:'#7d735d',woods:'#565e55',graveyard:'#746977',mire:'#5c6a4e',crags:'#6c6679',barrow:'#655862',path:'#9c8968',water:'#3f5566',shore:'#6f7a6a',thicket:'#3c4a40',void:'#1f1d27'};
+const SAND=[196,184,150],FOAM=[168,188,190],EARTH=[88,70,54],BRIAR=[84,40,46];
+const TONE_KEYS=['meadow','woods','graveyard','mire','crags','barrow','path','water','shore','thicket','void','frostmere','ashscar','briarlair','ice','lava'];
+const DEFAULT_TONES={meadow:'#7d735d',woods:'#565e55',graveyard:'#746977',mire:'#5c6a4e',crags:'#6c6679',barrow:'#655862',path:'#9c8968',water:'#3f5566',shore:'#6f7a6a',thicket:'#3c4a40',void:'#1f1d27',
+  frostmere:'#97a3ad',ashscar:'#4d4340',briarlair:'#4f5c3c',ice:'#b4d3e2',lava:'#e8662a'};
 const toRGB=h=>{const n=parseInt(String(h).replace('#',''),16);return Number.isFinite(n)?[n>>16&255,n>>8&255,n&255]:[128,128,128];};
 const REGION_TONES=new Map(),GROUND=new Map();
 /** Region colour on the lattice (seed independent, so built once per palette), blended across borders by bilerp. */
@@ -444,6 +541,12 @@ export function groundColors(seed, palette={}){
   for(let k=0;k<LN*LN;k++){c[0]=region[0][k];c[1]=region[1][k];c[2]=region[2][k];
     const dens=s.density[k],forest=smooth(.5,.86,dens),heath=1-smooth(.07,.22,dens),rocky=smooth(.56,.82,s.rock[k])*(1-forest),meadow=(1-forest)*(1-heath)*(1-rocky);
     mix(.1*meadow,grass);mix(.4*forest,thicket);mix(.2*heath,path);mix(.24*rocky,stone);const shade=1-.12*forest;L0[k]=c[0]*shade;L1[k]=c[1]*shade;L2[k]=c[2]*shade;}
+  // Areas (seeded) tint their ground: snow round the mere, ash in the scar, deep moss inside the throne.
+  for(const a of s.areas){const tone=tones[a.id];if(!tone)continue;const reach=a.r+(a.wall||0)+4;
+    for(let j=0;j<LN;j++){const z=-EXTENT+j*LATTICE;if(Math.abs(z-a.z)>reach)continue;for(let i=0;i<LN;i++){const x=-EXTENT+i*LATTICE;if(Math.abs(x-a.x)>reach)continue;
+      const d=Math.sqrt((x-a.x)*(x-a.x)+(z-a.z)*(z-a.z))+(a.id==='briarlair'?0:(valueNoise(x*.11+a.x*.01+31,z*.11-a.z*.01-17)-.5)*5),t=(a.id==='briarlair'?1-smooth(a.r-1,a.r+1.5,d):1-smooth(a.r-3,a.r+2,d))*.82;if(t<=0)continue;
+      const k=j*LN+i;L0[k]+=(tone[0]-L0[k])*t;L1[k]+=(tone[1]-L1[k])*t;L2[k]+=(tone[2]-L2[k])*t;}}}
+  const iceTone=tones.ice,lavaTone=tones.lava,lair=s.areas.find(a=>a.id==='briarlair');
   // How far each cell lies from water, from dry land and from ground (in grid thirds, see chamfer).
   const S=scratch();S.dist2||(S.dist2=new Uint16Array(N*N));S.dist3||(S.dist3=new Uint16Array(N*N));
   const toWater=chamfer(grid,[0,1,0,0,0],S.dist),fromShore=chamfer(grid,[1,0,1,1,1],S.dist2),toGround=chamfer(grid,[1,0,0,0,0],S.dist3);
@@ -462,20 +565,30 @@ export function groundColors(seed, palette={}){
         c[0]=L0[q]*w00+L0[q+1]*w10+L0[q+LN]*w01+L0[q+LN+1]*w11;c[1]=L1[q]*w00+L1[q+1]*w10+L1[q+LN]*w01+L1[q+LN+1]*w11;c[2]=L2[q]*w00+L2[q+1]*w10+L2[q+LN]*w01+L2[q+LN+1]*w11;
         const worn=1-smooth(.5,1.15,trailLine[k]),dug=1-smooth(.2,.8,fenceLine[k]);if(worn>0)mix(.5*worn,path);if(detail[k]&DETAIL.ford)mix(.55,shore);if(dug>0)mix(.55*dug,EARTH);
         const wd=toWater[k]*DIST_UNIT;if(wd<2.6){mix(.6*(1-wd/2.6),shore);if(wd<.9)mix(.22,SAND);}
+        // Frostmere's ice: pale, with long cracks of deeper blue.
+        if(detail[k]&DETAIL.ice){mix(.66,iceTone);const crack=Math.abs(valueNoise(x*.21+7,z*.21-3)-.5),sheen=valueNoise(x*.08-2,z*.08+5);mix(.25*(1-smooth(.01,.045,crack)),water);mix(.18*smooth(.55,.85,sheen),FOAM);}
         r=c[0];g=c[1];b=c[2];land[k]=1;
+      }else if(code===W&&(detail[k]&DETAIL.lava)){
+        // Lava: a dark crust at the rim, molten and bright in the middle.
+        const e=Math.min(1,fromShore[k]*DIST_UNIT/1.6),x=-EXTENT+(i+.5)*CELL,flow=valueNoise(x*.6+3,z*.6-5)*.3;
+        const hot=Math.min(1,e*.85+flow);r=40+(lavaTone[0]-40)*hot+(hot>.75?(255-lavaTone[0])*(hot-.75)*2.4:0);g=24+(lavaTone[1]-24)*hot+(hot>.75?(196-lavaTone[1])*(hot-.75)*2.4:0);b=22+(lavaTone[2]-22)*hot*.6;land[k]=2;
       }else if(code===W){
         // Shallows lighter, a pale rim where the water laps the bank, deep water dark.
         const e=fromShore[k]*DIST_UNIT,t=Math.min(1,e/5),m=.5+.5*t,dim=1.12-.42*t;c[0]=(shore[0]+(water[0]-shore[0])*m)*dim;c[1]=(shore[1]+(water[1]-shore[1])*m)*dim;c[2]=(shore[2]+(water[2]-shore[2])*m)*dim;
         if(e<.9)mix(.3,FOAM);r=c[0];g=c[1];b=c[2];land[k]=2;}
-      else if(code===T){const t=Math.min(1,toGround[k]*DIST_UNIT/3.5),m=1.08-.3*t;r=thicket[0]*m;g=thicket[1]*m;b=thicket[2]*m;land[k]=3;}
+      else if(code===T){const t=Math.min(1,toGround[k]*DIST_UNIT/3.5),m=1.08-.3*t;r=thicket[0]*m;g=thicket[1]*m;b=thicket[2]*m;land[k]=3;
+        // The throne's wall: briar, darker and redder than any thicket.
+        if(lair){const x=-EXTENT+(i+.5)*CELL,dx=x-lair.x,dz=z-lair.z,d2=dx*dx+dz*dz,rIn=lair.r-.2,rOut=lair.r+lair.wall+.4;if(d2>rIn*rIn&&d2<rOut*rOut){r=r*.55+BRIAR[0]*.45;g=g*.55+BRIAR[1]*.45;b=b*.55+BRIAR[2]*.45;}}}
       else{const t=Math.min(1,toGround[k]*DIST_UNIT/6),m=.45*(1-t);r=dark[0]+(thicket[0]-dark[0])*m;g=dark[1]+(thicket[1]-dark[1])*m;b=dark[2]+(thicket[2]-dark[2])*m;land[k]=4;}
       // A faint mottle so broad patches do not read as flat paint.
       const mo=code===V?1:.96+hash2(i>>1,j>>1,seed)*.08;
       rgb[k*3]=Math.min(255,r*mo);rgb[k*3+1]=Math.min(255,g*mo);rgb[k*3+2]=Math.min(255,b*mo);
     }}
   // Soften the stair-steps: where kinds of ground meet, a texel takes its neighbourhood's average.
-  {const src=rgb.slice();for(let j=1;j<N-1;j++)for(let i=1;i<N-1;i++){const k=j*N+i,a=land[k];if(land[k-1]===a&&land[k+1]===a&&land[k-N]===a&&land[k+N]===a)continue;
-    for(let ch=0;ch<3;ch++){const o=k*3+ch;rgb[o]=(src[o]*4+src[o-3]*2+src[o+3]*2+src[o-N*3]*2+src[o+N*3]*2+src[o-N*3-3]+src[o-N*3+3]+src[o+N*3-3]+src[o+N*3+3])/16;}}}
+  // Ice edges count as a change of ground too, so the mere's rim is softened like a shore.
+  const iceAt_=k=>(detail[k]&DETAIL.ice)?8:0,cls=k=>land[k]|iceAt_(k);
+  {const src=rgb.slice();for(let pass=0;pass<2;pass++){const from=pass?rgb.slice():src;for(let j=1;j<N-1;j++)for(let i=1;i<N-1;i++){const k=j*N+i,a=cls(k);if(cls(k-1)===a&&cls(k+1)===a&&cls(k-N)===a&&cls(k+N)===a)continue;if(pass&&!(iceAt_(k)||iceAt_(k-1)||iceAt_(k+1)||iceAt_(k-N)||iceAt_(k+N)))continue;
+    for(let ch=0;ch<3;ch++){const o=k*3+ch;rgb[o]=(from[o]*4+from[o-3]*2+from[o+3]*2+from[o-N*3]*2+from[o+N*3]*2+from[o-N*3-3]+from[o-N*3+3]+from[o+N*3-3]+from[o+N*3+3])/16;}}}}
   out={seed,size:N,extent:EXTENT,res:GROUND_RES,rgb,land,hex:null};
   if(GROUND.size>=3)GROUND.delete(GROUND.keys().next().value);GROUND.set(key,out);return out;
 }
@@ -516,7 +629,10 @@ function pickType(rng,region,patch){
 /** Every node and cache at the start of a world. Ids are `n<index>`. */
 export function generateNodes(seed){
   const shape=shapeFor(seed),{grid,detail,blocked}=shape,rng=rngFor(seed),nodes=[],B=4,BN=Math.ceil(EXTENT*2/B)+1,buckets=new Array(BN*BN);
-  const clear=(x,z)=>{const k=cellOf(x,z);return k<0||grid[k]!==G?0:blocked[k]*DIST_UNIT;};
+  // Nothing grows on Frostmere's ice, and the throne's floor is kept open for the fight.
+  const lair=shape.areas.find(a=>a.id==='briarlair'),arena=(x,z)=>!!lair&&(x-lair.x)*(x-lair.x)+(z-lair.z)*(z-lair.z)<(lair.r-2.5)*(lair.r-2.5);
+  const clear=(x,z)=>{const k=cellOf(x,z);return k<0||grid[k]!==G||(detail[k]&DETAIL.ice)||arena(x,z)?0:blocked[k]*DIST_UNIT;};
+  const zone=(x,z)=>{for(const a of shape.areas)if(inArea(a,x,z))return a.id;return regionAt(x,z);};
   const onTrail=(x,z)=>{const k=cellOf(x,z);return k>=0&&(detail[k]&DETAIL.trail)!==0;};
   const bucketOf=(x,z)=>Math.floor((z+EXTENT)/B)*BN+Math.floor((x+EXTENT)/B);
   const add=(type,x,z)=>{const node={id:`n${nodes.length}`,type,x,z,hits:NODES[type].hits,ready:0};nodes.push(node);const b=bucketOf(x,z);(buckets[b]||(buckets[b]=[])).push(node);return node;};
@@ -532,13 +648,13 @@ export function generateNodes(seed){
   const PREFER={reliquary:['stones','clearing','shore','fence'],moonchest:['clearing','shore','stones','fence'],ironchest:['fence','shore','clearing','stones','heath'],crate:['heath','fence','shore','clearing','stones']};
   for(const {type,count,min,max} of [...CACHE_LAYOUT].reverse()){
     const gap=type==='crate'?9:16,prefer=PREFER[type]||['clearing','shore','fence','stones','heath'];
-    const fits=(x,z)=>{const r=Math.sqrt(x*x+z*z);return r>=min&&r<=max&&placedCaches.every(c=>(c.x-x)**2+(c.z-z)**2>=gap*gap)&&free(type,x,z);};
+    const fits=(x,z)=>{const r=Math.sqrt(x*x+z*z);return r>=min&&r<=max&&clear(x,z)>0&&placedCaches.every(c=>(c.x-x)**2+(c.z-z)**2>=gap*gap)&&free(type,x,z);};
     let placed=0,kindAt=Math.floor(rng()*prefer.length);
     for(let round=0;placed<count&&round<prefer.length*3;round++){
       const kind=prefer[(kindAt+round)%prefer.length],options=spots.filter(s=>s.kind===kind&&!used.has(s)&&fits(s.x,s.z));if(!options.length)continue;
       // Aim for a distance spread evenly across the tier's band (not its area), so every tier keeps its own ring.
       const want=min+rng()*(Math.min(max,RULES.radius)-min);let spot=options[0],off=Infinity;for(const o of options){const d=Math.abs(Math.sqrt(o.x*o.x+o.z*o.z)-want);if(d<off){off=d;spot=o;}}used.add(spot);
-      if(kind==='stones'){const stone=pickType(rng,regionAt(spot.x,spot.z),PATCH.rocky),ring=6+Math.floor(rng()*3),turn=rng();for(let s=0;s<ring;s++){const [dx,dz]=pseudoDir((s+turn)/ring*4),x=spot.x+dx*3.6,z=spot.z+dz*3.6;if(stone&&solid(stone)&&clear(x,z)>=1.2)add(stone,x,z);}}
+      if(kind==='stones'){const stone=pickType(rng,zone(spot.x,spot.z),PATCH.rocky),ring=6+Math.floor(rng()*3),turn=rng();for(let s=0;s<ring;s++){const [dx,dz]=pseudoDir((s+turn)/ring*4),x=spot.x+dx*3.6,z=spot.z+dz*3.6;if(stone&&solid(stone)&&clear(x,z)>=1.2)add(stone,x,z);}}
       placedCaches.push(add(type,spot.x,spot.z));placed++;
     }
     for(let i=0;i<count*400&&placed<count;i++){
@@ -562,26 +678,45 @@ export function generateNodes(seed){
   const S=1.6,M=Math.floor(EXTENT*2/S),hosts=[];
   for(let gj=0;gj<M;gj++)for(let gi=0;gi<M;gi++){
     const x=-EXTENT+(gi+rng())*S,z=-EXTENT+(gj+rng())*S,roll=rng(),r2=x*x+z*z;
-    if(r2<8.5*8.5)continue;const k=cellOf(x,z);if(k<0||grid[k]!==G)continue;
+    if(r2<8.5*8.5)continue;const k=cellOf(x,z);if(k<0||grid[k]!==G||(detail[k]&DETAIL.ice))continue;
     const d=bilerp(shape.density,x,z),patch=patchOf(d,bilerp(shape.rock,x,z));
     const odds=patch===PATCH.forest?.12+.36*smooth(.62,1,d):PATCH_ODDS[patch];if(roll>=odds)continue;
-    const region=regionAt(x,z),type=pickType(rng,region,patch);if(!type)continue;
+    const region=zone(x,z),type=pickType(rng,region,patch);if(!type)continue;
     if(clear(x,z)<(solid(type)?1.5:.8)||(detail[k]&DETAIL.trail)||!free(type,x,z))continue;
     const node=add(type,x,z);if(patch===PATCH.forest||type==='grave')hosts.push([node,region]);
   }
+  // The areas' own finds: Frostmere's crystals stand round the ice, the Ashen Scar's vents across its bare ground.
+  for(const [id,type,want] of [['frostmere','rimecrystal',14],['ashscar','embervent',14]]){
+    const a=shape.areas.find(entry=>entry.id===id);if(!a)continue;
+    let have=0;for(const n of nodes)if(n.type===type)have++;
+    for(let t=0;t<want*40&&have<want;t++){const [dx,dz]=randomDir(rng),r=Math.sqrt(rng())*a.r,x=a.x+dx*r,z=a.z+dz*r;if(!inArea(a,x,z,-1)||clear(x,z)<1.5||onTrail(x,z)||!free(type,x,z))continue;add(type,x,z);have++;}
+  }
   // Night-only finds beside their hosts, where the region grows them.
   for(const [host,region] of hosts){
-    const night=poolsFor(region).night.find(t=>NIGHT_HOSTS[t]===host.type);if(!night||rng()>(host.type==='tree'?.2:.45))continue;
+    const night=poolsFor(region).night.find(t=>NIGHT_HOSTS[t]===host.type);if(!night)continue;if(!night||rng()>(host.type==='tree'?.2:.45))continue;
     const [dx,dz]=randomDir(rng),l=1+rng()*.5,x=host.x+dx*l,z=host.z+dz*l;
     if(clear(x,z)<.7||onTrail(x,z)||!free(night,x,z))continue;add(night,x,z);
   }
   // Every hollow keeps a fair night harvest: top up beside any host in a region that grows it.
   for(const night of Object.keys(NIGHT_HOSTS)){
     let have=0;for(const n of nodes)if(n.type===night)have++;if(have>=NIGHT_MIN[night])continue;
-    const hostsOf=shuffle(nodes.filter(n=>n.type===NIGHT_HOSTS[night]&&poolsFor(regionAt(n.x,n.z)).night.includes(night)),rng);
+    const hostsOf=shuffle(nodes.filter(n=>n.type===NIGHT_HOSTS[night]&&poolsFor(zone(n.x,n.z)).night.includes(night)),rng);
     for(let pass=0;pass<2&&have<NIGHT_MIN[night];pass++)for(const host of hostsOf){if(have>=NIGHT_MIN[night])break;
       const [dx,dz]=randomDir(rng),l=1+rng()*.6,x=host.x+dx*l,z=host.z+dz*l;if(clear(x,z)<.7||onTrail(x,z)||!free(night,x,z))continue;add(night,x,z);have++;}
   }
+  // Landmarks, from their own stream so the rest of the hollow keeps its ids: the Briar Throne at the heart
+  // of its lair (Mother Briar sleeps on it, briar.mjs) and the Sunken Stair down into a delve (delve.mjs),
+  // somewhere out in the outer ring.
+  {const lrng=rngFor((seed>>>0)^0x1a4d);
+    if(lair)add('briarthrone',lair.x-lair.gx*2.4,lair.z-lair.gz*2.4);
+    let stair=null;
+    for(let pass=0;pass<3&&!stair;pass++)for(let t=0;t<400&&!stair;t++){
+      const r=96+lrng()*(pass<2?26:32),[dx,dz]=randomDir(lrng),x=dx*r,z=dz*r,region=regionAt(x,z);
+      if(pass<2&&!['mire','crags','barrow'].includes(region))continue;
+      if(shape.areas.some(a=>inArea(a,x,z,6))||clear(x,z)<(pass?2.4:3.2)||onTrail(x,z)||!free('delve',x,z))continue;
+      stair={x,z};
+    }
+    if(stair)add('delve',stair.x,stair.z);}
   return reachableOnly(shape,nodes);
 }
 

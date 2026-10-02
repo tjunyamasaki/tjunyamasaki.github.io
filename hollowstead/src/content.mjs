@@ -33,6 +33,8 @@ export const ITEMS = {
   glowbloom:{name:'Glowcap bloom',icon:'glowbloom'},wispdust:{name:'Wisp essence',icon:'wispdust'},
   // Refinement: only creatures drop it. Spent at a workbench to roll weapon modifiers (refine.mjs).
   ichor:{name:'Dread ichor',icon:'ichor'},
+  // Areas (worldgen.mjs): what only Frostmere and the Ashen Scar give. They awaken the Heartfire past its third level.
+  rime:{name:'Rime shard',icon:'rime'},emberglass:{name:'Emberglass',icon:'emberglass'},
 };
 export const EQUIPMENT = {
   axe:{name:'Woodcutter’s axe',icon:'axe',durability:70},pick:{name:'Flint pick',icon:'pick',durability:70},
@@ -104,6 +106,18 @@ export const NODES = {
   // `night`: only there after dark (see nodeAwake). Hidden, untargetable and not solid by day.
   glowsprout:{name:'Young glowcap',hits:1,workSeconds:1.4,handRate:1,output:'backpack',loot:{glowbloom:2},regrow:320,radius:0,night:true},
   gravewisp:{name:'Grave wisp',hits:1,workSeconds:1.6,handRate:1,output:'backpack',loot:{wispdust:1},regrow:360,radius:0,night:true},
+  // Areas: Frostmere's crystals and the Ashen Scar's vents.
+  rimecrystal:{name:'Rime crystal',hits:5,workSeconds:3.6,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{rime:2,shard:1},regrow:720,radius:.55},
+  embervent:{name:'Emberglass vent',hits:5,workSeconds:3.6,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{emberglass:2,ember:1},regrow:720,radius:.55},
+  // Landmarks: never harvested. `landmark` names what holding the action does (World.useLandmark).
+  briarthrone:{name:'The Briar Throne',hits:1,workSeconds:99,handRate:0,output:'floor',loot:{},regrow:0,radius:1.1,landmark:'throne'},
+  // Omens (omens.mjs): turn up somewhere for a while, never regrow.
+  fallenstar:{name:'Fallen star',hits:1,workSeconds:2.2,handRate:1,output:'floor',loot:{},regrow:0,radius:.7,omen:true},
+  soulrift:{name:'Soul rift',hits:1,workSeconds:99,handRate:0,output:'floor',loot:{},regrow:0,radius:0,omen:true},
+  mimic:{name:'Lonely chest',hits:1,workSeconds:2.4,handRate:1,output:'floor',loot:{},regrow:0,radius:.5,omen:true},
+  witchcauldron:{name:'Witch’s cauldron',hits:1,workSeconds:1.5,handRate:1,output:'floor',loot:{},regrow:0,radius:.55,omen:true},
+  goldpumpkin:{name:'Golden pumpkin',hits:1,workSeconds:2,handRate:1,output:'floor',loot:{},regrow:0,radius:.35,omen:true},
+  delve:{name:'The Sunken Stair',hits:1,workSeconds:1.2,handRate:1,output:'floor',loot:{},regrow:0,radius:.9,landmark:'delve'},
 };
 export const STRUCTURES = {
   hearth:{name:'Heartfire',hp:600,radius:1,light:8},fire:{name:'Campfire',hp:160,radius:.55,light:6},
@@ -162,6 +176,9 @@ export const ENEMIES = {
   bonewalker:{name:'Bonewalker',hp:48,speed:2.5*SPEED_SCALE,damage:24,range:5.6,period:2.1,loot:{bone:1}},
   bogling:{name:'Bogling',hp:52,speed:1.8*SPEED_SCALE,damage:20,range:7.5,period:3,loot:{spore:1}},
   golem:{name:'Moonshard golem',hp:320,speed:1.05*SPEED_SCALE,damage:72,range:2.7,period:3,loot:{shard:2,stone:2}},
+  // The great bosses (bosses.mjs): Mother Briar on her throne, The Unblinking at the bottom of a delve.
+  briarmother:{name:'Mother Briar',hp:2400,speed:1.55*SPEED_SCALE,damage:58,range:4.2,period:2.1,boss:true,loot:{ember:12}},
+  unblinking:{name:'The Unblinking',hp:2200,speed:1.1*SPEED_SCALE,damage:62,range:6,period:2,boss:true,loot:{ember:14}},
 };
 export const CHARACTERS = [
   {id:'ember',name:'Ember',detail:'The lost lantern keeper',color:'#f6a35d'},
@@ -170,11 +187,30 @@ export const CHARACTERS = [
   {id:'cinder',name:'Cinder',detail:'The reluctant grave robber',color:'#de817b'},
 ];
 export const label = key => ITEMS[key]?.name || EQUIPMENT[key]?.name || magicItems[key]?.name || STRUCTURES[key]?.name || ENEMIES[key]?.name || key;
-export function phaseAt(time){const t=time%RULES.cycle;return t<RULES.day?'day':t<RULES.day+RULES.dusk?'dusk':'night';}
-export function dayAt(time){return Math.floor(time/RULES.cycle)+1;}
-/** Night-only nodes (NODES[type].night) exist only while it is night. */
-export function nodeAwake(node, time){return !NODES[node?.type]?.night||phaseAt(time)==='night';}
-export function phaseRemaining(time){const t=time%RULES.cycle;return (t<RULES.day?RULES.day:t<RULES.day+RULES.dusk?RULES.day+RULES.dusk:RULES.cycle)-t;}
+/**
+ * Day and night schedules, in seconds. An expedition keeps the standard one. The Vigil (a single save
+ * kept for the long haul, vigil.mjs) lets every part of the day run longer, so a day out exploring
+ * and a night holding the fire each have room to breathe.
+ */
+export const CLOCKS = Object.freeze({
+  standard: Object.freeze({day:DAY, dusk:DUSK, night:NIGHT, cycle:DAY+DUSK+NIGHT}),
+  vigil: Object.freeze({day:250, dusk:40, night:140, cycle:430}),
+});
+/** The schedule a world keeps. */
+export const scheduleOf = world => world?.mode==='vigil'?CLOCKS.vigil:CLOCKS.standard;
+/**
+ * The hollow's own clock: world time minus the time the party spent below in a delve (delve.mjs).
+ * The hollow holds still while everyone is down there, so day, night and the moons wait for them.
+ */
+export const hollowTime = world => Math.max(0,(Number(world?.time)||0)-(Number(world?.below)||0));
+export function phaseAt(time, schedule=CLOCKS.standard){const t=time%schedule.cycle;return t<schedule.day?'day':t<schedule.day+schedule.dusk?'dusk':'night';}
+export function dayAt(time, schedule=CLOCKS.standard){return Math.floor(time/schedule.cycle)+1;}
+/** Phase and day of a world (its schedule, its hollow clock). */
+export const phaseOf = world => phaseAt(hollowTime(world), scheduleOf(world));
+export const dayOf = world => dayAt(hollowTime(world), scheduleOf(world));
+/** Night-only nodes (NODES[type].night) exist only while it is night. `when` is a world (preferred) or a standard-clock time. */
+export function nodeAwake(node, when){if(!NODES[node?.type]?.night)return true;return (when&&typeof when==='object'?phaseOf(when):phaseAt(Number(when)||0))==='night';}
+export function phaseRemaining(time, schedule=CLOCKS.standard){const t=time%schedule.cycle;return (t<schedule.day?schedule.day:t<schedule.day+schedule.dusk?schedule.day+schedule.dusk:schedule.cycle)-t;}
 
 // Reject inherited property names at every data-driven lookup boundary.
 for (const table of [ITEMS,EQUIPMENT,NODES,STRUCTURES,RECIPES,ENEMIES]) Object.setPrototypeOf(table,null);

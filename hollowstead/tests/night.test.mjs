@@ -281,12 +281,12 @@ test('theme lighting falls back and does not change safety radii',()=>{
   const self=entityBrightness(frame, 30, 30, {local:true});
   assert.ok(self>=frame.lighting.localSilhouette);
   assert.ok(self<0.3);
-  // The day track's dusk and night stops come from RULES (main.mjs paintClock), never hard-coded in its CSS.
+  // The day track's dusk and night stops come from the world's schedule (main.mjs paintClock, content.mjs scheduleOf), never hard-coded in its CSS.
   const css=readFileSync(new URL('../style.css', import.meta.url),'utf8');
   const track=css.match(/\.day-track\{[^}]*\}/g)||[];
   assert.ok(track.length>0);
   assert.equal(track.some(rule=>rule.includes('58%')||rule.includes('69%')), false);
   const main=readFileSync(new URL('../src/main.mjs', import.meta.url),'utf8');
-  assert.match(main, /RULES\.day\/RULES\.cycle/);
+  assert.match(main, /clock\.day\/clock\.cycle/);
   assert.equal(main.includes('time=163'), false);
 });

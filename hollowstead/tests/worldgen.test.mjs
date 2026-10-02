@@ -6,6 +6,7 @@ import {CACHE_LAYOUT, INNER_RING, OUTER_RING, NODE_POOLS, isCache, regionAt} fro
 import {
   TERRAIN, CELL, EXTENT, GRID_SIZE, HEARTH_CLEAR, DETAIL, worldShape, terrainAt, walkableAt, densityAt, patchAt,
   clearanceAt, landNear, generateNodes, groundColors, groundHex,
+  areaAt,
 } from '../src/worldgen.mjs?v=harvest-18';
 
 const SEEDS = [402, 7, 90210, 3141592];
@@ -219,7 +220,8 @@ test('the world keeps walkers on land: moves, shoves, dashes, spawns and builds'
 });
 
 test('landNear finds the bank; clearance measures open ground', () => {
-  const shape = worldShape(402), lake = shape.lakes[0];
+  // A lake no area has frozen or burnt away (worldgen.mjs areas).
+  const shape = worldShape(402), lake = shape.lakes.find(l => !areaAt(402, l.x, l.z)) || shape.lakes[0];
   const near = landNear(402, lake.x, lake.z, 40);
   assert.ok(near && walkableAt(402, near.x, near.z));
   assert.equal(landNear(402, 1000, 1000, 5), null);
@@ -235,7 +237,7 @@ test('ground colours follow the walkable grid for both renderers and the map', (
   assert.equal(g.size, GRID_SIZE); assert.equal(g.rgb.length, g.size*g.size*3);
   const code = {[TERRAIN.ground]: 1, [TERRAIN.fence]: 1, [TERRAIN.water]: 2, [TERRAIN.thicket]: 3, [TERRAIN.void]: 4};
   for(let k = 0; k < shape.grid.length; k += 97) assert.equal(g.land[k], code[shape.grid[k]]);
-  const lake = shape.lakes[0], water = groundHex(g, lake.x, lake.z), land = groundHex(g, 0, 20);
+  const lake = shape.lakes.find(l => !areaAt(402, l.x, l.z)) || shape.lakes[0], water = groundHex(g, lake.x, lake.z), land = groundHex(g, 0, 20);
   assert.match(water, /^#[0-9a-f]{6}$/); assert.notEqual(water, land);
   const blue = h => parseInt(h.slice(5, 7), 16)-parseInt(h.slice(1, 3), 16);
   assert.ok(blue(water) > blue(land), 'water reads bluer than the meadow');

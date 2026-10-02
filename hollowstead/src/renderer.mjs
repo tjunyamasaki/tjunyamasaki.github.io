@@ -413,11 +413,11 @@ export class Renderer {
       if(e.down||e.ghost){sx*=.8;sy*=.65;}
       if(kind==='enemy'&&e.elite){sx*=1.3;sy*=1.3;}
       if(kind==='enemy'&&e.warden){sx*=1.12;sy*=1.12;}
-      if(kind==='prop'&&e.scale){sx*=e.scale;sy*=e.scale;}
+      if((kind==='prop'||kind==='building')&&e.scale){sx*=e.scale;sy*=e.scale;}
       if(key==='gravecraft-skeleton')sy*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
       if(o.hitUntil>this.clock){const squash=Math.sin((o.hitUntil-this.clock)*14)*(motion.hitSquash||0);sx*=1+squash;sy*=1-squash;}
       const flip=(kind==='player'&&e.dx<-.1)||((kind==='magic'||kind==='ally')&&e.facing===-1)||(kind==='enemy'&&e.face===-1);
-      o.sprite.scale.set(flip?-sx:sx,sy,1);o.sprite.position.set(o.x,bob+(present?.y||0)+(kind==='projectile'?.9:0),o.z);if(kind==='projectile')o.shadow.visible=false;o.shadow.position.set(o.x,.018,o.z);
+      o.sprite.scale.set(flip?-sx:sx,sy,1);o.sprite.position.set(o.x,bob+(present?.y||0)+(kind==='projectile'?.9:0),o.z);if(kind==='projectile')o.shadow.visible=false;o.shadow.position.set(o.x,.018,o.z);if(kind==='building'&&e.scale)o.shadow.scale.setScalar(o.def.size[0]*.26*e.scale);
       if(kind==='zone'){o.shadow.visible=false;if(e.kind==='star'){const fall=Math.max(0,1-e.age/e.delay);o.sprite.position.y=.4+fall*9;o.sprite.position.x=o.x+fall*3;}else{const life=Math.min(1,e.age*3)*Math.min(1,(e.life-e.age)*2);o.sprite.scale.set(sx*e.radius/1.3,sy*e.radius/1.3,1);o.sprite.position.y=-.2;o.sprite.material.opacity=.8*life;}}
       if(kind==='ally'&&ALLIES[key]?.fly){o.sprite.position.y=.9+Math.sin(this.clock*6+e.x)*.15;}
       if(kind==='projectile')o.sprite.material.rotation=-(e.aim||0);

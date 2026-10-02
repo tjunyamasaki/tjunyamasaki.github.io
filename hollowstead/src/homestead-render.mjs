@@ -8,10 +8,12 @@
 // from above and anything behind it is hidden by it. Every box gets a back-face "hull" one notch
 // larger in ink colour, which gives the hand-inked outline the sprites have.
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {BARRIERS, CROPS, barrierIndex, cellAt, centerOf, gateAxis, groundLinks, keyOf, linksOf, tileAt, TOOLS} from './homestead.mjs?v=harvest-18';
+import {BARRIERS, CELL, CROPS, OBJECTS, barrierIndex, cellAt, centerOf, footCenter, objectSpot, gateAxis, groundLinks, keyOf, linksOf, objectScale, sizeOf, tileAt, TOOLS} from './homestead.mjs?v=harvest-18';
+
+const H = CELL / 2; // half a cell: how far a barrier's run reaches toward each neighbour
 
 const INK = '#2b2233';
-const TEX = 128;
+const TEX = 192;
 const FLOOR_Y = .014;
 export const GROUND_LOOK = Object.freeze({
   soil: {fill: '#6b4836', rim: '#8c6248', edge: '#4a3127', flat: '#6b4836'},
@@ -75,7 +77,7 @@ function cutInner(g, S, s, m){
 function paintSoil(g, S, variant){
   const L = GROUND_LOOK.soil;
   g.fillStyle = L.fill;g.fillRect(0, 0, S, S);
-  const rows = 4, h = S / rows;
+  const rows = 6, h = S / rows;
   for(let k = 0; k < rows; k++){
     const y = k * h;
     g.fillStyle = '#7d5640';g.fillRect(0, y + h * .12, S, h * .34);
@@ -83,15 +85,15 @@ function paintSoil(g, S, variant){
     g.fillStyle = '#4b3126';g.fillRect(0, y + h * .62, S, h * .16);
   }
   const r = rng(91 + variant * 17);
-  for(let n = 0; n < 34; n++){
+  for(let n = 0; n < 60; n++){
     const x = r() * S, y = r() * S, s = 1 + r() * 2.4;
     g.fillStyle = r() < .5 ? 'rgba(40,26,22,.55)' : 'rgba(170,128,96,.45)';
     g.beginPath();g.ellipse(x, y, s * 1.3, s, 0, 0, Math.PI * 2);g.fill();
   }
 }
 function paintPlank(g, S, variant){
-  const rows = 4, h = S / rows, tones = ['#9a6b47', '#8d603f', '#a3734c', '#93653f'];
-  const joints = [[.3], [.72], [.12, .86], [.55]];
+  const rows = 6, h = S / rows, tones = ['#9a6b47', '#8d603f', '#a3734c', '#93653f', '#9f6f49', '#8a5d3d'];
+  const joints = [[.3], [.72], [.12, .86], [.55], [.4, .94], [.18, .66]];
   for(let k = 0; k < rows; k++){
     const y = k * h, tone = tones[(k + variant) % tones.length];
     g.fillStyle = tone;g.fillRect(0, y, S, h);
@@ -113,7 +115,9 @@ function paintPlank(g, S, variant){
 function paintFlagstone(g, S, variant){
   g.fillStyle = '#4d4a57';g.fillRect(0, 0, S, S);
   const r = rng(301 + variant * 13), tones = ['#8f8a9e', '#9a95aa', '#857f94', '#a29db2'];
-  const cells = variant % 2 ? [[0, 0, .55, .5], [.55, 0, .45, .5], [0, .5, .4, .5], [.4, .5, .6, .5]] : [[0, 0, .45, .55], [.45, 0, .55, .55], [0, .55, .62, .45], [.62, .55, .38, .45]];
+  const cells = variant % 2
+    ? [[0, 0, .4, .36], [.4, 0, .34, .36], [.74, 0, .26, .36], [0, .36, .27, .32], [.27, .36, .45, .32], [.72, .36, .28, .32], [0, .68, .5, .32], [.5, .68, .5, .32]]
+    : [[0, 0, .3, .34], [.3, 0, .42, .34], [.72, 0, .28, .34], [0, .34, .55, .33], [.55, .34, .45, .33], [0, .67, .36, .33], [.36, .67, .3, .33], [.66, .67, .34, .33]];
   for(const [cx, cy, cw, ch] of cells){
     const x = cx * S + 3, y = cy * S + 3, w = cw * S - 6, hh = ch * S - 6, rad = 7 + r() * 5;
     g.fillStyle = tones[Math.floor(r() * tones.length)];
@@ -216,7 +220,7 @@ function addFence(M, x, z, reach, seed){
   M.tip(x, h, z, .2, .12, WOOD_D);
   for(const [dir, on] of Object.entries(reach)){
     if(!on)continue;
-    const [dx, dz] = STEP[dir], len = .5, mx = x + dx * len / 2, mz = z + dz * len / 2;
+    const [dx, dz] = STEP[dir], len = H, mx = x + dx * len / 2, mz = z + dz * len / 2;
     for(const y of [.36, .7]){
       if(dx)M.box(mx, y, mz, len, .1, .08, WOOD, {grain: 'x'});
       else M.box(mx, y, mz, .11, .1, len, WOOD, {grain: 'z'});
@@ -232,10 +236,11 @@ function addPalisade(M, b, x, z, reach){
   for(const [dir, on] of Object.entries(reach)){
     if(!on)continue;
     const [dx, dz] = STEP[dir];
-    stake(x + dx * .25, z + dz * .25);
-    if(dir === 'e' || dir === 's')stake(x + dx * .5, z + dz * .5);
-    else if(!linkedAt(b, dir))stake(x + dx * .5, z + dz * .5);
-    if(dx)for(const y of [.32, .86])M.box(x + dx * .25, y, z + .115, .5, .07, .04, WOOD_D, {grain: 'x', ink: .018});
+    const n = Math.round(H / .25);
+    for(let k = 1; k < n; k++)stake(x + dx * k * H / n, z + dz * k * H / n);
+    // The stake on the cell edge belongs to one side only, so a run never doubles up.
+    if(dir === 'e' || dir === 's' || !linkedAt(b, dir))stake(x + dx * H, z + dz * H);
+    if(dx)for(const y of [.32, .86])M.box(x + dx * H / 2, y, z + .125, H, .07, .04, WOOD_D, {grain: 'x', ink: .018});
   }
 }
 let LINKS = null;
@@ -245,27 +250,28 @@ function addStoneWall(M, x, z, reach){
   M.box(x, 1.04, z, .58, .09, .58, STONE_L, {ink: .022});
   for(const [dir, on] of Object.entries(reach)){
     if(!on)continue;
-    const [dx, dz] = STEP[dir], mx = x + dx * .25, mz = z + dz * .25;
-    if(dx){M.box(mx, .46, mz, .5, .92, .44, STONE, {grain: 'x'});M.box(mx, .95, mz, .5, .07, .5, STONE_L, {grain: 'x', ink: .02});}
-    else{M.box(mx, .46, mz, .44, .92, .5, STONE, {grain: 'z'});M.box(mx, .95, mz, .5, .07, .5, STONE_L, {grain: 'z', ink: .02});}
+    const [dx, dz] = STEP[dir], mx = x + dx * H / 2, mz = z + dz * H / 2;
+    if(dx){M.box(mx, .46, mz, H, .92, .44, STONE, {grain: 'x'});M.box(mx, .95, mz, H, .07, .5, STONE_L, {grain: 'x', ink: .02});}
+    else{M.box(mx, .46, mz, .44, .92, H, STONE, {grain: 'z'});M.box(mx, .95, mz, .5, .07, H, STONE_L, {grain: 'z', ink: .02});}
   }
 }
 
 // Gate parts in the gate's own frame: the opening runs along x, leaves hinge on the posts.
-const GATE_HALF = .44, LEAF = .4;
+const GATE_HALF = H - .06, LEAF = GATE_HALF - .08;
 function gateFrame(M){
   for(const s of [-1, 1]){M.box(s * GATE_HALF, .52, 0, .16, 1.04, .16, WOOD_D);M.tip(s * GATE_HALF, 1.04, 0, .16, .12, WOOD_D);}
 }
 function gateLeaf(M, side){
   // Local frame: hinge at the origin, the leaf runs toward +x (side 1) or -x (side -1).
   const w = LEAF - .02;
-  for(let k = 0; k < 3; k++){
-    const cx = side * (.07 + k * (w - .1) / 2), h = .78 - Math.abs(k - 1) * .04;
+  const pickets = Math.max(3, Math.round(w / .14));
+  for(let k = 0; k < pickets; k++){
+    const cx = side * (.07 + k * (w - .12) / (pickets - 1)), h = .78 - Math.abs(k - (pickets - 1) / 2) * .025;
     M.box(cx, .1 + h / 2, 0, .1, h, .05, WOOD, {grain: 'y', ink: .02});
   }
   for(const y of [.28, .72])M.box(side * w / 2, y, .035, w, .08, .045, WOOD_D, {grain: 'x', ink: .02});
-  const m = new THREE.Matrix4().makeTranslation(side * w / 2, .5, .035).multiply(new THREE.Matrix4().makeRotationZ(side * -.86));
-  M.box(0, 0, 0, .52, .07, .04, WOOD_L, {matrix: m, grain: 'x', ink: .018});
+  const m = new THREE.Matrix4().makeTranslation(side * w / 2, .5, .035).multiply(new THREE.Matrix4().makeRotationZ(side * -Math.atan2(.44, w)));
+  M.box(0, 0, 0, Math.hypot(w, .44) * .92, .07, .04, WOOD_L, {matrix: m, grain: 'x', ink: .018});
 }
 
 // ------------------------------------------------------------------ the layer
@@ -328,7 +334,7 @@ export class HomesteadLayer {
       const variant = tile.g === 'soil' ? Math.floor(hash(i, j) * 3) : Math.floor(hash(i, j, 1) * 4);
       const {key: mk, mat} = this.groundMaterial(tile.g, m, variant);
       let b = buckets.get(mk);if(!b){b = {mat, pos: [], uv: []};buckets.set(mk, b);}
-      const x0 = i, x1 = i + 1, z0 = j, z1 = j + 1, y = tile.g === 'soil' ? FLOOR_Y : FLOOR_Y + .004;
+      const x0 = i * CELL, x1 = x0 + CELL, z0 = j * CELL, z1 = z0 + CELL, y = tile.g === 'soil' ? FLOOR_Y : FLOOR_Y + .004;
       b.pos.push(x0, y, z0, x0, y, z1, x1, y, z1, x0, y, z0, x1, y, z1, x1, y, z0);
       b.uv.push(0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1);
     }
@@ -412,6 +418,23 @@ export class HomesteadLayer {
     }
     g.renderOrder = 3;this.group.add(g);this.ghost = g;
   }
+  /** A see-through copy of the camp object in hand, standing where it would go and at the size it will have. */
+  syncObjectGhost(ui){
+    const tool = ui && TOOLS[ui.tool], type = tool?.kind === 'object' && ui.cursor ? tool.type : '';
+    if(this.objectGhost && this.objectGhost.userData.type !== type){this.group.remove(this.objectGhost);this.objectGhost.material.map?.dispose();this.objectGhost.material.dispose();this.objectGhost = null;}
+    if(!type)return;
+    const def = this.r.theme.sprites[type], base = this.r.textures.get(type);
+    if(!def || !base)return;
+    if(!this.objectGhost){
+      const map = base.clone();map.needsUpdate = true;map.repeat.set(1 / (def.columns || 1), 1 / (def.rows || 1));map.offset.set(0, 1 - 1 / (def.rows || 1));
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map, transparent: true, depthWrite: false, opacity: .72}));
+      sprite.center.set(...(def.anchor || [.5, 0]));sprite.renderOrder = 3;sprite.userData.type = type;
+      this.group.add(sprite);this.objectGhost = sprite;
+    }
+    const {w, h} = OBJECTS[type], {x, z} = objectSpot(ui.cursor.i, ui.cursor.j, w, h), k = objectScale(type);
+    this.objectGhost.position.set(x, 0, z);this.objectGhost.scale.set(def.size[0] * k, def.size[1] * k, 1);
+    this.objectGhost.material.color.set(ui.valid ? '#e4f5d2' : '#ff9a8f');
+  }
   /** The cursor cell and a fading grid around it while a tool is out. */
   syncCursor(ui, clock){
     if(!this.gridMesh){
@@ -419,22 +442,22 @@ export class HomesteadLayer {
       for(let k = 0; k <= n; k++){g.strokeStyle = 'rgba(246,234,210,.9)';g.lineWidth = 2;g.beginPath();g.moveTo(k * cs, 0);g.lineTo(k * cs, S);g.moveTo(0, k * cs);g.lineTo(S, k * cs);g.stroke();}
       g.globalCompositeOperation = 'destination-in';const grad = g.createRadialGradient(S / 2, S / 2, cs * .6, S / 2, S / 2, S / 2);grad.addColorStop(0, 'rgba(0,0,0,.5)');grad.addColorStop(1, 'rgba(0,0,0,0)');g.fillStyle = grad;g.fillRect(0, 0, S, S);
       const tex = new THREE.CanvasTexture(c);tex.colorSpace = THREE.SRGBColorSpace;
-      this.gridMesh = new THREE.Mesh(new THREE.PlaneGeometry(9, 9), new THREE.MeshBasicMaterial({map: tex, transparent: true, depthWrite: false}));
+      this.gridMesh = new THREE.Mesh(new THREE.PlaneGeometry(9 * CELL, 9 * CELL), new THREE.MeshBasicMaterial({map: tex, transparent: true, depthWrite: false}));
       this.gridMesh.rotation.x = -Math.PI / 2;this.gridMesh.renderOrder = 1;this.group.add(this.gridMesh);
       const cc = document.createElement('canvas');cc.width = cc.height = 128;const q = cc.getContext('2d');
       q.lineWidth = 10;q.strokeStyle = INK;q.beginPath();q.roundRect(10, 10, 108, 108, 18);q.stroke();q.lineWidth = 5;q.strokeStyle = '#ffffff';q.stroke();
       q.fillStyle = 'rgba(255,255,255,.22)';q.fill();
       const ct = new THREE.CanvasTexture(cc);ct.colorSpace = THREE.SRGBColorSpace;
-      this.cursor = new THREE.Mesh(new THREE.PlaneGeometry(1.08, 1.08), new THREE.MeshBasicMaterial({map: ct, transparent: true, depthWrite: false, depthTest: false}));
+      this.cursor = new THREE.Mesh(new THREE.PlaneGeometry(CELL * 1.04, CELL * 1.04), new THREE.MeshBasicMaterial({map: ct, transparent: true, depthWrite: false, depthTest: false}));
       this.cursor.rotation.x = -Math.PI / 2;this.cursor.renderOrder = 4;this.group.add(this.cursor);
     }
     const on = !!(ui?.tool && ui.cursor);
     this.gridMesh.visible = this.cursor.visible = on;
     if(!on)return;
-    const {x, z} = centerOf(ui.cursor.i, ui.cursor.j);
+    const {w, h} = sizeOf(ui.tool), {x, z} = footCenter(ui.cursor.i, ui.cursor.j, w, h);
     this.gridMesh.position.set(x, .03, z);
     const pulse = 1 + Math.sin(clock * 6) * .03;
-    this.cursor.position.set(x, .05, z);this.cursor.scale.set(pulse, pulse, 1);
+    this.cursor.position.set(x, .05, z);this.cursor.scale.set(w * pulse, h * pulse, 1);
     const tool = TOOLS[ui.tool];
     this.cursor.material.color.set(!ui.valid ? '#ff8a7e' : tool?.kind === 'remove' ? '#ffb38a' : tool?.kind === 'harvest' || tool?.kind === 'plant' ? '#f6e3a0' : '#bfe8a6');
   }
@@ -454,7 +477,7 @@ export class HomesteadLayer {
     for(const b of world.buildings)if(b.grid && b.hp > 0){n++;h = (h * 31 + (b.i * 7349 + b.j * 1931) * 4 + BARRIER_ORDER.indexOf(b.type) * 97 + (b.rotation | 0)) % 1000000007;}
     const barrierKey = `${world.seed}:${n}:${h}`;
     if(barrierKey !== this.barrierKey){this.barrierKey = barrierKey;this.buildBarriers(world);}
-    this.syncGates(world, Math.min(dt, .05));this.syncGhost(world, ui);this.syncCursor(ui, clock);
+    this.syncGates(world, Math.min(dt, .05));this.syncGhost(world, ui);this.syncObjectGhost(ui);this.syncCursor(ui, clock);
     for(const ev of world.events)if(ev.id > this.lastEvent){if(ev.type === 'tile' && world.time - ev.at < 1)this.effect(ev);this.lastEvent = ev.id;}
     this.effects = this.effects.filter(e => {
       e.life += dt;e.vy -= 7 * dt;e.m.position.x += e.vx * dt;e.m.position.z += e.vz * dt;e.m.position.y = Math.max(.02, e.m.position.y + e.vy * dt);
@@ -473,9 +496,9 @@ const BARRIER_ORDER = Object.keys(BARRIERS);
 function shadowOf(out, x, z, reach, half){
   const y = .012, oz = .07;
   const quad = (x0, z0, x1, z1) => out.push(x0, y, z0, x0, y, z1, x1, y, z1, x0, y, z0, x1, y, z1, x1, y, z0);
-  quad(x - (reach.w ? .5 : half), z - half + oz, x + (reach.e ? .5 : half), z + half + oz);
-  if(reach.n)quad(x - half, z - .5 + oz, x + half, z - half + oz);
-  if(reach.s)quad(x - half, z + half + oz, x + half, z + .5 + oz);
+  quad(x - (reach.w ? H : half), z - half + oz, x + (reach.e ? H : half), z + half + oz);
+  if(reach.n)quad(x - half, z - H + oz, x + half, z - half + oz);
+  if(reach.s)quad(x - half, z + half + oz, x + half, z + H + oz);
 }
 
 // ------------------------------------------------------------------ canvas fallback
@@ -485,7 +508,7 @@ export function paintHomesteadCanvas(r, c, world, frame, ui){
   c.save();c.lineJoin = 'round';c.lineCap = 'round';
   for(const [key, tile] of Object.entries(cells)){
     const look = GROUND_LOOK[tile.g];if(!look)continue;
-    const [i, j] = key.split(',').map(Number), a = r.screenPoint(i, j), b = r.screenPoint(i + 1, j + 1), m = groundLinks(world, i, j, tile.g);
+    const [i, j] = key.split(',').map(Number), a = r.screenPoint(i * CELL, j * CELL), b = r.screenPoint((i + 1) * CELL, (j + 1) * CELL), m = groundLinks(world, i, j, tile.g);
     c.fillStyle = look.flat;c.fillRect(a.x - .5, a.y - .5, b.x - a.x + 1, b.y - a.y + 1);
     c.strokeStyle = INK;c.lineWidth = Math.max(1, unit * .04);c.beginPath();
     if(!m.n){c.moveTo(a.x, a.y);c.lineTo(b.x, a.y);}if(!m.s){c.moveTo(a.x, b.y);c.lineTo(b.x, b.y);}
@@ -499,7 +522,7 @@ export function paintHomesteadCanvas(r, c, world, frame, ui){
     c.lineWidth = Math.max(2, unit * (b.type === 'fence' ? .09 : .3));
     for(const [dir, on] of Object.entries(reach)){
       if(!on)continue;
-      const [dx, dz] = STEP[dir], e = r.screenPoint(x + dx * .5, z + dz * .5, tall * .6), s0 = r.screenPoint(x, z, tall * .6);
+      const [dx, dz] = STEP[dir], e = r.screenPoint(x + dx * H, z + dz * H, tall * .6), s0 = r.screenPoint(x, z, tall * .6);
       if(b.type === 'gate' && b.open)continue;
       c.strokeStyle = INK;c.lineWidth += 3;c.beginPath();c.moveTo(s0.x, s0.y);c.lineTo(e.x, e.y);c.stroke();c.lineWidth -= 3;
       c.strokeStyle = col;c.beginPath();c.moveTo(s0.x, s0.y);c.lineTo(e.x, e.y);c.stroke();
@@ -509,7 +532,7 @@ export function paintHomesteadCanvas(r, c, world, frame, ui){
     c.strokeStyle = col;c.lineWidth = Math.max(1.5, unit * .13);c.stroke();
   }
   if(ui?.tool && ui.cursor){
-    const a = r.screenPoint(ui.cursor.i, ui.cursor.j), b = r.screenPoint(ui.cursor.i + 1, ui.cursor.j + 1);
+    const {w, h} = sizeOf(ui.tool), a = r.screenPoint(ui.cursor.i * CELL, ui.cursor.j * CELL), b = r.screenPoint((ui.cursor.i + w) * CELL, (ui.cursor.j + h) * CELL);
     c.strokeStyle = ui.valid ? '#bfe8a6' : '#ff8a7e';c.lineWidth = 2.5;c.strokeRect(a.x + 2, a.y + 2, b.x - a.x - 4, b.y - a.y - 4);
   }
   c.restore();

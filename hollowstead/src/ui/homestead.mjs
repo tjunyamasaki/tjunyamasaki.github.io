@@ -3,7 +3,8 @@
 // worked, so a fence line or a field of soil is one stroke. The tool stays in hand until you
 // put it away (✕, Esc or a right click). With no tool out, tapping a gate opens it and tapping a
 // ripe crop harvests it.
-import {BARRIERS, CROPS, CROP_TYPES, GROUNDS, TOOLS, barrierAt, cellAt, cellLine, cellReason, ripe, tileAt} from '../homestead.mjs?v=harvest-18';
+import {BARRIERS, CELL, CROPS, CROP_TYPES, GROUNDS, OBJECT_TYPES, TOOLS, barrierAt, cellAt, cellLine, cellReason, ripe, sizeOf, tileAt} from '../homestead.mjs?v=harvest-18';
+import {STRUCTURES} from '../content.mjs?v=harvest-18';
 
 const ink = '#2b2233';
 const svg = body => `<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">${body}</svg>`;
@@ -22,6 +23,8 @@ export const GLYPHS = Object.freeze({
 
 const FARM = ['till', ...CROP_TYPES.map(id => `plant:${id}`), 'harvest', 'remove'];
 const BUILD = ['plank', 'flagstone', 'fence', 'wall', 'stonewall', 'gate', 'remove'];
+const CAMP = [...OBJECT_TYPES.map(id => `obj:${id}`), 'remove'];
+const TABS = [['farm', 'Farm', FARM], ['build', 'Build', BUILD], ['camp', 'Camp', CAMP]];
 const ROTATES = new Set(['fence', 'wall', 'stonewall', 'gate']);
 const DRAGS = new Set(['till', 'plank', 'flagstone', 'fence', 'wall', 'stonewall', 'harvest', 'remove', ...CROP_TYPES.map(id => `plant:${id}`)]);
 const HINT = {
@@ -33,25 +36,26 @@ const HINT = {
 };
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const nameOf = id => id.startsWith('plant:') ? CROPS[id.slice(6)].name : TOOLS[id]?.name || id;
+const SHORT = {bench: 'Workbench', chest: 'Chest', fire: 'Campfire', pot: 'Cauldron', lantern: 'Lantern', bed: 'Bedroll', trap: 'Trap', ward: 'Ward', hushstone: 'Hush stone'};
 
 export function homesteadMarkup({tab = 'farm', tool = '', rotation = 0, options = false, settings = {}, counts = {}, icon = () => ''} = {}){
-  const ids = tab === 'build' ? BUILD : FARM;
+  const [, , ids] = TABS.find(([id]) => id === tab) || TABS[0];
   const button = id => {
-    const crop = id.startsWith('plant:') ? CROPS[id.slice(6)] : null;
-    const glyph = crop ? icon(crop.seed) : GLYPHS[id] || '';
+    const crop = id.startsWith('plant:') ? CROPS[id.slice(6)] : null, object = id.startsWith('obj:') ? id.slice(4) : '';
+    const glyph = crop ? icon(crop.seed) : object ? icon(object) : GLYPHS[id] || '';
     const count = crop && !settings.free ? `<em>${counts[crop.seed] || 0}</em>` : '';
-    return `<button type="button" class="hs-tool${id === 'remove' ? ' hs-remove' : ''}" data-hs-tool="${escapeHtml(id)}" aria-pressed="${id === tool}" title="${escapeHtml(nameOf(id))}">${glyph}${count}<small>${escapeHtml(crop ? crop.name : nameOf(id))}</small></button>`;
+    return `<button type="button" class="hs-tool${id === 'remove' ? ' hs-remove' : ''}" data-hs-tool="${escapeHtml(id)}" aria-pressed="${id === tool}" title="${escapeHtml(nameOf(id))}">${glyph}${count}<small>${escapeHtml(crop ? crop.name : object ? SHORT[object] || nameOf(id) : nameOf(id))}</small></button>`;
   };
   const rotate = ROTATES.has(tool) ? `<button type="button" class="hs-chip" data-hs-rotate aria-label="Rotate (R)">${GLYPHS.rotate}<small>Rotate <kbd>R</kbd></small></button>` : '';
-  const hint = tool ? `<p class="hs-hint"><b>${escapeHtml(nameOf(tool))}</b> ${escapeHtml(HINT[tool] || (tool.startsWith('plant:') ? 'Drag over tilled soil to sow.' : ''))}${ROTATES.has(tool) ? ` <span>${tool === 'gate' ? ['Faces south', 'Faces east', 'Faces north', 'Faces west'][rotation & 3] : rotation & 1 ? 'Runs north–south' : 'Runs east–west'}</span>` : ''}</p>` : '';
+  const hint = tool ? `<p class="hs-hint"><b>${escapeHtml(nameOf(tool))}</b> ${escapeHtml(HINT[tool] || (tool.startsWith('plant:') ? 'Drag over tilled soil to sow.' : tool.startsWith('obj:') ? `Tap to place. Takes ${sizeOf(tool).w}×${sizeOf(tool).h} tile${sizeOf(tool).w * sizeOf(tool).h > 1 ? 's' : ''}; floors can run underneath.` : ''))}${ROTATES.has(tool) ? ` <span>${tool === 'gate' ? ['Faces south', 'Faces east', 'Faces north', 'Faces west'][rotation & 3] : rotation & 1 ? 'Runs north–south' : 'Runs east–west'}</span>` : ''}</p>` : '';
   const opt = (key, label, on) => `<button type="button" class="hs-opt" data-hs-option="${key}" aria-pressed="${!!on}">${escapeHtml(label)}</button>`;
   const panel = options ? `<div class="hs-options" role="dialog" aria-label="Homestead options">
     ${opt('free', 'Free building', settings.free)}${opt('day', 'Hold daylight', settings.day)}
     <div class="hs-speed" role="group" aria-label="Growth speed"><span>Growth</span>${[1, 5, 20].map(n => `<button type="button" class="hs-opt" data-hs-option="speed:${n}" aria-pressed="${settings.speed === n}">×${n}</button>`).join('')}</div>
     ${opt('ripen', 'Ripen everything', false)}${opt('clear', 'Clear the homestead', false)}</div>` : '';
   return `<div class="hs-dock">${hint}<div class="hs-row">
-    <div class="hs-tabs" role="tablist"><button type="button" role="tab" data-hs-tab="farm" aria-selected="${tab !== 'build'}">Farm</button><button type="button" role="tab" data-hs-tab="build" aria-selected="${tab === 'build'}">Build</button></div>
-    <div class="hs-tools" role="toolbar" aria-label="${tab === 'build' ? 'Building' : 'Farming'} tools">${ids.map(button).join('')}</div>
+    <div class="hs-tabs" role="tablist">${TABS.map(([id, label]) => `<button type="button" role="tab" data-hs-tab="${id}" aria-selected="${id === tab}">${label}</button>`).join('')}</div>
+    <div class="hs-tools" role="toolbar" aria-label="${escapeHtml((TABS.find(([id]) => id === tab) || TABS[0])[1])} tools">${ids.map(button).join('')}</div>
     <div class="hs-side">${rotate}${tool ? `<button type="button" class="hs-chip" data-hs-tool="" aria-label="Put the tool away (Esc)">✕<small>Done</small></button>` : `<button type="button" class="hs-chip" data-hs-options aria-expanded="${!!options}" aria-label="Homestead options">⚙<small>Options</small></button>`}</div>
   </div>${panel}</div>`;
 }
@@ -65,11 +69,17 @@ export function createHomesteadControls({panel, getWorld, me, send, toast, icon,
   const world = () => getWorld();
   const active = () => !!world()?.homestead;
 
+  /** The cell a piece is anchored at (its north-west cell) when the pointer is at (x, z): a big piece centres on the pointer. */
+  function anchor(x, z){
+    const {w, h} = sizeOf(state.tool);
+    return [Math.round(x / CELL - w / 2), Math.round(z / CELL - h / 2)];
+  }
   function cursor(){
     if(state.hover) return state.hover;
     if(state.touched) return state.touched;
     const p = me();if(!p) return null;
-    const [i, j] = cellAt(p.x + (p.dx || 0) * 1.3, p.z + (p.dz || 0) * 1.3);
+    const {w, h} = sizeOf(state.tool), reach = CELL * (.9 + Math.max(w, h) * .5);
+    const [i, j] = anchor(p.x + (p.dx || 0) * reach, p.z + (p.dz || 0) * reach);
     return {i, j};
   }
   /** What the renderer draws: the tool, its cursor cell and whether the cell would take it. */
@@ -114,7 +124,7 @@ export function createHomesteadControls({panel, getWorld, me, send, toast, icon,
   /** Pointer handlers for the world canvas. They return true when they used the event. */
   function down(e, point){
     if(!active() || !state.tool || !point || e.button === 2) return false;
-    const [i, j] = cellAt(point.x, point.z);
+    const [i, j] = anchor(point.x, point.z);
     state.stroke = {id: e.pointerId, last: [i, j]};state.touched = {i, j};
     enqueue([[i, j]]);
     return true;
@@ -122,10 +132,10 @@ export function createHomesteadControls({panel, getWorld, me, send, toast, icon,
   function move(e, point){
     if(!active()) return false;
     if(e.pointerType === 'mouse'){
-      if(point){const [i, j] = cellAt(point.x, point.z);state.hover = {i, j};}else state.hover = null;
+      if(point){const [i, j] = anchor(point.x, point.z);state.hover = {i, j};}else state.hover = null;
     }
     if(!state.stroke || e.pointerId !== state.stroke.id || !point) return false;
-    const [i, j] = cellAt(point.x, point.z), [li, lj] = state.stroke.last;
+    const [i, j] = anchor(point.x, point.z), [li, lj] = state.stroke.last;
     if(i === li && j === lj) return true;
     if(DRAGS.has(state.tool)) enqueue(cellLine([li, lj], [i, j]).slice(1), true);
     state.stroke.last = [i, j];state.touched = {i, j};
@@ -184,6 +194,7 @@ export function createHomesteadControls({panel, getWorld, me, send, toast, icon,
   }
   panel?.addEventListener('click', click);
   for(const type of ['pointerdown', 'pointerup']) panel?.addEventListener(type, event => event.stopPropagation());
-  return {state, view, setTool, rotate, down, move, up, leave, tap, paint, show, holding: () => !!state.tool};
+  function openTab(tab){state.tab = TABS.some(([id]) => id === tab) ? tab : 'farm';state.options = false;paint(true);}
+  return {state, view, setTool, rotate, down, move, up, leave, tap, paint, show, openTab, holding: () => !!state.tool};
 }
 export {BARRIERS, GROUNDS};

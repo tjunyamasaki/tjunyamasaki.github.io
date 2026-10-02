@@ -1,17 +1,20 @@
 // Homestead: building and farming on a grid (host simulation, no DOM).
 //
-// The ground is cut into one-unit cells. A cell holds up to two layers:
+// The ground is cut into cells CELL units wide (about a wanderer and a half). A cell holds up to two layers:
 //  - ground: tilled soil (crops grow in it) or a floor (planks, flagstones). Kept in world.tiles.
-//  - a barrier: fence, palisade, stone wall or gate. These are ordinary World buildings (they keep
-//    hit points, block walkers, and creatures claw at them) flagged `grid` with their cell (i, j).
+//  - something standing on it: a barrier (fence, palisade, stone wall, gate: buildings flagged `grid`
+//    with their cell i, j) or a camp object (workbench, chest, fire...: buildings with a `foot`
+//    {i, j, w, h} of whole cells, drawn scaled to fit it). Both are ordinary World buildings, so they
+//    keep hit points, block walkers, and creatures claw at walls.
 // Neighbouring pieces join: barriers draw rails to the barriers beside them, floors and soil merge
 // their borders (see homestead-render.mjs). Nothing here knows how anything looks.
 //
 // Every change goes through one command, {type:'tile', tool, cells:[[i,j],...], rotation}, so a
 // drag that paints twenty fence posts is a single request and guests can use it like the host.
-import {ITEMS, RULES, STRUCTURES, NODES} from './content.mjs?v=harvest-18';
+import {ITEMS, RECIPES, RULES, STRUCTURES, NODES} from './content.mjs?v=harvest-18';
+import {hushReason} from './hush.mjs?v=harvest-18';
 
-export const CELL = 1;
+export const CELL = 1.5;
 export const MAX_CELLS = 48;
 /** How far from the wanderer a cell may be worked outside the Homestead sandbox. */
 export const WORK_RANGE = 6;
@@ -24,12 +27,37 @@ export const GROUNDS = Object.freeze({
 
 /** Building types placed on the grid. `wall` and `gate` keep their old ids, so creatures still go for them. */
 export const BARRIERS = Object.freeze({
-  fence: {name: 'Fence', cost: {wood: 1}, radius: .42},
-  wall: {name: 'Palisade', cost: {wood: 2}, radius: .46},
-  stonewall: {name: 'Stone wall', cost: {stone: 2}, radius: .48},
-  gate: {name: 'Gate', cost: {wood: 3}, radius: .42, gate: true},
+  // Radii keep the gap between two neighbours narrower than a wanderer (body .33).
+  fence: {name: 'Fence', cost: {wood: 1}, radius: .62},
+  wall: {name: 'Palisade', cost: {wood: 2}, radius: .66},
+  stonewall: {name: 'Stone wall', cost: {stone: 2}, radius: .68},
+  gate: {name: 'Gate', cost: {wood: 3}, radius: .62, gate: true},
 });
 export const BARRIER_TYPES = Object.freeze(Object.keys(BARRIERS));
+
+/**
+ * Camp objects on the grid: footprint in cells (w across, h deep) and `art`, how wide the drawing
+ * itself is in world units (the sprite minus its transparent padding, measured from the theme art).
+ * Each is drawn at the scale that makes its art fill its footprint (objectScale), like the props in
+ * Don't Starve or Stardew sit in their tiles. Costs come from RECIPES.
+ */
+export const OBJECTS = Object.freeze({
+  bench: {w: 1, h: 1, art: 1.54},
+  chest: {w: 1, h: 1, art: 1.05},
+  fire: {w: 1, h: 1, art: 1.62},
+  pot: {w: 1, h: 1, art: 1.56},
+  lantern: {w: 1, h: 1, art: 1.02},
+  bed: {w: 2, h: 1, art: 2.04},
+  trap: {w: 1, h: 1, art: 1.56},
+  ward: {w: 1, h: 1, art: .98},
+  hushstone: {w: 1, h: 1, art: 1.49},
+});
+export const OBJECT_TYPES = Object.freeze(Object.keys(OBJECTS));
+/** Art fills 88% of the footprint's width; small art grows a little, never past 1.12. */
+export function objectScale(type){
+  const o = OBJECTS[type];
+  return o ? Math.min(1.12, o.w * CELL * .88 / o.art) : 1;
+}
 
 /**
  * Crops. `grow`: seconds from seed to ripe in daylight (night grows at NIGHT_RATE).
@@ -56,6 +84,7 @@ export const TOOLS = Object.freeze({
   wall: {kind: 'barrier', type: 'wall', name: 'Palisade'},
   stonewall: {kind: 'barrier', type: 'stonewall', name: 'Stone wall'},
   gate: {kind: 'barrier', type: 'gate', name: 'Gate'},
+  ...Object.fromEntries(OBJECT_TYPES.map(id => [`obj:${id}`, {kind: 'object', type: id, name: STRUCTURES[id]?.name || id}])),
   ...Object.fromEntries(CROP_TYPES.map(id => [`plant:${id}`, {kind: 'plant', crop: id, name: `Plant ${CROPS[id].name.toLowerCase()}`}])),
   harvest: {kind: 'harvest', name: 'Harvest'},
   remove: {kind: 'remove', name: 'Remove'},
@@ -65,6 +94,20 @@ export const TOOLS = Object.freeze({
 export const keyOf = (i, j) => `${i},${j}`;
 export const cellAt = (x, z) => [Math.floor(x / CELL), Math.floor(z / CELL)];
 export const centerOf = (i, j) => ({x: (i + .5) * CELL, z: (j + .5) * CELL});
+/** Footprint of a tool's piece: 1x1 for everything but camp objects. */
+export const sizeOf = toolId => {const t = TOOLS[toolId];return t?.kind === 'object' ? {w: OBJECTS[t.type].w, h: OBJECTS[t.type].h} : {w: 1, h: 1};};
+/** Where a footprint anchored at cell (i, j) puts its building: the middle of its cells. */
+export const footCenter = (i, j, w, h) => ({x: (i + w / 2) * CELL, z: (j + h / 2) * CELL});
+/**
+ * Where a camp object's sprite stands: a little south of its footprint's middle. The art is drawn
+ * from the front with its feet on its bottom edge, so this puts the body over the middle of its
+ * tiles in the 3/4 view instead of hanging over the row behind.
+ */
+export const objectSpot = (i, j, w, h) => {const c = footCenter(i, j, w, h);return {x: c.x, z: c.z + h * CELL * .2};};
+/** Camp object whose footprint covers cell (i, j), if any. */
+export function objectAt(world, i, j){
+  return world.buildings.find(b => b.foot && b.hp > 0 && i >= b.foot.i && i < b.foot.i + b.foot.w && j >= b.foot.j && j < b.foot.j + b.foot.h) || null;
+}
 
 /** The world's tile layer, made on first use. `rev` changes whenever any ground changes. */
 export function tilesOf(world){
@@ -140,10 +183,10 @@ export function stepTiles(world, dt, phase){
 }
 
 const free = world => !!world.homestead?.free;
-const costOf = tool => tool.kind === 'ground' ? GROUNDS[tool.ground].cost : tool.kind === 'barrier' ? BARRIERS[tool.type].cost : tool.kind === 'plant' ? {[CROPS[tool.crop].seed]: 1} : {};
+const costOf = tool => tool.kind === 'ground' ? GROUNDS[tool.ground].cost : tool.kind === 'barrier' ? BARRIERS[tool.type].cost : tool.kind === 'object' ? RECIPES[tool.type]?.cost || {} : tool.kind === 'plant' ? {[CROPS[tool.crop].seed]: 1} : {};
 
 function blockedByThings(world, x, z, radius){
-  if(world.buildings.some(b => !b.grid && b.hp > 0 && Math.hypot(b.x - x, b.z - z) < Math.max(.3, b.radius ?? STRUCTURES[b.type]?.radius ?? 0) + radius)) return 'Something is built here';
+  if(world.buildings.some(b => !b.grid && !b.foot && b.hp > 0 && Math.hypot(b.x - x, b.z - z) < Math.max(.3, b.radius ?? STRUCTURES[b.type]?.radius ?? 0) + radius)) return 'Something is built here';
   if(world.nodes.some(n => !n.ready && (NODES[n.type]?.radius || 0) > .2 && Math.hypot(n.x - x, n.z - z) < NODES[n.type].radius + radius)) return 'Clear this spot first';
   return '';
 }
@@ -159,8 +202,25 @@ export function cellReason(world, p, toolId, i, j){
   const {x, z} = centerOf(i, j);
   if(!world.walkable(x, z)) return 'Outside the clearing';
   if(!world.homestead && Math.hypot(x - p.x, z - p.z) > WORK_RANGE) return 'Move closer to this spot';
-  const tile = tileAt(world, i, j), barrier = barrierAt(world, i, j);
-  if(tool.kind === 'ground'){
+  const tile = tileAt(world, i, j), barrier = barrierAt(world, i, j), object = tool.kind === 'object' ? null : objectAt(world, i, j);
+  if(tool.kind === 'object'){
+    const {w, h} = OBJECTS[tool.type];
+    for(let a = 0; a < w; a++)for(let b = 0; b < h; b++){
+      const ci = i + a, cj = j + b, c = centerOf(ci, cj), t = tileAt(world, ci, cj);
+      if(!world.walkable(c.x, c.z)) return 'Outside the clearing';
+      if(barrierAt(world, ci, cj)) return 'A wall is in the way';
+      const other = objectAt(world, ci, cj);
+      if(other) return other.type === tool.type && other.foot.i === i && other.foot.j === j ? 'same' : 'Something is built here';
+      if(t?.g === 'soil') return 'Not on tilled soil';
+    }
+    const {x: fx, z: fz} = footCenter(i, j, w, h);
+    if(world.players.some(q => q.online && !q.ghost && Math.abs(q.x - fx) < w * CELL / 2 + .2 && Math.abs(q.z - fz) < h * CELL / 2 + .2)) return 'A wanderer is standing here';
+    const why = blockedByThings(world, fx, fz, Math.min(w, h) * CELL * .45);if(why) return why;
+    if(tool.type === 'hushstone' && hushReason(world)) return hushReason(world);
+  }else if(object && ['barrier', 'plant', 'harvest'].includes(tool.kind) || object && tool.ground === 'soil'){
+    // Floors may run under furniture; soil, crops and walls may not.
+    return tool.kind === 'harvest' ? 'same' : 'Something is built here';
+  }else if(tool.kind === 'ground'){
     if(tile?.g === tool.ground) return 'same';
     if(tile?.crop) return 'Harvest or remove the crop first';
     if(tool.ground === 'soil' && barrier) return 'Something is built here';
@@ -182,6 +242,11 @@ export function cellReason(world, p, toolId, i, j){
     if(!ripe(tile)) return 'Not ripe yet';
     return '';
   }else if(tool.kind === 'remove'){
+    if(object && !barrier){
+      if(object.type === 'hearth' || object.fixed) return 'That stays';
+      if(world.chestSessions?.has(object.id)) return 'Someone has it open';
+      return '';
+    }
     return barrier || tile ? '' : 'same';
   }else if(tool.kind === 'use'){
     if(barrier?.type === 'gate') return '';
@@ -226,8 +291,16 @@ function refund(world, p, cost){
 /** Apply one tool to one cell. Assumes cellReason() said ''. */
 function applyCell(world, p, toolId, i, j, rotation){
   const tool = TOOLS[toolId], tiles = tilesOf(world), key = keyOf(i, j), {x, z} = centerOf(i, j);
-  const tile = tiles.cells[key] || null, barrier = barrierAt(world, i, j);
+  const tile = tiles.cells[key] || null, barrier = barrierAt(world, i, j), object = objectAt(world, i, j);
   if(!free(world) && !world.pay(p, costOf(tool), true)) return false;
+  if(tool.kind === 'object'){
+    const {w, h} = OBJECTS[tool.type], c = objectSpot(i, j, w, h);
+    const b = world.structure(tool.type, c.x, c.z);
+    Object.assign(b, {foot: {i, j, w, h}, scale: objectScale(tool.type)});
+    world.buildings.push(b);world.stats.built++;
+    world.event('tile', c.x, c.z, '', {tool: toolId});world.event('build', c.x, c.z, STRUCTURES[tool.type]?.name || tool.type);
+    return true;
+  }
   if(tool.kind === 'ground'){
     if(tile?.g && tile.g !== 'soil') refund(world, p, GROUNDS[tile.g].cost);
     tiles.cells[key] = {g: tool.ground, crop: null, growth: 0};
@@ -248,10 +321,12 @@ function applyCell(world, p, toolId, i, j, rotation){
     if(barrier?.type === 'gate'){barrier.open = !barrier.open;world.event('tile', x, z, '', {tool: barrier.open ? 'open' : 'close'});}
     else harvestTile(world, p, tile, i, j);
   }else if(tool.kind === 'remove'){
-    if(barrier){
-      refund(world, p, BARRIERS[barrier.type]?.cost || {});
-      world.dropContainer?.(barrier.store, barrier.x, barrier.z);
-      world.buildings = world.buildings.filter(b => b !== barrier);
+    if(barrier || object){
+      const gone = barrier || object;
+      refund(world, p, (barrier ? BARRIERS[gone.type]?.cost : RECIPES[gone.type]?.cost) || {});
+      world.dropContainer?.(gone.store, gone.x, gone.z);
+      if(gone.overflow) world.dropContainer?.(gone.overflow, gone.x, gone.z);
+      world.buildings = world.buildings.filter(b => b !== gone);
     }else if(tile?.crop){
       if(!ripe(tile) && !free(world)) world.give(p, CROPS[tile.crop].seed, 1);
       else if(ripe(tile)) harvestTile(world, p, tile, i, j);

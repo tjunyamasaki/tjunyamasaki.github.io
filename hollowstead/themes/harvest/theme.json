@@ -4279,8 +4279,8 @@
     "crop-pumpkin": {
       "src": "./sprites/crop-pumpkin.svg?v=home1",
       "size": [
-        1.7,
-        2.55
+        2.45,
+        3.675
       ],
       "anchor": [
         0.5,
@@ -4300,8 +4300,8 @@
     "crop-moonroot": {
       "src": "./sprites/crop-moonroot.svg?v=home1",
       "size": [
-        1.5,
-        2.25
+        2.2,
+        3.3
       ],
       "anchor": [
         0.5,
@@ -4321,8 +4321,8 @@
     "crop-duskwheat": {
       "src": "./sprites/crop-duskwheat.svg?v=home1",
       "size": [
-        1.55,
-        2.32
+        2.25,
+        3.375
       ],
       "anchor": [
         0.5,
@@ -4342,8 +4342,8 @@
     "crop-bloodapple": {
       "src": "./sprites/crop-bloodapple.svg?v=home1",
       "size": [
-        1.5,
-        2.25
+        2.2,
+        3.3
       ],
       "anchor": [
         0.5,

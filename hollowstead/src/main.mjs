@@ -459,7 +459,7 @@ async function refineSlot(slot){
   refining.pending=-1;if(result?.ok&&refining.itemId===itemId){refining.fresh=slot;setTimeout(()=>{if(refining.fresh===slot){refining.fresh=-1;dirty=true;}},1600);}dirty=true;renderSheet();
 }
 function toggleInventory(){if(sheet==='inventory'||sheet==='chest')closeSheet();else openSheet('inventory');}
-function toggleFieldBuild(){if(sheet==='catalog'&&catalog.source==='field')closeSheet();else openFieldBuild();}
+function toggleFieldBuild(){if(world?.homestead&&homestead){if(sheet)closeSheet();homestead.openTab('camp');return;}if(sheet==='catalog'&&catalog.source==='field')closeSheet();else openFieldBuild();}
 async function runAction(action){
   if(!action)return;
   if(!action.enabled){if(action.disabledReason)toast(action.disabledReason);return;}

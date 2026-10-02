@@ -35,6 +35,10 @@ export const ITEMS = {
   ichor:{name:'Dread ichor',icon:'ichor'},
   // Areas (worldgen.mjs): what only Frostmere and the Ashen Scar give. They awaken the Heartfire past its third level.
   rime:{name:'Rime shard',icon:'rime'},emberglass:{name:'Emberglass',icon:'emberglass'},
+  // Homestead crops (homestead.mjs CROPS): what grows in tilled soil, and its seeds.
+  moonroot:{name:'Moonroot',icon:'moonroot',food:14,heal:4,courage:10},bloodapple:{name:'Bloodapple',icon:'bloodapple',food:10,heal:8},
+  wheat:{name:'Duskwheat sheaf',icon:'wheat'},
+  rootseed:{name:'Moonroot seed',icon:'rootseed'},wheatseed:{name:'Duskwheat grain',icon:'wheatseed'},appleseed:{name:'Bloodapple seed',icon:'appleseed'},
 };
 export const EQUIPMENT = {
   axe:{name:'Woodcutter’s axe',icon:'axe',durability:70},pick:{name:'Flint pick',icon:'pick',durability:70},
@@ -130,6 +134,8 @@ export const STRUCTURES = {
   pot:{name:'Cauldron',hp:160,radius:.55},lantern:{name:'Soul lantern',hp:140,radius:.3,light:6},
   bed:{name:'Bedroll',hp:100,radius:0},ward:{name:'Warding totem',hp:200,radius:.55},hushstone:{name:'Hushing stone',hp:220,radius:.6},
   cart:{name:'Hand cart',hp:220,radius:.55},
+  // Homestead barriers (homestead.mjs): only ever placed on the grid.
+  fence:{name:'Fence',hp:120,radius:.42},stonewall:{name:'Stone wall',hp:420,radius:.48},
 };
 export const RECIPES = {
   axe:{kind:'tool',cost:{wood:2,stone:2},station:'bench',desc:'Fell trees twice as quickly.'},

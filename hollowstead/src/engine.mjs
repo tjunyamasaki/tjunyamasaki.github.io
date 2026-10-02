@@ -28,6 +28,7 @@ import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
 import {stepMobs} from './mobs.mjs?v=harvest-18';
+import {applyTiles, cropTargets, setupHomestead, stepTiles, BARRIERS as GRID_BARRIERS} from './homestead.mjs?v=harvest-18';
 import {ARENA, arenaEliteChance, arenaKill, arenaPick, arenaScale, setupArena, stepArena} from './arena.mjs?v=harvest-18';
 // Frontier features. Each module owns its rules; the World only calls these hooks.
 import {armNextWave, kingVisits, spawnWave, stepNight} from './night.mjs?v=harvest-18';
@@ -210,6 +211,7 @@ export class World {
     if(options?.arena===true||options?.lab===true)setupArena(this);
     if(options?.lab===true)setupLab(this);
     if(options?.dungeon)setupDungeon(this, options.dungeon===true?{}:options.dungeon);
+    if(options?.homestead===true)setupHomestead(this);
   }
   nextId(prefix){return prefix+(this.idCounter++);}
   nextItemUid(){return `i${this.idCounter++}`;}
@@ -431,7 +433,7 @@ export class World {
   // Only new construction can draw distant supplies. Crafting, repairs and other upkeep stay local.
   stores(p,forBuild=false){pruneChests(this);return this.buildings.filter(b=>(b.type==='chest'||b.type==='cart')&&b.hp>0&&(forBuild||inSupplyChestRange(distance(p,b)))&&(!this.chestSessions.has(b.id)||this.chestSessions.get(b.id).ownerId===p.id)).map(b=>b.store);}
   available(p,itemId,forBuild=false){return this.count(p, itemId)+this.stores(p,forBuild).reduce((total, store)=>total+countItem(store, itemId), 0);}
-  canPay(p,cost,forBuild=false){return Object.entries(cost).every(([itemId, need])=>Number.isInteger(need)&&this.available(p, itemId,forBuild)>=need);}
+  canPay(p,cost,forBuild=false){if(this.homestead?.free)return true;return Object.entries(cost).every(([itemId, need])=>Number.isInteger(need)&&this.available(p, itemId,forBuild)>=need);}
   takeCost(clones,cost){
     for(const [itemId, need] of Object.entries(cost)){
       if(!itemDefinition(itemId)||!Number.isInteger(need)||need<=0)return false;
@@ -447,6 +449,7 @@ export class World {
     return true;
   }
   pay(p,cost,forBuild=false){
+    if(this.homestead?.free)return true;
     const sources=[p.inventory, ...this.stores(p,forBuild)];
     const clones=sources.map(cloneContainer);
     if(!this.takeCost(clones, cost))return false;
@@ -517,7 +520,7 @@ export class World {
     const radius=Math.max(.6,STRUCTURES[type].radius);
     if(this.buildings.length>=160)return 'The camp has reached its structure limit';
     if(this.players.some(q=>q.online&&!q.ghost&&Math.hypot(q.x-x,q.z-z)<radius+.4))return 'A wanderer is standing here';
-    if(this.buildings.some(b=>Math.hypot(b.x-x,b.z-z)<Math.max(.65,STRUCTURES[b.type].radius)+radius+.1))return 'Too close to another structure';
+    if(this.buildings.some(b=>Math.hypot(b.x-x,b.z-z)<Math.max(b.grid?.45:.65,b.radius??STRUCTURES[b.type].radius)+radius+.1))return 'Too close to another structure';
     if(this.nodes.some(n=>!n.ready&&NODES[n.type].radius>.3&&Math.hypot(n.x-x,n.z-z)<NODES[n.type].radius+radius))return 'Clear these resources first';
     if(type==='hushstone'&&hushReason(this))return hushReason(this);
     if(RECIPES[type].station&&!this.stationBuilding(p, type, stationId,true))return 'Build this at a workbench';
@@ -684,10 +687,11 @@ export class World {
     if(this.status!=='playing')return {ok:false,code:'unavailable'};
     if(p.down||p.ghost){if(cmd.type==='interact'&&p.charm>0){p.charm--;this.revivePlayer(p);this.event('heal',p.x,p.z,'Last charm');return {ok:true,code:'ok'};}return {ok:false,code:'unavailable'};}
     if(Object.hasOwn(INTENTS,cmd.type))return inventoryIntent(this,p,cmd);
-    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill','refine'].includes(cmd.type))return {ok:false,code:'cooldown'};
+    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill','refine','tile'].includes(cmd.type))return {ok:false,code:'cooldown'};
     switch(cmd.type){
       case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){const gx=clamp(cmd.x,-this.radius+1,this.radius-1),gz=clamp(cmd.z,-this.radius+1,this.radius-1),land=this.walkable(gx,gz)?null:this.landNear(gx,gz,6);p.goal={x:land?land.x:gx,z:land?land.z:gz,target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
       case 'craft':return this.performCraft(p, cmd.recipe, cmd.stationId);
+      case 'tile':return applyTiles(this, p, cmd);
       case 'build':return this.dungeon?{ok:false,code:'unavailable'}:this.performBuild(p, cmd.recipe, cmd.x, cmd.z, cmd.stationId, cmd.rotation);
       case 'use':{
         let stack=null;
@@ -759,7 +763,8 @@ export class World {
     const revive=this.players.find(q=>q.id!==p.id&&q.online&&q.down&&inRange(q));
     const candidates=[
       ...this.nodes.filter(n=>!(n.ready>this.time)&&nodeAwake(n,this)&&inRange(n)&&(NODES[n.type].handRate||NODES[n.type].tool)).map(e=>({kind:'node',entity:e,label:e.type==='tree'?'Chop':['rock','ore','grave','shardrock','rimecrystal','embervent'].includes(e.type)?'Mine':isCache(e.type)||e.type==='fallenstar'||e.type==='mimic'?'Open':e.type==='witchcauldron'?'Sip':NODES[e.type].landmark==='delve'?'Descend':'Gather'})),
-      ...this.buildings.filter(b=>b.hp>0&&inRange(b)&&(typeof id==='string'||b.towedBy!==p.id)).map(e=>({kind:'building',entity:e,label:this.buildingLabel(e)})),
+      ...this.buildings.filter(b=>b.hp>0&&inRange(b)&&!(b.grid&&b.type!=='gate')&&(typeof id==='string'||b.towedBy!==p.id)).map(e=>({kind:'building',entity:e,label:this.buildingLabel(e)})),
+      ...cropTargets(this,p),
       ...(revive?[{kind:'revive',entity:revive,label:'Revive teammate'}]:[]),
     ];
     if(typeof id==='string')return candidates.find(t=>t.entity.id===id)||null;
@@ -773,6 +778,7 @@ export class World {
     const e=t.entity;
     if(t.kind==='revive')return {ok:true,code:'ok'};
     if(t.kind==='drop')return {ok:false,code:'rejected'};
+    if(t.kind==='crop')return applyTiles(this,p,{tool:'harvest',cells:[[e.i,e.j]]});
     if(t.kind==='node'){
       const started=this.setHarvestTarget(p, {mode:'auto', nodeId:e.id});
       return started.ok?started:{ok:false,code:'rejected'};
@@ -843,7 +849,7 @@ export class World {
   }
   finishDismantle(p, building){
     if(!building||building.type==='hearth'||this.chestSessions.has(building.id))return;
-    for(const [itemId, count] of Object.entries(RECIPES[building.type].cost))this.give(p, itemId, Math.ceil(count*.5));
+    for(const [itemId, count] of Object.entries((building.grid?GRID_BARRIERS[building.type]?.cost:RECIPES[building.type]?.cost)||{}))this.give(p, itemId, Math.ceil(count*.5));
     this.dropContainer(building.store, building.x, building.z);
     if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);
     this.buildings=this.buildings.filter(entry=>entry!==building);
@@ -1467,7 +1473,7 @@ export class World {
       Object.defineProperty(this,'obstacleCache',{value:cache,writable:true,configurable:true,enumerable:false});
     }
     const out=[];
-    for(const b of this.buildings){const radius=STRUCTURES[b.type]?.radius||0;if(radius>0&&b.hp>0&&!(b.type==='gate'&&b.open))out.push({id:b.id,type:b.type,x:b.x,z:b.z,radius,tow:b.towedBy||null});}
+    for(const b of this.buildings){const radius=b.radius??STRUCTURES[b.type]?.radius??0;if(radius>0&&b.hp>0&&!(b.type==='gate'&&b.open))out.push({id:b.id,type:b.type,x:b.x,z:b.z,radius,tow:b.towedBy||null});}
     out.grid=cache.grid;out.nodes=cache.list;
     return out;
   }
@@ -1642,6 +1648,8 @@ export class World {
     if(this.arena){this.time+=dt;if(this.arena.lab)stepLab(this,dt);else stepArena(this,dt);if(this.status!=='playing')return;}
     else if(this.dungeon){this.time+=dt;stepDungeon(this,dt);stepDelve(this,dt);if(this.status!=='playing')return;}
     else{
+    // Homestead sandbox with daylight held: dusk never comes (the clock skips to the next morning).
+    if(this.homestead?.day&&phaseOf(this)!=='day')this.time+=RULES.cycle-((this.time%RULES.cycle)+RULES.cycle)%RULES.cycle+20;
     const before=phaseOf(this),oldDay=dayOf(this);this.time+=dt;phase=phaseOf(this);
     if(before!==phase){const survived=dayOf(this)-1;this.event('phase',0,0,phase==='day'?(survived>0?`Dawn. ${survived} ${survived===1?'night':'nights'} survived.`:'Dawn. You made it.'):phase==='dusk'?'Dusk is falling. Return to your fire.':'Keep the fire alive.');if(phase==='day')this.best.day=Math.max(this.best.day||1,dayOf(this));if(phase==='day'){for(const p of this.players)if(p.down||p.ghost)this.revivePlayer(p);if(isVigil(this))for(const p of this.players)if(!(p.charm>0))p.charm=1;this.enemies=this.enemies.filter(e=>e.type==='king'||e.home||isMagicAlly(e));this.hostile=[];}}
     if(!this.showcase&&dayOf(this)!==oldDay&&this.bossSlain&&!this.endless){this.status='victory';this.event('announce',0,0,'The curse is broken. Your fire still burns.');return;}
@@ -1714,6 +1722,7 @@ export class World {
     if(!this.arena)stepCarts(this,dt,obstacles);
     for(const p of this.players)if(p.online&&!p.down&&!p.ghost)trinketEvent(this,p,'tick',{dt,phase});
     this.stepMagic(dt);this.stepProjectiles(dt);stepArsenal(this, dt, obstacles);stepSkills(this, dt, obstacles);
+    if(this.tiles)stepTiles(this,dt,phase);
     for(const b of this.buildings){
       b.cooldown=Math.max(0,b.cooldown-dt);if(b.type==='hearth'&&b.hp>0&&phase==='day'&&!this.showcase)b.hp=Math.min(b.maxHp,b.hp+dt*1.5);if(['hearth','fire'].includes(b.type))b.fuel=Math.max(0,b.fuel-dt*(phase==='day'?.18:1));
       if(b.type==='farm'&&b.planted)b.growth=Math.min(100,b.growth+dt*(phase==='day'?1:.35));
@@ -1769,7 +1778,7 @@ export class World {
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
       projectiles:this.projectiles, allies:this.allies, zones:this.zones, beats:this.beats, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
-      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone,
+      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone, tiles:this.tiles, homestead:this.homestead,
       ...magicSnapshotFields(this),
     };
     // Where each random stream stands, so a reloaded save carries on rather than replaying the seed.
@@ -1782,7 +1791,7 @@ export class World {
     if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
     // A dungeon floor is rebuilt from its seed (dungeon/layout.mjs), never from the hollow's map.
     const world=new World(data.seed,data.dungeon?{bare:true}:{});
-    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','below','saga','surface','delves','lair','omens','omenT','omensDone'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','below','saga','surface','delves','lair','omens','omenT','omensDone','tiles','homestead'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     if(world.arena){world.nodes=[];}if(world.dungeon)world.nodes=dungeonNodes(world);if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||(!world.arena&&!world.dungeon))world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
     for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);sanitizeRefine(p);}

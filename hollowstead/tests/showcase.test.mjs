@@ -67,7 +67,8 @@ test('showcase list follows the live content tables and can place, remove, and c
   const categories = showcaseCategories();
   const ids = name => categories.find(category => category.id === name).entries.map(entry => entry.id);
   assert.deepEqual(ids('nature').sort(), Object.keys(NODES).sort());
-  assert.deepEqual(ids('buildings').sort(), Object.keys(STRUCTURES).sort());
+  // Grid-only homestead barriers (homestead.mjs) are built with the Homestead tools, not spawned here.
+  assert.deepEqual(ids('buildings').sort(), Object.keys(STRUCTURES).filter(id => id !== 'fence' && id !== 'stonewall').sort());
   assert.deepEqual(ids('mobs').filter(id => ENEMIES[id]).sort(), Object.keys(ENEMIES).sort());
   const carried = new Set([...ids('materials'), ...ids('food'), ...ids('gear'), ...ids('magic')]);
   for (const id of Object.keys(ITEMS)) assert.equal(carried.has(id), true);

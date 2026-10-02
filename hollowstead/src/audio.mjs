@@ -154,6 +154,8 @@ export class Sound {
       }
       return;
     }
+    // Homestead (homestead.mjs): a thud of earth or timber, a pluck for a seed, a creak for a gate.
+    if(type==='tile'){const k=String(ev?.tool||''),[f0,f1,d,w]=k==='harvest'?[520,880,.14,'sine']:k.startsWith('plant')?[760,980,.08,'sine']:k==='open'||k==='close'?[210,160,.22,'triangle']:k==='remove'?[260,120,.12,'triangle']:[170,95,.1,'triangle'];this.sweep(f0,f1,d,w,.05);return;}
     const tones={hit:[130,70,.1,'triangle'],swing:[180,60,.12,'sawtooth'],hurt:[100,40,.22,'sawtooth'],loot:[500,850,.16,'sine'],craft:[420,650,.22,'triangle'],build:[180,550,.35,'triangle'],heal:[600,950,.2,'sine'],phase:[330,110,.7,'sine'],kill:[160,55,.25,'triangle'],dash:[250,90,.12,'sine'],bolt:[720,180,.16,'sine'],impact:[70,30,.35,'triangle'],dodge:[900,1500,.14,'sine'],swap:[520,380,.07,'square'],rankup:[520,1040,.32,'triangle'],ashes:[260,70,.32,'triangle'],portal:[140,260,.3,'sine'],quake:[55,28,.42,'triangle'],splat:[210,90,.18,'sine'],charge:[160,320,.2,'sawtooth']};
     const [from,to,duration,wave]=tones[type]||[300,400,.15,'sine'];const osc=this.context.createOscillator(),gain=this.context.createGain();osc.type=wave;osc.frequency.setValueAtTime(from,t);osc.frequency.exponentialRampToValueAtTime(to,t+duration);gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.065,t+.012);gain.gain.exponentialRampToValueAtTime(.0001,t+duration);osc.connect(gain);gain.connect(this.context.destination);osc.start(t);osc.stop(t+duration+.01);
   }

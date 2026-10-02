@@ -43,6 +43,8 @@ import {CHARM} from './trinkets.mjs?v=harvest-18';
 import {dungeonStatus, layoutOf} from './dungeon/run.mjs?v=harvest-18';
 import {VARIANTS, isVariant} from './dungeon/variants.mjs?v=harvest-18';
 import {floorTones} from './dungeon/art.mjs?v=harvest-18';
+import {createHomesteadControls} from './ui/homestead.mjs?v=harvest-18';
+import {CROPS} from './homestead.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -54,6 +56,7 @@ async function bounded(promise){let timer;try{return await Promise.race([promise
 
 let theme,renderer,sound,world,network=null,mode='front',localId='host',character='ember',room='',paused=false,remotePaused=false,hiddenPause=false,linkLost=false;
 let sheet=null,category='all',selected=null,placement=null,maintenance=false,maintenanceTarget=null;
+let homestead=null;
 let showcaseCategory='materials',showcaseTool='',showcaseListOpen=false,showcaseMobCount=1,showcaseMarkupCache='',showcaseHistoryClosing=false,fullscreenNote='';
 let lastNotice=0,lastEvent=0,lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,saveTime=0,pingTime=0,lastMode='normal';
 let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:0},dirty=true;
@@ -155,7 +158,7 @@ function maintainChest(){
 }
 /** A standalone dungeon run (not a delve below an expedition, which keeps the hollow in world.surface and saves with it). */
 function isRun(w){return !!(w?.dungeon&&!w.surface);}
-function save(manual=false){if(world?.showcase||world?.arena||isRun(world)){if(manual)toast(world.dungeon?'Dungeon runs are not saved':world.arena?'Arena runs are not saved':'Showcase stays on this screen');return;}if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;
+function save(manual=false){if(world?.showcase||world?.arena||isRun(world)){if(manual)toast(world.dungeon?'Dungeon runs are not saved':world.arena?'Arena runs are not saved':world.homestead?'The homestead sandbox is not saved':'Showcase stays on this screen');return;}if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;
   // A Vigil writes only to its own slot; an expedition never touches it.
   const vigil=world.mode==='vigil',key=vigil?SAVE_KEYS.vigil:SAVE_KEYS.expeditionV2;
   try{localStorage.setItem(key,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));saveText=vigil?'Vigil kept on this browser':'Saved on this browser';if(manual)toast(vigil?'Vigil saved':'Expedition saved');dirty=true;}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
@@ -210,22 +213,23 @@ function prepareWorld(resume=false,dungeon=null,vigil=null){
 function enterGame(){
   $('front').hidden=true;$('game').hidden=false;$('end-screen').hidden=true;closeSheet();$('room-panel').hidden=true;document.body.classList.add('playing');
   linkLost=false;cancelPlacement();cancelMaintenance();
-  if(world?.showcase){connectionText='Showcase';saveText='Not saved';showStatus('');}
+  if(world?.homestead){connectionText='Homestead';saveText='The homestead sandbox is not saved';showStatus('');}
+  else if(world?.showcase){connectionText='Showcase';saveText='Not saved';showStatus('');}
   else if(world?.arena){connectionText=world.arena.lab?'Weapon lab':'Battle arena';saveText=world.arena.lab?'The lab is not saved':'Arena runs are not saved';showStatus('');}
   else if(world?.dungeon){connectionText=mode==='solo'?'Dungeon run':connectionText||'Connected to camp';saveText='Dungeon runs are not saved';showStatus('');}
   else if(mode==='solo'){connectionText='Expedition saved locally';saveText='Saved on this browser';showStatus('Expedition saved locally');}
   else{connectionText=connectionText||'Connected to camp';saveText=mode==='guest'?'Kept by the host':'Saved on this browser';}
-  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase);announce(world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':world?.mode==='vigil'?(dayOf(world)===1&&world.time<5?'The Vigil begins. One fire, one save, as long as you can keep it.':'The vigil goes on. The fire remembers you.'):dayOf(world)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
-  document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);document.body.classList.toggle('dungeon',!!world?.dungeon);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
+  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase&&!world?.homestead);homestead?.show(!!world?.homestead);announce(world?.homestead?'The homestead. Pick a tool below, then tap or drag across the ground.':world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':world?.mode==='vigil'?(dayOf(world)===1&&world.time<5?'The Vigil begins. One fire, one save, as long as you can keep it.':'The vigil goes on. The fire remembers you.'):dayOf(world)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
+  document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);document.body.classList.toggle('dungeon',!!world?.dungeon);document.body.classList.toggle('homestead',!!world?.homestead);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
   showLab(!!world?.arena?.lab);
 }
 async function goHome(){
   leaveArena();
-  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;showFrontPanel('home-panel');$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();syncVigilHint();demoWorld();
+  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);homestead?.show(false);document.body.classList.remove('homestead');$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;showFrontPanel('home-panel');$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();syncVigilHint();demoWorld();
   void checkForUpdate();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
-function setBusy(value){busy=value;for(const id of ['mode-expedition','mode-join','host','join','solo','continue','showcase','arena','lab','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
+function setBusy(value){busy=value;for(const id of ['mode-expedition','mode-join','host','join','solo','continue','showcase','homestead','arena','lab','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
 function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status,wasDeep=!!world.dungeon;world=World.restore(data);dirty=true;if(!!world.dungeon!==wasDeep&&!$('room-panel').hidden)roomLabels();if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');showFrontPanel('room-panel');$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
 async function hostCamp(dungeon=null,vigil=null){
   if(busy)return;if(dungeon&&(typeof dungeon!=='object'||(typeof Event!=='undefined'&&dungeon instanceof Event)))dungeon=null;if(typeof vigil!=='string')vigil=null;setBusy(true);sound.unlock();storeProfile();showStatus(dungeon?'Opening the dungeon doors…':vigil?'Lighting the vigil fire…':'Opening the camp…');
@@ -305,6 +309,16 @@ function startShowcase(){
   world.addPlayer('host',$('player-name').value,character);
   mode='solo';room='';showcaseCategory='materials';showcaseTool='';showcaseListOpen=false;showcaseMobCount=1;showcaseMarkupCache='';
   cancelPlacement();cancelMaintenance();clearSelection();
+  enterGame();
+}
+/** Homestead: a calm clearing to build and farm on the grid (homestead.mjs). Free building, no creatures. Not saved. */
+function startHomestead(){
+  sound.unlock();storeProfile();
+  world=new World((Math.random()*0xffffffff)>>>0,{showcase:true,homestead:true});
+  const p=world.addPlayer('host',$('player-name').value,character);
+  // Supplies for when free building is switched off in the options.
+  for(const [id,n] of [['wood',40],['stone',40],['fiber',20],...Object.values(CROPS).map(c=>[c.seed,12])])world.give(p,id,n);
+  mode='solo';room='';showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();
   enterGame();
 }
 /** Battle arena: solo waves in a small round clearing. Not saved. */
@@ -415,6 +429,7 @@ function contextFacts(p){
     const lock=world.chestSessions.get(entity.id);
     return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{})};
   }
+  if(target.kind==='crop')return {...base,i:entity.i,j:entity.j,crop:entity.crop};
   if(target.kind==='node'){const node=NODES[entity.type];return {...base,required:!!node?.required,toolReady:!(node?.tool)||world.hasTool(p,node.tool),toolLabel:node?.tool?label(node.tool).toLowerCase():''};}
   return base;
 }
@@ -675,7 +690,7 @@ async function toggleFullscreen(){
   syncFullscreenUi();renderer?.resize?.();
 }
 function menuHTML(){
-  const camp=room?`Camp ${escapeHtml(room)}`:world?.dungeon?'Dungeon run':world?.arena?.lab?'Weapon lab':world?.arena?'Battle arena':world?.showcase?'Showcase':'Solo expedition';
+  const camp=room?`Camp ${escapeHtml(room)}`:world?.dungeon?'Dungeon run':world?.arena?.lab?'Weapon lab':world?.arena?'Battle arena':world?.homestead?'Homestead':world?.showcase?'Showcase':'Solo expedition';
   const auto=world?.arena||world?.dungeon?`<div class="menu-row"><span>Auto-attack</span><button type="button" data-command="auto" aria-pressed="${autoAttack}">${autoAttack?'On':'Off'}</button></div>`:'';
   return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div>${auto}<div class="menu-row"><span>Fullscreen</span><button type="button" data-command="fullscreen">${isFullscreen()?'Exit fullscreen':'Fullscreen'}</button></div>${fullscreenNote?`<p class="muted small">${escapeHtml(fullscreenNote)}</p>`:''}<div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'&&!world?.arena&&!world?.dungeon&&!world?.showcase?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">${world?.arena?'Leave the arena':world?.dungeon?'Leave the dungeon':'Save & return to title'}</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
 }
@@ -998,6 +1013,7 @@ function ui(){
       else{if(!placement.anchored){placement.x=Math.round((p.x+p.dx*3)*2)/2;placement.z=Math.round((p.z+p.dz*3)*2)/2;}const why=world.canBuild(p,placement.key,placement.x,placement.z,placement.stationId);placement.valid=!why;placement.reason=why||'';}
     }
     if(world?.showcase)paintShowcase();
+    if(world?.homestead)homestead?.paint();
     if(world?.arena?.lab)paintLab();
     if(sheet==='catalog'&&catalog.source==='station'){const station=world.buildings.find(b=>b.id===catalog.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(sheet==='refine'){const station=world.buildings.find(b=>b.id===refining.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
@@ -1054,7 +1070,7 @@ function setupControls(){
   $('looks').onclick=e=>{const b=e.target.closest('[data-look]');if(!b)return;pickWanderer(baseOf(character),b.dataset.look);};
   $('mode-expedition').onclick=()=>{if(!busy){syncSaveOption();showFrontPanel('expedition-panel');}};$('expedition-back').onclick=()=>showFrontPanel('home-panel');
   $('mode-join').onclick=()=>{if(!busy){showFrontPanel('join-panel');$('room-input').focus();}};$('join-back').onclick=()=>showFrontPanel('home-panel');
-  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
+  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('homestead').onclick=()=>{if(!busy)startHomestead();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;syncSoundButton();sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   // Pack, Build and Light answer on release over the same button (pointer events, so a held joystick does not swallow the tap).
@@ -1112,8 +1128,13 @@ function setupControls(){
   joystick.addEventListener('pointermove',e=>{if(e.pointerId===pointer)moveStick(e);});
   for(const type of ['pointerup','pointercancel','lostpointercapture'])joystick.addEventListener(type,e=>{if(pointer===e.pointerId){pointer=null;stick={x:0,z:0};$('stick').style.transform='';}});
   function moveStick(e){const r=joystick.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,z=e.clientY-r.top-r.height/2,l=Math.hypot(x,z),scale=Math.min(1,42/Math.max(1,l));$('stick').style.transform=`translate(${x*scale}px,${z*scale}px)`;stick={x:clamp(x/42,-1,1),z:clamp(z/42,-1,1)};}
-  $('world').addEventListener('pointerdown',e=>{pointerStart={x:e.clientX,y:e.clientY};});
+  $('world').addEventListener('pointerdown',e=>{pointerStart={x:e.clientX,y:e.clientY};if(homestead?.holding()&&['solo','host','guest'].includes(mode)&&!$('game').hidden&&homestead.down(e,renderer.worldPoint(e.clientX,e.clientY))){try{$('world').setPointerCapture(e.pointerId);}catch{}e.preventDefault();}});
+  $('world').addEventListener('pointermove',e=>{if(world?.homestead)homestead?.move(e,renderer.worldPoint(e.clientX,e.clientY));});
+  $('world').addEventListener('pointerleave',()=>homestead?.leave());
+  $('world').addEventListener('pointercancel',e=>homestead?.up(e));
+  $('world').addEventListener('contextmenu',e=>{if(homestead?.holding()){e.preventDefault();homestead.setTool('');}});
   $('world').addEventListener('pointerup',e=>{
+    if(homestead?.holding()){homestead.up(e);return;}
     if(!pointerStart||Math.hypot(e.clientX-pointerStart.x,e.clientY-pointerStart.y)>12||!['solo','host','guest'].includes(mode)||$('game').hidden)return;
     const modeName=currentMode();if(!allowsMovement(modeName)&&modeName!=='normal')return;
     const point=renderer.worldPoint(e.clientX,e.clientY);if(!point)return;
@@ -1125,6 +1146,7 @@ function setupControls(){
     }
     if(placement?.showcase){commitShowcase(Math.round(point.x*2)/2,Math.round(point.z*2)/2);return;}
     if(placement){placement.x=Math.round(point.x*2)/2;placement.z=Math.round(point.z*2)/2;placement.anchored=true;refresh();return;}
+    if(modeName==='normal'&&homestead?.tap(point))return;
     const picked=renderer.pick(e.clientX,e.clientY,world);
     if(maintenance){maintenanceTarget=picked&&world.buildings.includes(picked)?picked.id:null;selected=maintenanceTarget;dirty=true;return;}
     if(modeName!=='normal')return;
@@ -1167,6 +1189,8 @@ function setupControls(){
     if(['INPUT','TEXTAREA'].includes(event.target.tagName)||$('game').hidden||!$('end-screen').hidden)return;
     const key=event.key.toLowerCase();
     if([' ','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key))event.preventDefault();
+    if(key==='escape'&&homestead?.holding()&&!sheet){homestead.setTool('');return;}
+    if(key==='r'&&homestead?.holding()&&!event.repeat){homestead.rotate();return;}
     if(key==='escape'){
       const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!(selection&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement||showcaseTool==='remove',maintaining:maintenance});
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();
@@ -1249,14 +1273,15 @@ function frame(now){
   if(networkTime>.075){networkTime=0;if(mode==='guest'&&playing)network?.input(input);if(mode==='host')network?.broadcast();}
   if(saveTime>10){saveTime=0;save();}if(pingTime>3){pingTime=0;network?.ping();}
   if(uiTime>.18){uiTime=0;dirty=true;ui();}
-  const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement,demo:$('game').hidden});if(playing)frameFeatureHud(featureContext(me()),dt);requestAnimationFrame(frame);
+  const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement,demo:$('game').hidden,homestead:!$('game').hidden&&world?.homestead?homestead?.view():null});if(playing)frameFeatureHud(featureContext(me()),dt);requestAnimationFrame(frame);
 }
 async function init(){
   if(await checkForUpdate())return;
   await loadMagicModules();
   theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;autoAttack=prefs.autoAttack!==false;syncSoundButton();
   paintClock();demoWorld();setupControls();paintModeIcons();syncSoundButton();bindFeatureHud(featureContext(null));syncSaveOption();syncVigilHint();const params=new URLSearchParams(location.search);
-  const code=params.has('showcase')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showFrontPanel('join-panel');showStatus('A place by the fire is waiting. Choose a name and join.');}
+  const code=params.has('showcase')||params.has('homestead')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showFrontPanel('join-panel');showStatus('A place by the fire is waiting. Choose a name and join.');}
+  homestead=createHomesteadControls({panel:$('homestead-panel'),getWorld:()=>world,me,send,toast,icon,onChange:tool=>{if(tool){cancelPlacement();cancelMaintenance();selected=null;}dirty=true;}});
   const showcasePanel=$('showcase-panel');
   showcasePanel?.addEventListener('pointerdown',event=>event.stopPropagation());
   showcasePanel?.addEventListener('pointerup',event=>event.stopPropagation());
@@ -1286,8 +1311,9 @@ async function init(){
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void checkForUpdate();});
   setInterval(()=>void checkForUpdate(),60000);
   $('loading').hidden=true;$('front').hidden=false;requestAnimationFrame(frame);
-  if(params.has('dev')||params.has('showcase')||params.has('arena')||params.has('lab')||params.has('dungeon'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,startLab,startDungeon,labCommand,setTime(t){world.time=t;},get network(){return network;}};
+  if(params.has('dev')||params.has('showcase')||params.has('homestead')||params.has('arena')||params.has('lab')||params.has('dungeon'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,startLab,startDungeon,labCommand,setTime(t){world.time=t;},get network(){return network;}};
   if(params.has('showcase'))startShowcase();
+  else if(params.has('homestead'))startHomestead();
   else if(params.has('lab'))startLab();
   else if(params.has('arena'))startArena();
   else if(params.has('dungeon'))startDungeon(params.get('dungeon')||'');

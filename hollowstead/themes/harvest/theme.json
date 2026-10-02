@@ -4275,6 +4275,222 @@
         }
       },
       "icon": "./sprites/hushstone-icon.svg?v=haul1"
+    },
+    "crop-pumpkin": {
+      "src": "./sprites/crop-pumpkin.svg?v=home1",
+      "size": [
+        1.7,
+        2.55
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "crop-moonroot": {
+      "src": "./sprites/crop-moonroot.svg?v=home1",
+      "size": [
+        1.5,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "crop-duskwheat": {
+      "src": "./sprites/crop-duskwheat.svg?v=home1",
+      "size": [
+        1.55,
+        2.32
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "crop-bloodapple": {
+      "src": "./sprites/crop-bloodapple.svg?v=home1",
+      "size": [
+        1.5,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "moonroot": {
+      "src": "./sprites/moonroot.svg?v=home1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moonroot-icon.svg?v=home1"
+    },
+    "rootseed": {
+      "src": "./sprites/rootseed.svg?v=home1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/rootseed-icon.svg?v=home1"
+    },
+    "wheat": {
+      "src": "./sprites/wheat.svg?v=home1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/wheat-icon.svg?v=home1"
+    },
+    "wheatseed": {
+      "src": "./sprites/wheatseed.svg?v=home1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/wheatseed-icon.svg?v=home1"
+    },
+    "bloodapple": {
+      "src": "./sprites/bloodapple.svg?v=home1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/bloodapple-icon.svg?v=home1"
+    },
+    "appleseed": {
+      "src": "./sprites/appleseed.svg?v=home1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/appleseed-icon.svg?v=home1"
     }
   },
   "motion": {

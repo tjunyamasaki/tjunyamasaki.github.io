@@ -27,7 +27,7 @@ export function showcaseCategories(){
     gear.push({id, name: item.name, kind: 'item'});
   }
   const magic = Object.values(magicItems).map(item => ({id: item.id, name: item.name, kind: 'item'}));
-  const buildings = Object.entries(STRUCTURES).map(([id, spec]) => ({id, name: spec.name, kind: 'building'}));
+  const buildings = Object.entries(STRUCTURES).filter(([id]) => id !== 'fence' && id !== 'stonewall').map(([id, spec]) => ({id, name: spec.name, kind: 'building'}));
   const nature = Object.entries(NODES).map(([id, spec]) => ({id, name: spec.name, kind: 'node'}));
   const mobs = Object.entries(ENEMIES).map(([id, spec]) => ({id, name: spec.name, kind: 'mob'}));
   for(const entry of magicMobEntries()){

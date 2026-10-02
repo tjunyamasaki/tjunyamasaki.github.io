@@ -225,6 +225,10 @@ export function describeContext(facts) {
       disabledReason: facts.toolLabel ? `Needs a ${facts.toolLabel}` : 'Needs a tool',
     })];
   }
+  if (facts.kind === 'crop') {
+    // A ripe homestead crop in reach (homestead.mjs cropTargets).
+    return [make('harvest', {targetId: facts.id, command: {type: 'tile', tool: 'harvest', cells: [[facts.i, facts.j]]}})];
+  }
   if (facts.kind === 'drop') return [];
   if (facts.kind === 'revive') {
     return [make('revive', {targetId: facts.id})];

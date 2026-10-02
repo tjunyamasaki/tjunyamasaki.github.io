@@ -1,0 +1,54 @@
+/* Homestead mode: the build & farm dock (src/ui/homestead.mjs). */
+#homestead-panel{position:fixed;z-index:36;left:0;right:0;bottom:calc(8px + env(safe-area-inset-bottom));display:flex;justify-content:center;pointer-events:none;touch-action:manipulation}
+#homestead-panel[hidden]{display:none!important}
+body.homestead .hotbar,body.homestead #attack,body.homestead #skill,body.homestead #hotbar-potion,body.homestead .stamina-track{display:none!important}
+
+.hs-dock{pointer-events:auto;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;max-width:calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right))}
+.hs-row{display:flex;align-items:stretch;gap:6px;padding:5px;border-radius:16px;background:#2b2532ee;border:1px solid #d8bd9545;box-shadow:0 10px 30px #120d1888,inset 0 1px 0 #ffffff10;max-width:100%}
+.hs-tabs{display:flex;flex-direction:column;gap:4px;flex:none}
+.hs-tabs button{flex:1;min-height:0;min-width:52px;padding:4px 8px;border-radius:10px;border:1px solid transparent;background:#211c2880;color:var(--muted);font:600 11px/1 Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase}
+.hs-tabs button[aria-selected="true"]{background:#edb47a;color:#2b2233;border-color:#2b2233}
+.hs-tools{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0;padding:1px}
+.hs-tools::-webkit-scrollbar{display:none}
+.hs-tool,.hs-chip{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:56px;min-width:56px;height:58px;min-height:58px;padding:5px 2px 4px;border-radius:12px;border:1px solid #dac29a30;background:linear-gradient(#3b3342,#2e2836);color:var(--cream);transition:transform .08s,background .12s,border-color .12s}
+.hs-tool svg,.hs-chip svg,.hs-tool .item-icon{width:30px;height:30px;flex:none;filter:drop-shadow(0 2px 0 #2b2233a0);pointer-events:none}
+.hs-tool small,.hs-chip small{font-size:9px;line-height:1;white-space:nowrap;color:var(--muted);pointer-events:none}
+.hs-tool em{position:absolute;top:3px;right:4px;min-width:14px;padding:1px 3px;border-radius:5px;background:#211c28dd;color:var(--cream);font:normal 9px/1.2 Arial,sans-serif}
+.hs-tool:hover,.hs-chip:hover{border-color:#edb47a88}
+.hs-tool:active,.hs-chip:active{transform:scale(.94)}
+.hs-tool[aria-pressed="true"]{background:linear-gradient(#f2c68f,#e2a464);border-color:#2b2233;box-shadow:0 0 0 2px #edb47a55,0 4px 0 #2b2233;transform:translateY(-3px)}
+.hs-tool[aria-pressed="true"] small{color:#2b2233;font-weight:700}
+.hs-tool.hs-remove{margin-left:4px}
+.hs-tool.hs-remove::before{content:"";position:absolute;left:-5px;top:8px;bottom:8px;width:1px;background:#dac29a30}
+.hs-side{display:flex;gap:4px;flex:none}
+.hs-chip{width:50px;min-width:50px;font-size:18px;background:#211c2880}
+.hs-chip kbd{display:none}
+.hs-hint{margin:0;padding:5px 12px;border-radius:999px;background:#211c28dd;border:1px solid #d8bd9530;font-size:12px;color:var(--muted);text-align:center;max-width:min(560px,100%);pointer-events:none;animation:hs-in .18s ease-out}
+.hs-hint b{color:var(--cream);margin-right:4px}
+.hs-hint span{margin-left:6px;color:#edb47a}
+.hs-options{position:absolute;bottom:calc(100% + 8px);right:0;display:flex;flex-direction:column;gap:6px;width:220px;padding:10px;border-radius:14px;background:#2b2532f5;border:1px solid #d8bd9545;box-shadow:0 12px 34px #120d1899;animation:hs-in .15s ease-out}
+.hs-opt{min-height:40px;padding:6px 10px;border-radius:10px;border:1px solid #dac29a30;background:#211c2880;color:var(--cream);text-align:left;font-size:13px}
+.hs-opt[aria-pressed="true"]{background:#8fd3c033;border-color:#8fd3c0aa}
+.hs-opt[aria-pressed="true"]::before{content:"✓ ";color:#8fd3c0}
+.hs-speed{display:flex;align-items:center;gap:4px}
+.hs-speed span{flex:1;font-size:12px;color:var(--muted)}
+.hs-speed .hs-opt{min-width:44px;text-align:center}
+.hs-speed .hs-opt[aria-pressed="true"]::before{content:""}
+@keyframes hs-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (hover:hover) and (pointer:fine){.hs-chip kbd{display:inline;font-size:8px;opacity:.7}}
+
+/* Small landscape phones: a slimmer dock between the joystick and the actions. */
+@media(max-height:520px){
+  .hs-tool,.hs-chip{width:46px;min-width:46px;height:50px;min-height:50px}
+  .hs-tool svg,.hs-chip svg,.hs-tool .item-icon{width:26px;height:26px}
+  .hs-tool small,.hs-chip small{font-size:8px}
+  .hs-tabs button{min-width:44px;font-size:10px;padding:3px 5px}
+  .hs-hint{font-size:11px;padding:4px 10px}
+  .hs-dock{max-width:calc(100vw - 330px)}
+}
+@media(max-width:700px) and (orientation:portrait){.hs-dock{max-width:calc(100vw - 16px)}#homestead-panel{bottom:calc(150px + env(safe-area-inset-bottom))}}
+
+/* Front menu: room for the seventh mode card. */
+#front .menu-modes{grid-template-columns:1.25fr repeat(4,1fr)}
+#front .mode-homestead{grid-column:span 2;border-color:#9fd8a866;background:linear-gradient(135deg,#2f3a2fd9,#2b2532d9)}
+@media(max-width:700px) and (orientation:portrait){#front .menu-modes{grid-template-columns:repeat(2,1fr)}}

@@ -20,6 +20,7 @@
 //   enemy.face       -1 / 1, which way the sprite looks
 //   world.hostile    enemy projectiles and lobbed spores
 import {ENEMIES, STRUCTURES} from './content.mjs?v=harvest-18';
+import {BARRIER_TYPES} from './homestead.mjs?v=harvest-18';
 import {ALLIES, ROAM} from './progression.mjs?v=harvest-18';
 import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {landBlow, preyFor} from './arsenal.mjs?v=harvest-18';
@@ -595,7 +596,7 @@ export function stepMobs(world, dt, obstacles){
         const anchor = target.homing ? null : (people.includes(target) || target.type === 'hearth' || target.type === 'cart' ? target : null);
         const route = anchor ? fieldRoute(fieldFor(world, obstacles, anchor, sig), e.x, e.z) : 'none';
         // No way in on the field: a closed palisade to claw through, or just a way round past the field's edge.
-        walled = route === 'walled' && world.buildings.some(b => (b.type === 'wall' || b.type === 'gate') && !b.open && b.hp > 0 && dist(b, e) < 12);
+        walled = route === 'walled' && world.buildings.some(b => BARRIER_TYPES.includes(b.type) && !b.open && b.hp > 0 && dist(b, e) < 12);
         if(typeof route === 'object'){dirX = route.x; dirZ = route.z;}
         else if(route === 'none' || (route === 'walled' && !walled)){
           const way = steer(world, obstacles, e, target.x, target.z, {stop: Math.min(stop, 1.2), lazy: true, radius: STRUCTURES[target.type]?.radius || 0});
@@ -653,7 +654,7 @@ export function stepMobs(world, dt, obstacles){
       if(!moved || progress < speed*dt*.25){
         e.stuck = (e.stuck || 0)+dt;
         // Walls and gates in the way get clawed when there is no way round.
-        const wall = !target.homing && world.buildings.find(b => ['wall', 'gate'].includes(b.type) && !b.open && b.hp > 0 && dist(b, e) < 1.8);
+        const wall = !target.homing && world.buildings.find(b => BARRIER_TYPES.includes(b.type) && !b.open && b.hp > 0 && dist(b, e) < 1.8);
         if(wall && e.cooldown <= 0){wall.hp -= def.damage*(e.power || 1)*STRUCTURE_HIT; e.cooldown = def.period; world.event('hit', wall.x, wall.z); e.stuck = 0;}
         else if(e.stuck > .7){e.detour = .6; e.stuck = 0;}
       }else e.stuck = Math.max(0, (e.stuck || 0)-dt);

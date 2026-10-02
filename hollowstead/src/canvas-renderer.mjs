@@ -1,6 +1,8 @@
 // Compatibility adapter for browsers without WebGL. It projects the same 3D
 // coordinates and sprite manifest onto Canvas2D; simulation/networking are shared.
 import {damageFloater,spawnFloater,stepFloaters} from './floaters.mjs?v=harvest-18';
+import {paintHomesteadCanvas} from './homestead-render.mjs?v=harvest-18';
+import {cropEntities} from './homestead.mjs?v=harvest-18';
 import {STRUCTURES, RULES, nodeAwake} from './content.mjs?v=harvest-18';
 import {paintScenery} from './scenery.mjs?v=harvest-18';
 import {paintRopes} from './cart-rope.mjs?v=harvest-18';
@@ -142,7 +144,7 @@ export class CanvasRenderer {
     c.save();poly(1);c.fillStyle=`rgba(${hot},${.22*alpha})`;c.fill();c.strokeStyle=`rgba(255,${tg.heavy?106:154},${tg.heavy?72:126},${.9*alpha})`;c.lineWidth=Math.max(2,.14*this.scale);c.stroke();
     poly(Math.max(.02,tg.fill));c.fillStyle=`rgba(${hot},${.46*alpha})`;c.fill();c.restore();
   }
-  render(world,localId,dt,{target=null,placement=null,demo=false}={}){
+  render(world,localId,dt,{target=null,placement=null,demo=false,homestead=null}={}){
     this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;if(this.seed!==world.seed){this.seed=world.seed;this.lastEvent=0;this.magicActors.clear();this.weaponFx.reset();}
     const p=world.player(localId)||world.players[0]||{x:0,z:2};this.focus.x+=((demo?0:p.x)-this.focus.x)*Math.min(1,dt*6);this.focus.z+=((demo?-1:p.z)-this.focus.z)*Math.min(1,dt*6);
     // Weapon effects (src/fx): built first so their camera kick and night light land this frame.
@@ -193,9 +195,10 @@ export class CanvasRenderer {
     for(const s of hostileShots(world))if(s.kind==='blast'&&!s.telegraph.waiting&&Math.abs(s.x-this.focus.x)<halfX+14&&Math.abs(s.z-this.focus.z)<halfZ+14)this.drawTelegraph(s.telegraph,.9);
     const hearthB=world.buildings.find(b=>b.type==='hearth')||(world.arena?{x:0,z:0,level:1}:null),plazaImg=this.images.get('plaza');if(hearthB&&plazaImg){const size=this.theme.sprites.plaza.size[0]*this.scale,q=this.screenPoint(hearthB.x,hearthB.z,0);c.save();c.filter=`brightness(${Math.min(1,entityBrightness(frame,hearthB.x,hearthB.z,{emissive:true}))})`;c.drawImage(plazaImg,q.x-size/2,q.y-size*.36,size,size*.72);c.filter='none';const g=this.images.get('plaza-glow');if(g){c.globalCompositeOperation='lighter';c.globalAlpha=(.12+.5*frame.darkness)*(.75+.25*Math.sin(this.clock*1.6));c.drawImage(g,q.x-size/2,q.y-size*.36,size,size*.72);}c.restore();}
     paintScenery(this,c,world,frame,dt,'ground');
+    paintHomesteadCanvas(this,c,world,frame,homestead);
     if(weapon&&(weapon.groundNormal.length||weapon.groundGlow.length))drawMagicCanvas(c,[...weapon.groundNormal,...weapon.groundGlow],(x,z,y)=>this.screenPoint(x,z,y));
     paintRopes(this,c,world,frame,this.theme,true);
-    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.map(e=>({e,key:e.type,kind:'building'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
+    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
     const drawn=entities.map(entry=>{
       if(entry.key==='gravecraft-skeleton'){
         const last=this.magicActors.get(entry.e.id)||{x:entry.e.x,z:entry.e.z};

@@ -41,9 +41,12 @@ function makeChip(hud, socket){
 export function bind(){
   const hud = document.getElementById('feature-hud');
   if(!hud || document.getElementById('trinket-chip')) return;
-  chips.push(makeChip(hud, 'trinket'), makeChip(hud, 'charm'));
+  // One row under the vitals (styles/hud.css stacks it below the region / dungeon badge).
+  const row = document.createElement('div'); row.className = 'trinket-row';
+  hud.append(row);
+  chips.push(makeChip(row, 'trinket'), makeChip(row, 'charm'));
   link = document.createElement('span'); link.className = 'trinket-link'; link.hidden = true; link.setAttribute('aria-hidden', 'true');
-  hud.append(link);
+  row.append(link);
 }
 
 export function paint(ctx){

@@ -22,7 +22,7 @@ The host keeps the shared save and must keep the game tab open. Switching away p
 
 1. Gather by hand. Tap a tree or rock to walk to it, or use the stick and hold **Gather**. A pine takes a few seconds; flint takes a little longer. Wood and flint land on the ground. Stay beside a pile and it comes to you; step onto it and it is picked up at once. Walk away and it stays where it fell, for 90 seconds: it blinks before it vanishes. (A fallen wanderer's spilled pack, or a broken chest's contents, lies a whole day and night.) A stack you just dropped will not jump back into your pack for a moment; someone else can take it. Grass, berries, pumpkins, and mushrooms go into your pack.
 2. Place a workbench from **Build**. It does not need another station. Open the workbench to craft an axe and a pick, then tap **Equip**. Moon iron and haunted graves need a worn pick. Spare tools in your pack do nothing until worn. Choose cauldrons, soul lanterns, wards and hushing stones at the workbench, then walk anywhere to place them beside you. A **hushing stone** sings the woods to sleep: no creature rises or comes hunting within 18 paces of it, so you can build in peace (raids, the Hollow King, rare moons and omens still come; two stones at most). The workbench also makes **bags**, worn in the bag socket: a forager's satchel (fiber and wood, +6 pack slots) early on, a delver's haversack (fiber, bone, moonshard, embers: +12) later. A bag can come off only when the smaller pack still holds everything. Construction draws materials from your pack and unlocked chests or carts anywhere in the hollow. Repairs and item crafting still use nearby supplies.
-3. Cook at a burning fire. Grow pumpkins in farm plots, make bandages at a workbench, and build a cauldron for stew. Eat from your pack: open it and tap Eat on the stack you want. The **Potion** hotbar slot shows all Vigor draughts in your pack; tap it or press **H** to drink one and restore 60 health and 20 courage.
+3. Cook at a burning fire. Grow pumpkins in farm plots, make bandages at a workbench, and build a cauldron for stew. Eat from your pack: open it and tap Eat on the stack you want. The **Potion** button beside Attack shows all Vigor draughts in your pack; tap it or press **H** to drink one and restore 60 health and 20 courage.
 4. Feed the Heartfire wood. Courage falls in darkness; when it runs low, darkness starts hurting. Hand lanterns have limited fuel; soul lanterns provide permanent light.
 5. Fight with the weapon in your hand. Every weapon aims itself at the best foe in reach, so you can run one way and fight the other. Hold **Attack** to swing. Every weapon also has a **skill** (the ✦ button beside Attack): it drains your whole stamina bar, hits much harder than a swing, and recharges on its own timer. It needs at least 40 stamina, and a full bar makes it strongest. Keep up to three weapons on the **hotbar** and tap one to swap mid-fight. Every creature telegraphs its blow on the ground; **Dodge** out of it, or dodge at the last moment to pass through untouched. Dodge holds two charges. Each charge has its own cooldown, and the next one starts only after the previous charge returns. Repair walls, rearm traps, and use wards to help defend the camp.
    **Mastery.** Every kill with a weapon in hand teaches you that weapon: tougher foes teach more, elites twice as much. Enough kills rank it up (★1 to ★5, like the arena): each rank hits a little harder and makes its attack and skill flashier. Mastery belongs to you, not the item, so when a weapon breaks the next one of its kind keeps its rank. The hotbar shows each weapon's stars, a gold bar toward the next rank, and an orange bar for its condition.
@@ -105,17 +105,17 @@ Only one wanderer can open a chest at a time. The same panel shows your pack, wo
 | Action | Touch | Keyboard |
 | --- | --- | --- |
 | Move | Left stick, or tap the ground | WASD / arrows |
-| Context action | The large circle. Its name follows what you are standing at: Gather, Chop, Feed, Cook, Open, Place, and so on. | E, hold when the action says to hold |
-| More actions | The smaller circles beside it. The Heartfire can show Feed, Cook, Awaken, Mend, and Repair; when all five apply, a greyed-out one gives way. | 1–4 |
-| Attack | Hold Attack. Aims itself. The expedition does not swing for you. In the battle arena, Auto-attack in the menu can. | Hold Space |
+| Context action | The amber pill above the right-hand buttons. Its name follows what you are standing at: Gather, Chop, Feed, Cook, Open, Place, and so on. With nothing nearby the row is empty. | E, hold when the action says to hold |
+| More actions | The smaller pills to its left. The Heartfire can show Feed, Cook, Awaken, Mend, and Repair; when all five apply, a greyed-out one gives way. | 1–4 |
+| Attack | Hold Attack, the big button in the corner. Aims itself. The expedition does not swing for you. In the battle arena, Auto-attack in the menu can. | Hold Space |
 | Skill | The ✦ button left of Attack. Drains all stamina (needs 40). The outer purple ring shows cooldown remaining; the inner blue-green ring shows stamina available. | Q |
-| Potion | Tap Potion on the hotbar to drink one carried Vigor draught. The number shows how many remain. | H |
+| Potion | The red button between Skill and Dodge drinks one carried Vigor draught; it answers even while you steer. The number shows how many remain, and it pulses when your health runs low. | H |
 | Swap weapon | Tap a weapon on the hotbar | R or Tab cycles |
-| Dodge | Two charges. A quick dash, invulnerable for a moment. Each charge cools on its own, and the next cooldown starts when the previous charge returns. With the stick still, you leap away from the nearest foe. | Shift |
-| Inventory / Build | Bottom bar | I / B |
+| Dodge | The blue button above Attack. Two charges. A quick dash, invulnerable for a moment. Each charge cools on its own, and the next cooldown starts when the previous charge returns. With the stick still, you leap away from the nearest foe. | Shift |
+| Inventory / Build | Pack and Build beside the minimap | I / B |
 | Eat, equip, drop | Open Inventory, select the stack, then Eat, Equip, or Drop | Arrows, Enter, Escape |
-| Lantern | A light circle appears when you carry a usable lantern | F |
-| Place or cancel | Place and Cancel replace the action circles while you are placing. Maintain camp uses the same circles. | E places, Escape cancels |
+| Lantern | Light beside the minimap (dim until you carry a usable lantern) | F |
+| Place or cancel | Place and Cancel replace the action pills while you are placing. Maintain camp uses the same pills. | E places, Escape cancels |
 | Map | Minimap | M |
 | Menu | Gear button in the Inventory header. Camp code, connection, save, invite, camera, sound, guide, and title live here. | Escape |
 

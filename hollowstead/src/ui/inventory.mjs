@@ -99,6 +99,25 @@ function columnsOf(grid) {
   return count || 4;
 }
 
+/**
+ * Square slots sized to fill their box without scrolling: tries every column count and keeps the one
+ * with the biggest slot (capped), then the fewest empty cells, then the fewest columns.
+ * Pure, so tests can read it: {columns, size}.
+ */
+export function fitSlots(count, width, height, {gap = 6, max = 76, min = 38} = {}) {
+  const n = Math.max(1, count);
+  let best = {columns: Math.min(n, 6), size: min, score: -1};
+  for (let columns = 1; columns <= n; columns++) {
+    const rows = Math.ceil(n / columns);
+    const raw = Math.floor(Math.min((width - gap * (columns - 1)) / columns, (height - gap * (rows - 1)) / rows));
+    const size = Math.min(max, raw);
+    if (size < 1) continue;
+    const score = size * 1000 - (columns * rows - n) * 10 - columns / 100;
+    if (score > best.score) best = {columns, size: Math.max(min, size), score};
+  }
+  return {columns: best.columns, size: best.size};
+}
+
 export function createInventoryPanel(root, hooks) {
   root.replaceChildren();
   const panel = document.createElement('div');
@@ -126,7 +145,7 @@ export function createInventoryPanel(root, hooks) {
             </div>
           </div>
         </div>
-        <div id="inv-grid" class="slot-grid" role="grid"></div>
+        <div class="grid-fit"><div id="inv-grid" class="slot-grid" role="grid"></div></div>
         <div id="inv-detail" class="item-detail" aria-live="polite"></div>
         <div id="inv-recovery" class="recovery-block" hidden>
           <p class="section-label">SAVED FROM AN OLDER PACK</p>
@@ -142,7 +161,7 @@ export function createInventoryPanel(root, hooks) {
             <button type="button" data-chest-op="sort">Sort</button>
           </div>
         </div>
-        <div id="chest-grid" class="slot-grid chest-grid" role="grid"></div>
+        <div class="grid-fit"><div id="chest-grid" class="slot-grid chest-grid" role="grid"></div></div>
         <div id="chest-overflow" class="recovery-block chest-overflow" hidden>
           <p class="section-label">SAVED FROM A LARGER CHEST</p>
           <div id="chest-overflow-grid" class="slot-grid recovery-grid"></div>
@@ -168,6 +187,23 @@ export function createInventoryPanel(root, hooks) {
   const chestTools = panel.querySelector('#chest-tools');
   const qtyRow = panel.querySelector('#detail-qty');
   const ops = panel.querySelector('#detail-ops');
+  // Pack and chest grids fill their box (styles/hud.css): refit on resize and when the slot count changes.
+  const fitted = new Map();
+  function fit(gridEl) {
+    const box = gridEl?.parentElement;
+    if (!box || !box.isConnected || box.offsetParent === null) return;
+    const width = box.clientWidth, height = box.clientHeight, count = gridEl.children.length;
+    if (!(width > 0) || !(height > 0)) return;
+    const key = `${width}x${height}:${count}`;
+    if (fitted.get(gridEl) === key) return;
+    fitted.set(gridEl, key);
+    const {columns, size} = fitSlots(count, width, height);
+    gridEl.style.setProperty('--cols', String(columns));
+    gridEl.style.setProperty('--slot', `${size}px`);
+  }
+  const fitAll = () => { fit(grid); if (!chestWrap.hidden) fit(chestGrid); };
+  const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(fitAll) : null;
+  for (const box of panel.querySelectorAll('.grid-fit')) resize?.observe(box);
   const pendingLine = panel.querySelector('#inv-pending');
   const detail = panel.querySelector('#inv-detail');
   const ghost = document.createElement('div');
@@ -275,6 +311,7 @@ export function createInventoryPanel(root, hooks) {
     }
     pendingLine.textContent = view.pendingText || '';
     paintDetails(view);
+    fitAll();
   }
 
   /** What the selected item is: its name and the lines of its tooltip (mastery, refinement, trinket text). */
@@ -411,7 +448,7 @@ export function createInventoryPanel(root, hooks) {
   }
   function activateFocused() { hooks.onActivate(); }
 
-  return {root: panel, update, cancelDrag, detailsOpen, dragging, focusStep, activateFocused, destroy() { ghost.remove(); panel.remove(); }};
+  return {root: panel, update, cancelDrag, detailsOpen, dragging, focusStep, activateFocused, destroy() { resize?.disconnect(); ghost.remove(); panel.remove(); }};
 }
 
 export function stackMaxDurability(itemId) {

@@ -58,20 +58,37 @@ export function inCategory(recipeId, category, tab) {
   return true;
 }
 
+/** The recipe the detail pane shows: the kept pick if it is still listed, else the first one that can be made now. */
+export function pickRecipe(recipes = [], pickId = '') {
+  return recipes.find(recipe => recipe.id === pickId) || recipes.find(recipe => !recipe.reason) || recipes[0] || null;
+}
+
 /**
- * `recipes` entries: {id, name, desc, icon, costs:[{have, need, name, short}], reason, action}
+ * Tiles on the left (every recipe at a glance), the picked recipe on the right with its costs and one big
+ * action button. `recipes` entries: {id, name, desc, icon, costs:[{have, need, name, short, icon}], reason, action}.
  * `reason` is host-observed text. This function does not invent one.
  */
-export function catalogMarkup({recipes = [], maintain = false, pendingId = ''} = {}) {
-  const maintainButton = maintain
-    ? '<button type="button" class="maintain-button" data-command="maintain">Maintain camp</button>'
-    : '';
-  const rows = recipes.map(recipe => {
-    const costs = (recipe.costs || []).map(cost =>
-      `<span class="${cost.short ? 'missing' : ''}">${escape(cost.have)}/${escape(cost.need)} ${escape(cost.name)}</span>`).join('');
-    const waiting = pendingId === recipe.id;
-    const blocked = !!recipe.reason || waiting;
-    return `<div class="recipe">${recipe.icon || ''}<div><h3>${escape(recipe.name)}</h3><p>${escape(recipe.desc || '')}</p><div class="cost">${costs}</div>${recipe.reason ? `<div class="reason">${escape(recipe.reason)}</div>` : ''}</div><button type="button" data-recipe="${escape(recipe.id)}" ${blocked ? 'disabled' : ''}>${escape(waiting ? 'Working…' : (recipe.action || 'Craft'))}</button></div>`;
+export function catalogMarkup({recipes = [], maintain = false, pendingId = '', pickId = ''} = {}) {
+  const picked = pickRecipe(recipes, pickId);
+  const tiles = recipes.map(recipe => {
+    const ready = !recipe.reason;
+    const on = picked?.id === recipe.id;
+    return `<button type="button" class="craft-tile${ready ? ' is-ready' : ''}${on ? ' is-picked' : ''}" data-pick="${escape(recipe.id)}" aria-pressed="${on}" aria-label="${escape(recipe.name)}${ready ? '' : `. ${escape(recipe.reason)}`}"><span class="craft-tile__icon">${recipe.icon || ''}</span><span class="craft-tile__name">${escape(recipe.name)}</span>${ready ? '<i class="craft-tile__ok" aria-hidden="true">✓</i>' : ''}</button>`;
   }).join('');
-  return `${maintainButton}${rows || '<p class="empty">Nothing to make here.</p>'}`;
+  const maintainTile = maintain
+    ? '<button type="button" class="craft-tile craft-tile--maintain" data-command="maintain"><span class="craft-tile__icon" aria-hidden="true">⚒</span><span class="craft-tile__name">Maintain camp</span></button>'
+    : '';
+  let detail = '<div class="craft-detail is-empty"><p class="empty">Nothing to make here.</p></div>';
+  if (picked) {
+    const waiting = pendingId === picked.id;
+    const blocked = !!picked.reason || waiting;
+    const costs = (picked.costs || []).map(cost =>
+      `<li class="${cost.short ? 'missing' : 'met'}">${cost.icon ? `<span class="craft-cost__icon">${cost.icon}</span>` : ''}<span class="craft-cost__name">${escape(cost.name)}</span><b>${escape(cost.have)}/${escape(cost.need)}</b></li>`).join('');
+    detail = `<div class="craft-detail">
+      <div class="craft-detail__head"><span class="craft-detail__icon">${picked.icon || ''}</span><div><h3>${escape(picked.name)}</h3><p>${escape(picked.desc || '')}</p></div></div>
+      <ul class="craft-costs">${costs}</ul>
+      <div class="craft-detail__foot">${picked.reason ? `<p class="reason">${escape(picked.reason)}</p>` : '<p class="reason ok">Ready</p>'}<button type="button" class="primary craft-go" data-recipe="${escape(picked.id)}" ${blocked ? 'disabled' : ''}>${escape(waiting ? 'Working…' : (picked.action || 'Craft'))}</button></div>
+    </div>`;
+  }
+  return `<div class="craft-layout"><div class="craft-tiles" role="listbox" aria-label="Recipes">${tiles}${maintainTile}${recipes.length || maintain ? '' : '<p class="empty">Nothing to make here.</p>'}</div>${detail}</div>`;
 }

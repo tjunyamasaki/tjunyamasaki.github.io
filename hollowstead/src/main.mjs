@@ -18,7 +18,7 @@ import {
   allowsCombat,allowsMovement,clusterFor,escapeStep,isHarvestAction,keyboardAction,
   keyboardPrimary,potionHotbar,resolveMode,showsLantern,usableLantern,
 } from './ui/actions.mjs?v=harvest-18';
-import {catalogMarkup,catalogModel,inCategory} from './ui/catalog.mjs?v=harvest-18';
+import {catalogMarkup,catalogModel,inCategory,pickRecipe} from './ui/catalog.mjs?v=harvest-18';
 import {actionNeedsConfirm,actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-18';
 import {salvageText} from './salvage.mjs?v=harvest-18';
 import {loadMagicModules} from './magic/load.mjs?v=harvest-18';
@@ -69,7 +69,7 @@ const ARENA_ZOOM=.8;
 let localActions=null,localActionWorld=null,localClient=null;
 let chestSession=null,chestOpening=false,chestToken=0,chestRenewAt=0,chestRenewing=false;
 let catalog={source:'field',stationId:null,stationType:null,tab:'build'};
-let catalogPending='';
+let catalogPending='',catalogPick='';
 // The workbench's Refine panel (src/ui/refine.mjs): which bench, which weapon type, the slot being rolled.
 let refining={stationId:null,itemId:null,pending:-1,fresh:-1};
 let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,pendingOp=null,actionPending=false;
@@ -423,8 +423,8 @@ function closeSheet(){
   if(sheet==='menu'&&mode==='solo')paused=false;
   sheet=null;$('sheet').hidden=true;clearSelection();dirty=true;
 }
-function openFieldBuild(){catalog={source:'field',stationId:null,stationType:null,tab:'build'};category='all';openSheet('catalog');}
-function openStationCatalog(panel){catalog={source:'station',stationId:panel.stationId,stationType:panel.stationType,tab:panel.tab};category='all';openSheet('catalog');}
+function openFieldBuild(){catalog={source:'field',stationId:null,stationType:null,tab:'build'};category='all';catalogPick='';openSheet('catalog');}
+function openStationCatalog(panel){catalog={source:'station',stationId:panel.stationId,stationType:panel.stationType,tab:panel.tab};category='all';catalogPick='';openSheet('catalog');}
 function openRefine(stationId){const p=me();refining={stationId,itemId:p?.equipment?.weapon?.itemId||carriedWeapons(p)[0]||null,pending:-1,fresh:-1};openSheet('refine');}
 /** Roll (or reroll) a slot of the weapon type shown in the Refine panel. */
 async function refineSlot(slot){
@@ -672,12 +672,14 @@ function menuHTML(){
 function replaceContent(html){
   const content=$('sheet-content');
   if(inventoryPanel?.root?.isConnected||content.dataset.kind!==sheet||html!==sheetMarkup){
-    const scroll=content.scrollTop;
+    const scroll=content.scrollTop,same=content.dataset.kind===sheet,tiles=same?content.querySelector('.craft-tiles')?.scrollTop||0:0;
     discardPanel();
     content.innerHTML=html;
     content.dataset.kind=sheet;
     sheetMarkup=html;
     content.scrollTop=scroll;
+    // The recipe tiles scroll on their own: keep their place when a pick or a craft repaints them.
+    if(tiles){const box=content.querySelector('.craft-tiles');if(box)box.scrollTop=tiles;}
   }
 }
 function setTabs(html){if(html!==tabsMarkup){$('sheet-tabs').innerHTML=html;tabsMarkup=html;}}
@@ -706,9 +708,10 @@ function renderSheet(){
     setTabs(tabs);
     const recipes=ids.map(id=>{
       const recipe=RECIPES[id],resultId=recipe.result||id;
-      return {id,name:label(resultId),desc:recipe.desc,icon:icon(resultId),action:model.action,reason:world.recipeReason(p,id,catalog.stationId)||'',costs:Object.entries(recipe.cost).map(([itemId,need])=>{const have=world.available(p,itemId,recipe.kind==='build');return {have,need,name:label(itemId),short:have<need};})};
+      return {id,name:label(resultId),desc:recipe.desc,icon:icon(resultId),action:model.action,reason:world.recipeReason(p,id,catalog.stationId)||'',costs:Object.entries(recipe.cost).map(([itemId,need])=>{const have=world.available(p,itemId,recipe.kind==='build');return {have,need,name:label(itemId),short:have<need,icon:icon(itemId)};})};
     });
-    replaceContent(catalogMarkup({recipes,maintain:model.maintain,pendingId:catalogPending}));
+    catalogPick=pickRecipe(recipes,catalogPick)?.id||'';
+    replaceContent(catalogMarkup({recipes,maintain:model.maintain,pendingId:catalogPending,pickId:catalogPick}));
   }else if(sheet==='refine'){
     title='Refine';kicker='WORKBENCH · WEAPON MODIFIERS';
     const weapons=carriedWeapons(p);
@@ -828,17 +831,30 @@ function paintCluster(modeName,p){
 }
 /** The potion shortcut always reflects the draughts currently carried in the pack. */
 function paintPotion(p){
-  const el=$('hotbar-potion'),view=potionHotbar(p,{mode:currentMode(),arena:!!world?.arena,pending:actionPending});
-  const sig=`${view.quantity}:${!!view.command}`;
+  // Pending is left out of the look on purpose: the button must not flicker or go dead while another action settles.
+  const el=$('hotbar-potion'),view=potionHotbar(p,{mode:currentMode(),arena:!!world?.arena,pending:false});
+  const low=p&&p.hp/maxHealth(p)<.35&&!!view.command;
+  const sig=`${view.quantity}:${!!view.command}:${low}`;
   if(el.dataset.state===sig)return;el.dataset.state=sig;
-  el.innerHTML=`${icon(view.itemId)}<small class="potion-count" aria-hidden="true">${view.quantity}</small><small>Potion <kbd>H</kbd></small>`;
-  el.disabled=!view.command;
+  el.innerHTML=`${icon(view.itemId)}<b class="potion-count" aria-hidden="true">${view.quantity}</b><small>Potion</small>`;
+  el.classList.toggle('is-disabled',!view.command);el.classList.toggle('is-low',low);
+  el.setAttribute('aria-disabled',String(!view.command));
   el.setAttribute('aria-label',`Drink Vigor draught, ${view.quantity} potions available (H)`);
   el.title=view.quantity?'Drink Vigor draught (H) · Restore 60 health and 20 courage':'No potions · Craft Vigor draughts at a workbench';
 }
+/**
+ * The potion answers on press (pointerdown), so it works while the other thumb steers.
+ * A short guard keeps a spammed tap from drinking two; a stale pack (loot picked up mid-fight) retries once.
+ */
+let potionAt=0;
 async function drinkPotion(){
-  const view=potionHotbar(me(),{mode:currentMode(),arena:!!world?.arena,pending:actionPending});
-  if(view.command)await withPending(view.command);
+  const now=performance.now();if(now-potionAt<450)return;
+  const p=me(),view=potionHotbar(p,{mode:currentMode(),arena:!!world?.arena,pending:false});
+  if(!view.command){if(!world?.arena&&!p?.down&&!p?.ghost)toast(view.quantity?'You cannot drink right now':'No potions · Craft Vigor draughts at a workbench');return;}
+  if(actionPending)return;
+  potionAt=now;
+  const result=await withPending(view.command);
+  if(result?.code==='staleRevision'){const again=potionHotbar(me(),{mode:currentMode(),arena:!!world?.arena,pending:false});if(again.command)await withPending(again.command);}
 }
 /** Weapon icons, mastery, condition and refinements, repainted only when changed. */
 function paintHotbar(p){
@@ -994,8 +1010,18 @@ function setupControls(){
   $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;$('front-sound').textContent=`SOUND ${sound.enabled?'ON':'OFF'}`;sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
-  $('hotbar-inventory').onclick=toggleInventory;$('hotbar-build').onclick=toggleFieldBuild;
-  $('hotbar-potion').onclick=()=>void drinkPotion();
+  // Pack, Build and Light answer on release over the same button (pointer events, so a held joystick does not swallow the tap).
+  const tools=$('top-tools');let toolPress=null;
+  tools.addEventListener('pointerdown',event=>{const button=event.target.closest('button');if(!button)return;event.preventDefault();event.stopPropagation();sound?.unlock();toolPress={id:event.pointerId,button};});
+  tools.addEventListener('pointerup',event=>{
+    const button=event.target.closest('button'),press=toolPress;toolPress=null;
+    if(!button||!press||press.id!==event.pointerId||press.button!==button)return;event.preventDefault();event.stopPropagation();
+    if(button.id==='hotbar-inventory')toggleInventory();
+    else if(button.id==='hotbar-build')toggleFieldBuild();
+    else if(button.id==='lantern-button'){if(usableLantern(me()))void send({type:'lanternToggle'});else toast('Carry a torch or lantern to light the way');}
+  });
+  tools.addEventListener('pointercancel',()=>{toolPress=null;});
+  tools.addEventListener('click',event=>{if(event.detail===0){const button=event.target.closest('button');if(button?.id==='hotbar-inventory')toggleInventory();else if(button?.id==='hotbar-build')toggleFieldBuild();else if(button?.id==='lantern-button'&&usableLantern(me()))void send({type:'lanternToggle'});}});
   // Weapon slots answer on press, like the action buttons: a swap mid-fight must not wait for a click.
   $('weapon-bar').addEventListener('pointerdown',event=>{
     const button=event.target.closest('.weapon-slot');if(!button)return;event.preventDefault();event.stopPropagation();sound?.unlock();
@@ -1020,7 +1046,7 @@ function setupControls(){
     if(button.id==='attack'){if(!allowsCombat(currentMode()))return;hold.attack=true;captured={pointerId:event.pointerId,kind:'attack'};void send({type:'attack'});return;}
     if(button.id==='skill'){if(!allowsCombat(currentMode()))return;void send({type:'skill'},{quiet:true});return;}
     if(button.id==='dodge'){const actor=me();if(!actor||(actor.dashCharges??0)<1||(!world.arena&&actor.stamina<DASH.stamina)||actor.down||actor.ghost)return;void send({type:'dash'},{quiet:true});return;}
-    if(button.id==='lantern-button'){if(usableLantern(me()))void send({type:'lanternToggle'});return;}
+    if(button.id==='hotbar-potion'){void drinkPotion();return;}
     const action=liveActions.find(entry=>entry.id===button.dataset.action);
     captured={pointerId:event.pointerId,kind:'context',mode:button.dataset.mode,id:action?.id};
     if(!action)return;
@@ -1071,6 +1097,7 @@ function setupControls(){
   $('sheet-content').onclick=event=>{
     const button=event.target.closest('button');if(!button)return;
     if(button.dataset.refineSlot!=null){void refineSlot(Number(button.dataset.refineSlot));return;}
+    if(button.dataset.pick){catalogPick=button.dataset.pick;dirty=true;renderSheet();return;}
     if(button.dataset.recipe){
       if(catalogPending)return;
       const recipe=RECIPES[button.dataset.recipe];if(!recipe)return;

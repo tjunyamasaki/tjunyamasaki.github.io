@@ -653,13 +653,14 @@ export class HomesteadLayer {
     for(const [id, g] of this.gates)if(!seen.has(id)){this.group.remove(g.root);this.gates.delete(id);}
   }
   /** Health bars over walls and gates that have taken blows, like the ones over camp objects (renderer.mjs). */
-  syncHealth(world, clock){
+  syncHealth(world, clock, targetId = null){
     const bars = this.bars ||= new Map(), seen = new Set(), memo = this.hpMemo ||= new Map();
     for(const b of world.buildings){
       if(!b.grid || !(b.hp > 0))continue;
       let m = memo.get(b.id);if(!m){m = {};memo.set(b.id, m);}
-      const show = recentHit(m, b.hp, clock);
-      if(!(b.hp < b.maxHp) || show <= .02)continue;
+      // Shown while targeted (even unhurt), or for a moment after a blow.
+      const aimed = b.id === targetId, recent = recentHit(m, b.hp, clock), show = aimed ? 1 : recent;
+      if(!aimed && !(b.hp < b.maxHp) || show <= .02)continue;
       seen.add(b.id);
       let bar = bars.get(b.id);
       if(!bar){
@@ -760,14 +761,14 @@ export class HomesteadLayer {
       this.effects.push({m, vx: Math.cos(a) * 1.4, vz: Math.sin(a) * 1.1, vy: 1.6 + Math.random() * 1.2, life: 0});
     }
   }
-  update(world, frame, dt, ui, clock){
+  update(world, frame, dt, ui, clock, targetId = null){
     const groundKey = `${world.seed}:${world.tiles?.rev ?? -1}:${Object.keys(world.tiles?.cells || {}).length}`;
     if(groundKey !== this.groundKey){this.groundKey = groundKey;this.buildGround(world);}
     let n = 0, h = 0;
     for(const b of world.buildings)if(b.grid && b.hp > 0){n++;h = (h * 31 + (b.i * 7349 + b.j * 1931) * 4 + BARRIER_ORDER.indexOf(b.type) * 97 + (b.rotation | 0)) % 1000000007;}
     const barrierKey = `${world.seed}:${n}:${h}`;
     if(barrierKey !== this.barrierKey){this.barrierKey = barrierKey;this.buildBarriers(world);}
-    this.syncPeek(world, dt);this.syncHealth(world, clock);this.syncGates(world, Math.min(dt, .05));this.syncGhost(world, ui);this.syncObjectGhost(ui);this.syncCursor(ui, clock);
+    this.syncPeek(world, dt);this.syncHealth(world, clock, targetId);this.syncGates(world, Math.min(dt, .05));this.syncGhost(world, ui);this.syncObjectGhost(ui);this.syncCursor(ui, clock);
     for(const ev of world.events)if(ev.id > this.lastEvent){
       if(world.time - ev.at < 1){
         if(ev.type === 'tile')this.effect(ev);

@@ -44,7 +44,7 @@ import {generateNodes, walkableAt, landNear, zoneAt, iceAt} from './worldgen.mjs
 import {HEARTH_MAX, ICE, areaBossFell, hearthCost, stepAreas, useLandmark} from './areas.mjs?v=harvest-18';
 import {DELVE, ascend, exitDelve, stepDelve, surfaceForNetwork} from './delve.mjs?v=harvest-18';
 import {bossLoot} from './bosses.mjs?v=harvest-18';
-import {brewSpeed, omenKill, omenNodes, stepOmens, useOmen} from './omens.mjs?v=harvest-18';
+import {brewSpeed, omenKill, omenNodes, riftKill, stepOmens, useOmen} from './omens.mjs?v=harvest-18';
 import {gildedLoot, moonLuck} from './moons.mjs?v=harvest-18';
 // Dungeons (src/dungeon): a run through freshly carved floors. The rules live there; the World calls these hooks.
 import {dungeonKill, dungeonLuck, dungeonNodes, dungeonScale, joinDungeon, layoutOf, setupDungeon, stepDungeon} from './dungeon/run.mjs?v=harvest-18';
@@ -1765,7 +1765,7 @@ export class World {
       // The sun did most of the work (sunburn.mjs): no loot, experience or mastery, just ash.
       const burnt=sunTook(e);
       const loot=ENEMIES[e.type]?.loot;if(loot&&!burnt)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));
-      if(!isMagicAlly(e)){this.kills++;if(this.dungeon)dungeonKill(this,e);if((e.mimic||e.champion)&&!burnt)omenKill(this,e);if(e.gilded&&!burnt)gildedLoot(this,e);if((e.warden||e.type==='king')&&!this.showcase)for(const q of this.players)if(q.online&&!q.ghost)unlockCharm(this,q,e.type==='king'?'the Hollow King fell':'the Warden fell');if(!this.showcase&&!burnt){this.spillLoot(this.roll(e.type,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)+(e.warden?1:0)+dungeonLuck(this)+moonLuck(this)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost){trinketEvent(this,killer,'kill',{enemy:e,phase});refineKill(this,killer,e);}if(killer&&!killer.ghost)creditKill(this,killer,e);}
+      if(!isMagicAlly(e)){this.kills++;if(this.dungeon)dungeonKill(this,e);if((e.mimic||e.champion)&&!burnt)omenKill(this,e);if(e.omen)riftKill(this,e);if(e.gilded&&!burnt)gildedLoot(this,e);if((e.warden||e.type==='king')&&!this.showcase)for(const q of this.players)if(q.online&&!q.ghost)unlockCharm(this,q,e.type==='king'?'the Hollow King fell':'the Warden fell');if(!this.showcase&&!burnt){this.spillLoot(this.roll(e.type,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)+(e.warden?1:0)+dungeonLuck(this)+moonLuck(this)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost){trinketEvent(this,killer,'kill',{enemy:e,phase});refineKill(this,killer,e);}if(killer&&!killer.ghost)creditKill(this,killer,e);}
       this.event('kill',e.x,e.z);if(burnt)this.event('ashes',e.x,e.z,'',{creature:e.type,king:e.type==='king'});
       if((e.type==='king'||ENEMIES[e.type]?.boss)&&!burnt){const times=noteBossKill(this,e.type);areaBossFell(this,e);if(ENEMIES[e.type]?.boss)bossLoot(this,e,times);}
       if(e.type==='king'&&!this.dungeon){this.bossSlain=true;this.event('announce',e.x,e.z,burnt?'The Hollow King burns away in the daylight, and takes his treasure with him.':'The Hollow King falls. His treasure spills across the grass.');}

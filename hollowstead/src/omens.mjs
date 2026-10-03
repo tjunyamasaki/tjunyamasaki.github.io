@@ -3,7 +3,9 @@
 //   fallenstar    a star crashed to earth: its light wakes a guard round it, led by an elder; it opens only
 //                 once they are all dead, for star-iron, an epic and a fair chance at a legendary
 //   soulrift      a tear in the dark: step close and it pours out four waves, the last led by a great elder;
-//                 seal it for a legendary
+//                 seal it for a legendary. Its creatures stay by the rift (they give up on a wanderer who runs
+//                 far off), a wave only counts when it is slain, and a rift left alone (everyone fled or fell)
+//                 falls quiet and must be fought again from the first wave
 //   mimic         a lonely chest: maybe treasure, maybe teeth (a huge elder that drops a hoard)
 //   cauldron      a witch's cauldron left bubbling: one sip each, a blessing (or a hex) until the dawn after next
 //   goldpumpkin   a golden pumpkin: a heartstone and an epic, if you find it before it rots
@@ -48,7 +50,7 @@ export const omenKinds = world => Object.entries(OMENS).filter(([, o]) => !o.age
  * and `xp` x (1 + region tier) for everyone within `share`.
  */
 export const OMEN = Object.freeze({first: .7, every: 1.6, jitter: .3, max: 1, maxVigil: 2, life: 2, near: 20, ring: [30, 132],
-  wake: 14, guards: 4, guardsPer: 2, tierUp: 1, leaderHp: 1.6, riftWake: 8, riftWaves: 4, mimic: .55, mimicHp: 2.2,
+  wake: 14, guards: 4, guardsPer: 2, tierUp: 1, leaderHp: 1.6, riftWake: 8, riftWaves: 4, riftLeash: 16, riftFar: 34, riftQuiet: 20, mimic: .55, mimicHp: 2.2,
   championHp: 2.6, escort: 3, escortPer: 1,
   xp: Object.freeze({fallenstar: 120, soulrift: 150, mimic: 100, goldpumpkin: 60, altar: 140}), share: 26});
 /** A Dread champion's name: one of these, and one of those. */
@@ -174,11 +176,18 @@ function stepOmen(world, o, dt){
     o.state = 'new'; o.champion = null; o.spawn = [];
   }
   if(o.kind === 'soulrift'){
-    if(o.state === 'new' && near(OMEN.riftWake)){o.state = 'open'; o.wave = 0; o.spawn = []; riftWave(world, o, tier);}
+    if(o.state === 'new' && near(OMEN.riftWake)){o.state = 'open'; o.wave = 0; o.spawn = []; o.alone = 0; riftWave(world, o, tier);}
     else if(o.state === 'open'){
+      // Nobody standing near (fled, or fell): after a while the rift falls quiet and takes its creatures back.
+      o.alone = near(OMEN.riftFar) ? 0 : (o.alone || 0)+dt;
+      if(o.alone > OMEN.riftQuiet){quietRift(world, o); return;}
+      // Struck down this tick but not yet cleared away: wait for the kill to be counted (riftKill).
+      if(o.spawn.some(id => world.enemies.some(e => e.id === id && !(e.hp > 0)))) return;
       const alive = o.spawn.filter(id => world.enemies.some(e => e.id === id && e.hp > 0));
       o.spawn = alive;
       if(!alive.length){
+        // A wave only counts when it was slain: creatures that vanished some other way never open the next one.
+        if(o.waveSize != null && (o.slain || 0) < o.waveSize){quietRift(world, o); return;}
         if(o.wave < OMEN.riftWaves) riftWave(world, o, tier);
         else{
           world.event('riftclose', o.x, o.z, '', {});
@@ -191,8 +200,22 @@ function stepOmen(world, o, dt){
   }
 }
 
+/** The rift closes its waves and waits: its creatures sink back in and the next fight starts from wave one. */
+function quietRift(world, o){
+  const ids = new Set(o.spawn || []);
+  if(ids.size) world.enemies = world.enemies.filter(e => !ids.has(e.id));
+  o.state = 'new'; o.wave = 0; o.spawn = []; o.slain = 0; o.waveSize = null; o.alone = 0;
+  world.event('announce', o.x, o.z, 'The soul rift falls quiet. Its wave sinks back into the dark.');
+}
+
+/** A rift's creature died (World, before the dead are cleared). */
+export function riftKill(world, e){
+  const o = (world.omens || []).find(entry => entry.id === e.omen && entry.kind === 'soulrift' && !entry.done);
+  if(o && (o.spawn || []).includes(e.id)) o.slain = (o.slain || 0)+1;
+}
+
 function riftWave(world, o, tier){
-  o.wave++;
+  o.wave++; o.slain = 0; o.waveSize = 0;
   const last = o.wave === OMEN.riftWaves, level = Math.max(1, tier)+OMEN.tierUp;
   const count = 4+o.wave*2+(humans(world)-1)*3;
   const pools = [['crawler', 'crawler', 'wraith', 'bogling'], ['bonewalker', 'crawler', 'wraith', 'bogling'], ['brute', 'bonewalker', 'wraith', 'bogling', 'crawler'], ['brute', 'golem', 'bonewalker', 'wraith', 'bogling']];
@@ -202,9 +225,10 @@ function riftWave(world, o, tier){
     // Wave 3 brings an elder; the last wave a great elder and two more.
     const lead = last && i === 0, elder = (o.wave >= 3 && i === 0) || (last && i <= 2);
     const type = lead ? (tier >= 2 ? 'golem' : 'brute') : pool[i%pool.length];
-    const e = world.spawnEnemy(type, o.x+Math.cos(a)*r, o.z+Math.sin(a)*r, {tier: level, elite: elder ? true : undefined});
+    // Bound to the rift: they chase a wanderer close by and walk back to it when you get far away (mobs.mjs home).
+    const e = world.spawnEnemy(type, o.x+Math.cos(a)*r, o.z+Math.sin(a)*r, {tier: level, elite: elder ? true : undefined, home: true, leash: OMEN.riftLeash});
     if(!e) continue;
-    e.hunt = true; e.omen = o.id; o.spawn.push(e.id);
+    e.aggro = true; e.omen = o.id; o.spawn.push(e.id); o.waveSize++;
     if(lead) e.hp = e.maxHp = Math.round(e.maxHp*OMEN.leaderHp);
   }
   world.event('portal', o.x, o.z, '', {radius: 2.4});

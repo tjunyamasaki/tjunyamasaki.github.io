@@ -38,17 +38,36 @@ export const STRUCTURE_HIT = .25, HEARTH_HIT = .175;
 export const HUNT_RANGE = 40;
 export const structureHit = b => b.type === 'hearth' ? HEARTH_HIT : STRUCTURE_HIT;
 /**
- * Breaking what wanderers built. A creature walled out of its prey turns on the nearest wall or gate
- * in its way and strikes it with its own attacks (wind-up and all) instead of pawing at it; one with
- * no prey near smashes structures it passes. `wall` is how long being walled out is remembered.
+ * Breaking what wanderers built. A creature only turns on buildings when it cannot get at a wanderer:
+ *  - walled out (no way round on its flow field): it strikes the nearest wall or gate in its way with its
+ *    own attacks (wind-up and all) instead of pawing at it;
+ *  - no wanderer in sight (none within its sight range): it smashes structures it passes on its way.
+ * A wanderer it can see and reach is always chased, however far, never ignored for a nearby wall.
+ * `wall` is how long being walled out is remembered.
  */
 export const SIEGE = Object.freeze({wall: 2.5, reach: 2.8, roam: 6, prey: 7});
 const SPARED = new Set(['hearth', 'cart', 'trap', 'farm']);
 const radiusOf = b => b.radius || STRUCTURES[b.type]?.radius || .5;
-function siegeTarget(world, e, prey){
+/**
+ * A creature sees a wanderer it has picked up within its sight range (preyFor: 12 units, 40 when hunting).
+ * Underground the rock also has to leave a clear line (World.canSee). Walls do not hide anyone: a creature
+ * that knows where you are walks round them, and only breaks them when there is no way round.
+ */
+function seesPrey(world, e, prey){
+  if(!prey) return false;
+  if(!world.dungeon) return true;
+  if(e.sightOf === prey.id && world.time - (e.sightAt ?? -99) < .3) return e.sightOk;
+  e.sightOf = prey.id; e.sightAt = world.time; e.sightOk = world.canSee(e, prey);
+  return e.sightOk;
+}
+/** `prey`: the wanderer or cart being hunted, or null. `fallback`: where it heads otherwise (the hearth). */
+function siegeTarget(world, e, prey, fallback = null){
   const walled = world.time - (e.walledAt ?? -99) < SIEGE.wall;
-  const free = !prey || dist(prey, e) > SIEGE.prey;
-  if(!walled && !free) return null;
+  // A wanderer in sight and within reach: chase them, leave the buildings alone.
+  if(!walled && prey && seesPrey(world, e, prey)) return null;
+  // Nothing hunted and the hearth close by: go for the hearth itself.
+  if(!walled && !prey && fallback && dist(fallback, e) <= SIEGE.prey) return null;
+  prey ||= fallback;
   let best = null, bd = Infinity;
   for(const b of world.buildings){
     if(b.hp <= 0 || SPARED.has(b.type) || !STRUCTURES[b.type] || b.open) continue;
@@ -570,7 +589,8 @@ export function stepMobs(world, dt, obstacles){
       // `hunt`: creatures sent after wanderers in the dark (night.mjs) look much farther for prey.
       const near = preyFor(world, e, prey, e.hunt ? HUNT_RANGE : 12);
       target = near || hearth || (world.showcase ? people[0] : null);
-      if(!e.minion) target = siegeTarget(world, e, target) || target;
+      if(!e.minion) target = siegeTarget(world, e, near, target) || target;
+      e.chase = !!(near && target === near && seesPrey(world, e, near));
     }
     if(!target){e.vx = e.vz = 0; continue;}
     const reach = target.type === 'hearth' ? 1.1 : target.type === 'cart' ? .35 : target.structure ? target.radius + .15 : 0;
@@ -683,7 +703,9 @@ export function stepMobs(world, dt, obstacles){
       if(!moved || progress < speed*dt*.25){
         e.stuck = (e.stuck || 0)+dt;
         // Walls and gates in the way get clawed when there is no way round.
-        const wall = !target.homing && world.buildings.find(b => BARRIER_TYPES.includes(b.type) && !b.open && b.hp > 0 && dist(b, e) < 1.8);
+        // Only when it cannot get at a wanderer it sees (walled out, or nobody in sight); otherwise it works round.
+        const blind = !e.chase || world.time - (e.walledAt ?? -99) < SIEGE.wall;
+        const wall = !target.homing && blind && world.buildings.find(b => BARRIER_TYPES.includes(b.type) && !b.open && b.hp > 0 && dist(b, e) < 1.8);
         if(wall) e.walledAt = world.time;
         if(wall && e.cooldown <= 0){wall.hp -= def.damage*(e.power || 1)*STRUCTURE_HIT; e.cooldown = def.period; world.event('hit', wall.x, wall.z); e.stuck = 0;}
         else if(e.stuck > .7){e.detour = .6; e.stuck = 0;}

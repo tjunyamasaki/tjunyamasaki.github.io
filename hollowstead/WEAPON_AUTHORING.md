@@ -82,6 +82,7 @@ Write a 5-line design brief first (fantasy, auto verb, rhythm, skill climax, loo
 - [ ] `src/fx/<id>.mjs` exporting `<NAME>_FX`, added to `WEAPON_FX` in `src/fx/index.mjs` (§7).
 - [ ] `src/fx/kit.mjs` → `HUES['<id>']`: `H(core, main, glow, deep, alt)`; used by the generic flourishes (rank-up, damage flair).
 - [ ] `src/magic/art.mjs`: `HELD_GEAR['<id>']` (reuse a motion: `staff`, `swing`, `thrust`, `bow`, `bell`, `fan`, `rattle`, `needle`, `tome`), or add the id to `UNHELD` when your rig draws the weapon itself.
+  A blade swung in the hand can instead join the arm rig (`src/player-rig.mjs` → `RIG_GEAR`, its own track in `TRACKS`, and an upright `grip-<id>` sprite from `tools/art/rig.py` `TOOLS`): the front arm then reaches for the grip every frame. Give it a motion of its own, not a copy of the sword's cuts.
 - [ ] `assets/magic/<id>/item.svg` (+ square `icon.svg`): hand-written SVG, cartoon horror, thick `#2b2233` outlines, strong silhouette, 2 to 5 KB.
 - [ ] `src/progression.mjs` → `ITEM_RARITY` and the matching `POOLS` list (expedition loot). `STARTERS` in `src/arena.mjs` only if asked.
 - [ ] `src/audio.mjs` → `play()`: a synth branch for your cast/impact event types (copy the `foxfire` branch shape).

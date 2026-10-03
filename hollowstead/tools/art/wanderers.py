@@ -115,7 +115,9 @@ def hooded(name, P):
     head += line(f"M176 {hc[1] + 82} Q256 {hc[1] + 108} 336 {hc[1] + 82}", 6, pal["trim"])
     body += head if not tilt else f'<g transform="rotate({tilt} 256 {450 + by})">{head}</g>'
     a_f, hf = arm(sh_f, *P.get("af", (14, 8)), pal["cloak"], pal["cloak_d"], GLOVE, 70, 62, 32, 36)
-    body += a_f + fx_layer(P.get("fx", ""), hf, pal)
+    if not P.get("noarm"):    # rig.py draws the front arm as its own bones
+        body += a_f
+    body += fx_layer(P.get("fx", ""), hf, pal)
     if lean:
         body = f'<g transform="rotate({lean} 256 {640 + by})">{body}</g>'
     b += body
@@ -200,7 +202,8 @@ def masked(name, P):
     head += fill(fringe, pal["hair"], 6)
     body += head if not tilt else f'<g transform="rotate({tilt} 256 {450 + by})">{head}</g>'
     a_f, hf = arm(sh_f, *P.get("af", (14, 8)), "#524463", "#3e3446", SKIN, 68, 60, 30, 34)
-    body += a_f + line(f"M{hf[0] - 14} {hf[1] - 22} L{hf[0] + 14} {hf[1] - 26}", 8, LEATHER)
+    if not P.get("noarm"):    # rig.py draws the front arm as its own bones
+        body += a_f + line(f"M{hf[0] - 14} {hf[1] - 22} L{hf[0] + 14} {hf[1] - 26}", 8, LEATHER)
     body += fx_layer(P.get("fx", ""), hf, pal)
     if lean:
         body = f'<g transform="rotate({lean} 256 {640 + by})">{body}</g>'

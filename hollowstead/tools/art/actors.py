@@ -129,9 +129,10 @@ def witch(name, P):
     head += brush((136, hy + 6), (200, hy - 14), (270, hy - 16), 6, "#ffffff", .15)
     head += sparkle(292, hy - 70, 1.3, pal["band"])
     body += G(head, 0, 0) if not ht else f'<g transform="rotate({ht} 256 {470 + by})">{head}</g>'
-    # front arm
+    # front arm (rig.py leaves it out: the game draws it as two bones that follow the held tool)
     a_f, hf = arm(sh_f, P.get("af", (14, 8))[0], P.get("af", (14, 8))[1], pal["cloak"], pal["cloak_d"], SKIN)
-    body += a_f
+    if not P.get("noarm"):
+        body += a_f
     fx = P.get("fx", "")
     if fx == "spark":
         body += sparkle(hf[0] + 20, hf[1] - 10, 3.2, pal["charm"]) + sparkle(hf[0] + 20, hf[1] - 10, 1.6, "#ffffff")

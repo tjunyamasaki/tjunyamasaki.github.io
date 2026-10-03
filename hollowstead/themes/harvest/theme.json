@@ -3460,6 +3460,287 @@
         }
       }
     },
+    "ember-rig": {
+      "src": "./sprites/ember-rig.svg?v=rig1",
+      "size": [
+        2.25,
+        3.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 8,
+      "rows": 2,
+      "lazy": true,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "ember-arm": {
+      "src": "./sprites/ember-arm.svg?v=rig1",
+      "size": [
+        0.5625,
+        0.5625
+      ],
+      "anchor": [
+        0.5,
+        0.8125
+      ],
+      "columns": 2,
+      "rows": 1,
+      "lazy": true,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "moss-rig": {
+      "src": "./sprites/moss-rig.svg?v=rig1",
+      "size": [
+        2.25,
+        3.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 8,
+      "rows": 2,
+      "lazy": true,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "moss-arm": {
+      "src": "./sprites/moss-arm.svg?v=rig1",
+      "size": [
+        0.5625,
+        0.5625
+      ],
+      "anchor": [
+        0.5,
+        0.8125
+      ],
+      "columns": 2,
+      "rows": 1,
+      "lazy": true,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "vesper-rig": {
+      "src": "./sprites/vesper-rig.svg?v=rig1",
+      "size": [
+        2.25,
+        3.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 8,
+      "rows": 2,
+      "lazy": true,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "vesper-arm": {
+      "src": "./sprites/vesper-arm.svg?v=rig1",
+      "size": [
+        0.5625,
+        0.5625
+      ],
+      "anchor": [
+        0.5,
+        0.8125
+      ],
+      "columns": 2,
+      "rows": 1,
+      "lazy": true,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "cinder-rig": {
+      "src": "./sprites/cinder-rig.svg?v=rig1",
+      "size": [
+        2.25,
+        3.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 8,
+      "rows": 2,
+      "lazy": true,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "cinder-arm": {
+      "src": "./sprites/cinder-arm.svg?v=rig1",
+      "size": [
+        0.5625,
+        0.5625
+      ],
+      "anchor": [
+        0.5,
+        0.8125
+      ],
+      "columns": 2,
+      "rows": 1,
+      "lazy": true,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "grip-axe": {
+      "src": "./sprites/grip-axe.svg?v=rig1",
+      "size": [
+        2.25,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.21875
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "grip-pick": {
+      "src": "./sprites/grip-pick.svg?v=rig1",
+      "size": [
+        2.25,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.21875
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "grip-sword": {
+      "src": "./sprites/grip-sword.svg?v=rig1",
+      "size": [
+        2.25,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.21875
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "grip-broadsword": {
+      "src": "./sprites/grip-broadsword.svg?v=rig1",
+      "size": [
+        2.25,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.21875
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "grip-flamberge": {
+      "src": "./sprites/grip-flamberge.svg?v=rig1",
+      "size": [
+        2.25,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.21875
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
     "glow-crawler": {
       "src": "./sprites/glow/crawler.png?v=art4",
       "size": [
@@ -5011,7 +5292,15 @@
         "ember",
         "moss",
         "vesper",
-        "cinder"
+        "cinder",
+        "ember-rig",
+        "ember-arm",
+        "moss-rig",
+        "moss-arm",
+        "vesper-rig",
+        "vesper-arm",
+        "cinder-rig",
+        "cinder-arm"
       ],
       "options": {
         "hood": {

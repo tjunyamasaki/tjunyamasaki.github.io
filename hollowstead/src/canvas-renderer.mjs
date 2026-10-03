@@ -11,6 +11,7 @@ import {biome, distance, createDropMotion} from './engine.mjs?v=harvest-18';
 import {equippedLanternLit, itemSpriteKey, spriteVariant} from './inventory.mjs?v=harvest-18';
 import {magicClipName, magicVisuals} from './magic/registry.mjs?v=harvest-18';
 import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-18';
+import {PlayerRig} from './player-rig.mjs?v=harvest-18';
 import {buildMagicEffects, drawMagicCanvas, usesMagicEffects} from './magic/effects.mjs?v=harvest-18';
 import {WeaponFx, dropBlink} from './fx/index.mjs?v=harvest-18';
 import {orthographicHalf, viewSize, watchViewport} from './camera.mjs?v=harvest-18';
@@ -32,7 +33,7 @@ import {loadImage, preloadThemeAssets} from './assets.mjs?v=harvest-18';
 /** Swarm fights spray numbers; old labels give way so the DOM stays light on phones. */
 export class CanvasRenderer {
   constructor(canvas,theme){
-    this.canvas=canvas;this.theme=theme;this.magicClock=new MagicClock();this.weaponFx=new WeaponFx();this.flashLevel=-1;this.magicActors=new Map();this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');
+    this.canvas=canvas;this.theme=theme;this.playerRig=new PlayerRig();this.magicClock=new MagicClock();this.weaponFx=new WeaponFx();this.flashLevel=-1;this.magicActors=new Map();this.ctx=canvas.getContext('2d');if(!this.ctx)throw new Error('Canvas rendering is unavailable.');
     this.images=new Map();this.zoom=1;this.clock=0;this.lastEvent=0;this.seed=null;this.effects=[];this.floaters=[];this.focus={x:0,z:0,set:(x,y,z)=>{this.focus.x=x;this.focus.z=z;}};this.dropMotion=createDropMotion();this.view=null;this.localId=null;
     this.onResize=()=>this.resize();watchViewport(this.onResize);this.resize();
   }
@@ -84,7 +85,23 @@ export class CanvasRenderer {
     }
     c.restore();
   }
-  drawSprite(key,e,kind,world,frame,p){
+  /** The held-tool rig (player-rig.mjs) for a wanderer, or null; its sheets load on first use. */
+  rigPose(player){
+    if(!this.magicFrame)return null;
+    return this.playerRig.pose(player,this.magicFrame.time,this.clock,this.theme,key=>this.images.has(key)||(this.ensureImage(key),false));
+  }
+  /** The rig's tool and two arm bones, over the body (`back` parts: under it); screen offsets from its anchor. */
+  drawRigParts(rig,s,bob,display,back=false){
+    const c=this.ctx,S=this.scale;
+    for(const part of rig.parts){if(!!part.back!==back)continue;
+      const def=this.theme.sprites[part.key],img=this.images.get(part.key);if(!def||!img)continue;
+      const cols=def.columns||1,rows=def.rows||1,sw=img.naturalWidth/cols,sh=img.naturalHeight/rows,w=def.size[0]*S,h=def.size[1]*S;
+      c.save();c.translate(s.x+part.x*S,s.y-bob-part.y*S);c.rotate(-part.rotation);c.scale(part.side,part.len??1);
+      c.filter=`brightness(${Math.min(1,Math.max(0,part.tool?display*.85+.15:display))})`;
+      c.drawImage(img,(part.frame%cols)*sw,Math.floor(part.frame/cols)*sh,sw,sh,-w*def.anchor[0],-h*(1-def.anchor[1]),w,h);c.restore();
+    }
+  }
+  drawSprite(key,e,kind,world,frame,p,rig=null){
     if(kind==='drop')return this.drawDrop(key,e,world,frame);
     // A weapon's body rig (src/fx WEAPON_FX: the kitsune's tails...). One sorted behind the body is
     // drawn now; one sorted in front of it (origin nearer the camera) after the body.
@@ -96,9 +113,9 @@ export class CanvasRenderer {
     }
     const c=this.ctx,def=this.theme.sprites[key]||this.theme.sprites.ember,img=this.images.get(key)||(this.ensureImage(key),this.images.get(def.base)||this.images.get('ember')),ground=this.screenPoint(e.x,e.z,0),s=this.screenPoint(e.x,e.z,e.lift||0);
     const special=kind==='ally'?(e.anim||'idle'):magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0||e.act>0?'attack':'walk'):e.action||'idle'),clip=def.clips[clipName]||def.clips.walk||def.clips.attack||def.clips.idle;
-    const cols=def.columns||1,rows=def.rows||1,frameIndex=key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
-    let w=def.size[0]*this.scale,h=def.size[1]*this.scale;if(e.down||e.ghost){w*=.8;h*=.65;}if(kind==='enemy'&&e.elite){w*=1.3;h*=1.3;}if(kind==='enemy'&&e.warden){w*=1.12;h*=1.12;}if((kind==='prop'||kind==='building')&&e.scale){w*=e.scale;h*=e.scale;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(kind==='zone'&&e.kind==='frost'){w*=e.radius/1.3;h*=e.radius/1.3;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
-    const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob*this.scale:kind==='enemy'&&key==='wraith'?(Math.sin(this.clock*3)*.1+.2)*this.scale:0;
+    const cols=def.columns||1,rows=def.rows||1,frameIndex=rig?rig.frame:key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length],sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
+    let w=def.size[0]*this.scale,h=def.size[1]*this.scale;if(e.down||e.ghost){w*=.8;h*=.65;}if(kind==='enemy'&&e.elite){w*=1.3;h*=1.3;}if(kind==='enemy'&&e.warden){w*=1.12;h*=1.12;}if((kind==='prop'||kind==='building')&&e.scale){w*=e.scale;h*=e.scale;}if(e.pose){w*=e.pose.scale;h*=e.pose.scale;}if(rig){w*=rig.scale[0];h*=rig.scale[1];}if(kind==='zone'&&e.kind==='frost'){w*=e.radius/1.3;h*=e.radius/1.3;}if(key==='gravecraft-skeleton')h*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
+    const bob=rig?rig.bob*this.scale:moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob*this.scale:kind==='enemy'&&key==='wraith'?(Math.sin(this.clock*3)*.1+.2)*this.scale:0;
     const emissive=(kind==='prop'&&e.glow)||(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e));
     let display=kind==='preview'?Math.max(0.72, entityBrightness(frame, e.x, e.z)):entityBrightness(frame, e.x, e.z, {local:kind==='player'&&e.id===p.id, emissive});
     if(kind==='building'&&['hearth','fire'].includes(key)&&e.fuel<=0)display*=0.45;
@@ -108,8 +125,10 @@ export class CanvasRenderer {
     // Night-only resources glow so they can be found in the dark.
     const halo=kind==='node'&&nightGlow(e);if(halo){const r=1.3*this.scale,g=c.createRadialGradient(0,0,0,0,0,r);g.addColorStop(0,halo+'aa');g.addColorStop(.5,halo+'40');g.addColorStop(1,halo+'00');c.save();c.translate(ground.x,ground.y);c.scale(1,.72);c.globalCompositeOperation='lighter';c.globalAlpha*=(.3+.55*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));c.fillStyle=g;c.beginPath();c.arc(0,0,r,0,Math.PI*2);c.fill();c.restore();}
     if(kind!=='held'&&kind!=='zone'){c.fillStyle='#211b2b30';c.beginPath();c.ellipse(ground.x,ground.y,w*.26,w*.10,0,0,Math.PI*2);c.fill();}
+    if(rig)this.drawRigParts(rig,s,bob,display,true);
     c.translate(s.x,s.y-bob);
     if(e.pose){c.rotate(-e.pose.rotation);c.scale(e.pose.side,1);}
+    else if(rig){c.rotate(-rig.rotation);if(e.dx<-.1)c.scale(-1,1);}
     else{
       if((kind==='player'&&e.dx<-.1)||((kind==='magic'||kind==='ally')&&e.facing===-1)||(kind==='enemy'&&e.face===-1)||(key==='cart'&&e.face===1))c.scale(-1,1);
       let tilt=Number.isFinite(e.aim)?-e.aim:moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;
@@ -124,7 +143,8 @@ export class CanvasRenderer {
     if(rigAfter)drawMagicCanvas(this.ctx,rigAfter,(x,z,y)=>this.screenPoint(x,z,y));
     if((kind==='enemy'||kind==='building'||(kind==='ally'&&key!=='crow'))&&e.hp<e.maxHp&&fade>0.04){const y=s.y-h*(key==='hearth'?.62:kind==='enemy'||kind==='ally'?key==='crawler'?.38:.82:.37);c.save();c.globalAlpha=fade;c.fillStyle='#2a2533';c.fillRect(s.x-21,y,42,4);c.fillStyle=kind==='enemy'?'#df9383':kind==='ally'?'#9fd8a8':'#d2c395';c.fillRect(s.x-20,y+1,40*Math.max(0,e.hp/e.maxHp),2);c.restore();}
     if(kind==='player'&&e.id!==p.id&&fade>0.05){c.save();c.globalAlpha=fade;c.font='10px Arial';c.textAlign='center';c.fillStyle='#f4e4c8';c.fillText(e.name,s.x,s.y-h-4);c.restore();}
-    if(kind==='player'&&!e.down&&!e.ghost){
+    if(rig)this.drawRigParts(rig,s,bob,display);
+    else if(kind==='player'&&!e.down&&!e.ghost){
       const pose=heldWeaponPose(e,this.magicFrame.time,this.theme);
       if(pose&&this.images.has(pose.key))this.drawSprite(pose.key,{id:e.id,x:e.x+pose.x,z:e.z+pose.z,lift:pose.y,pose},'held',world,frame,p);
     }
@@ -198,7 +218,7 @@ export class CanvasRenderer {
     paintHomesteadCanvas(this,c,world,frame,homestead);
     if(weapon&&(weapon.groundNormal.length||weapon.groundGlow.length))drawMagicCanvas(c,[...weapon.groundNormal,...weapon.groundGlow],(x,z,y)=>this.screenPoint(x,z,y));
     paintRopes(this,c,world,frame,this.theme,true);
-    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
+    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
     const drawn=entities.map(entry=>{
       if(entry.key==='gravecraft-skeleton'){
         const last=this.magicActors.get(entry.e.id)||{x:entry.e.x,z:entry.e.z};
@@ -209,7 +229,7 @@ export class CanvasRenderer {
       const present=this.dropMotion.sample(entry.e,world,this.clock,dt);
       return {...entry, e:{...entry.e, x:present.x, z:present.z, lift:present.y, flightT:present.t||0}, depth:present.z};
     });
-    drawn.sort((a,b)=>(a.depth??a.e.z)-(b.depth??b.e.z));for(const {e,key,kind}of drawn){if(kind==='drop'&&!this.theme.sprites[key])continue;if(Math.abs(e.x-this.focus.x)<halfX+4&&Math.abs(e.z-this.focus.z)<halfZ+4)this.drawSprite(key,e,kind,world,frame,p);}
+    drawn.sort((a,b)=>(a.depth??a.e.z)-(b.depth??b.e.z));for(const {e,key,kind,rig}of drawn){if(kind==='drop'&&!this.theme.sprites[key])continue;if(Math.abs(e.x-this.focus.x)<halfX+4&&Math.abs(e.z-this.focus.z)<halfZ+4)this.drawSprite(key,e,kind,world,frame,p,rig);}
     paintRopes(this,c,world,frame,this.theme);
     paintScenery(this,c,world,frame,dt,'air');
     this.dropMotion.retain(new Set(world.drops.map(drop=>drop.id)));

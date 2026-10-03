@@ -35,6 +35,7 @@ export function arenaTile(x,z,R){
 }
 const PROJECTILE_KEYS={arrow:'arrow',bolt:'mbolt',wisp:'wisp',seed:'pumpseed'};
 import {MagicClock, heldWeaponPose, skeletonFrame} from './magic/art.mjs?v=harvest-18';
+import {PlayerRig} from './player-rig.mjs?v=harvest-18';
 import {buildMagicEffects, usesMagicEffects} from './magic/effects.mjs?v=harvest-18';
 import {MagicMesh} from './magic/effects-three.mjs?v=harvest-18';
 import {WeaponFx, dropBlink} from './fx/index.mjs?v=harvest-18';
@@ -139,7 +140,7 @@ class CombatLayer {
 }
 export class Renderer {
   constructor(canvas,theme){
-    this.canvas=canvas;this.theme=theme;this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.rigMeshes=new Map();this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);this.dungeonLayer=null;
+    this.canvas=canvas;this.theme=theme;this.playerRig=new PlayerRig();this.scene=new THREE.Scene();this.scene.background=new THREE.Color(theme.palette.background);this.magicClock=new MagicClock();this.magicMesh=new MagicMesh(this.scene);this.rigMeshes=new Map();this.glowMesh=new MagicMesh(this.scene,{additive:true,order:5,capacity:65536});this.groundFxMesh=new MagicMesh(this.scene,{order:-.6,capacity:32768});this.groundGlowMesh=new MagicMesh(this.scene,{additive:true,order:-.5,capacity:49152});this.weaponFx=new WeaponFx();this.flashLevel=-1;this.combat=new CombatLayer(this.scene);this.afterimages=[];this.scenery=new SceneryLayer(this);this.dungeonLayer=null;
     this.scene.fog=new THREE.FogExp2(theme.palette.background,.009);this.camera=new THREE.OrthographicCamera(-15,15,15,-15,.1,180);
     this.gl=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.setPixelRatio(Math.min(devicePixelRatio,1.6));this.gl.outputColorSpace=THREE.SRGBColorSpace;
     this.objects=new Map();this.textures=new Map();this.materials=new Map();this.dropTextures=new Map();this.effects=[];this.floaters=[];this.focus=new THREE.Vector3();this.zoom=1;this.lastEvent=0;this.seed=null;this.clock=0;this.dropMotion=createDropMotion();
@@ -320,6 +321,33 @@ export class Renderer {
     if(glow){glow.visible=true;glow.position.set(hearth.x,.015,hearth.z);glow.material.opacity=(.12+.5*frame.darkness)*(.75+.25*Math.sin(this.clock*1.6));}
   }
   reveal(x,z){if(!this.view)return 1;return labelOpacity(brightnessAt(this.view.sources, x, z, this.view.darkness, this.view.lighting), this.view.darkness, this.view.lighting);}
+  /** The held-tool rig (player-rig.mjs) for a wanderer, or null; its sheets load on first use. */
+  rigPose(player){
+    if(!this.magicFrame)return null;
+    return this.playerRig.pose(player,this.magicFrame.time,this.clock,this.theme,key=>this.textures.has(key)||(void this.ensureTexture(key).catch(()=>{}),false));
+  }
+  /**
+   * Draw the rig's tool and two arm bones over the body. Offsets are in the picture plane, so they
+   * follow the camera's right/up; each part sits a hair nearer the camera than the last, so it sorts
+   * just in front of its own body and still behind anything standing in front of the wanderer.
+   */
+  syncRigParts(player, body, rig, alive){
+    const q=this.camera.quaternion,right=this._rigRight||=new THREE.Vector3(),up=this._rigUp||=new THREE.Vector3(),toward=this._rigToward||=new THREE.Vector3();
+    right.set(1,0,0).applyQuaternion(q);up.set(0,1,0).applyQuaternion(q);toward.set(0,0,1).applyQuaternion(q);
+    // A hit squash (hitUntil) stretches the body sprite; the bones ride along with it.
+    const kx=Math.abs(body.sprite.scale.x)/(body.def.size[0]*rig.scale[0]),ky=body.sprite.scale.y/(body.def.size[1]*rig.scale[1]);
+    rig.parts.forEach((part,i)=>{
+      const id=`rig${i}:${player.id}`;let o=this.objects.get(id);
+      if(!o||o.key!==part.key){if(o)this.remove(o);o=this.sprite(part.key,id);}
+      alive.add(id);o.shadow.visible=false;o.initialized=true;
+      const cols=o.def.columns||1,rows=o.def.rows||1;o.sprite.material.map.offset.set((part.frame%cols)/cols,1-1/rows-Math.floor(part.frame/cols)/rows);
+      o.sprite.position.copy(body.sprite.position).addScaledVector(right,part.x*kx).addScaledVector(up,part.y*ky).addScaledVector(toward,part.back?-.02:.02*(i+1));
+      o.x=o.sprite.position.x;o.z=o.sprite.position.z;
+      o.sprite.scale.set(part.side*o.def.size[0],o.def.size[1]*(part.len??1),1);o.sprite.material.rotation=part.rotation;o.sprite.renderOrder=body.sprite.renderOrder;
+      o.sprite.visible=body.sprite.visible;o.sprite.material.opacity=body.sprite.material.opacity;
+      o.sprite.material.color.copy(body.sprite.material.color);if(part.tool)o.sprite.material.color.lerp(this._rigWhite||=new THREE.Color('#ffffff'),.2);
+    });
+  }
   syncHeldWeapon(player, body){
     const pose=!player.down&&!player.ghost?heldWeaponPose(player,this.magicFrame.time,this.theme):null,id='held'+player.id;
     if(!pose||!this.theme.sprites[pose.key]){const old=this.objects.get(id);if(old)this.remove(old);return null;}
@@ -399,9 +427,9 @@ export class Renderer {
     const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;this.paintField(frame);this.paintFlash(weapon);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
     this.paintPlaza(world,frame);if(world.dungeon)this.dungeonLayer?.update(world,frame,this.clock);this.scenery.update(world,frame,dt,this.focus);(this.homestead||=new HomesteadLayer(this)).update(world,frame,dt,homestead,this.clock);this.combat.begin();
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>({e,key:e.character,kind:'player'})),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
-    for(const {e,key,kind}of entities){
+    for(const {e,key,kind,rig}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
       const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key||(o.fallback&&this.textures.has(key))){if(o)this.remove(o);o=kind==='drop'?this.dropSprite(key,id,e):this.sprite(key,id);if(!o){alive.delete(id);continue;}}o.sprite.visible=o.shadow.visible=visible;if(o.beacon&&!visible)this.syncBeacon(o,null,e,null,0,false);if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.eyes)o.eyes.visible=visible;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
       const present=kind==='drop'?this.dropMotion.sample(e,world,this.clock,dt,id=>{const body=this.objects.get('player'+id);return body?.initialized?{x:body.x,z:body.z}:null;}):null;
@@ -409,12 +437,12 @@ export class Renderer {
       const smooth=(['player','enemy','magic','ally'].includes(kind)||key==='cart')&&!demo?Math.min(1,dt*(e.id===localId||(key==='cart'&&e.towedBy===localId)?22:13)):1;
       if(!o.initialized){o.x=tx;o.z=tz;o.initialized=true;}else{o.x+=(tx-o.x)*smooth;o.z+=(tz-o.z)*smooth;}
       const special=kind==='ally'?(e.anim||'idle'):magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0||e.act>0?'attack':'walk'):e.action||'idle'),clip=o.def.clips[clipName]||o.def.clips.walk||o.def.clips.attack||o.def.clips.idle;
-      const cols=o.def.columns||1,rows=o.def.rows||1,frameIndex=key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,o.def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length];
+      const cols=o.def.columns||1,rows=o.def.rows||1,frameIndex=rig?rig.frame:key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,o.def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length];
       o.sprite.material.map.offset.set((frameIndex%cols)/cols,1-1/rows-Math.floor(frameIndex/cols)/rows);
       // A hand cart shows its handle on the puller's side. Sprites ignore a negative scale, so mirror the sheet cell instead.
       if(key==='cart'){const mirror=e.face===1;o.sprite.material.map.repeat.x=(mirror?-1:1)/cols;if(mirror)o.sprite.material.map.offset.x+=1/cols;}
-      const bob=moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob:kind==='enemy'&&key==='wraith'?.2+Math.sin(this.clock*3)*.1:0;
-      let sx=o.def.size[0],sy=o.def.size[1];if(kind==='drop'&&present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}
+      const bob=rig?rig.bob:moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob:kind==='enemy'&&key==='wraith'?.2+Math.sin(this.clock*3)*.1:0;
+      let sx=o.def.size[0],sy=o.def.size[1];if(rig){sx*=rig.scale[0];sy*=rig.scale[1];}if(kind==='drop'&&present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}
       if(e.down||e.ghost){sx*=.8;sy*=.65;}
       if(kind==='enemy'&&e.elite){sx*=1.3;sy*=1.3;}
       if(kind==='enemy'&&e.warden){sx*=1.12;sy*=1.12;}
@@ -426,6 +454,7 @@ export class Renderer {
       if(kind==='zone'){o.shadow.visible=false;if(e.kind==='star'){const fall=Math.max(0,1-e.age/e.delay);o.sprite.position.y=.4+fall*9;o.sprite.position.x=o.x+fall*3;}else{const life=Math.min(1,e.age*3)*Math.min(1,(e.life-e.age)*2);o.sprite.scale.set(sx*e.radius/1.3,sy*e.radius/1.3,1);o.sprite.position.y=-.2;o.sprite.material.opacity=.8*life;}}
       if(kind==='ally'&&ALLIES[key]?.fly){o.sprite.position.y=.9+Math.sin(this.clock*6+e.x)*.15;}
       if(kind==='projectile')o.sprite.material.rotation=-(e.aim||0);
+      else if(rig)o.sprite.material.rotation=rig.rotation;
       else if(Number.isFinite(e.aim))o.sprite.material.rotation=e.aim;
       else{o.sprite.material.rotation=moving?Math.sin(this.clock*10)*motion.walkTilt:Math.sin(this.clock*1.8+e.x)*motion.idleSway;if(['attack','gather'].includes(e.action)&&e.actionUntil>world.time)o.sprite.material.rotation=motion.attackTilt*Math.sin((e.actionUntil-world.time)*12);}
       // Crops lean in the wind (duskwheat most); a ripe one breathes a little so it reads as ready.
@@ -444,7 +473,7 @@ export class Renderer {
       if(kind!=='zone')o.sprite.material.opacity=kind==='drop'?dropBlink(e,world.time,this.clock):e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
       const fade=labelOpacity(display, frame.darkness, frame.lighting);
       if(kind==='building'&&STRUCTURES[key].light){const lit=key==='lantern'||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
-      if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);this.syncWeaponRig(e,o,world,weapon);}
+      if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;if(rig){this.syncRigParts(e,o,rig,alive);const old=this.objects.get('held'+e.id);if(old)this.remove(old);}else{const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);}this.syncWeaponRig(e,o,world,weapon);}
       // Night-only finds (regions.mjs) glow in the dark so they can be found from afar.
       if(kind==='node'){const hue=nightGlow(e);if(hue){this.glow(o,1.1);o.glow.material.color.set(hue);o.glow.material.opacity=(.16+.42*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));}}
       if(kind==='drop'){const beacon=present?.t?null:lootBeacon(e.stack?.itemId);if(beacon)this.syncBeacon(o,beacon,e,frame,dropBlink(e,world.time,this.clock),true);else if(o.beacon)this.syncBeacon(o,null,e,null,0,false);}

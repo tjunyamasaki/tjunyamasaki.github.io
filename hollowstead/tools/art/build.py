@@ -58,9 +58,9 @@ def target(t):
 
 
 def registry():
-    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead
+    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig
     reg = {}
-    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead):
+    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig):
         for key, spec in getattr(mod, "SPRITES", getattr(mod, "NODES", {})).items():
             reg[key] = spec
     return reg
@@ -132,6 +132,10 @@ def main():
     if not a.only or "plaza" in keys:
         import camp
         camp.write_decals(SPRITES)
+    if not a.only or any("-rig" in k or "-arm" in k or k.startswith("grip-") for k in keys):
+        import rig
+        rig.rig_data()
+        print("wrote src/rig-data.mjs")
     if not a.only or "magic" in keys:
         import magic
         for k, im in magic.build_magic(ROOT).items():

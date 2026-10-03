@@ -3,7 +3,7 @@
 import {NODES, RECIPES, label} from './content.mjs?v=harvest-18';
 import {
   CAULDRON_COOK_RECIPES, CONTEXT_ACTIONS, DISMANTLE_HOLD_SECONDS, FIELD_BUILD_RECIPES,
-  FIRE_COOK_RECIPES, FIRE_STATION_TYPES, WORKBENCH_BUILD_RECIPES, WORKBENCH_CRAFT_RECIPES,
+  FIRE_COOK_RECIPES, FIRE_STATION_TYPES, GRID_FIELD_BUILD_RECIPES, GRID_WORKBENCH_BUILD_RECIPES, WORKBENCH_BUILD_RECIPES, WORKBENCH_CRAFT_RECIPES,
 } from './contracts.mjs?v=harvest-18';
 
 export function harvestProfile(nodeType){
@@ -43,7 +43,10 @@ export function stationRule(recipeId){
   };
 }
 
-export function contextRecipeIds({source, stationType, tab}){
+/** `grid`: the world builds on the grid (homestead.mjs gridWorld), so walls, floors and soil replace the free-placed ones. */
+export function contextRecipeIds({source, stationType, tab, grid=false}){
+  if(grid&&source==='field'&&tab==='build')return [...GRID_FIELD_BUILD_RECIPES];
+  if(grid&&source==='station'&&stationType==='bench'&&tab==='build')return [...GRID_WORKBENCH_BUILD_RECIPES];
   if(source==='field'&&tab==='build')return [...FIELD_BUILD_RECIPES];
   if(source==='station'&&stationType==='bench'&&tab==='craft')return [...WORKBENCH_CRAFT_RECIPES];
   if(source==='station'&&stationType==='bench'&&tab==='build')return [...WORKBENCH_BUILD_RECIPES];

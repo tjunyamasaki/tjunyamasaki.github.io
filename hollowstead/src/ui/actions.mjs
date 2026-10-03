@@ -30,6 +30,8 @@ const SPECS = Object.freeze({
   revive: {icon: '♥', label: 'Revive', activation: 'hold'},
   pickup: {icon: '↑', label: 'Pick up', activation: 'hold'},
   place: {icon: '✓', label: 'Place', activation: 'tap'},
+  rotate: {icon: '↻', label: 'Rotate', activation: 'tap'},
+  pullup: {icon: '⌫', label: 'Pull up', activation: 'tap'},
   cancel: {icon: '✕', label: 'Cancel', activation: 'tap'},
   dismantle: {icon: '⌫', label: 'Dismantle', activation: 'hold'},
   pull: {icon: '⇢', label: 'Pull', activation: 'tap'},
@@ -176,18 +178,29 @@ export function usableLantern(player) {
   };
 }
 
-export function describePlacement({valid = false, pending = false, reason = ''} = {}) {
+/** `rotates`: a grid piece that turns (homestead.mjs rotates) gets a Rotate button between Place and Cancel. */
+export function describePlacement({valid = false, pending = false, reason = '', rotates = false} = {}) {
   return [
     make('place', {
       enabled: !!valid && !pending,
       disabledReason: reason || 'Cannot place that here',
     }),
+    ...(rotates ? [make('rotate', {enabled: !pending})] : []),
     make('cancel', {enabled: !pending}),
   ];
 }
 
-export function describeMaintenance({building = null, locked = false, wood = 0, inRange = true} = {}) {
+/** `tile`: {i, j, ground} of a floor or soil cell picked with no building on it (grid worlds). */
+export function describeMaintenance({building = null, locked = false, wood = 0, inRange = true, tile = null} = {}) {
   const actions = [];
+  if (!building && tile) {
+    actions.push(make('pullup', {
+      label: tile.ground === 'soil' ? 'Fill in' : 'Pull up',
+      enabled: !!tile.inRange,
+      disabledReason: 'Move closer',
+      command: {type: 'tile', tool: 'remove', cells: [[tile.i, tile.j]]},
+    }));
+  }
   if (building && inRange) {
     if (building.hp < building.maxHp) {
       actions.push(make('repair', {
@@ -235,8 +248,13 @@ export function describeContext(facts) {
     })];
   }
   if (facts.kind === 'crop') {
-    // A ripe homestead crop in reach (homestead.mjs cropTargets).
-    return [make('harvest', {targetId: facts.id, command: {type: 'tile', tool: 'harvest', cells: [[facts.i, facts.j]]}})];
+    // Soil in reach (homestead.mjs cropTargets): a ripe crop to harvest, or empty soil to sow with a seed you carry.
+    if (facts.crop) return [make('harvest', {targetId: facts.id, command: {type: 'tile', tool: 'harvest', cells: [[facts.i, facts.j]]}})];
+    return (facts.seeds || []).slice(0, CONTEXT_SLOTS).map(seed => make('plant', {
+      targetId: facts.id,
+      label: seed.name,
+      command: {type: 'tile', tool: `plant:${seed.crop}`, cells: [[facts.i, facts.j]]},
+    }));
   }
   if (facts.kind === 'drop') return [];
   if (facts.kind === 'revive') {

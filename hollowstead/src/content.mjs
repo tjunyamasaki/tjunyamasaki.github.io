@@ -196,6 +196,20 @@ export const RECIPES = {
   gravelight:{kind:'tool',cost:{wispdust:3,ore:3,ember:2},station:'bench',desc:'A wisp-fed lantern bright enough for the Moonshard Crags.'},
   barrowcloak:{kind:'tool',cost:{bone:8,fiber:6,meat:2},station:'bench',desc:'Bone-lined warmth against the Barrow Fields’ grave-chill.'},
   cart:{kind:'build',cost:{wood:8,fiber:4,stone:2},desc:'A chest on wheels. Pull it along, open it anywhere.'},
+  // Grid pieces (homestead.mjs): built a cell at a time on the Vigil and in the Homestead, never free-placed.
+  // `grid` marks them; their cost is per cell. Floors and soil have no structure of their own.
+  till:{kind:'build',grid:true,name:'Tilled soil',cost:{},desc:'Turn a cell of earth for sowing. Plant seeds in it from the action buttons.'},
+  plank:{kind:'build',grid:true,name:'Plank floor',cost:{wood:1},desc:'Planks a cell at a time. Floors ringed by house walls make a room.'},
+  roughplank:{kind:'build',grid:true,name:'Rough planks',cost:{wood:1},desc:'Planks with a ragged outer edge.'},
+  boards:{kind:'build',grid:true,name:'Broad boards',cost:{wood:2},station:'bench',desc:'Wide, dark boards for a finer floor.'},
+  fieldstone:{kind:'build',grid:true,name:'Fieldstone path',cost:{stone:1},desc:'Loose stones whose edge follows the path.'},
+  flagstone:{kind:'build',grid:true,name:'Flagstone floor',cost:{stone:1},station:'bench',desc:'Fitted flagstones.'},
+  cobble:{kind:'build',grid:true,name:'Cobblestone',cost:{stone:2},station:'bench',desc:'Rounded cobbles set close.'},
+  slabs:{kind:'build',grid:true,name:'Stone slabs',cost:{stone:2},station:'bench',desc:'Big cut slabs.'},
+  fence:{kind:'build',grid:true,cost:{wood:1,fiber:1},desc:'A low fence. Keeps nothing out for long, but joins into lines and pens.'},
+  stonewall:{kind:'build',grid:true,cost:{stone:3},station:'bench',desc:'A low stone wall: sturdy, slow to break.'},
+  timberwall:{kind:'build',grid:true,cost:{wood:4},station:'bench',desc:'A house wall. Ring a floor with house walls and a gate to make a room, and sleep the night away in it.'},
+  masonwall:{kind:'build',grid:true,cost:{stone:5},station:'bench',desc:'The sturdiest house wall. Closes a room like timber does.'},
   satchel:{kind:'tool',cost:{fiber:8,wood:3},station:'bench',desc:'Wear it in the bag socket: six more pack slots.'},
   haversack:{kind:'tool',cost:{fiber:12,bone:6,shard:5,ember:4},station:'bench',desc:'Wear it in the bag socket: twelve more pack slots.'},
 };

@@ -1,10 +1,10 @@
-// Homestead dock (the build & farm toolbar) and its pointer painting.
-// Pick a tool, then tap or drag across the ground: every cell the finger or mouse passes is
-// worked, so a fence line or a field of soil is one stroke. The tool stays in hand until you
-// put it away (✕, Esc or a right click). With no tool out, tapping a gate opens it and tapping a
-// ripe crop harvests it.
-import {BARRIERS, CELL, CROPS, CROP_TYPES, GROUNDS, OBJECT_TYPES, TOOLS, barrierAt, cellAt, cellLine, cellReason, ripe, sizeOf, tileAt} from '../homestead.mjs?v=harvest-18';
-import {STRUCTURES, dayOf, phaseOf} from '../content.mjs?v=harvest-18';
+// Placing grid pieces (homestead.mjs) from the Build menu: the placement mode main.mjs runs when a grid
+// recipe is picked. The piece follows the cell in front of you (or under the mouse); a tap on the ground
+// pins it there, and the Place / Rotate / Cancel action buttons work it like any other placement. A drag
+// across the ground paints every cell it passes (floors, soil, fences, walls), so a fence line is one
+// stroke. Walls and floors stay in hand after placing; a camp object goes back to normal play.
+import {CELL, TOOLS, cellLine, cellReason, sizeOf, rotates} from '../homestead.mjs?v=harvest-18';
+import {dayOf, phaseOf} from '../content.mjs?v=harvest-18';
 import {bloom, toNight} from '../nightbloom.mjs?v=harvest-18';
 
 const ink = '#2b2233';
@@ -29,57 +29,20 @@ export const GLYPHS = Object.freeze({
   rotate: svg('<path d="M24 11 A9 9 0 1 0 25 20" fill="none" stroke-width="2.6"/><path d="M19 10 H25 V4" fill="none" stroke-width="2.6"/>'),
 });
 
-const FARM = ['till', ...CROP_TYPES.map(id => `plant:${id}`), 'harvest', 'remove'];
-const FLOORS = ['plank', 'boards', 'roughplank', 'flagstone', 'slabs', 'cobble', 'fieldstone', 'remove'];
-const WALLS = ['fence', 'wall', 'stonewall', 'timberwall', 'masonwall', 'gate', 'remove'];
-const CAMP = [...OBJECT_TYPES.map(id => `obj:${id}`), 'remove'];
-const TABS = [['farm', 'Farm', FARM], ['floors', 'Floors', FLOORS], ['walls', 'Walls', WALLS], ['camp', 'Camp', CAMP]];
-const ROTATES = new Set(['fence', 'wall', 'stonewall', 'timberwall', 'masonwall', 'gate']);
-const DRAGS = new Set(['till', ...FLOORS, 'fence', 'wall', 'stonewall', 'timberwall', 'masonwall', 'harvest', 'remove', ...CROP_TYPES.map(id => `plant:${id}`)]);
-const HINT = {
-  till: 'Drag to till a bed. Joined soil merges into one patch.',
-  plank: 'Drag to lay planks.', flagstone: 'Drag to lay flagstones.', slabs: 'Drag to lay big stone slabs.', boards: 'Drag to lay broad boards.', cobble: 'Drag to lay cobbles.',
-  roughplank: 'Drag to lay rough planks. Their outer edge is left ragged.', fieldstone: 'Drag to lay a fieldstone path. Its edge follows the stones.',
-  fence: 'Drag to run a fence. Pieces join their neighbours.', wall: 'Drag a palisade line.', stonewall: 'Drag a stone wall.',
-  timberwall: 'Drag a timber house wall. Ring a floor with house walls and a gate to make a room.',
-  masonwall: 'Drag a masonry house wall. Ring a floor with house walls and a gate to make a room.',
-  gate: 'Tap between two fence pieces. Tap a gate with no tool to open it.',
-  harvest: 'Drag over ripe crops.', remove: 'Drag to pull up crops, floors and walls.',
-};
-const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-const nameOf = id => id.startsWith('plant:') ? CROPS[id.slice(6)].name : TOOLS[id]?.name || id;
-const SHORT = {bench: 'Workbench', chest: 'Chest', fire: 'Campfire', pot: 'Cauldron', lantern: 'Lantern', bed: 'Bedroll', trap: 'Trap', ward: 'Ward', hushstone: 'Hush stone'};
 
-export function homesteadMarkup({tab = 'farm', tool = '', rotation = 0, options = false, settings = {}, counts = {}, icon = () => ''} = {}){
-  const [, , ids] = TABS.find(([id]) => id === tab) || TABS[0];
-  const button = id => {
-    const crop = id.startsWith('plant:') ? CROPS[id.slice(6)] : null, object = id.startsWith('obj:') ? id.slice(4) : '';
-    const glyph = crop ? icon(crop.seed) : object ? icon(object) : GLYPHS[id] || '';
-    const count = crop && !settings.free ? `<em>${counts[crop.seed] || 0}</em>` : '';
-    return `<button type="button" class="hs-tool${id === 'remove' ? ' hs-remove' : ''}" data-hs-tool="${escapeHtml(id)}" aria-pressed="${id === tool}" title="${escapeHtml(nameOf(id))}">${glyph}${count}<small>${escapeHtml(crop ? crop.name : object ? SHORT[object] || nameOf(id) : nameOf(id))}</small></button>`;
-  };
-  const rotate = ROTATES.has(tool) ? `<button type="button" class="hs-chip" data-hs-rotate aria-label="Rotate (R)">${GLYPHS.rotate}<small>Rotate <kbd>R</kbd></small></button>` : '';
-  const hint = tool ? `<p class="hs-hint"><b>${escapeHtml(nameOf(tool))}</b> ${escapeHtml(HINT[tool] || (tool.startsWith('plant:') ? 'Drag over tilled soil to sow.' : tool.startsWith('obj:') ? `Tap to place. Takes ${sizeOf(tool).w}×${sizeOf(tool).h} tile${sizeOf(tool).w * sizeOf(tool).h > 1 ? 's' : ''}; floors can run underneath.` : ''))}${ROTATES.has(tool) ? ` <span>${tool === 'gate' ? ['Faces south', 'Faces east', 'Faces north', 'Faces west'][rotation & 3] : rotation & 1 ? 'Runs north–south' : 'Runs east–west'}</span>` : ''}</p>` : '';
-  const opt = (key, label, on) => `<button type="button" class="hs-opt" data-hs-option="${key}" aria-pressed="${!!on}">${escapeHtml(label)}</button>`;
-  const panel = options ? `<div class="hs-options" role="dialog" aria-label="Homestead options">
-    ${opt('free', 'Free building', settings.free)}${opt('day', 'Hold daylight', settings.day)}
-    <div class="hs-speed" role="group" aria-label="Growth speed"><span>Growth</span>${[1, 5, 20].map(n => `<button type="button" class="hs-opt" data-hs-option="speed:${n}" aria-pressed="${settings.speed === n}">×${n}</button>`).join('')}</div>
-    ${opt('ripen', 'Ripen everything', false)}${opt('night', 'Skip to night', false)}${opt('bloom', 'Night bloom tonight', false)}${opt('raid', 'Send a raid', false)}${opt('clear', 'Clear the homestead', false)}</div>` : '';
-  return `<div class="hs-dock">${hint}<div class="hs-row">
-    <div class="hs-tabs" role="tablist">${TABS.map(([id, label]) => `<button type="button" role="tab" data-hs-tab="${id}" aria-selected="${id === tab}">${label}</button>`).join('')}</div>
-    <div class="hs-tools" role="toolbar" aria-label="${escapeHtml((TABS.find(([id]) => id === tab) || TABS[0])[1])} tools">${ids.map(button).join('')}</div>
-    <div class="hs-side">${rotate}${tool ? `<button type="button" class="hs-chip" data-hs-tool="" aria-label="Put the tool away (Esc)">✕<small>Done</small></button>` : `<button type="button" class="hs-chip" data-hs-options aria-expanded="${!!options}" aria-label="Homestead options">⚙<small>Options</small></button>`}</div>
-  </div>${panel}</div>`;
-}
+/** Icon for a grid recipe in the Build menu (camp objects use their sprites). */
+export const gridGlyph = recipeId => GLYPHS[recipeId] || '';
+
+/** Pieces a drag paints along its path; camp objects are placed one at a time. */
+const paints = toolId => TOOLS[toolId] && TOOLS[toolId].kind !== 'object';
 
 /**
- * The controller main.mjs wires to the world canvas and the dock. It owns the tool in hand, the
- * cursor cell and the paint stroke, and sends one 'tile' command per batch of new cells.
+ * The controller main.mjs drives while a grid recipe is in placement mode. It owns the tool in hand,
+ * the cursor cell and the paint stroke, and sends one 'tile' command per batch of cells.
  */
-export function createHomesteadControls({panel, getWorld, me, send, toast, icon, onChange = () => {}}){
-  const state = {tool: '', tab: 'farm', rotation: 0, hover: null, touched: null, stroke: null, queue: [], timer: 0, options: false, markup: ''};
+export function createGridControls({getWorld, me, send, toast = () => {}, onPlaced = () => {}}){
+  const state = {tool: '', stationId: null, rotation: 0, hover: null, pinned: null, stroke: null, queue: [], timer: 0};
   const world = () => getWorld();
-  const active = () => !!world()?.homestead;
 
   /** The cell a piece is anchored at (its north-west cell) when the pointer is at (x, z): a big piece centres on the pointer. */
   function anchor(x, z){
@@ -87,137 +50,127 @@ export function createHomesteadControls({panel, getWorld, me, send, toast, icon,
     return [Math.round(x / CELL - w / 2), Math.round(z / CELL - h / 2)];
   }
   function cursor(){
+    if(state.pinned) return state.pinned;
     if(state.hover) return state.hover;
-    if(state.touched) return state.touched;
     const p = me();if(!p) return null;
     const {w, h} = sizeOf(state.tool), reach = CELL * (.9 + Math.max(w, h) * .5);
     const [i, j] = anchor(p.x + (p.dx || 0) * reach, p.z + (p.dz || 0) * reach);
     return {i, j};
   }
-  /** What the renderer draws: the tool, its cursor cell and whether the cell would take it. */
-  function view(){
+  function reasonAt(c){
     const w = world(), p = me();
-    if(!state.tool || !w || !p) return null;
-    const c = cursor();
-    const why = c ? cellReason(w, p, state.tool, c.i, c.j) : 'none';
-    return {tool: state.tool, cursor: c, valid: !why || why === 'same', rotation: state.rotation};
+    if(!w || !p || !c) return 'Nothing to build on';
+    return cellReason(w, p, state.tool, c.i, c.j, {stationId: state.stationId});
   }
-  function setTool(id){
-    state.tool = id && TOOLS[id] ? (state.tool === id ? '' : id) : '';
-    state.touched = null;state.stroke = null;
-    if(state.tool && !ROTATES.has(state.tool)) state.rotation = 0;
-    if(state.tool === 'gate') state.rotation &= 3;else state.rotation &= 1;
-    state.options = false;paint(true);onChange(state.tool);
+  /** What the renderer draws and the action buttons read: the tool, its cell, whether the cell takes it. */
+  function view(){
+    if(!state.tool || !world() || !me()) return null;
+    const c = cursor(), why = reasonAt(c);
+    return {tool: state.tool, cursor: c, valid: !why, reason: why === 'same' ? 'Already built here' : why, rotation: state.rotation, rotates: rotates(state.tool)};
   }
+  function start(toolId, stationId = null){
+    state.tool = TOOLS[toolId] ? toolId : '';state.stationId = stationId;
+    state.rotation = 0;state.pinned = null;state.stroke = null;state.queue.length = 0;
+  }
+  function stop(){start('');}
   function rotate(){
-    if(!ROTATES.has(state.tool)) return false;
+    if(!rotates(state.tool)) return false;
     state.rotation = (state.rotation + 1) % (state.tool === 'gate' ? 4 : 2);
-    paint(true);return true;
+    return true;
   }
   function flush(){
     clearTimeout(state.timer);state.timer = 0;
     if(!state.queue.length || !state.tool) {state.queue.length = 0;return;}
-    const cells = state.queue.splice(0, 48), tool = state.tool;
-    void send({type: 'tile', tool, cells, rotation: state.rotation});
+    const cells = state.queue.splice(0, 48);
+    void send({type: 'tile', tool: state.tool, cells, rotation: state.rotation, stationId: state.stationId});
     if(state.queue.length) state.timer = setTimeout(flush, 45);
   }
-  /** Cells a stroke passes over. Only the first tap reports why a cell refuses; the rest of a drag stays quiet. */
-  function enqueue(cells, quiet = false){
-    const w = world(), p = me();if(!w || !p) return;
+  /** Cells a stroke passes over; cells that would refuse stay quiet. */
+  function enqueue(cells){
     for(const [i, j] of cells){
       if(state.queue.some(([a, b]) => a === i && b === j)) continue;
-      const why = cellReason(w, p, state.tool, i, j);
-      if(why === 'same' || (why && quiet)) continue;
+      if(reasonAt({i, j})) continue;
       state.queue.push([i, j]);
     }
     if(!state.timer) state.timer = setTimeout(flush, 30);
   }
+  /** The Place button: the piece goes where the cursor is. Resolves to the host's answer. */
+  async function place(){
+    const c = cursor(), why = reasonAt(c);
+    if(why){toast(why === 'same' ? 'Already built here' : why);return null;}
+    const tool = state.tool;
+    const result = await send({type: 'tile', tool, cells: [[c.i, c.j]], rotation: state.rotation, stationId: state.stationId});
+    if(result?.ok){state.pinned = null;onPlaced(tool);}
+    return result;
+  }
 
-  /** Pointer handlers for the world canvas. They return true when they used the event. */
+  /** Pointer handlers for the world canvas while placing. They return true when they used the event. */
   function down(e, point){
-    if(!active() || !state.tool || !point || e.button === 2) return false;
+    if(!state.tool || !point || e.button === 2) return false;
     const [i, j] = anchor(point.x, point.z);
-    state.stroke = {id: e.pointerId, last: [i, j]};state.touched = {i, j};
-    enqueue([[i, j]]);
+    state.stroke = {id: e.pointerId, start: [i, j], last: [i, j], painted: false};
     return true;
   }
   function move(e, point){
-    if(!active()) return false;
-    if(e.pointerType === 'mouse'){
+    if(!state.tool) return false;
+    if(e.pointerType === 'mouse' && !state.stroke){
       if(point){const [i, j] = anchor(point.x, point.z);state.hover = {i, j};}else state.hover = null;
+      return false;
     }
     if(!state.stroke || e.pointerId !== state.stroke.id || !point) return false;
     const [i, j] = anchor(point.x, point.z), [li, lj] = state.stroke.last;
     if(i === li && j === lj) return true;
-    if(DRAGS.has(state.tool)) enqueue(cellLine([li, lj], [i, j]).slice(1), true);
-    state.stroke.last = [i, j];state.touched = {i, j};
+    if(paints(state.tool)){
+      // The first step off the starting cell turns the press into a paint stroke, starting cell included.
+      enqueue(state.stroke.painted ? cellLine([li, lj], [i, j]).slice(1) : cellLine(state.stroke.start, [i, j]));
+      state.stroke.painted = true;
+    }
+    state.stroke.last = [i, j];state.pinned = {i, j};
     return true;
   }
+  /** A tap pins the piece to the cell; the end of a stroke sends what is left of it. */
   function up(e){
-    if(!state.stroke || (e && e.pointerId !== state.stroke.id)) return !!(active() && state.tool);
-    state.stroke = null;flush();return true;
+    const stroke = state.stroke;
+    if(!stroke || (e && e.pointerId !== stroke.id)) return false;
+    state.stroke = null;
+    if(stroke.painted){flush();state.pinned = null;}
+    else state.pinned = {i: stroke.start[0], j: stroke.start[1]};
+    return true;
   }
   function leave(){state.hover = null;}
-  /** No tool out: a tap on a gate opens or shuts it, on a ripe crop harvests it. */
-  function tap(point){
-    const w = world(), p = me();
-    if(!w || !p || !point || !(w.tiles || w.buildings.some(b => b.grid))) return false;
-    const [i, j] = cellAt(point.x, point.z), gate = barrierAt(w, i, j);
-    if((gate?.type === 'gate') || ripe(tileAt(w, i, j))){
-      if(cellReason(w, p, 'use', i, j)){return false;}
-      void send({type: 'tile', tool: 'use', cells: [[i, j]]});return true;
-    }
-    return false;
-  }
 
-  function option(key){
-    const w = world();if(!w?.homestead) return;
-    const h = w.homestead;
-    if(key === 'free') h.free = !h.free;
-    else if(key === 'day') h.day = !h.day;
-    else if(key.startsWith('speed:')) h.speed = Number(key.slice(6)) || 1;
-    else if(key === 'ripen'){for(const tile of Object.values(w.tiles?.cells || {})) if(tile.crop) tile.growth = 100;toast('Everything is ripe');}
-    else if(key === 'night'){h.day = false;if(phaseOf(w) !== 'night') w.time += toNight(w) + .5;toast('Night falls');}
-    else if(key === 'bloom'){h.bloom = dayOf(w);if(phaseOf(w) === 'night') bloom(w);toast(phaseOf(w) === 'night' ? 'Rare flowers open nearby' : 'Rare flowers will open tonight');}
-    else if(key === 'raid'){
-      const p = me();if(!p) return;
-      const a = Math.random() * Math.PI * 2;
-      for(const [type, k] of [['crawler', 0], ['crawler', 1], ['crawler', 2], ['brute', 3]]){
-        const b = a + (k - 1.5) * .35, e = w.spawnEnemy(type, p.x + Math.cos(b) * 11, p.z + Math.sin(b) * 11, {elite: false});
-        if(e) e.hunt = true;
-      }
-      h.day = false;state.options = false;toast('A raid is coming');
-    }
-    else if(key === 'clear'){w.buildings = w.buildings.filter(b => !b.grid);w.enemies = [];if(w.tiles){w.tiles.cells = {};w.tiles.rev++;}toast('The homestead is clear');}
-    paint(true);
-  }
-  function click(event){
-    const t = event.target.closest('[data-hs-tool],[data-hs-tab],[data-hs-rotate],[data-hs-option],[data-hs-options]');
-    if(!t) return;
-    if(t.dataset.hsTab){state.tab = t.dataset.hsTab;state.options = false;paint(true);return;}
-    if(t.hasAttribute('data-hs-rotate')){rotate();return;}
-    if(t.hasAttribute('data-hs-options')){state.options = !state.options;paint(true);return;}
-    if(t.dataset.hsOption){option(t.dataset.hsOption);return;}
-    if(t.hasAttribute('data-hs-tool')) setTool(t.dataset.hsTool);
-  }
-  function paint(force = false){
-    const w = world();
-    if(!panel || panel.hidden || !w?.homestead) return;
-    const p = me(), counts = {};
-    if(p) for(const id of CROP_TYPES){const seed = CROPS[id].seed;counts[seed] = w.available(p, seed);}
-    const html = homesteadMarkup({tab: state.tab, tool: state.tool, rotation: state.rotation, options: state.options, settings: w.homestead, counts, icon});
-    if(!force && html === state.markup) return;
-    state.markup = html;panel.innerHTML = html;
-  }
-  function show(open){
-    if(!panel) return;
-    panel.hidden = !open;
-    if(!open){state.tool = '';state.stroke = null;state.hover = null;state.touched = null;state.options = false;state.queue.length = 0;state.markup = '';panel.innerHTML = '';return;}
-    paint(true);
-  }
-  panel?.addEventListener('click', click);
-  for(const type of ['pointerdown', 'pointerup']) panel?.addEventListener(type, event => event.stopPropagation());
-  function openTab(tab){state.tab = TABS.some(([id]) => id === tab) ? tab : 'farm';state.options = false;paint(true);}
-  return {state, view, setTool, rotate, down, move, up, leave, tap, paint, show, openTab, holding: () => !!state.tool};
+  return {start, stop, rotate, place, view, down, move, up, leave, active: () => !!state.tool, tool: () => state.tool};
 }
-export {BARRIERS, GROUNDS};
+
+// ------------------------------------------------------------------ Homestead test tools (game menu)
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const SPEEDS = [1, 5, 20];
+/** Rows for the menu sheet in the Homestead sandbox: switches, then one-shot test buttons. */
+export function homesteadMenuHTML(h = {}){
+  const row = (label, cmd, text, pressed) => `<div class="menu-row"><span>${esc(label)}</span><button type="button" data-command="hs:${cmd}"${pressed == null ? '' : ` aria-pressed="${!!pressed}"`}>${esc(text)}</button></div>`;
+  return row('Free building', 'free', h.free ? 'On' : 'Off', h.free)
+    + row('Hold daylight', 'day', h.day ? 'On' : 'Off', h.day)
+    + row('Crop growth', 'speed', `×${h.speed || 1}`)
+    + `<div class="menu-row"><span>Test</span><div class="menu-tests">${[['ripen', 'Ripen crops'], ['night', 'Skip to night'], ['bloom', 'Night bloom'], ['raid', 'Send a raid'], ['clear', 'Clear all']].map(([cmd, text]) => `<button type="button" data-command="hs:${cmd}">${esc(text)}</button>`).join('')}</div></div>`;
+}
+/** Run one menu tool. Returns true when the menu should close so you can watch it happen. */
+export function homesteadOption(w, key, {me, toast = () => {}} = {}){
+  const h = w?.homestead;if(!h) return false;
+  if(key === 'free'){h.free = !h.free;toast(h.free ? 'Free building on' : 'Building costs materials');return false;}
+  if(key === 'day'){h.day = !h.day;return false;}
+  if(key === 'speed'){h.speed = SPEEDS[(SPEEDS.indexOf(h.speed || 1) + 1) % SPEEDS.length];return false;}
+  if(key === 'ripen'){for(const tile of Object.values(w.tiles?.cells || {})) if(tile.crop) tile.growth = 100;toast('Everything is ripe');return true;}
+  if(key === 'night'){h.day = false;if(phaseOf(w) !== 'night') w.time += toNight(w) + .5;toast('Night falls');return true;}
+  if(key === 'bloom'){h.bloom = dayOf(w);if(phaseOf(w) === 'night') bloom(w);toast(phaseOf(w) === 'night' ? 'Rare flowers open nearby' : 'Rare flowers will open tonight');return true;}
+  if(key === 'raid'){
+    const p = me?.();if(!p) return false;
+    const a = Math.random() * Math.PI * 2;
+    for(const [type, k] of [['crawler', 0], ['crawler', 1], ['crawler', 2], ['brute', 3]]){
+      const b = a + (k - 1.5) * .35, e = w.spawnEnemy(type, p.x + Math.cos(b) * 11, p.z + Math.sin(b) * 11, {elite: false});
+      if(e) e.hunt = true;
+    }
+    h.day = false;toast('A raid is coming');return true;
+  }
+  if(key === 'clear'){w.buildings = w.buildings.filter(b => !b.grid && !b.foot);w.enemies = [];if(w.tiles){w.tiles.cells = {};w.tiles.rev++;}toast('The homestead is clear');return true;}
+  return false;
+}

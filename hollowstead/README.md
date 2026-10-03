@@ -17,7 +17,7 @@ Pick a wanderer and a name on the left of the title screen, then a card on the r
 - **Arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
 - **Weapon lab** is the arena without rounds, for trying and balancing weapons. See [Weapon lab](#weapon-lab).
 - **Showcase** is a sandbox clearing for placing anything in the game.
-- **Homestead** (or `?homestead` in the address) is a calm clearing for building and farming on the grid: till soil, sow day and night crops, lay floors, run fences, palisades, stone walls and gates, close rooms with house walls and sleep through the night, cook blessing dishes, and test raids against your walls. Solo, free building by default, not saved. See `docs/HOMESTEAD.md`.
+- **The Vigil** builds and farms on the grid (soil, floors, walls and camp objects a cell at a time, from the Build menu, paid for in materials). **Homestead** (or `?homestead` in the address) is a calm sandbox for the same system: till soil, sow day and night crops, lay floors, run fences, palisades, stone walls and gates, close rooms with house walls and sleep through the night, cook blessing dishes, and test raids against your walls. Solo, free building by default, not saved. See `docs/HOMESTEAD.md`.
 
 The icons at the top right open the field guide, fullscreen and sound.
 

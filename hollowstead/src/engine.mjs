@@ -28,7 +28,7 @@ import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
 import {stepMobs} from './mobs.mjs?v=harvest-18';
-import {applyTiles, cropTargets, roomOfBuilding, setupHomestead, stepTiles, BARRIERS as GRID_BARRIERS} from './homestead.mjs?v=harvest-18';
+import {applyTiles, carriedSeeds, cropTargets, gridWorld, roomOfBuilding, setupHomestead, stepTiles, wildSeeds} from './homestead.mjs?v=harvest-18';
 import {stepSleep} from './sleep.mjs?v=harvest-18';
 import {BUFF, buffed, giveBuff, stepBuffs} from './buffs.mjs?v=harvest-18';
 import {stepBlooms, wildNodes} from './nightbloom.mjs?v=harvest-18';
@@ -518,6 +518,8 @@ export class World {
   }
   canBuild(p,type,x,z,stationId){
     if(!RECIPES[type]||RECIPES[type].kind!=='build')return 'Unknown structure';
+    // On the grid worlds walls, gates, the old pumpkin patch and camp objects go on the grid (homestead.mjs applyTiles).
+    if(RECIPES[type].grid||(gridWorld(this)&&type!=='cart'))return 'Build this on the grid';
     if(!Number.isFinite(x)||!Number.isFinite(z)||!this.walkable(x,z))return 'Outside the clearing';
     if(Math.hypot(x-p.x,z-p.z)>5.5)return 'Move closer to this spot';
     const radius=Math.max(.6,STRUCTURES[type].radius);
@@ -782,7 +784,8 @@ export class World {
     const e=t.entity;
     if(t.kind==='revive')return {ok:true,code:'ok'};
     if(t.kind==='drop')return {ok:false,code:'rejected'};
-    if(t.kind==='crop')return applyTiles(this,p,{tool:'harvest',cells:[[e.i,e.j]]});
+    // Soil (homestead.mjs cropTargets): harvest a ripe crop, or sow the first seed carried into empty soil.
+    if(t.kind==='crop'){if(e.crop)return applyTiles(this,p,{tool:'harvest',cells:[[e.i,e.j]]});const seed=carriedSeeds(this,p)[0];return seed?applyTiles(this,p,{tool:`plant:${seed}`,cells:[[e.i,e.j]]}):{ok:false,code:'rejected'};}
     if(t.kind==='node'){
       const started=this.setHarvestTarget(p, {mode:'auto', nodeId:e.id});
       return started.ok?started:{ok:false,code:'rejected'};
@@ -856,7 +859,8 @@ export class World {
   }
   finishDismantle(p, building){
     if(!building||building.type==='hearth'||this.chestSessions.has(building.id))return;
-    for(const [itemId, count] of Object.entries((building.grid?GRID_BARRIERS[building.type]?.cost:RECIPES[building.type]?.cost)||{}))this.give(p, itemId, Math.ceil(count*.5));
+    if(!this.homestead?.free)for(const [itemId, count] of Object.entries(RECIPES[building.type]?.cost||{}))this.give(p, itemId, Math.ceil(count*.5));
+    if(building.grid||building.foot)this.gridRev=(this.gridRev||0)+1;
     this.dropContainer(building.store, building.x, building.z);
     if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);
     this.buildings=this.buildings.filter(entry=>entry!==building);
@@ -1022,7 +1026,8 @@ export class World {
       return;
     }
     for(const id of ids)this.awardXp(this.player(id),GATHER_XP);
-    const loot=harvestLoot(this, node, work, profile.loot)||profile.loot;
+    let loot=harvestLoot(this, node, work, profile.loot)||profile.loot;
+    const seeds=wildSeeds(this, node.type);if(Object.keys(seeds).length){loot={...loot};for(const [id,n] of Object.entries(seeds))loot[id]=(loot[id]||0)+n;}
     if(profile.output==='floor'){
       const entries=Object.entries(loot);
       entries.forEach(([itemId, count], index)=>{

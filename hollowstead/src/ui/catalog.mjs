@@ -5,16 +5,18 @@
 import {RECIPES} from '../content.mjs?v=harvest-18';
 import {contextRecipeIds} from '../interactions.mjs?v=harvest-18';
 
-const BUILD_CAMP = new Set(['fire', 'bench', 'chest', 'lantern', 'bed']);
-const BUILD_DEFENSE = new Set(['wall', 'gate', 'trap', 'ward', 'hushstone']);
-const BUILD_FOOD = new Set(['farm', 'pot']);
+const BUILD_CAMP = new Set(['fire', 'bench', 'chest', 'lantern', 'bed', 'cart']);
+const BUILD_DEFENSE = new Set(['wall', 'gate', 'trap', 'ward', 'hushstone', 'fence', 'stonewall', 'timberwall', 'masonwall']);
+const BUILD_FOOD = new Set(['farm', 'pot', 'till']);
+const BUILD_FLOOR = new Set(['plank', 'roughplank', 'boards', 'fieldstone', 'flagstone', 'cobble', 'slabs']);
 
 function escape(value) {
   return String(value).replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
 }
 
-export function catalogModel({source = 'field', stationType = null, tab = 'build'} = {}) {
-  const recipeIds = contextRecipeIds({source, stationType, tab});
+/** `grid`: the world builds on the grid (homestead.mjs gridWorld): walls, floors and soil join the list. */
+export function catalogModel({source = 'field', stationType = null, tab = 'build', grid = false} = {}) {
+  const recipeIds = contextRecipeIds({source, stationType, tab, grid});
   const cooking = source === 'station' && (stationType === 'fire' || stationType === 'hearth' || stationType === 'pot');
   const bench = source === 'station' && stationType === 'bench';
   let title = 'Build';
@@ -28,7 +30,9 @@ export function catalogModel({source = 'field', stationType = null, tab = 'build
     kicker = 'WORKBENCH';
     tabs = [{id: 'craft', label: 'Craft'}, {id: 'build', label: 'Build'}];
   }
-  const categories = cooking ? [] : tab === 'build' || source === 'field'
+  const categories = cooking ? [] : grid && (tab === 'build' || source === 'field')
+    ? [{id: 'all', label: 'All'}, {id: 'camp', label: 'Camp'}, {id: 'defense', label: 'Walls'}, {id: 'floor', label: 'Floors'}, {id: 'food', label: 'Farm'}]
+    : tab === 'build' || source === 'field'
     ? [{id: 'all', label: 'All'}, {id: 'camp', label: 'Camp'}, {id: 'defense', label: 'Defense'}, {id: 'food', label: 'Food'}]
     : [{id: 'all', label: 'All'}, {id: 'tool', label: 'Equipment'}, {id: 'item', label: 'Care'}];
   return {
@@ -49,6 +53,7 @@ export function inCategory(recipeId, category, tab) {
     if (category === 'camp') return BUILD_CAMP.has(recipeId);
     if (category === 'defense') return BUILD_DEFENSE.has(recipeId);
     if (category === 'food') return BUILD_FOOD.has(recipeId);
+    if (category === 'floor') return BUILD_FLOOR.has(recipeId);
     return false;
   }
   const recipe = RECIPES[recipeId];

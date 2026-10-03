@@ -9,37 +9,49 @@
 // Neighbouring pieces join: barriers draw rails to the barriers beside them, floors and soil merge
 // their borders (see homestead-render.mjs). Nothing here knows how anything looks.
 //
-// Every change goes through one command, {type:'tile', tool, cells:[[i,j],...], rotation}, so a
+// Every change goes through one command, {type:'tile', tool, cells:[[i,j],...], rotation, stationId}, so a
 // drag that paints twenty fence posts is a single request and guests can use it like the host.
+//
+// Where it runs: the Vigil and the Homestead sandbox (gridWorld). There the Build menu offers the grid
+// pieces (contracts.mjs GRID_*_BUILD_RECIPES) and every piece costs what its RECIPES entry says, per
+// cell; the Homestead can switch that off (world.homestead.free). Ordinary expeditions keep the old
+// free-placed walls and pumpkin patches.
 import {ITEMS, RECIPES, RULES, STRUCTURES, NODES} from './content.mjs?v=harvest-18';
+import {stationLabel} from './interactions.mjs?v=harvest-18';
 import {hushReason} from './hush.mjs?v=harvest-18';
 
 export const CELL = 1.5;
 export const MAX_CELLS = 48;
 /** How far from the wanderer a cell may be worked outside the Homestead sandbox. */
 export const WORK_RANGE = 6;
+/** Most buildings a world keeps (saves refuse more than 500: serialization.mjs). */
+export const BUILDING_LIMIT = 450;
 
+/** True where building and farming happen on the grid: the Vigil and the Homestead, never underground. */
+export const gridWorld = world => !!world && !world.dungeon && !world.arena && (!!world.homestead || world.mode === 'vigil');
+
+/** Ground kinds. `recipe`: the RECIPES entry that lays it (its cost is per cell). */
 export const GROUNDS = Object.freeze({
-  soil: {name: 'Tilled soil', cost: {}},
-  plank: {name: 'Plank floor', cost: {wood: 1}},
-  flagstone: {name: 'Flagstone floor', cost: {stone: 1}},
-  boards: {name: 'Broad boards', cost: {wood: 1}},
-  roughplank: {name: 'Rough planks', cost: {wood: 1}},
-  slabs: {name: 'Stone slabs', cost: {stone: 1}},
-  cobble: {name: 'Cobblestone', cost: {stone: 1}},
-  fieldstone: {name: 'Fieldstone path', cost: {stone: 1}},
+  soil: {name: 'Tilled soil', recipe: 'till'},
+  plank: {name: 'Plank floor', recipe: 'plank'},
+  flagstone: {name: 'Flagstone floor', recipe: 'flagstone'},
+  boards: {name: 'Broad boards', recipe: 'boards'},
+  roughplank: {name: 'Rough planks', recipe: 'roughplank'},
+  slabs: {name: 'Stone slabs', recipe: 'slabs'},
+  cobble: {name: 'Cobblestone', recipe: 'cobble'},
+  fieldstone: {name: 'Fieldstone path', recipe: 'fieldstone'},
 });
 
-/** Building types placed on the grid. `wall` and `gate` keep their old ids, so creatures still go for them. */
+/** Building types placed on the grid (costs: RECIPES by the same id). `wall` and `gate` keep their old ids. */
 export const BARRIERS = Object.freeze({
   // Radii keep the gap between two neighbours narrower than a wanderer (body .33).
-  fence: {name: 'Fence', cost: {wood: 1}, radius: .62},
-  wall: {name: 'Palisade', cost: {wood: 2}, radius: .66},
-  stonewall: {name: 'Stone wall', cost: {stone: 2}, radius: .68},
-  gate: {name: 'Gate', cost: {wood: 3}, radius: .62, gate: true},
+  fence: {name: 'Fence', radius: .62},
+  wall: {name: 'Palisade', radius: .66},
+  stonewall: {name: 'Stone wall', radius: .68},
+  gate: {name: 'Gate', radius: .62, gate: true},
   // House walls: tall and solid; with a gate for a door they close a room (roomAt).
-  timberwall: {name: 'Timber wall', cost: {wood: 3}, radius: .7, room: true},
-  masonwall: {name: 'Masonry wall', cost: {stone: 3}, radius: .72, room: true},
+  timberwall: {name: 'Timber wall', radius: .7, room: true},
+  masonwall: {name: 'Masonry wall', radius: .72, room: true},
 });
 export const BARRIER_TYPES = Object.freeze(Object.keys(BARRIERS));
 /** What closes a room: the house walls, and gates as its doors. Fences, palisades and low walls do not. */
@@ -93,7 +105,7 @@ export const CROP_TYPES = Object.freeze(Object.keys(CROPS));
 export const STAGES = Object.freeze([0, 25, 60, 100]);
 export const NIGHT_RATE = .35;
 
-/** Every tool the dock offers, by id. */
+/** Every grid tool, by id. The Build menu reaches them through their recipes (toolOfRecipe). */
 export const TOOLS = Object.freeze({
   till: {kind: 'ground', ground: 'soil', name: 'Till soil'},
   plank: {kind: 'ground', ground: 'plank', name: 'Plank floor'},
@@ -115,6 +127,24 @@ export const TOOLS = Object.freeze({
   remove: {kind: 'remove', name: 'Remove'},
   use: {kind: 'use', name: 'Use'},
 });
+
+/** The grid tool a Build-menu recipe places, or null for a piece that is still free-placed (the cart). */
+export function toolOfRecipe(recipeId){
+  if(!RECIPES[recipeId] || RECIPES[recipeId].kind !== 'build') return null;
+  if(recipeId === 'till') return 'till';
+  if(TOOLS[recipeId] && (TOOLS[recipeId].kind === 'ground' || TOOLS[recipeId].kind === 'barrier')) return recipeId;
+  return OBJECTS[recipeId] ? `obj:${recipeId}` : null;
+}
+/** The RECIPES entry behind a tool: what it costs and where it may be built. */
+export function recipeOfTool(toolId){
+  const tool = TOOLS[toolId];
+  if(!tool) return null;
+  if(tool.kind === 'ground') return GROUNDS[tool.ground].recipe;
+  if(tool.kind === 'barrier' || tool.kind === 'object') return tool.type;
+  return null;
+}
+/** Pieces that turn with R or the Rotate button. */
+export const rotates = toolId => TOOLS[toolId]?.kind === 'barrier';
 
 export const keyOf = (i, j) => `${i},${j}`;
 export const cellAt = (x, z) => [Math.floor(x / CELL), Math.floor(z / CELL)];
@@ -208,7 +238,12 @@ export function stepTiles(world, dt, phase){
 }
 
 const free = world => !!world.homestead?.free;
-const costOf = tool => tool.kind === 'ground' ? GROUNDS[tool.ground].cost : tool.kind === 'barrier' ? BARRIERS[tool.type].cost : tool.kind === 'object' ? RECIPES[tool.type]?.cost || {} : tool.kind === 'plant' ? {[CROPS[tool.crop].seed]: 1} : {};
+function costOf(toolId){
+  const tool = TOOLS[toolId];
+  if(tool?.kind === 'plant') return {[CROPS[tool.crop].seed]: 1};
+  return RECIPES[recipeOfTool(toolId)]?.cost || {};
+}
+const recipeCost = recipeId => RECIPES[recipeId]?.cost || {};
 
 function blockedByThings(world, x, z, radius){
   if(world.buildings.some(b => !b.grid && !b.foot && b.hp > 0 && Math.hypot(b.x - x, b.z - z) < Math.max(.3, b.radius ?? STRUCTURES[b.type]?.radius ?? 0) + radius)) return 'Something is built here';
@@ -220,9 +255,10 @@ function blockedByThings(world, x, z, radius){
  * Why `tool` cannot be used on cell (i, j) right now: '' when it can, 'same' when it would
  * change nothing (painting over your own work stays quiet), otherwise a sentence for a toast.
  */
-export function cellReason(world, p, toolId, i, j){
+export function cellReason(world, p, toolId, i, j, {stationId = null} = {}){
   const tool = TOOLS[toolId];
   if(!tool) return 'Unknown tool';
+  if(!gridWorld(world)) return 'Build here with the Build menu';
   if(!Number.isInteger(i) || !Number.isInteger(j)) return 'Outside the clearing';
   const {x, z} = centerOf(i, j);
   if(!world.walkable(x, z)) return 'Outside the clearing';
@@ -242,6 +278,7 @@ export function cellReason(world, p, toolId, i, j){
     if(world.players.some(q => q.online && !q.ghost && Math.abs(q.x - fx) < w * CELL / 2 + .2 && Math.abs(q.z - fz) < h * CELL / 2 + .2)) return 'A wanderer is standing here';
     const why = blockedByThings(world, fx, fz, Math.min(w, h) * CELL * .45);if(why) return why;
     if(tool.type === 'hushstone' && hushReason(world)) return hushReason(world);
+    if(world.buildings.length >= BUILDING_LIMIT) return 'The camp has reached its structure limit';
   }else if(object && ['barrier', 'plant', 'harvest'].includes(tool.kind) || object && tool.ground === 'soil'){
     // Floors may run under furniture; soil, crops and walls may not.
     return tool.kind === 'harvest' ? 'same' : 'Something is built here';
@@ -254,7 +291,7 @@ export function cellReason(world, p, toolId, i, j){
     // Painting one barrier over another swaps it (a gate dropped into a fence line, a fence rebuilt in stone).
     if(barrier?.type === tool.type) return 'same';
     if(tile?.crop) return 'A crop is growing here';
-    if(world.buildings.filter(b => b.grid).length >= 600) return 'The homestead has reached its limit';
+    if(!barrier && world.buildings.length >= BUILDING_LIMIT) return 'The camp has reached its structure limit';
     const radius = BARRIERS[tool.type].radius;
     if(!barrier && world.players.some(q => q.online && !q.ghost && Math.hypot(q.x - x, q.z - z) < radius + .3)) return 'A wanderer is standing here';
     const why = blockedByThings(world, x, z, radius);if(why) return why;
@@ -278,8 +315,13 @@ export function cellReason(world, p, toolId, i, j){
     if(ripe(tile)) return '';
     return 'same';
   }
-  if(!free(world) && !world.canPay(p, costOf(tool), true)){
-    const [itemId] = Object.entries(costOf(tool)).find(([id, n]) => world.available(p, id, true) < n) || [];
+  if(free(world)) return '';
+  // Workbench pieces: built from a catalog opened at a workbench, like the free-placed ones (World.stationBuilding).
+  const recipeId = recipeOfTool(toolId);
+  if(RECIPES[recipeId]?.station && !world.stationBuilding(p, recipeId, stationId, true)) return stationLabel(recipeId) || 'Build this at a workbench';
+  const cost = costOf(toolId);
+  if(!world.canPay(p, cost, true)){
+    const [itemId] = Object.entries(cost).find(([id, n]) => world.available(p, id, true) < n) || [];
     return itemId ? `Needs ${ITEMS[itemId]?.name?.toLowerCase() || itemId}` : 'Gather the missing materials';
   }
   return '';
@@ -317,7 +359,7 @@ function refund(world, p, cost){
 function applyCell(world, p, toolId, i, j, rotation){
   const tool = TOOLS[toolId], tiles = tilesOf(world), key = keyOf(i, j), {x, z} = centerOf(i, j);
   const tile = tiles.cells[key] || null, barrier = barrierAt(world, i, j), object = objectAt(world, i, j);
-  if(!free(world) && !world.pay(p, costOf(tool), true)) return false;
+  if(!free(world) && !world.pay(p, costOf(toolId), true)) return false;
   if(tool.kind === 'object'){
     const {w, h} = OBJECTS[tool.type], c = objectSpot(i, j, w, h);
     const b = world.structure(tool.type, c.x, c.z);
@@ -327,12 +369,12 @@ function applyCell(world, p, toolId, i, j, rotation){
     return true;
   }
   if(tool.kind === 'ground'){
-    if(tile?.g && tile.g !== 'soil') refund(world, p, GROUNDS[tile.g].cost);
+    if(tile?.g) refund(world, p, recipeCost(GROUNDS[tile.g].recipe));
     tiles.cells[key] = {g: tool.ground, crop: null, growth: 0};
     tiles.rev++;
     world.event('tile', x, z, '', {tool: toolId});
   }else if(tool.kind === 'barrier'){
-    if(barrier){refund(world, p, BARRIERS[barrier.type]?.cost || {});world.buildings = world.buildings.filter(b => b !== barrier);}
+    if(barrier){refund(world, p, recipeCost(barrier.type));world.buildings = world.buildings.filter(b => b !== barrier);}
     world.gridRev = (world.gridRev || 0) + 1;
     const b = world.structure(tool.type, x, z);
     Object.assign(b, {grid: true, i, j, radius: BARRIERS[tool.type].radius, rotation: orient(world, tool.type, i, j, rotation | 0), open: false});
@@ -349,7 +391,7 @@ function applyCell(world, p, toolId, i, j, rotation){
   }else if(tool.kind === 'remove'){
     if(barrier || object){
       const gone = barrier || object;
-      refund(world, p, (barrier ? BARRIERS[gone.type]?.cost : RECIPES[gone.type]?.cost) || {});
+      refund(world, p, recipeCost(gone.type));
       world.dropContainer?.(gone.store, gone.x, gone.z);
       if(gone.overflow) world.dropContainer?.(gone.overflow, gone.x, gone.z);
       world.buildings = world.buildings.filter(b => b !== gone);world.gridRev = (world.gridRev || 0) + 1;
@@ -358,7 +400,7 @@ function applyCell(world, p, toolId, i, j, rotation){
       else if(ripe(tile)) harvestTile(world, p, tile, i, j);
       tile.crop = null;tile.growth = 0;
     }else if(tile){
-      refund(world, p, GROUNDS[tile.g].cost);
+      refund(world, p, recipeCost(GROUNDS[tile.g].recipe));
       delete tiles.cells[key];tiles.rev++;
     }
     world.event('tile', x, z, '', {tool: 'remove'});
@@ -378,7 +420,7 @@ export function applyTiles(world, p, cmd){
     const i = Array.isArray(cell) ? cell[0] : NaN, j = Array.isArray(cell) ? cell[1] : NaN;
     if(!Number.isInteger(i) || !Number.isInteger(j) || seen.has(keyOf(i, j))) continue;
     seen.add(keyOf(i, j));
-    const why = cellReason(world, p, toolId, i, j);
+    const why = cellReason(world, p, toolId, i, j, {stationId: typeof cmd.stationId === 'string' ? cmd.stationId : null});
     if(why){if(why !== 'same' && !refusal) refusal = why;continue;}
     if(applyCell(world, p, toolId, i, j, rotation)) done++;
   }
@@ -429,17 +471,44 @@ export function roomOfBuilding(world, b){
   const [i, j] = cellAt(b.x, b.z);return roomAt(world, i, j);
 }
 
-/** Ripe crops a wanderer can reach, as World.target() candidates. */
+/** Seeds a wanderer carries, as crop ids, in CROPS order. */
+export function carriedSeeds(world, p){
+  return CROP_TYPES.filter(id => world.available(p, CROPS[id].seed, true) > 0);
+}
+/**
+ * Soil a wanderer can reach, as World.target() candidates: ripe crops (Harvest), and empty soil while
+ * they carry seeds (Plant). Growing crops are left alone so they never steal the target.
+ */
 export function cropTargets(world, p){
   const cells = world.tiles?.cells;
   if(!cells) return [];
   const out = [];
+  let seeds = null;
   for(const [key, tile] of Object.entries(cells)){
-    if(!ripe(tile)) continue;
+    if(tile.g !== 'soil') continue;
+    const empty = !tile.crop;
+    if(!ripe(tile) && !empty) continue;
     const [i, j] = key.split(',').map(Number), {x, z} = centerOf(i, j);
     if(Math.hypot(x - p.x, z - p.z) >= RULES.reach) continue;
-    out.push({kind: 'crop', entity: {id: `crop:${key}`, i, j, x, z, type: `crop-${tile.crop}`, crop: tile.crop}, label: `Harvest ${CROPS[tile.crop].name.toLowerCase()}`});
+    if(empty){
+      seeds ??= carriedSeeds(world, p);
+      if(!seeds.length || barrierAt(world, i, j) || objectAt(world, i, j)) continue;
+      out.push({kind: 'crop', entity: {id: `soil:${key}`, i, j, x, z, type: 'soil', crop: null}, label: 'Plant'});
+    }else out.push({kind: 'crop', entity: {id: `crop:${key}`, i, j, x, z, type: `crop-${tile.crop}`, crop: tile.crop}, label: `Harvest ${CROPS[tile.crop].name.toLowerCase()}`});
   }
+  return out;
+}
+
+/**
+ * A chance at crop seeds from wild plants on the grid worlds (World node harvest): grain from dry grass,
+ * moonroot from mooncaps, bloodapple from berry bushes. Pumpkin seeds already come with wild pumpkins
+ * and berries; the night crops' seeds from the night blooms (nightbloom.mjs).
+ */
+export const WILD_SEEDS = Object.freeze({grass: {wheatseed: .35}, mushroom: {rootseed: .35}, bush: {appleseed: .2}});
+export function wildSeeds(world, nodeType){
+  if(!gridWorld(world) || !WILD_SEEDS[nodeType]) return {};
+  const out = {};
+  for(const [itemId, chance] of Object.entries(WILD_SEEDS[nodeType])) if((world.lootRng?.() ?? Math.random()) < chance) out[itemId] = 1;
   return out;
 }
 

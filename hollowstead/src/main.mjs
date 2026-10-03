@@ -43,8 +43,8 @@ import {CHARM} from './trinkets.mjs?v=harvest-18';
 import {dungeonStatus, layoutOf} from './dungeon/run.mjs?v=harvest-18';
 import {VARIANTS, isVariant} from './dungeon/variants.mjs?v=harvest-18';
 import {floorTones} from './dungeon/art.mjs?v=harvest-18';
-import {createHomesteadControls} from './ui/homestead.mjs?v=harvest-18';
-import {CROPS, roomOfBuilding} from './homestead.mjs?v=harvest-18';
+import {createGridControls, gridGlyph, homesteadMenuHTML, homesteadOption} from './ui/homestead.mjs?v=harvest-18';
+import {CROPS, OBJECTS, barrierAt, carriedSeeds, cellAt, gridWorld, roomOfBuilding, tileAt, toolOfRecipe, WORK_RANGE} from './homestead.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -56,7 +56,7 @@ async function bounded(promise){let timer;try{return await Promise.race([promise
 
 let theme,renderer,sound,world,network=null,mode='front',localId='host',character='ember',room='',paused=false,remotePaused=false,hiddenPause=false,linkLost=false;
 let sheet=null,category='all',selected=null,placement=null,maintenance=false,maintenanceTarget=null;
-let homestead=null;
+let grid=null,maintenanceCell=null;
 let showcaseCategory='materials',showcaseTool='',showcaseListOpen=false,showcaseMobCount=1,showcaseMarkupCache='',showcaseHistoryClosing=false,fullscreenNote='';
 let lastNotice=0,lastEvent=0,lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,saveTime=0,pingTime=0,lastMode='normal';
 let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:0},dirty=true;
@@ -197,8 +197,8 @@ function currentMode(){
     down:!!p?.down,ghost:!!p?.ghost,panel:sheet,placement:!!placement,maintenance,
   });
 }
-function cancelPlacement(){placement=null;}
-function cancelMaintenance(){maintenance=false;maintenanceTarget=null;endContextHold();}
+function cancelPlacement(){placement=null;grid?.stop();}
+function cancelMaintenance(){maintenance=false;maintenanceTarget=null;maintenanceCell=null;endContextHold();}
 function clearSelection(){selection=null;pendingOp=null;qtyMode='all';chosenQty=1;}
 function refresh(){dirty=true;ui();}
 function discardPanel(){inventoryPanel?.destroy();inventoryPanel=null;}
@@ -219,13 +219,13 @@ function enterGame(){
   else if(world?.dungeon){connectionText=mode==='solo'?'Dungeon run':connectionText||'Connected to camp';saveText='Dungeon runs are not saved';showStatus('');}
   else if(mode==='solo'){connectionText='Expedition saved locally';saveText='Saved on this browser';showStatus('Expedition saved locally');}
   else{connectionText=connectionText||'Connected to camp';saveText=mode==='guest'?'Kept by the host':'Saved on this browser';}
-  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase&&!world?.homestead);homestead?.show(!!world?.homestead);announce(world?.homestead?'The homestead. Pick a tool below, then tap or drag across the ground.':world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':world?.mode==='vigil'?(dayOf(world)===1&&world.time<5?'The Vigil begins. One fire, one save, as long as you can keep it.':'The vigil goes on. The fire remembers you.'):dayOf(world)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
+  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase&&!world?.homestead);announce(world?.homestead?'The homestead. Open Build (B) for soil, floors and walls; drag across the ground to lay a line. Free building and test tools are in the menu.':world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':world?.mode==='vigil'?(dayOf(world)===1&&world.time<5?'The Vigil begins. One fire, one save, as long as you can keep it.':'The vigil goes on. The fire remembers you.'):dayOf(world)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
   document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);document.body.classList.toggle('dungeon',!!world?.dungeon);document.body.classList.toggle('homestead',!!world?.homestead);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
   showLab(!!world?.arena?.lab);
 }
 async function goHome(){
   leaveArena();
-  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);homestead?.show(false);document.body.classList.remove('homestead');$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;showFrontPanel('home-panel');$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();syncVigilHint();demoWorld();
+  save();endContextHold();resetInput();inventoryPanel?.cancelDrag();await network?.stop();network=null;mode='front';room='';paused=false;remotePaused=false;linkLost=false;showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();closeSheet();showShowcase(false);grid?.stop();document.body.classList.remove('homestead');$('game').hidden=true;$('end-screen').hidden=true;$('front').hidden=false;showFrontPanel('home-panel');$('connection-banner').hidden=true;document.body.classList.remove('playing','boss');setBusy(false);showStatus('');syncSaveOption();syncVigilHint();demoWorld();
   void checkForUpdate();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
@@ -429,7 +429,7 @@ function contextFacts(p){
     const lock=world.chestSessions.get(entity.id);
     return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{})};
   }
-  if(target.kind==='crop')return {...base,i:entity.i,j:entity.j,crop:entity.crop};
+  if(target.kind==='crop')return {...base,i:entity.i,j:entity.j,crop:entity.crop,seeds:entity.crop?[]:carriedSeeds(world,p).map(id=>({crop:id,name:CROPS[id].name}))};
   if(target.kind==='node'){const node=NODES[entity.type];return {...base,required:!!node?.required,toolReady:!(node?.tool)||world.hasTool(p,node.tool),toolLabel:node?.tool?label(node.tool).toLowerCase():''};}
   return base;
 }
@@ -459,12 +459,13 @@ async function refineSlot(slot){
   refining.pending=-1;if(result?.ok&&refining.itemId===itemId){refining.fresh=slot;setTimeout(()=>{if(refining.fresh===slot){refining.fresh=-1;dirty=true;}},1600);}dirty=true;renderSheet();
 }
 function toggleInventory(){if(sheet==='inventory'||sheet==='chest')closeSheet();else openSheet('inventory');}
-function toggleFieldBuild(){if(world?.homestead&&homestead){if(sheet)closeSheet();homestead.openTab('camp');return;}if(sheet==='catalog'&&catalog.source==='field')closeSheet();else openFieldBuild();}
+function toggleFieldBuild(){if(sheet==='catalog'&&catalog.source==='field')closeSheet();else openFieldBuild();}
 async function runAction(action){
   if(!action)return;
   if(!action.enabled){if(action.disabledReason)toast(action.disabledReason);return;}
   if(action.id==='cancel'){if(placement)cancelPlacement();else cancelMaintenance();dirty=true;return;}
   if(action.id==='place'){await confirmPlace();return;}
+  if(action.id==='rotate'){grid?.rotate();dirty=true;return;}
   if(action.id==='open'){await openChest(action.targetId);return;}
   if(action.panel){const result=await send(action.command);if(result?.ok){if(action.panel.sheet==='refine')openRefine(action.panel.stationId);else openStationCatalog(action.panel);}return;}
   if(action.command)await send(action.command);
@@ -474,6 +475,8 @@ async function confirmPlace(){
   if(!placement||placement.pending)return;
   if(!placement.valid){toast(placement.reason||'Cannot place that here');return;}
   const pending=placement;pending.pending=true;refresh();
+  // A grid piece (homestead.mjs): walls and floors stay in hand for the next cell; a camp object is done.
+  if(pending.grid){const result=await grid.place();if(placement!==pending)return;pending.pending=false;if(result?.ok&&pending.tool.startsWith('obj:'))cancelPlacement();refresh();return;}
   const result=await send({type:'placeBuilding',recipeId:pending.key,x:pending.x,z:pending.z,rotation:pending.rotation||0,stationId:pending.stationId??null});
   if(placement!==pending)return;pending.pending=false;if(result?.ok)placement=null;refresh();
 }
@@ -482,6 +485,8 @@ function placeRecipe(key){
   if(chestSession||chestOpening)releaseChestUI();
   if(sheet==='menu'&&mode==='solo')paused=false;
   sheet=null;$('sheet').hidden=true;clearSelection();cancelMaintenance();endContextHold();
+  const stationId=catalog.source==='station'?catalog.stationId:null,tool=gridWorld(world)?toolOfRecipe(key):null;
+  if(tool){grid.start(tool,stationId);placement={key,grid:true,tool,valid:false,pending:false,reason:'',stationId};selected=null;refresh();return;}
   placement={key,x:Math.round((p.x+p.dx*3)*2)/2,z:Math.round((p.z+p.dz*3)*2)/2,rotation:0,valid:false,anchored:false,pending:false,reason:'',stationId:catalog.source==='station'?catalog.stationId:null};
   selected=null;refresh();
 }
@@ -691,8 +696,9 @@ async function toggleFullscreen(){
 }
 function menuHTML(){
   const camp=room?`Camp ${escapeHtml(room)}`:world?.dungeon?'Dungeon run':world?.arena?.lab?'Weapon lab':world?.arena?'Battle arena':world?.homestead?'Homestead':world?.showcase?'Showcase':'Solo expedition';
+  const tests=world?.homestead?homesteadMenuHTML(world.homestead):'';
   const auto=world?.arena||world?.dungeon?`<div class="menu-row"><span>Auto-attack</span><button type="button" data-command="auto" aria-pressed="${autoAttack}">${autoAttack?'On':'Off'}</button></div>`:'';
-  return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div>${auto}<div class="menu-row"><span>Fullscreen</span><button type="button" data-command="fullscreen">${isFullscreen()?'Exit fullscreen':'Fullscreen'}</button></div>${fullscreenNote?`<p class="muted small">${escapeHtml(fullscreenNote)}</p>`:''}<div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'&&!world?.arena&&!world?.dungeon&&!world?.showcase?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">${world?.arena?'Leave the arena':world?.dungeon?'Leave the dungeon':'Save & return to title'}</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
+  return `<div class="menu-row"><span>Camp</span><b>${camp}</b></div><div class="menu-row"><span>Connection</span><b>${escapeHtml(connectionText||'On this device')}</b></div><div class="menu-row"><span>Save</span><b>${escapeHtml(saveText||(mode==='guest'?'Kept by the host':'Not saved yet'))}</b></div><div class="menu-row"><span>Sound</span><button type="button" data-command="sound">${sound.enabled?'On':'Off'}</button></div>${auto}${tests}<div class="menu-row"><span>Fullscreen</span><button type="button" data-command="fullscreen">${isFullscreen()?'Exit fullscreen':'Fullscreen'}</button></div>${fullscreenNote?`<p class="muted small">${escapeHtml(fullscreenNote)}</p>`:''}<div class="menu-row"><span>Camera distance</span><div><button type="button" data-command="zoom-out" aria-label="Zoom out">−</button><button type="button" data-command="zoom-in" aria-label="Zoom in">+</button></div></div><div class="menu-actions"><button type="button" class="primary" data-command="resume">Back to the woods</button>${room?'<button type="button" data-command="invite">Copy camp invite ↗</button>':''}${mode!=='guest'&&!world?.arena&&!world?.dungeon&&!world?.showcase?'<button type="button" data-command="save">Save expedition</button>':''}<button type="button" data-command="guide">Read the field guide</button><button type="button" data-command="home">${world?.arena?'Leave the arena':world?.dungeon?'Leave the dungeon':'Save & return to title'}</button></div><p class="muted small" style="margin-top:18px">${mode==='guest'?'The host keeps the shared save. Your progress is part of their expedition.':'Progress is saved on this browser. The host must keep this tab open for friends to play.'}</p>`;
 }
 function replaceContent(html){
   const content=$('sheet-content');
@@ -725,7 +731,7 @@ function renderSheet(){
     drawMap($('full-map'),true);
   }else if(!p)return;
   else if(sheet==='catalog'){
-    const model=catalogModel(catalog);
+    const onGrid=gridWorld(world),free=!!world.homestead?.free,model=catalogModel({...catalog,grid:onGrid});
     title=model.title;kicker=model.kicker;
     const tab=catalog.source==='field'||catalog.tab==='build'?'build':'craft';
     const ids=model.recipeIds.filter(id=>inCategory(id,category,tab));
@@ -733,7 +739,8 @@ function renderSheet(){
     setTabs(tabs);
     const recipes=ids.map(id=>{
       const recipe=RECIPES[id],resultId=recipe.result||id;
-      return {id,name:label(resultId),desc:recipe.desc,icon:icon(resultId),action:model.action,reason:world.recipeReason(p,id,catalog.stationId)||'',costs:Object.entries(recipe.cost).map(([itemId,need])=>{const have=world.available(p,itemId,recipe.kind==='build');return {have,need,name:label(itemId),short:have<need,icon:icon(itemId)};})};
+      const reason=free&&recipe.kind==='build'?'':world.recipeReason(p,id,catalog.stationId)||'';
+      return {id,name:recipe.name||label(resultId),desc:recipe.desc,icon:(onGrid&&!OBJECTS[id]&&gridGlyph(id))||icon(resultId),action:model.action,reason,costs:Object.entries(recipe.cost).map(([itemId,need])=>{const have=world.available(p,itemId,recipe.kind==='build');return {have,need,name:label(itemId),short:have<need,icon:icon(itemId)};})};
     });
     catalogPick=pickRecipe(recipes,catalogPick)?.id||'';
     replaceContent(catalogMarkup({recipes,maintain:model.maintain,pendingId:catalogPending,pickId:catalogPick}));
@@ -833,12 +840,19 @@ function paintAction(el,action,modeName){
   el.setAttribute('aria-label',action.enabled?action.label:`${action.label}. ${action.disabledReason}`);
   el.innerHTML=`<span>${action.icon}</span><small>${escapeHtml(action.label)}</small>`;
 }
+/** Maintenance on the grid worlds: a floor or soil cell picked with nothing built on it can be pulled up. */
+function maintenanceTile(p){
+  if(!maintenance||maintenanceTarget||!maintenanceCell||!p)return null;
+  const {i,j}=maintenanceCell,t=tileAt(world,i,j);if(!t)return null;
+  const x=(i+.5)*1.5,z=(j+.5)*1.5;
+  return {i,j,ground:t.g,inRange:Math.hypot(x-p.x,z-p.z)<=WORK_RANGE};
+}
 function paintCluster(modeName,p){
   const building=maintenance?world.buildings.find(entry=>entry.id===maintenanceTarget&&entry.hp>0):null;
   const actions=clusterFor(modeName,{
     context:p?contextFacts(p):null,
-    placement:placement?{valid:!!placement.valid,pending:!!placement.pending,reason:placement.reason||''}:null,
-    maintenance:{building:building?{id:building.id,type:building.type,hp:building.hp,maxHp:building.maxHp}:null,locked:!!(building&&world.chestSessions.get(building.id)&&world.chestSessions.get(building.id).ownerId!==localId),wood:p?world.available(p,'wood'):0,inRange:!!(p&&building&&distance(p,building)<RULES.reach)},
+    placement:placement?{valid:!!placement.valid,pending:!!placement.pending,reason:placement.reason||'',rotates:!!(placement.grid&&grid?.view()?.rotates)}:null,
+    maintenance:{building:building?{id:building.id,type:building.type,hp:building.hp,maxHp:building.maxHp}:null,locked:!!(building&&world.chestSessions.get(building.id)&&world.chestSessions.get(building.id).ownerId!==localId),wood:p?world.available(p,'wood'):0,inRange:!!(p&&building&&distance(p,building)<RULES.reach),tile:maintenanceTile(p)},
   });
   // Dungeons: the camp's bench refines and crafts, its fire cooks; nothing is built, fed or taken apart.
   const shown=world?.dungeon?actions.filter(action=>action&&!['build','repair','feed','dismantle'].includes(action.id)):actions;
@@ -1010,14 +1024,15 @@ function ui(){
     if(placement){
       if(placement.showcase){if(!placement.anchored){placement.x=Math.round((p.x+p.dx*3)*2)/2;placement.z=Math.round((p.z+p.dz*3)*2)/2;}const why=showcasePlaceReason(world,p,placement.kind,placement.key,placement.x,placement.z);placement.valid=!why;placement.reason=why||'';}
       else if(placement.stationId&&!world.buildings.some(b=>b.id===placement.stationId&&b.hp>0)){cancelPlacement();toast('That workbench is gone');}
+      else if(placement.grid){const view=grid.view();placement.valid=!!view?.valid;placement.reason=view?.reason||'';}
       else{if(!placement.anchored){placement.x=Math.round((p.x+p.dx*3)*2)/2;placement.z=Math.round((p.z+p.dz*3)*2)/2;}const why=world.canBuild(p,placement.key,placement.x,placement.z,placement.stationId);placement.valid=!why;placement.reason=why||'';}
     }
     if(world?.showcase)paintShowcase();
-    if(world?.homestead)homestead?.paint();
     if(world?.arena?.lab)paintLab();
     if(sheet==='catalog'&&catalog.source==='station'){const station=world.buildings.find(b=>b.id===catalog.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(sheet==='refine'){const station=world.buildings.find(b=>b.id===refining.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(maintenance&&maintenanceTarget&&!world.buildings.some(b=>b.id===maintenanceTarget&&b.hp>0))maintenanceTarget=null;
+    if(maintenanceCell&&!tileAt(world,maintenanceCell.i,maintenanceCell.j))maintenanceCell=null;
     paintCluster(currentMode(),p);drawMap($('minimap'));
     if(['victory','defeat'].includes(world.status)&&lastEnd!==world.status){lastEnd=world.status;resetInput();endContextHold();cancelPlacement();cancelMaintenance();closeSheet();save();$('end-screen').hidden=false;const won=world.status==='victory';if(world.dungeon){const top=Math.max(...world.players.map(q=>q.level||1)),d=world.dungeon;$('end-kicker').textContent='THE DEEP KEEPS ITS OWN';$('end-title').textContent=`Fallen on floor ${d.depth}.`;$('end-text').textContent=`${d.stats.floors?`You went down ${d.stats.floors} ${d.stats.floors===1?'flight':'flights'} of stairs`:'The first floor held you'}, cleared ${d.stats.rooms} ${d.stats.rooms===1?'chamber':'chambers'} and opened ${d.stats.caches} ${d.stats.caches===1?'cache':'caches'}. Every floor is carved anew; the next run starts at the top.${world.best?.loot?` Best find: ${label(world.best.loot)}.`:''}`;$('end-stats').innerHTML=`<span><b>${d.depth}</b>FLOOR</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=true;$('new-expedition').hidden=mode==='guest';$('new-expedition').innerHTML='Descend again <span>→</span>';}else if(world.arena){const top=Math.max(...world.players.map(q=>q.level||1)),a=world.arena;$('end-kicker').textContent='THE ARENA FALLS SILENT';$('end-title').textContent=`Fallen on wave ${Math.max(1,a.wave)}.`;$('end-text').textContent=a.best?`You cleared ${a.best} ${a.best===1?'wave':'waves'} and reached level ${top}. Every run starts over; the swarm grows every wave.`:'The first wave took you. Keep moving, and dodge through the glowing warnings.';$('end-stats').innerHTML=`<span><b>${a.best||0}</b>WAVES</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=true;$('new-expedition').hidden=false;$('new-expedition').innerHTML='Fight again <span>→</span>';}else{$('new-expedition').innerHTML='Another expedition →';$('end-kicker').textContent=won?'THE CURSE IS BROKEN':'THE EXPEDITION ENDS';$('end-title').textContent=won?'Morning, at last.':'The last light.';$('end-text').textContent=won?'Five nights in the hollow. One fire kept alive. You made a home where nothing was meant to live.':world.buildings.some(b=>b.type==='hearth')?'The woods claimed every wanderer. A stronger camp and a friend’s helping hand can turn the next night.':'The Heartfire was destroyed. Walls, traps and a well-fed fire will help your next camp endure.';const top=Math.max(...world.players.map(q=>q.level||1));$('end-text').textContent+=world.best?.loot?` Best find: ${label(world.best.loot)}.`:'';$('end-stats').innerHTML=`<span><b>${Math.max(0,dayOf(world)-1)}</b>NIGHTS</span><span><b>${top}</b>LEVEL</span><span><b>${world.kills}</b>FOES</span>`;$('endless').hidden=!won||mode==='guest';$('new-expedition').hidden=mode==='guest';}}
   }
@@ -1110,7 +1125,7 @@ function setupControls(){
     if(button.id==='skill'){if(!allowsCombat(currentMode()))return;void send({type:'skill'},{quiet:true});return;}
     if(button.id==='dodge'){const actor=me();if(!actor||(actor.dashCharges??0)<1||(!world.arena&&actor.stamina<DASH.stamina)||actor.down||actor.ghost)return;void send({type:'dash'},{quiet:true});return;}
     if(button.id==='hotbar-potion'){void drinkPotion();return;}
-    const action=liveActions.find(entry=>entry.id===button.dataset.action);
+    const slot=CONTEXT_BUTTONS.indexOf(button.id),action=slot>=0&&liveActions[slot]?.id===button.dataset.action?liveActions[slot]:liveActions.find(entry=>entry.id===button.dataset.action);
     captured={pointerId:event.pointerId,kind:'context',mode:button.dataset.mode,id:action?.id};
     if(!action)return;
     if(!action.enabled){toast(action.disabledReason);return;}
@@ -1128,13 +1143,15 @@ function setupControls(){
   joystick.addEventListener('pointermove',e=>{if(e.pointerId===pointer)moveStick(e);});
   for(const type of ['pointerup','pointercancel','lostpointercapture'])joystick.addEventListener(type,e=>{if(pointer===e.pointerId){pointer=null;stick={x:0,z:0};$('stick').style.transform='';}});
   function moveStick(e){const r=joystick.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,z=e.clientY-r.top-r.height/2,l=Math.hypot(x,z),scale=Math.min(1,42/Math.max(1,l));$('stick').style.transform=`translate(${x*scale}px,${z*scale}px)`;stick={x:clamp(x/42,-1,1),z:clamp(z/42,-1,1)};}
-  $('world').addEventListener('pointerdown',e=>{pointerStart={x:e.clientX,y:e.clientY};if(homestead?.holding()&&['solo','host','guest'].includes(mode)&&!$('game').hidden&&homestead.down(e,renderer.worldPoint(e.clientX,e.clientY))){try{$('world').setPointerCapture(e.pointerId);}catch{}e.preventDefault();}});
-  $('world').addEventListener('pointermove',e=>{if(world?.homestead)homestead?.move(e,renderer.worldPoint(e.clientX,e.clientY));});
-  $('world').addEventListener('pointerleave',()=>homestead?.leave());
-  $('world').addEventListener('pointercancel',e=>homestead?.up(e));
-  $('world').addEventListener('contextmenu',e=>{if(homestead?.holding()){e.preventDefault();homestead.setTool('');}});
+  // Grid placement (ui/homestead.mjs): a press pins the piece to a cell, a drag paints a line of them.
+  const gridPlacing=()=>!!(placement?.grid&&grid?.active()&&currentMode()==='placement');
+  $('world').addEventListener('pointerdown',e=>{pointerStart={x:e.clientX,y:e.clientY};if(gridPlacing()&&['solo','host','guest'].includes(mode)&&!$('game').hidden&&grid.down(e,renderer.worldPoint(e.clientX,e.clientY))){try{$('world').setPointerCapture(e.pointerId);}catch{}e.preventDefault();}});
+  $('world').addEventListener('pointermove',e=>{if(gridPlacing())grid.move(e,renderer.worldPoint(e.clientX,e.clientY));});
+  $('world').addEventListener('pointerleave',()=>grid?.leave());
+  $('world').addEventListener('pointercancel',e=>grid?.up(e));
+  $('world').addEventListener('contextmenu',e=>{if(gridPlacing()){e.preventDefault();cancelPlacement();dirty=true;}});
   $('world').addEventListener('pointerup',e=>{
-    if(homestead?.holding()){homestead.up(e);return;}
+    if(gridPlacing()&&grid.up(e)){dirty=true;return;}
     if(!pointerStart||Math.hypot(e.clientX-pointerStart.x,e.clientY-pointerStart.y)>12||!['solo','host','guest'].includes(mode)||$('game').hidden)return;
     const modeName=currentMode();if(!allowsMovement(modeName)&&modeName!=='normal')return;
     const point=renderer.worldPoint(e.clientX,e.clientY);if(!point)return;
@@ -1146,9 +1163,15 @@ function setupControls(){
     }
     if(placement?.showcase){commitShowcase(Math.round(point.x*2)/2,Math.round(point.z*2)/2);return;}
     if(placement){placement.x=Math.round(point.x*2)/2;placement.z=Math.round(point.z*2)/2;placement.anchored=true;refresh();return;}
-    if(modeName==='normal'&&homestead?.tap(point))return;
     const picked=renderer.pick(e.clientX,e.clientY,world);
-    if(maintenance){maintenanceTarget=picked&&world.buildings.includes(picked)?picked.id:null;selected=maintenanceTarget;dirty=true;return;}
+    if(maintenance){
+      // Walls and floors on the grid are not sprites: pick them by the cell under the tap.
+      const [ci,cj]=cellAt(point.x,point.z),wall=gridWorld(world)?barrierAt(world,ci,cj):null;
+      const building=picked&&world.buildings.includes(picked)?picked:wall;
+      maintenanceTarget=building?building.id:null;selected=maintenanceTarget;
+      maintenanceCell=!building&&gridWorld(world)&&tileAt(world,ci,cj)?{i:ci,j:cj}:null;
+      dirty=true;return;
+    }
     if(modeName!=='normal')return;
     if(picked&&world.nodes.includes(picked)){selected=picked.id;void send({type:'setHarvestTarget',nodeId:picked.id,mode:'auto'});return;}
     if(picked&&world.drops.includes(picked)){selected=picked.id;void send({type:'move',x:picked.x,z:picked.z,target:picked.id});return;}
@@ -1179,6 +1202,7 @@ function setupControls(){
     if(cmd==='resume')closeSheet();if(cmd==='save')save(true);if(cmd==='home')void goHome();if(cmd==='invite')void copyInvite();if(cmd==='guide')openSheet('guide');
     if(cmd==='sound'){sound.enabled=!sound.enabled;sound.unlock();storeProfile();dirty=true;renderSheet();}
     if(cmd==='auto'){autoAttack=!autoAttack;storeProfile();sheetMarkup='';dirty=true;renderSheet();}
+    if(cmd.startsWith('hs:')){const close=homesteadOption(world,cmd.slice(3),{me,toast});if(close)closeSheet();else{sheetMarkup='';dirty=true;renderSheet();}}
     if(cmd==='fullscreen')void toggleFullscreen();
     if(cmd==='zoom-in')renderer.setZoom(renderer.zoom+.15);if(cmd==='zoom-out')renderer.setZoom(renderer.zoom-.15);
     if(cmd==='maintain'){closeSheet();maintenance=true;maintenanceTarget=null;selected=null;dirty=true;}
@@ -1189,8 +1213,7 @@ function setupControls(){
     if(['INPUT','TEXTAREA'].includes(event.target.tagName)||$('game').hidden||!$('end-screen').hidden)return;
     const key=event.key.toLowerCase();
     if([' ','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key))event.preventDefault();
-    if(key==='escape'&&homestead?.holding()&&!sheet){homestead.setTool('');return;}
-    if(key==='r'&&homestead?.holding()&&!event.repeat){homestead.rotate();return;}
+    if(key==='r'&&placement?.grid&&!sheet&&!event.repeat){grid?.rotate();dirty=true;return;}
     if(key==='escape'){
       const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!(selection&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement||showcaseTool==='remove',maintaining:maintenance});
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();
@@ -1273,7 +1296,7 @@ function frame(now){
   if(networkTime>.075){networkTime=0;if(mode==='guest'&&playing)network?.input(input);if(mode==='host')network?.broadcast();}
   if(saveTime>10){saveTime=0;save();}if(pingTime>3){pingTime=0;network?.ping();}
   if(uiTime>.18){uiTime=0;dirty=true;ui();}
-  const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement,demo:$('game').hidden,homestead:!$('game').hidden&&world?.homestead?homestead?.view():null});if(playing)frameFeatureHud(featureContext(me()),dt);requestAnimationFrame(frame);
+  const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement:placement?.grid?null:placement,demo:$('game').hidden,homestead:!$('game').hidden&&placement?.grid?grid?.view():null});if(playing)frameFeatureHud(featureContext(me()),dt);requestAnimationFrame(frame);
 }
 async function init(){
   if(await checkForUpdate())return;
@@ -1281,7 +1304,7 @@ async function init(){
   theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;autoAttack=prefs.autoAttack!==false;syncSoundButton();
   paintClock();demoWorld();setupControls();paintModeIcons();syncSoundButton();bindFeatureHud(featureContext(null));syncSaveOption();syncVigilHint();const params=new URLSearchParams(location.search);
   const code=params.has('showcase')||params.has('homestead')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showFrontPanel('join-panel');showStatus('A place by the fire is waiting. Choose a name and join.');}
-  homestead=createHomesteadControls({panel:$('homestead-panel'),getWorld:()=>world,me,send,toast,icon,onChange:tool=>{if(tool){cancelPlacement();cancelMaintenance();selected=null;}dirty=true;}});
+  grid=createGridControls({getWorld:()=>world,me,send,toast});
   const showcasePanel=$('showcase-panel');
   showcasePanel?.addEventListener('pointerdown',event=>event.stopPropagation());
   showcasePanel?.addEventListener('pointerup',event=>event.stopPropagation());

@@ -44,7 +44,7 @@ import {dungeonStatus, layoutOf} from './dungeon/run.mjs?v=harvest-18';
 import {VARIANTS, isVariant} from './dungeon/variants.mjs?v=harvest-18';
 import {floorTones} from './dungeon/art.mjs?v=harvest-18';
 import {createHomesteadControls} from './ui/homestead.mjs?v=harvest-18';
-import {CROPS} from './homestead.mjs?v=harvest-18';
+import {CROPS, roomOfBuilding} from './homestead.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -427,7 +427,7 @@ function contextFacts(p){
   const base={kind:target.kind,id:entity.id,type:entity.type,wood:world.available(p,'wood'),stone:world.available(p,'stone'),seeds:world.available(p,'seed')};
   if(target.kind==='building'){
     const lock=world.chestSessions.get(entity.id);
-    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{})};
+    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{})};
   }
   if(target.kind==='crop')return {...base,i:entity.i,j:entity.j,crop:entity.crop};
   if(target.kind==='node'){const node=NODES[entity.type];return {...base,required:!!node?.required,toolReady:!(node?.tool)||world.hasTool(p,node.tool),toolLabel:node?.tool?label(node.tool).toLowerCase():''};}
@@ -859,7 +859,7 @@ function paintPotion(p){
   // Pending is left out of the look on purpose: the button must not flicker or go dead while another action settles.
   const el=$('hotbar-potion'),view=potionHotbar(p,{mode:currentMode(),arena:!!world?.arena,pending:false});
   const low=p&&p.hp/maxHealth(p)<.35&&!!view.command;
-  const sig=`${view.quantity}:${!!view.command}:${low}`;
+  const sig=`${view.itemId}:${view.quantity}:${!!view.command}:${low}`;
   if(el.dataset.state===sig)return;el.dataset.state=sig;
   el.innerHTML=`${icon(view.itemId)}<b class="potion-count" aria-hidden="true">${view.quantity}</b><small>Potion</small>`;
   el.classList.toggle('is-disabled',!view.command);el.classList.toggle('is-low',low);
@@ -875,7 +875,7 @@ let potionAt=0;
 async function drinkPotion(){
   const now=performance.now();if(now-potionAt<450)return;
   const p=me(),view=potionHotbar(p,{mode:currentMode(),arena:!!world?.arena,pending:false});
-  if(!view.command){if(!world?.arena&&!p?.down&&!p?.ghost)toast(view.quantity?'You cannot drink right now':'No potions · Craft Vigor draughts at a workbench');return;}
+  if(!view.command){if(!world?.arena&&!p?.down&&!p?.ghost)toast(view.quantity?'You cannot drink right now':'No potions · Brew Vigor draughts at a cauldron');return;}
   if(actionPending)return;
   potionAt=now;
   const result=await withPending(view.command);

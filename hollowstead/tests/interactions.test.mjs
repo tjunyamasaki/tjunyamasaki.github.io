@@ -172,7 +172,7 @@ test('T17 station lists: bench tools, fueled fire, and cauldron stew',()=>{
 
   const cook=camp();
   cook.p.x=2;cook.p.z=0;
-  setPack(cook.w,cook.p,{pumpkin:4,meat:3,mushroom:4,berry:4});
+  setPack(cook.w,cook.p,{pumpkin:4,meat:3,mushroom:4,berry:4,wheat:3});
   const heart=cook.w.buildings[0];
   heart.fuel=0;
   for(const recipe of FIRE_COOK_RECIPES)assert.equal(act(cook.w,cook.p,{type:'craft',recipe,stationId:heart.id}).code,'missingFuel',recipe);
@@ -191,10 +191,10 @@ test('T17 station lists: bench tools, fueled fire, and cauldron stew',()=>{
   assert.equal(act(cook.w,cook.p,{type:'craft',recipe:'roast',stationId:pot.id}).ok,false);
   assert.equal(act(cook.w,cook.p,{type:'craft',recipe:'stew',stationId:pot.id}).ok,true);
   assert.equal(qty(cook.p.inventory,'stew'),1);
-  assert.deepEqual(CAULDRON_COOK_RECIPES,['stew']);
+  assert.deepEqual(CAULDRON_COOK_RECIPES,['stew','elixir','greaterelixir','moonbroth','tonic','tea','gloomstew','gourdsoup']);
   assert.deepEqual([...FIRE_COOK_RECIPES],contextRecipeIds({source:'station',stationType:'fire',tab:'craft'}));
   assert.deepEqual([...FIRE_COOK_RECIPES],contextRecipeIds({source:'station',stationType:'hearth',tab:'craft'}));
-  assert.deepEqual(['stew'],contextRecipeIds({source:'station',stationType:'pot',tab:'craft'}));
+  assert.deepEqual([...CAULDRON_COOK_RECIPES],contextRecipeIds({source:'station',stationType:'pot',tab:'craft'}));
 });
 
 test('T19 placement rechecks, dismantle hold, and exact ids do not retarget',()=>{

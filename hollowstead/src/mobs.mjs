@@ -37,6 +37,30 @@ export const STRUCTURE_HIT = .25, HEARTH_HIT = .175;
 /** How far a hunting creature (e.hunt, night.mjs) looks for prey. */
 export const HUNT_RANGE = 40;
 export const structureHit = b => b.type === 'hearth' ? HEARTH_HIT : STRUCTURE_HIT;
+/**
+ * Breaking what wanderers built. A creature walled out of its prey turns on the nearest wall or gate
+ * in its way and strikes it with its own attacks (wind-up and all) instead of pawing at it; one with
+ * no prey near smashes structures it passes. `wall` is how long being walled out is remembered.
+ */
+export const SIEGE = Object.freeze({wall: 2.5, reach: 2.8, roam: 6, prey: 7});
+const SPARED = new Set(['hearth', 'cart', 'trap', 'farm']);
+const radiusOf = b => b.radius || STRUCTURES[b.type]?.radius || .5;
+function siegeTarget(world, e, prey){
+  const walled = world.time - (e.walledAt ?? -99) < SIEGE.wall;
+  const free = !prey || dist(prey, e) > SIEGE.prey;
+  if(!walled && !free) return null;
+  let best = null, bd = Infinity;
+  for(const b of world.buildings){
+    if(b.hp <= 0 || SPARED.has(b.type) || !STRUCTURES[b.type] || b.open) continue;
+    const wall = BARRIER_TYPES.includes(b.type);
+    if(walled ? !wall : !(b.grid || b.foot || wall)) continue;
+    // Walled out: only a wall between the creature and its prey (or the hearth) is worth breaking.
+    if(walled && prey && dist(b, prey) > dist(e, prey) + .5) continue;
+    const d = dist(b, e) - radiusOf(b), range = walled ? SIEGE.reach : SIEGE.roam;
+    if(d < range && d < bd){bd = d; best = b;}
+  }
+  return best && {x: best.x, z: best.z, type: best.type, radius: radiusOf(best), id: best.id, structure: true};
+}
 
 /**
  * Attack patterns. `shape` is what the ground telegraph draws. Times in seconds, lengths in units.
@@ -313,7 +337,7 @@ function strikeArea(world, e, spec, amount, test){
   for(const a of [...(world.allies || []), ...(world.magicSummons || [])]){
     if(a && a.hp > 0 && Number.isFinite(a.x) && test(a.x, a.z, .35)){a.hp -= amount*(ALLIES[a.type]?.guard ?? 1); world.event('hit', a.x, a.z);}
   }
-  for(const b of world.buildings) if(b.hp > 0 && test(b.x, b.z, Math.max(.3, STRUCTURES[b.type]?.radius || .3))) b.hp -= amount*structureHit(b);
+  for(const b of world.buildings) if(b.hp > 0 && test(b.x, b.z, Math.max(.3, b.radius || STRUCTURES[b.type]?.radius || .3))){b.hp -= amount*structureHit(b); if(b.grid || b.foot) world.event('hit', b.x, b.z, '', {building: b.id});}
   return struck;
 }
 
@@ -419,7 +443,7 @@ function chooseAttack(world, e, target, d, reach){
     const spec = ATTACKS[id];
     if(d > spec.trigger+reach) continue;
     if(spec.min && d < spec.min+reach) continue;
-    if(target.type === 'hearth' && (spec.shape === 'line' || spec.shape === 'aim')) continue;
+    if((target.type === 'hearth' || target.structure) && (spec.shape === 'line' || spec.shape === 'aim')) continue;
     return id;
   }
   return null;
@@ -543,9 +567,10 @@ export function stepMobs(world, dt, obstacles){
       // `hunt`: creatures sent after wanderers in the dark (night.mjs) look much farther for prey.
       const near = preyFor(world, e, prey, e.hunt ? HUNT_RANGE : 12);
       target = near || hearth || (world.showcase ? people[0] : null);
+      if(!e.minion) target = siegeTarget(world, e, target) || target;
     }
     if(!target){e.vx = e.vz = 0; continue;}
-    const reach = target.type === 'hearth' ? 1.1 : target.type === 'cart' ? .35 : 0;
+    const reach = target.type === 'hearth' ? 1.1 : target.type === 'cart' ? .35 : target.structure ? target.radius + .15 : 0;
     const d = dist(e, target);
     e.face = target.x < e.x ? -1 : 1;
 
@@ -597,6 +622,7 @@ export function stepMobs(world, dt, obstacles){
         const route = anchor ? fieldRoute(fieldFor(world, obstacles, anchor, sig), e.x, e.z) : 'none';
         // No way in on the field: a closed palisade to claw through, or just a way round past the field's edge.
         walled = route === 'walled' && world.buildings.some(b => BARRIER_TYPES.includes(b.type) && !b.open && b.hp > 0 && dist(b, e) < 12);
+        if(walled) e.walledAt = world.time;
         if(typeof route === 'object'){dirX = route.x; dirZ = route.z;}
         else if(route === 'none' || (route === 'walled' && !walled)){
           const way = steer(world, obstacles, e, target.x, target.z, {stop: Math.min(stop, 1.2), lazy: true, radius: STRUCTURES[target.type]?.radius || 0});
@@ -655,6 +681,7 @@ export function stepMobs(world, dt, obstacles){
         e.stuck = (e.stuck || 0)+dt;
         // Walls and gates in the way get clawed when there is no way round.
         const wall = !target.homing && world.buildings.find(b => BARRIER_TYPES.includes(b.type) && !b.open && b.hp > 0 && dist(b, e) < 1.8);
+        if(wall) e.walledAt = world.time;
         if(wall && e.cooldown <= 0){wall.hp -= def.damage*(e.power || 1)*STRUCTURE_HIT; e.cooldown = def.period; world.event('hit', wall.x, wall.z); e.stuck = 0;}
         else if(e.stuck > .7){e.detour = .6; e.stuck = 0;}
       }else e.stuck = Math.max(0, (e.stuck || 0)-dt);

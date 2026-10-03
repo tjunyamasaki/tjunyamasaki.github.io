@@ -127,9 +127,9 @@ export const FIRE_STATION_TYPES = Object.freeze(['hearth', 'fire']);
 
 export const FIELD_BUILD_RECIPES = Object.freeze(['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed', 'cart']);
 export const WORKBENCH_BUILD_RECIPES = Object.freeze([...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone']);
-export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack']);
-export const FIRE_COOK_RECIPES = Object.freeze(['roast', 'roastMeat', 'roastCaps']);
-export const CAULDRON_COOK_RECIPES = Object.freeze(['stew']);
+export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack']);
+export const FIRE_COOK_RECIPES = Object.freeze(['roast', 'roastMeat', 'roastCaps', 'loaf']);
+export const CAULDRON_COOK_RECIPES = Object.freeze(['stew', 'elixir', 'greaterelixir', 'moonbroth', 'tonic', 'tea', 'gloomstew', 'gourdsoup']);
 
 export const RECIPE_CONTEXTS = Object.freeze({
   fieldBuild: Object.freeze({source: 'field', stationType: null, tab: 'build', category: 'build', label: 'Build', recipes: FIELD_BUILD_RECIPES}),
@@ -189,6 +189,10 @@ export const CONTEXT_ACTIONS = Object.freeze({
   mimic: Object.freeze(['unlock']),
   witchcauldron: Object.freeze(['sip']),
   goldpumpkin: Object.freeze(['gather']),
+  wildgloomcap: Object.freeze(['gather']),
+  wildstarlily: Object.freeze(['gather']),
+  wildmoonpetal: Object.freeze(['gather']),
+  wildghostgourd: Object.freeze(['gather']),
   drop: Object.freeze([]),
 });
 

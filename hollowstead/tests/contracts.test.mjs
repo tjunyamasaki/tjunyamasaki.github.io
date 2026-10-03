@@ -110,7 +110,7 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(MIGRATION_PREFERRED_WEAPON, 'sword');
   assert.equal(equipmentSlotFor('torch'), 'light');
   assert.equal(equipmentSlotFor('berry'), null);
-  assert.deepEqual(SUPPLY_ITEM_IDS, ['wood', 'stone', 'fiber', 'ore', 'ember', 'seed', 'berry', 'pumpkin', 'mushroom', 'meat', 'roast', 'stew', 'bandage', 'shard', 'bone', 'spore', 'elixir', 'heartstone', 'glowbloom', 'wispdust', 'ichor', 'rime', 'emberglass', 'moonroot', 'bloodapple', 'wheat', 'rootseed', 'wheatseed', 'appleseed']);
+  assert.deepEqual(SUPPLY_ITEM_IDS, ['wood', 'stone', 'fiber', 'ore', 'ember', 'seed', 'berry', 'pumpkin', 'mushroom', 'meat', 'roast', 'stew', 'bandage', 'shard', 'bone', 'spore', 'elixir', 'heartstone', 'glowbloom', 'wispdust', 'ichor', 'rime', 'emberglass', 'moonroot', 'bloodapple', 'wheat', 'rootseed', 'wheatseed', 'appleseed', 'gloomcap', 'starlily', 'moonpetal', 'ghostgourd', 'gloomspore', 'lilybulb', 'petalseed', 'gourdseed', 'moonbroth', 'loaf', 'tonic', 'tea', 'gloomstew', 'gourdsoup', 'greaterelixir']);
   assert.equal(itemDefinition('wood').stackLimit, STACK_LIMIT);
   assert.equal(itemDefinition('wood').supplyUnits, 1);
   assert.equal(itemDefinition('axe').supplyUnits, 0);
@@ -139,9 +139,9 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
 
   assert.deepEqual(FIELD_BUILD_RECIPES, ['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed', 'cart']);
   assert.deepEqual(WORKBENCH_BUILD_RECIPES, [...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone']);
-  assert.deepEqual(WORKBENCH_CRAFT_RECIPES, ['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'elixir', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack']);
-  assert.deepEqual(FIRE_COOK_RECIPES, ['roast', 'roastMeat', 'roastCaps']);
-  assert.deepEqual(CAULDRON_COOK_RECIPES, ['stew']);
+  assert.deepEqual(WORKBENCH_CRAFT_RECIPES, ['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack']);
+  assert.deepEqual(FIRE_COOK_RECIPES, ['roast', 'roastMeat', 'roastCaps', 'loaf']);
+  assert.deepEqual(CAULDRON_COOK_RECIPES, ['stew', 'elixir', 'greaterelixir', 'moonbroth', 'tonic', 'tea', 'gloomstew', 'gourdsoup']);
   assert.equal(RECIPE_CONTEXTS.fieldBuild.source, 'field');
   assert.equal(RECIPE_CONTEXTS.fieldBuild.stationType, null);
   assert.equal(RECIPE_CONTEXTS.fireCook.label, 'Cooking');

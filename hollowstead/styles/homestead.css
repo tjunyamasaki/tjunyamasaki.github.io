@@ -52,3 +52,19 @@ body.homestead .hotbar,body.homestead #attack,body.homestead #skill,body.homeste
 #front .menu-modes{grid-template-columns:1.25fr repeat(4,1fr)}
 #front .mode-homestead{grid-column:span 2;border-color:#9fd8a866;background:linear-gradient(135deg,#2f3a2fd9,#2b2532d9)}
 @media(max-width:700px) and (orientation:portrait){#front .menu-modes{grid-template-columns:repeat(2,1fr)}}
+
+/* Blessings and the room you stand in (src/ui/home.mjs), under the vitals in #feature-hud. */
+#feature-hud>.home-row{order:3}
+.home-row{display:flex;flex-wrap:wrap;gap:5px;max-width:min(360px,60vw)}
+.home-row:empty{display:none}
+.home-chip{display:flex;align-items:center;gap:5px;padding:3px 8px 3px 3px;border-radius:12px;background:#211c28dd;border:1px solid #d8bd9540;box-shadow:inset 3px 0 0 var(--buff,#d8bd95);animation:hs-in .2s ease-out}
+.home-icon,.home-glyph{width:24px;height:24px;flex:none;display:grid;place-items:center}
+.home-icon svg,.home-icon img,.home-icon .item-icon{width:24px;height:24px}
+.home-glyph{border-radius:8px;background:#edb47a;color:#2b2233;font:700 15px/1 Arial,sans-serif}
+.home-text{display:flex;flex-direction:column;line-height:1.05}
+.home-text b{font-size:11px;color:var(--cream)}
+.home-text small{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.home-chip.is-ending{animation:home-ending 1s ease-in-out infinite alternate}
+.home-room{--buff:#edb47a}
+.home-room.is-asleep .home-glyph{background:#9fb9ef}
+@keyframes home-ending{to{opacity:.55}}

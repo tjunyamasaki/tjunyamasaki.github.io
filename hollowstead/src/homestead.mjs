@@ -37,8 +37,15 @@ export const BARRIERS = Object.freeze({
   wall: {name: 'Palisade', cost: {wood: 2}, radius: .66},
   stonewall: {name: 'Stone wall', cost: {stone: 2}, radius: .68},
   gate: {name: 'Gate', cost: {wood: 3}, radius: .62, gate: true},
+  // House walls: tall and solid; with a gate for a door they close a room (roomAt).
+  timberwall: {name: 'Timber wall', cost: {wood: 3}, radius: .7, room: true},
+  masonwall: {name: 'Masonry wall', cost: {stone: 3}, radius: .72, room: true},
 });
 export const BARRIER_TYPES = Object.freeze(Object.keys(BARRIERS));
+/** What closes a room: the house walls, and gates as its doors. Fences, palisades and low walls do not. */
+export const ROOM_WALLS = Object.freeze(['timberwall', 'masonwall', 'gate']);
+/** Largest room, in cells: past this a space counts as outdoors. */
+export const ROOM_MAX = 120;
 
 /**
  * Camp objects on the grid: footprint in cells (w across, h deep) and `art`, how wide the drawing
@@ -74,6 +81,12 @@ export const CROPS = Object.freeze({
   moonroot: {name: 'Moonroot', seed: 'rootseed', grow: 60, yield: {moonroot: 2}, seeds: [1, 2], glow: '#bff3ff'},
   duskwheat: {name: 'Duskwheat', seed: 'wheatseed', grow: 80, yield: {wheat: 2, fiber: 2}, seeds: [1, 3]},
   bloodapple: {name: 'Bloodapple', seed: 'appleseed', grow: 140, yield: {bloodapple: 3}, seeds: [0, 1], regrow: 60},
+  // Night crops: grow only after dark (a little at dusk), never by day. Seeds come from wild night blooms (nightbloom.mjs).
+  gloomcap: {name: 'Gloomcap', seed: 'gloomspore', grow: 70, yield: {gloomcap: 3}, seeds: [1, 2], night: true, glow: '#c9b2ef'},
+  starlily: {name: 'Starlily', seed: 'lilybulb', grow: 90, yield: {starlily: 2}, seeds: [1, 2], night: true, glow: '#9ff0ff'},
+  // Rare: their seeds only come from the rare blooms on some common nights.
+  moonpetal: {name: 'Moonpetal', seed: 'petalseed', grow: 150, yield: {moonpetal: 2}, seeds: [0, 1], night: true, rare: true, glow: '#fff4c6'},
+  ghostgourd: {name: 'Ghostgourd', seed: 'gourdseed', grow: 160, yield: {ghostgourd: 1}, seeds: [1, 1], night: true, rare: true, glow: '#9ff0ff'},
 });
 export const CROP_TYPES = Object.freeze(Object.keys(CROPS));
 /** Growth (0..100) at which each of the four art frames starts. */
@@ -94,6 +107,8 @@ export const TOOLS = Object.freeze({
   wall: {kind: 'barrier', type: 'wall', name: 'Palisade'},
   stonewall: {kind: 'barrier', type: 'stonewall', name: 'Stone wall'},
   gate: {kind: 'barrier', type: 'gate', name: 'Gate'},
+  timberwall: {kind: 'barrier', type: 'timberwall', name: 'Timber wall'},
+  masonwall: {kind: 'barrier', type: 'masonwall', name: 'Masonry wall'},
   ...Object.fromEntries(OBJECT_TYPES.map(id => [`obj:${id}`, {kind: 'object', type: id, name: STRUCTURES[id]?.name || id}])),
   ...Object.fromEntries(CROP_TYPES.map(id => [`plant:${id}`, {kind: 'plant', crop: id, name: `Plant ${CROPS[id].name.toLowerCase()}`}])),
   harvest: {kind: 'harvest', name: 'Harvest'},
@@ -178,7 +193,7 @@ export function groundLinks(world, i, j, ground){
 export function growthRate(world, tile, phase){
   const crop = CROPS[tile.crop];
   if(!crop) return 0;
-  const light = phase === 'day' ? 1 : NIGHT_RATE;
+  const light = crop.night ? (phase === 'night' ? 1 : phase === 'dusk' ? .4 : 0) : phase === 'day' ? 1 : NIGHT_RATE;
   return 100 / crop.grow * light * (world.homestead?.speed || 1);
 }
 
@@ -318,6 +333,7 @@ function applyCell(world, p, toolId, i, j, rotation){
     world.event('tile', x, z, '', {tool: toolId});
   }else if(tool.kind === 'barrier'){
     if(barrier){refund(world, p, BARRIERS[barrier.type]?.cost || {});world.buildings = world.buildings.filter(b => b !== barrier);}
+    world.gridRev = (world.gridRev || 0) + 1;
     const b = world.structure(tool.type, x, z);
     Object.assign(b, {grid: true, i, j, radius: BARRIERS[tool.type].radius, rotation: orient(world, tool.type, i, j, rotation | 0), open: false});
     world.buildings.push(b);world.stats.built++;
@@ -336,7 +352,7 @@ function applyCell(world, p, toolId, i, j, rotation){
       refund(world, p, (barrier ? BARRIERS[gone.type]?.cost : RECIPES[gone.type]?.cost) || {});
       world.dropContainer?.(gone.store, gone.x, gone.z);
       if(gone.overflow) world.dropContainer?.(gone.overflow, gone.x, gone.z);
-      world.buildings = world.buildings.filter(b => b !== gone);
+      world.buildings = world.buildings.filter(b => b !== gone);world.gridRev = (world.gridRev || 0) + 1;
     }else if(tile?.crop){
       if(!ripe(tile) && !free(world)) world.give(p, CROPS[tile.crop].seed, 1);
       else if(ripe(tile)) harvestTile(world, p, tile, i, j);
@@ -369,6 +385,48 @@ export function applyTiles(world, p, cmd){
   if(done) world.assertItems?.();
   if(!done && refusal){world.tell(p, refusal);return {ok: false, code: 'rejected', reason: refusal};}
   return {ok: true, code: 'ok', done};
+}
+
+/**
+ * The room around cell (i, j): every cell reachable from it without crossing a room wall (ROOM_WALLS)
+ * must have a floor, and there must be at most ROOM_MAX of them. Returns {cells, size, key} or null
+ * (outdoors, or a gap somewhere in the walls). Gates count as doors whether open or shut.
+ */
+const ROOM_MEMO = new WeakMap();
+export function roomAt(world, i, j){
+  const cells = world.tiles?.cells;
+  if(!cells) return null;
+  const walls = new Set();
+  let n = 0;
+  for(const b of world.buildings) if(b.grid && b.hp > 0){n++;if(ROOM_WALLS.includes(b.type)) walls.add(keyOf(b.i, b.j));}
+  const stamp = `${world.tiles.rev}:${world.gridRev || 0}:${n}`;
+  let memo = ROOM_MEMO.get(world);
+  if(!memo || memo.stamp !== stamp){memo = {stamp, rooms: new Map()};ROOM_MEMO.set(world, memo);}
+  const start = keyOf(i, j);
+  if(memo.rooms.has(start)) return memo.rooms.get(start);
+  let room = null;
+  if(!walls.has(start) && cells[start]?.g && cells[start].g !== 'soil'){
+    const seen = new Set([start]), queue = [[i, j]];let open = false;
+    while(queue.length && !open){
+      const [a, b] = queue.pop();
+      for(const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
+        const k = keyOf(a + da, b + db);
+        if(seen.has(k) || walls.has(k)) continue;
+        const t = cells[k];
+        if(!t?.g || t.g === 'soil' || seen.size >= ROOM_MAX){open = true;break;}
+        seen.add(k);queue.push([a + da, b + db]);
+      }
+    }
+    if(!open){const list = [...seen].sort();room = {cells: list, size: list.length, key: list[0]};for(const k of list) memo.rooms.set(k, room);}
+  }
+  memo.rooms.set(start, room);
+  return room;
+}
+/** The room a building (a bed) stands in, by any of its cells. */
+export function roomOfBuilding(world, b){
+  if(!b) return null;
+  if(b.foot){for(let a = 0; a < b.foot.w; a++)for(let c = 0; c < b.foot.h; c++){const r = roomAt(world, b.foot.i + a, b.foot.j + c);if(r) return r;}return null;}
+  const [i, j] = cellAt(b.x, b.z);return roomAt(world, i, j);
 }
 
 /** Ripe crops a wanderer can reach, as World.target() candidates. */

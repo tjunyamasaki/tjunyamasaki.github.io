@@ -67,8 +67,8 @@ test('catalog contexts stay on their lists', () => {
   const built = catalogModel({source: 'station', stationType: 'bench', tab: 'build'});
   assert.deepEqual(built.recipeIds, [...WORKBENCH_BUILD_RECIPES]);
   assert.equal(built.maintain, true);
-  assert.deepEqual(catalogModel({source: 'station', stationType: 'pot', tab: 'craft'}).recipeIds, ['stew']);
-  assert.deepEqual(catalogModel({source: 'station', stationType: 'hearth', tab: 'craft'}).recipeIds, ['roast', 'roastMeat', 'roastCaps']);
+  assert.deepEqual(catalogModel({source: 'station', stationType: 'pot', tab: 'craft'}).recipeIds, ['stew', 'elixir', 'greaterelixir', 'moonbroth', 'tonic', 'tea', 'gloomstew', 'gourdsoup']);
+  assert.deepEqual(catalogModel({source: 'station', stationType: 'hearth', tab: 'craft'}).recipeIds, ['roast', 'roastMeat', 'roastCaps', 'loaf']);
   assert.equal(inCategory('wall', 'defense', 'build'), true);
   assert.equal(inCategory('pot', 'defense', 'build'), false);
   assert.equal(inCategory('axe', 'tool', 'craft'), true);

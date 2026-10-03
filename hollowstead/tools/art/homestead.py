@@ -340,6 +340,326 @@ def appleseed():
     return d, b
 
 
+# ------------------------------------------------------------------ night crops: gloomcap, starlily
+GLM = "#8f6fc4"; GLM_D = "#634a94"; GLM_L = "#c9b2ef"; GLM_S = "#e8ffd0"
+STAR = "#e6eefc"; STAR_D = "#a9bde0"; STAR_G = "#9ff0ff"
+
+
+def cap(d, x, base, h, r, tilt=0, col=GLM, dark=GLM_D, light=GLM_L, spots=True):
+    s = ""
+    stem = f"M{x - r * .2} {base} Q{x - r * .26} {base - h * .5} {x - r * .14 + tilt * .5} {base - h} L{x + r * .14 + tilt * .5} {base - h} Q{x + r * .26} {base - h * .5} {x + r * .2} {base} Z"
+    s += fill(stem, "#dfe3ea", 7) + brush((x - r * .05, base - 8), (x - r * .08, base - h * .5), (x + tilt * .4, base - h + 6), 5, "#b8bfcc")
+    cy = base - h
+    c = f"M{x - r + tilt} {cy + 8} Q{x - r + tilt} {cy - r * .95} {x + tilt} {cy - r * .95} Q{x + r + tilt} {cy - r * .95} {x + r + tilt} {cy + 8} Q{x + tilt} {cy + r * .3} {x - r + tilt} {cy + 8} Z"
+    s += shaded(d, c, col, dark, -8, -8, brush((x - r * .55 + tilt, cy - r * .3), (x - r * .3 + tilt, cy - r * .75), (x + r * .15 + tilt, cy - r * .8), 8, light), 7)
+    if spots:
+        for (dx, dy, rr) in [(-.42, -.32, .14), (.18, -.6, .12), (.5, -.22, .1)]:
+            s += f'<circle cx="{f(x + tilt + dx * r)}" cy="{f(cy + dy * r)}" r="{f(rr * r)}" fill="{GLM_S}" stroke="none"/>'
+    return s
+
+
+def gloomcap_0():
+    d = []; b = mound(56)
+    b += cap(d, 256, 738, 26, 30, spots=False)
+    return d, b
+
+
+def gloomcap_1():
+    d = []; b = mound(72)
+    b += cap(d, 226, 740, 44, 44, -6) + cap(d, 292, 742, 30, 32, 6, spots=False)
+    return d, b
+
+
+def gloomcap_2():
+    d = []; b = mound(86)
+    b += cap(d, 300, 742, 50, 52, 8) + cap(d, 206, 742, 66, 64, -8) + cap(d, 256, 744, 30, 30, 0, spots=False)
+    return d, b
+
+
+def gloomcap_3():
+    d = []; b = mound(100)
+    b += cap(d, 320, 742, 76, 70, 10) + cap(d, 196, 742, 96, 88, -10) + cap(d, 262, 746, 50, 48, 0)
+    b += sparkle(150, 540, 1.3, GLM_S) + sparkle(360, 560, 1.0, GLM_S) + sparkle(270, 600, .8, GLM_S)
+    return d, b
+
+
+def lily_leaves(n, L, spread, col=LEAF, alt=LEAF_D):
+    b = ""
+    for i in range(n):
+        t = i / max(1, n - 1) - .5
+        b += longleaf(256 + t * 30, 738, t * spread, L * (1 - abs(t) * .3), 34, col if i % 2 else alt, LEAF_L if i % 2 else None)
+    return b
+
+
+def star_flower(x, y, s, open_=1.0):
+    g = ""
+    k_ = 1 / s  # the group is scaled by s: keep the ink the same weight as everywhere else
+    for k in range(6):
+        a = k * 60 + 30
+        L = 70 * open_
+        p = f"M0 0 Q{f(30)} {f(-L * .45)} 0 {f(-L)} Q{f(-30)} {f(-L * .45)} 0 0 Z"
+        g += f'<g transform="rotate({a})">' + fill(p, STAR if k % 2 else "#f6f9ff", 6 * k_) + line(f"M0 -10 L0 {f(-L * .6)}", 3 * k_, STAR_D) + '</g>'
+    g += f'<circle cx="0" cy="0" r="16" fill="{GOLD_L}" stroke-width="{sw(6 * k_)}"/>'
+    for a in range(0, 360, 60):
+        g += f'<circle cx="{f(math.cos(math.radians(a)) * 9)}" cy="{f(math.sin(math.radians(a)) * 9)}" r="3" fill="{GOLD}" stroke="none"/>'
+    return f'<g transform="translate({f(x)} {f(y)}) scale({s:.3f} {s * .8:.3f})">{g}</g>'
+
+
+def starlily_0():
+    d = []; b = mound(56)
+    b += lily_leaves(2, 70, 40)
+    return d, b
+
+
+def starlily_1():
+    d = []; b = mound(70)
+    b += lily_leaves(4, 140, 90)
+    b += stalk((256, 738), (252, 660), (258, 600), 12)
+    b += ell(258, 588, 16, 26, STAR_D, 6)
+    return d, b
+
+
+def starlily_2():
+    d = []; b = mound(80)
+    b += lily_leaves(5, 170, 110)
+    b += stalk((256, 738), (246, 600), (262, 500), 14)
+    b += fill("M262 500 Q232 470 248 420 Q262 400 276 420 Q292 470 262 500 Z", STAR, 7) + line("M262 496 L262 430", 3, STAR_D)
+    return d, b
+
+
+def starlily_3():
+    d = []; b = mound(90)
+    b += lily_leaves(6, 190, 130)
+    b += stalk((256, 738), (240, 590), (260, 470), 15)
+    b += star_flower(260, 452, 1.15)
+    b += sparkle(150, 420, 1.2, "#ffffff") + sparkle(372, 470, .9, "#ffffff")
+    return d, b
+
+
+# ------------------------------------------------------------------ rare crops: moonpetal, ghostgourd
+SILV = "#dfe4ee"; SILV_D = "#9aa3b8"; SILV_L = "#ffffff"; PALE = "#cfe9ef"; PALE_D = "#86aeb9"; PALE_L = "#f1fcff"; GHOST_G = "#9ff0ff"
+
+
+def crescent_petal(x, y, ang, L, s=1.0):
+    p = f"M0 0 Q{f(38 * s)} {f(-L * .35)} {f(14 * s)} {f(-L)} Q{f(-2 * s)} {f(-L * .55)} {f(-26 * s)} {f(-L * .62)} Q{f(-6 * s)} {f(-L * .3)} 0 0 Z"
+    return f'<g transform="translate({f(x)} {f(y)}) rotate({f(ang)})">' + fill(p, SILV, 6) + brush((6 * s, -L * .2), (16 * s, -L * .5), (12 * s, -L * .85), 5, SILV_L) + '</g>'
+
+
+def moonpetal_0():
+    d = []; b = mound(56)
+    b += longleaf(248, 736, -20, 64, 24, "#a8b6c4") + longleaf(264, 736, 24, 56, 22, "#c3cfda")
+    return d, b
+
+
+def moonpetal_1():
+    d = []; b = mound(70)
+    for i, a in enumerate((-70, -35, 0, 35, 70)):
+        b += longleaf(256, 736, a, 120 - abs(a) * .5, 34, "#a8b6c4" if i % 2 else "#c3cfda", SILV_L if i % 2 else None)
+    return d, b
+
+
+def moonpetal_2():
+    d = []; b = mound(80)
+    for i, a in enumerate((-75, -40, 0, 40, 75)):
+        b += longleaf(256, 736, a, 140 - abs(a) * .5, 36, "#a8b6c4" if i % 2 else "#c3cfda", SILV_L if i % 2 else None)
+    b += stalk((256, 738), (250, 620), (256, 520), 12, "#9aa3b8", "#6f7a90")
+    b += fill("M256 520 Q226 488 244 440 Q256 424 270 440 Q288 488 256 520 Z", SILV, 7)
+    return d, b
+
+
+def moonpetal_3():
+    d = []; b = mound(92)
+    for i, a in enumerate((-80, -45, 0, 45, 80)):
+        b += longleaf(256, 736, a, 150 - abs(a) * .5, 38, "#a8b6c4" if i % 2 else "#c3cfda", SILV_L if i % 2 else None)
+    b += stalk((256, 738), (246, 600), (258, 480), 13, "#9aa3b8", "#6f7a90")
+    for k in range(5):
+        b += crescent_petal(258, 452, k * 72 - 10, 100, 1.1)
+    b += f'<circle cx="258" cy="452" r="22" fill="{GOLD_L}" stroke-width="{sw(6)}"/>' + f'<circle cx="252" cy="446" r="7" fill="#ffffff" stroke="none"/>'
+    b += sparkle(140, 400, 1.4, "#fff4c6") + sparkle(380, 430, 1.1, "#fff4c6") + sparkle(300, 330, .9, "#ffffff")
+    return d, b
+
+
+def gourd_body(d, x, y, s, glow=False):
+    body = (f"M{x} {y - 120 * s} C{x + 40 * s} {y - 120 * s} {x + 44 * s} {y - 70 * s} {x + 52 * s} {y - 40 * s} "
+            f"C{x + 96 * s} {y - 20 * s} {x + 104 * s} {y + 60 * s} {x + 60 * s} {y + 80 * s} C{x + 30 * s} {y + 94 * s} {x - 30 * s} {y + 94 * s} {x - 60 * s} {y + 80 * s} "
+            f"C{x - 104 * s} {y + 60 * s} {x - 96 * s} {y - 20 * s} {x - 52 * s} {y - 40 * s} C{x - 44 * s} {y - 70 * s} {x - 40 * s} {y - 120 * s} {x} {y - 120 * s} Z")
+    b = ""
+    b += shaded(d, body, PALE, PALE_D, -10 * s, -8 * s, line(f"M{x} {y - 110 * s} Q{x - 8 * s} {y} {x} {y + 86 * s} M{x - 46 * s} {y - 20 * s} Q{x - 62 * s} {y + 30 * s} {x - 38 * s} {y + 80 * s} M{x + 46 * s} {y - 20 * s} Q{x + 62 * s} {y + 30 * s} {x + 38 * s} {y + 80 * s}", 4, PALE_D))
+    b += brush((x - 64 * s, y - 10 * s), (x - 76 * s, y + 30 * s), (x - 58 * s, y + 66 * s), 9, PALE_L)
+    b += fill(f"M{x - 6 * s} {y - 116 * s} Q{x - 8 * s} {y - 146 * s} {x + 6 * s} {y - 164 * s} L{x + 20 * s} {y - 156 * s} Q{x + 8 * s} {y - 140 * s} {x + 10 * s} {y - 116 * s} Z", "#7c8a86", 5)
+    return b
+
+
+def ghostgourd_0():
+    d = []; b = mound(56)
+    b += cotyledons(256, 734, 1.0, "#9fb6b0", "#d2e6e0", 48)
+    return d, b
+
+
+def ghostgourd_1():
+    d = []; b = mound(76)
+    b += stalk((256, 734), (250, 690), (240, 650), 10, "#9fb6b0", "#6f8a84")
+    b += broadleaf(238, 656, -30, .9, "#9fb6b0", "#6f8a84") + broadleaf(262, 690, 40, .8, "#c3d8d2", "#6f8a84")
+    return d, b
+
+
+def ghostgourd_2():
+    d = []; b = mound(96)
+    b += broadleaf(176, 720, -70, 1.05, "#7f9a94", O) + broadleaf(334, 718, 66, 1.05, "#9fb6b0", "#6f8a84")
+    b += gourd_body(d, 270, 690, .45)
+    b += broadleaf(226, 668, -22, 1.1, "#9fb6b0", "#6f8a84")
+    return d, b
+
+
+def ghostgourd_3():
+    d = []; b = mound(120)
+    b += broadleaf(150, 716, -78, 1.1, "#7f9a94", O) + broadleaf(372, 716, 76, 1.05, "#9fb6b0", "#6f8a84")
+    b += gourd_body(d, 256, 660, .92, glow=True)
+    b += sparkle(352, 520, 1.2, "#e9fdff") + sparkle(160, 560, .9, "#e9fdff")
+    return d, b
+
+
+# ------------------------------------------------------------------ produce and seeds
+def gloomcap_item():
+    d = []; b = ""
+    b += cap(d, 300, 740, 90, 84, 10) + cap(d, 206, 742, 120, 104, -10)
+    return d, b
+
+
+def gloomspore():
+    d = []; b = ""
+    for (x, y, r) in [(220, 660, 30), (290, 650, 26), (256, 712, 30), (190, 716, 20), (322, 708, 22)]:
+        b += f'<circle cx="{x}" cy="{y}" r="{r}" fill="{GLM}" stroke-width="{sw(6)}"/><circle cx="{x - r * .3}" cy="{y - r * .3}" r="{r * .28}" fill="{GLM_S}" stroke="none"/>'
+    return d, b
+
+
+def starlily_item():
+    d = []; b = ""
+    b += longleaf(300, 700, 50, 120, 44, LEAF, LEAF_L) + longleaf(210, 700, -50, 110, 40, LEAF_D)
+    b += star_flower(256, 620, 2.6)
+    return d, b
+
+
+def lilybulb():
+    d = []; b = ""
+    bulb = "M256 520 Q300 560 316 620 Q330 700 256 716 Q182 700 196 620 Q212 560 256 520 Z"
+    b += shaded(d, bulb, "#efe4cf", "#cdbd9d", 8, -6, brush((222, 600), (214, 640), (226, 690), 7, "#ffffff", .8))
+    b += line("M256 520 Q252 490 262 460 M250 716 L240 744 M262 716 L274 742 M232 712 L216 736", 6, "#8c7a5c")
+    return d, b
+
+
+def moonpetal_item():
+    d = []; b = ""
+    for k in range(5):
+        b += crescent_petal(256, 610, k * 72 - 10, 130, 1.4)
+    b += f'<circle cx="256" cy="610" r="30" fill="{GOLD_L}" stroke-width="{sw(7)}"/>' + f'<circle cx="248" cy="602" r="9" fill="#ffffff" stroke="none"/>'
+    b += sparkle(360, 500, 1.2, "#fff4c6")
+    return d, b
+
+
+def petalseed():
+    d = []; b = ""
+    for (x, y, rot) in [(222, 662, -30), (292, 666, 24), (256, 716, 4)]:
+        c = "M-30 10 Q-22 -40 26 -34 Q-6 -20 -2 22 Q-16 26 -30 10 Z"
+        b += G(fill(c, SILV, 6) + brush((-14, 4), (-10, -20), (12, -28), 4, SILV_L), x, y, rot)
+    b += sparkle(320, 600, 1.0, "#fff4c6")
+    return d, b
+
+
+def ghostgourd_item():
+    d = []; b = ""
+    b += gourd_body(d, 256, 650, 1.0, glow=True)
+    return d, b
+
+
+def gourdseed():
+    d = []; b = ""
+    for (x, y, rot) in [(222, 664, -20), (290, 668, 26), (256, 716, 0)]:
+        s = "M0 -36 Q22 -20 20 10 Q16 34 0 36 Q-16 34 -20 10 Q-22 -20 0 -36 Z"
+        b += G(shaded(d, s, PALE, PALE_D, 5, -4, brush((-8, -16), (-10, 0), (-6, 18), 4, PALE_L, .9)), x, y, rot)
+    return d, b
+
+
+# ------------------------------------------------------------------ dishes and draughts
+def bowl(soup, soup_l, bits, steam=True):
+    d = []; b = ""
+    body = "M110 620 Q120 740 256 742 Q392 740 402 620 Z"
+    b += shaded(d, body, WD, WD_D, 10, -6, brush((140, 650), (170, 710), (230, 730), 7, WD_L))
+    b += ell(256, 620, 148, 34, WD_D) + ell(256, 622, 126, 22, soup, 5)
+    for (x, y, c, rx, ry) in bits:
+        b += ell(x, y, rx, ry, c, 4)
+    b += brush((190, 612), (240, 606), (290, 608), 4, soup_l)
+    if steam:
+        for x in (210, 290):
+            b += f'<path d="M{x} 560 q-16 -24 0 -48 q16 -24 0 -48" fill="none" stroke="{BONE}" stroke-width="{sw(8)}" opacity=".85"/>'
+    return d, b
+
+
+def moonbroth():
+    return bowl("#cfe3ea", "#f4fbff", [(214, 618, MOON, 18, 9), (280, 612, MOON_D, 16, 8), (312, 628, MLEAF, 12, 6), (244, 630, "#e8c26a", 9, 5)])
+
+
+def gloomstew():
+    return bowl("#6b4e8f", "#a98bd0", [(206, 616, GLM, 20, 10), (272, 610, GLM_L, 16, 8), (316, 626, MEAT_D, 14, 7), (240, 630, GLM_S, 8, 4)])
+
+
+def gourdsoup():
+    return bowl("#bfe4ea", "#ecfcff", [(210, 616, PALE_D, 16, 8), (276, 612, "#9fb6b0", 14, 7), (316, 628, MOON, 12, 6), (244, 630, "#e0813b", 9, 5)])
+
+
+MEAT_D = "#b0585a"
+
+
+def loaf():
+    d = []; b = ""
+    body = "M120 690 Q110 590 200 560 Q256 544 312 560 Q402 590 392 690 Q392 734 256 736 Q120 734 120 690 Z"
+    b += shaded(d, body, "#c98a48", "#9c6432", 10, -10, brush((150, 640), (180, 590), (240, 572), 9, "#f0c27e"))
+    for x in (190, 256, 322):
+        b += line(f"M{x - 22} {618} Q{x} {596} {x + 22} {606}", 7, "#7a4a24")
+    b += wheat_head(370, 600, 30, .7)
+    return d, b
+
+
+def bottle(liquid, liquid_l, cork=WD, big=False, star=False):
+    d = []; b = ""
+    s = 1.12 if big else 1.0
+    bot = f"M{256 - 30 * s} {440 - (40 if big else 0)} L{256 + 30 * s} {440 - (40 if big else 0)} L{256 + 30 * s} 500 Q{256 + 124 * s} 540 {256 + 124 * s} 630 Q{256 + 124 * s} 740 256 740 Q{256 - 124 * s} 740 {256 - 124 * s} 630 Q{256 - 124 * s} 540 {256 - 30 * s} 500 Z"
+    b += fill(bot, "#f3eef8", 8)
+    liq = f"M{256 - 114 * s} 610 Q256 590 {256 + 114 * s} 610 Q{256 + 120 * s} 730 256 732 Q{256 - 120 * s} 730 {256 - 114 * s} 610 Z"
+    b += fill(liq, liquid, 0, ' stroke="none"') + fill_ns(f"M{256 - 114 * s} 610 Q256 590 {256 + 114 * s} 610 Q{256 + 116 * s} 640 {256 + 104 * s} 660 Q256 630 {256 - 106 * s} 660 Q{256 - 116 * s} 640 {256 - 114 * s} 610 Z", liquid_l)
+    b += fill(bot, "none", 8) + brush((170, 560), (160, 620), (176, 690), 9, "#ffffff", .8)
+    top = 400 - (40 if big else 0)
+    b += rrect(256 - 42 * s, top, 84 * s, 48, 10, cork, 7)
+    if big:
+        b += line(f"M{256 - 30 * s} {top + 70} L{256 + 30 * s} {top + 70}", 6, GOLD) + line(f"M{256 - 30 * s} {top + 86} L{256 + 30 * s} {top + 86}", 6, GOLD)
+    if star:
+        b += sparkle(256, 668, 2.4, "#fff4c6") + sparkle(350, 520, 1.3, "#fff4c6") + sparkle(160, 500, 1.0, "#fff4c6")
+    for (x, y, r) in [(230, 660, 10), (290, 690, 7)]:
+        b += f'<circle cx="{x}" cy="{y}" r="{r}" fill="{liquid_l}" stroke="none" opacity=".9"/>'
+    return d, b
+
+
+def tonic():
+    d, b = bottle("#7a1830", "#b8344e", cork=STAKE_D)
+    return d, b + apple(330, 690, 38) + broadleaf(250, 404, 30, .55, LEAF, LEAF_D)
+
+
+def tea():
+    d = []; b = ""
+    cup = "M140 600 L372 600 Q366 720 256 728 Q146 720 140 600 Z"
+    b += shaded(d, cup, "#e6eefc", "#a9bde0", 8, -6, brush((168, 630), (180, 680), (220, 708), 7, "#ffffff"))
+    b += ell(256, 600, 116, 22, "#a9bde0") + ell(256, 602, 100, 15, "#d8c37a", 5)
+    b += fill("M372 624 Q430 620 424 664 Q418 700 362 690", "none", 12) + line("M372 624 Q430 620 424 664 Q418 700 362 690", 6, "#e6eefc")
+    b += star_flower(232, 598, .45)
+    for x in (220, 290):
+        b += f'<path d="M{x} 552 q-16 -24 0 -48 q16 -24 0 -48" fill="none" stroke="{BONE}" stroke-width="{sw(8)}" opacity=".85"/>'
+    return d, b
+
+
+def greaterelixir():
+    return bottle("#d23b4a", "#ff8a7e", cork=GOLD_D, big=True, star=True)
+
+
 CROP = (40, 300, 472, 744)
 ITEM = (120, 400, 392, 740)
 SPRITES = {
@@ -350,6 +670,20 @@ SPRITES = {
     "moonroot": (moonroot_item, ITEM), "rootseed": (rootseed, (150, 520, 362, 740)),
     "wheat": (wheat_item, ITEM), "wheatseed": (wheatseed, (150, 520, 362, 740)),
     "bloodapple": (bloodapple_item, ITEM), "appleseed": (appleseed, (150, 520, 362, 740)),
+    # Night crops and the rare night blooms.
+    "crop-gloomcap": dict(frames=[gloomcap_0, gloomcap_1, gloomcap_2, gloomcap_3], cols=4, rows=1, target=(60, 360, 452, 744)),
+    "crop-starlily": dict(frames=[starlily_0, starlily_1, starlily_2, starlily_3], cols=4, rows=1, target=(70, 200, 442, 744)),
+    "crop-moonpetal": dict(frames=[moonpetal_0, moonpetal_1, moonpetal_2, moonpetal_3], cols=4, rows=1, target=(60, 200, 452, 744)),
+    "crop-ghostgourd": dict(frames=[ghostgourd_0, ghostgourd_1, ghostgourd_2, ghostgourd_3], cols=4, rows=1, target=(40, 360, 472, 744)),
+    "gloomcap": (gloomcap_item, ITEM), "gloomspore": (gloomspore, (150, 520, 362, 740)),
+    "starlily": (starlily_item, ITEM), "lilybulb": (lilybulb, (150, 480, 362, 740)),
+    "moonpetal": (moonpetal_item, ITEM), "petalseed": (petalseed, (150, 520, 362, 740)),
+    "ghostgourd": (ghostgourd_item, ITEM), "gourdseed": (gourdseed, (150, 520, 362, 740)),
+    # Cauldron and fire dishes, and the greater draught.
+    "moonbroth": (moonbroth, ITEM), "gloomstew": (gloomstew, ITEM), "gourdsoup": (gourdsoup, ITEM),
+    "loaf": (loaf, ITEM), "tonic": (tonic, ITEM), "tea": (tea, ITEM), "greaterelixir": (greaterelixir, ITEM),
 }
-ICONS = {k: SPRITES[k][0] for k in ("moonroot", "rootseed", "wheat", "wheatseed", "bloodapple", "appleseed")}
+ICONS = {k: SPRITES[k][0] for k in ("moonroot", "rootseed", "wheat", "wheatseed", "bloodapple", "appleseed",
+                                    "gloomcap", "gloomspore", "starlily", "lilybulb", "moonpetal", "petalseed", "ghostgourd", "gourdseed",
+                                    "moonbroth", "gloomstew", "gourdsoup", "loaf", "tonic", "tea", "greaterelixir")}
 WIDE = {}

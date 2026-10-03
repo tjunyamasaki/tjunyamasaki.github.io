@@ -51,7 +51,7 @@ export const NIGHT_FINDS = Object.freeze({
   wispdust: Object.freeze({node:'gravewisp', region:'graveyard', makes:'gravelight', text:'First wisp essence! Three, with moon iron and soul embers, make a grave lantern.'}),
 });
 /** Halo colours the renderers give night-only nodes so they read as glowing in the dark. */
-export const NIGHT_GLOW = Object.freeze({glowsprout:'#8ff0d8', gravewisp:'#b8ceff'});
+export const NIGHT_GLOW = Object.freeze({glowsprout:'#8ff0d8', gravewisp:'#b8ceff', wildgloomcap:'#c9b2ef', wildstarlily:'#9ff0ff', wildmoonpetal:'#fff4c6', wildghostgourd:'#9ff0ff'});
 
 /** Item detail lines (ui/actions.mjs effectLine) for the frontier gear and night finds. */
 export const FRONTIER_LINES = Object.freeze({

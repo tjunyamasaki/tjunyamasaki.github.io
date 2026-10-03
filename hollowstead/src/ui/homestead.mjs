@@ -4,7 +4,8 @@
 // put it away (✕, Esc or a right click). With no tool out, tapping a gate opens it and tapping a
 // ripe crop harvests it.
 import {BARRIERS, CELL, CROPS, CROP_TYPES, GROUNDS, OBJECT_TYPES, TOOLS, barrierAt, cellAt, cellLine, cellReason, ripe, sizeOf, tileAt} from '../homestead.mjs?v=harvest-18';
-import {STRUCTURES} from '../content.mjs?v=harvest-18';
+import {STRUCTURES, dayOf, phaseOf} from '../content.mjs?v=harvest-18';
+import {bloom, toNight} from '../nightbloom.mjs?v=harvest-18';
 
 const ink = '#2b2233';
 const svg = body => `<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">${body}</svg>`;
@@ -20,6 +21,8 @@ export const GLYPHS = Object.freeze({
   fence: svg('<path d="M3 13 H29 M3 21 H29" stroke-width="4.6"/><path d="M3 13 H29 M3 21 H29" stroke="#8a5a3c" stroke-width="2"/><path d="M9 28 V8 L11 5 L13 8 V28 Z M19 28 V8 L21 5 L23 8 V28 Z" fill="#6e4630"/>'),
   wall: svg('<path d="M4 28 V10 L6.5 5 L9 10 V28 Z M10 28 V8 L12.5 3 L15 8 V28 Z M16 28 V9 L18.5 4 L21 9 V28 Z M22 28 V10 L24.5 5 L27 10 V28 Z" fill="#7d5238"/><path d="M4 14 H27 M4 22 H27" stroke-width="1.6"/>'),
   stonewall: svg('<rect x="3" y="7" width="26" height="20" rx="2" fill="#9a95ab"/><path d="M3 14 H29 M3 21 H29 M11 7v7 M21 7v7 M16 14v7 M8 21v6 M24 21v6" stroke-width="1.8"/><rect x="2" y="4" width="28" height="4" rx="1.5" fill="#b7b2c6"/>'),
+  timberwall: svg('<rect x="4" y="5" width="6.4" height="23" rx="1" fill="#9a6b47"/><rect x="10.4" y="5" width="6.4" height="23" rx="1" fill="#8a5a3c"/><rect x="16.8" y="5" width="6.4" height="23" rx="1" fill="#a3734c"/><rect x="23.2" y="5" width="5" height="23" rx="1" fill="#8a5a3c"/><rect x="2" y="3" width="28" height="4.5" rx="1.5" fill="#6e4630"/><path d="M4 18 H28" stroke="#c99a68" stroke-width="2.4"/>'),
+  masonwall: svg('<rect x="3" y="7" width="26" height="21" rx="2" fill="#9a95ab"/><path d="M3 14 H29 M3 21 H29 M13 7v7 M22 14v7 M10 21v7 M20 21v7" stroke-width="2"/><rect x="2" y="3" width="28" height="5" rx="1.5" fill="#b7b2c6"/>'),
   gate: svg('<path d="M4 28 V6 M28 28 V6" stroke-width="4.6"/><path d="M4 28 V6 M28 28 V6" stroke="#6e4630" stroke-width="2"/><rect x="7" y="9" width="8.5" height="17" rx="1" fill="#8a5a3c"/><rect x="16.5" y="9" width="8.5" height="17" rx="1" fill="#8a5a3c"/><path d="M8 24 L15 11 M17.5 11 L24 24" stroke="#c99a68" stroke-width="1.6"/>'),
   harvest: svg('<path d="M9 26 L14 21" stroke-width="4.4"/><path d="M9 26 L14 21" stroke="#b88a62" stroke-width="2"/><path d="M13 22 C 6 14 12 4 22 5 C 16 8 14 14 17 19 Z" fill="#d6dbe8"/>'),
   remove: svg('<path d="M17 5 L13 19" stroke-width="3.6"/><path d="M17 5 L13 19" stroke="#b88a62" stroke-width="1.6"/><path d="M8 18 L18 21 L15 29 L5 26 Z" fill="#9aa0b4"/><path d="M14 4 H21" stroke-width="3"/>'),
@@ -28,16 +31,18 @@ export const GLYPHS = Object.freeze({
 
 const FARM = ['till', ...CROP_TYPES.map(id => `plant:${id}`), 'harvest', 'remove'];
 const FLOORS = ['plank', 'boards', 'roughplank', 'flagstone', 'slabs', 'cobble', 'fieldstone', 'remove'];
-const WALLS = ['fence', 'wall', 'stonewall', 'gate', 'remove'];
+const WALLS = ['fence', 'wall', 'stonewall', 'timberwall', 'masonwall', 'gate', 'remove'];
 const CAMP = [...OBJECT_TYPES.map(id => `obj:${id}`), 'remove'];
 const TABS = [['farm', 'Farm', FARM], ['floors', 'Floors', FLOORS], ['walls', 'Walls', WALLS], ['camp', 'Camp', CAMP]];
-const ROTATES = new Set(['fence', 'wall', 'stonewall', 'gate']);
-const DRAGS = new Set(['till', 'plank', 'flagstone', 'fence', 'wall', 'stonewall', 'harvest', 'remove', ...CROP_TYPES.map(id => `plant:${id}`)]);
+const ROTATES = new Set(['fence', 'wall', 'stonewall', 'timberwall', 'masonwall', 'gate']);
+const DRAGS = new Set(['till', ...FLOORS, 'fence', 'wall', 'stonewall', 'timberwall', 'masonwall', 'harvest', 'remove', ...CROP_TYPES.map(id => `plant:${id}`)]);
 const HINT = {
   till: 'Drag to till a bed. Joined soil merges into one patch.',
   plank: 'Drag to lay planks.', flagstone: 'Drag to lay flagstones.', slabs: 'Drag to lay big stone slabs.', boards: 'Drag to lay broad boards.', cobble: 'Drag to lay cobbles.',
   roughplank: 'Drag to lay rough planks. Their outer edge is left ragged.', fieldstone: 'Drag to lay a fieldstone path. Its edge follows the stones.',
   fence: 'Drag to run a fence. Pieces join their neighbours.', wall: 'Drag a palisade line.', stonewall: 'Drag a stone wall.',
+  timberwall: 'Drag a timber house wall. Ring a floor with house walls and a gate to make a room.',
+  masonwall: 'Drag a masonry house wall. Ring a floor with house walls and a gate to make a room.',
   gate: 'Tap between two fence pieces. Tap a gate with no tool to open it.',
   harvest: 'Drag over ripe crops.', remove: 'Drag to pull up crops, floors and walls.',
 };
@@ -59,7 +64,7 @@ export function homesteadMarkup({tab = 'farm', tool = '', rotation = 0, options 
   const panel = options ? `<div class="hs-options" role="dialog" aria-label="Homestead options">
     ${opt('free', 'Free building', settings.free)}${opt('day', 'Hold daylight', settings.day)}
     <div class="hs-speed" role="group" aria-label="Growth speed"><span>Growth</span>${[1, 5, 20].map(n => `<button type="button" class="hs-opt" data-hs-option="speed:${n}" aria-pressed="${settings.speed === n}">×${n}</button>`).join('')}</div>
-    ${opt('ripen', 'Ripen everything', false)}${opt('clear', 'Clear the homestead', false)}</div>` : '';
+    ${opt('ripen', 'Ripen everything', false)}${opt('night', 'Skip to night', false)}${opt('bloom', 'Night bloom tonight', false)}${opt('raid', 'Send a raid', false)}${opt('clear', 'Clear the homestead', false)}</div>` : '';
   return `<div class="hs-dock">${hint}<div class="hs-row">
     <div class="hs-tabs" role="tablist">${TABS.map(([id, label]) => `<button type="button" role="tab" data-hs-tab="${id}" aria-selected="${id === tab}">${label}</button>`).join('')}</div>
     <div class="hs-tools" role="toolbar" aria-label="${escapeHtml((TABS.find(([id]) => id === tab) || TABS[0])[1])} tools">${ids.map(button).join('')}</div>
@@ -172,7 +177,18 @@ export function createHomesteadControls({panel, getWorld, me, send, toast, icon,
     else if(key === 'day') h.day = !h.day;
     else if(key.startsWith('speed:')) h.speed = Number(key.slice(6)) || 1;
     else if(key === 'ripen'){for(const tile of Object.values(w.tiles?.cells || {})) if(tile.crop) tile.growth = 100;toast('Everything is ripe');}
-    else if(key === 'clear'){w.buildings = w.buildings.filter(b => !b.grid);if(w.tiles){w.tiles.cells = {};w.tiles.rev++;}toast('The homestead is clear');}
+    else if(key === 'night'){h.day = false;if(phaseOf(w) !== 'night') w.time += toNight(w) + .5;toast('Night falls');}
+    else if(key === 'bloom'){h.bloom = dayOf(w);if(phaseOf(w) === 'night') bloom(w);toast(phaseOf(w) === 'night' ? 'Rare flowers open nearby' : 'Rare flowers will open tonight');}
+    else if(key === 'raid'){
+      const p = me();if(!p) return;
+      const a = Math.random() * Math.PI * 2;
+      for(const [type, k] of [['crawler', 0], ['crawler', 1], ['crawler', 2], ['brute', 3]]){
+        const b = a + (k - 1.5) * .35, e = w.spawnEnemy(type, p.x + Math.cos(b) * 11, p.z + Math.sin(b) * 11, {elite: false});
+        if(e) e.hunt = true;
+      }
+      h.day = false;state.options = false;toast('A raid is coming');
+    }
+    else if(key === 'clear'){w.buildings = w.buildings.filter(b => !b.grid);w.enemies = [];if(w.tiles){w.tiles.cells = {};w.tiles.rev++;}toast('The homestead is clear');}
     paint(true);
   }
   function click(event){

@@ -39,6 +39,16 @@ export const ITEMS = {
   moonroot:{name:'Moonroot',icon:'moonroot',food:14,heal:4,courage:10},bloodapple:{name:'Bloodapple',icon:'bloodapple',food:10,heal:8},
   wheat:{name:'Duskwheat sheaf',icon:'wheat'},
   rootseed:{name:'Moonroot seed',icon:'rootseed'},wheatseed:{name:'Duskwheat grain',icon:'wheatseed'},appleseed:{name:'Bloodapple seed',icon:'appleseed'},
+  // Night crops (grow only after dark) and the rare night blooms (nightbloom.mjs).
+  gloomcap:{name:'Gloomcap',icon:'gloomcap',food:8,courage:-4},starlily:{name:'Starlily',icon:'starlily'},
+  moonpetal:{name:'Moonpetal',icon:'moonpetal'},ghostgourd:{name:'Ghostgourd',icon:'ghostgourd',food:22,heal:4},
+  gloomspore:{name:'Gloomcap spores',icon:'gloomspore'},lilybulb:{name:'Starlily bulb',icon:'lilybulb'},
+  petalseed:{name:'Moonpetal seed',icon:'petalseed'},gourdseed:{name:'Ghostgourd seed',icon:'gourdseed'},
+  // Dishes that leave a blessing for a while (buffs.mjs), and the greater draught.
+  moonbroth:{name:'Moonroot broth',icon:'moonbroth',food:25,heal:6,buff:'calm'},loaf:{name:'Duskwheat loaf',icon:'loaf',food:35,buff:'fed'},
+  tonic:{name:'Bloodapple tonic',icon:'tonic',food:4,heal:4,buff:'fury'},tea:{name:'Starlily tea',icon:'tea',food:4,courage:10,buff:'swift'},
+  gloomstew:{name:'Gloomcap stew',icon:'gloomstew',food:40,heal:10,buff:'warded'},gourdsoup:{name:'Ghostgourd soup',icon:'gourdsoup',food:50,heal:15,buff:'haunted'},
+  greaterelixir:{name:'Greater vigor draught',icon:'greaterelixir',heal:120,courage:40},
 };
 export const EQUIPMENT = {
   axe:{name:'Woodcutter’s axe',icon:'axe',durability:70},pick:{name:'Flint pick',icon:'pick',durability:70},
@@ -125,6 +135,11 @@ export const NODES = {
   witchcauldron:{name:'Witch’s cauldron',hits:1,workSeconds:1.5,handRate:1,output:'floor',loot:{},regrow:0,radius:.55,omen:true},
   goldpumpkin:{name:'Golden pumpkin',hits:1,workSeconds:2,handRate:1,output:'floor',loot:{},regrow:0,radius:.35,omen:true},
   delve:{name:'The Sunken Stair',hits:1,workSeconds:1.2,handRate:1,output:'floor',loot:{},regrow:0,radius:.9,landmark:'delve'},
+  // Night blooms (nightbloom.mjs): come up near camp on a common night, pulled up at dawn, never regrow.
+  wildgloomcap:{name:'Wild gloomcaps',hits:1,workSeconds:1.4,handRate:1,output:'backpack',loot:{gloomcap:2,gloomspore:2},regrow:99999,radius:0,night:true},
+  wildstarlily:{name:'Wild starlily',hits:1,workSeconds:1.4,handRate:1,output:'backpack',loot:{starlily:1,lilybulb:2},regrow:99999,radius:0,night:true},
+  wildmoonpetal:{name:'Moonpetal bloom',hits:1,workSeconds:2,handRate:1,output:'backpack',loot:{moonpetal:1,petalseed:2},regrow:99999,radius:0,night:true},
+  wildghostgourd:{name:'Ghostgourd',hits:1,workSeconds:2.2,handRate:1,output:'backpack',loot:{ghostgourd:1,gourdseed:2},regrow:99999,radius:.3,night:true},
 };
 export const STRUCTURES = {
   hearth:{name:'Heartfire',hp:600,radius:1,light:8},fire:{name:'Campfire',hp:160,radius:.55,light:6},
@@ -136,6 +151,7 @@ export const STRUCTURES = {
   cart:{name:'Hand cart',hp:220,radius:.55},
   // Homestead barriers (homestead.mjs): only ever placed on the grid.
   fence:{name:'Fence',hp:120,radius:.42},stonewall:{name:'Stone wall',hp:420,radius:.48},
+  timberwall:{name:'Timber wall',hp:360,radius:.7},masonwall:{name:'Masonry wall',hp:560,radius:.72},
 };
 export const RECIPES = {
   axe:{kind:'tool',cost:{wood:2,stone:2},station:'bench',desc:'Fell trees twice as quickly.'},
@@ -161,13 +177,21 @@ export const RECIPES = {
   crookstaff:{kind:'tool',cost:{shard:4,spore:2,wood:3},station:'bench',desc:'Moonshard bolts that burst on impact.'},
   bonemail:{kind:'tool',cost:{bone:8,fiber:4},station:'bench',desc:'Absorb 55% of damage until it breaks.'},
   shardplate:{kind:'tool',cost:{shard:8,ore:4,bone:4},station:'bench',desc:'Absorb 65% of damage until it breaks.'},
-  elixir:{kind:'item',cost:{spore:2,berry:2},station:'bench',desc:'Restore 60 health and 20 courage.'},
+  elixir:{kind:'cook',cost:{spore:2,berry:2},station:'pot',desc:'Restore 60 health and 20 courage.'},
+  greaterelixir:{kind:'cook',cost:{moonpetal:1,bloodapple:1,spore:2},station:'pot',desc:'Restore 120 health and 40 courage. Brewed from a rare moonpetal.'},
   ward:{kind:'build',cost:{stone:5,ore:2,ember:4},station:'bench',desc:'A soul-powered defense. Damages nearby enemies.'},
   hushstone:{kind:'build',cost:{stone:8,ore:2,ember:3},station:'bench',desc:'No creature rises or comes hunting within 18 paces, so you can build in peace. Raids and moons still come. Two at most.'},
   roast:{kind:'cook',cost:{pumpkin:1},station:'fire',desc:'Cook a pumpkin into a restorative supper.'},
   roastMeat:{kind:'cook',result:'roast',cost:{meat:1},station:'fire',desc:'Cook a raw morsel safely.'},
   roastCaps:{kind:'cook',result:'roast',cost:{mushroom:2},station:'fire',desc:'Cook away the mushrooms’ unsettling effects.'},
   stew:{kind:'cook',cost:{pumpkin:1,berry:2,meat:1},station:'pot',desc:'A feast: +65 hunger, +35 health and +25 courage.'},
+  // Homestead dishes (buffs.mjs): food that leaves a blessing behind.
+  moonbroth:{kind:'cook',cost:{moonroot:2,berry:1},station:'pot',desc:'Calm for 4 minutes: courage holds in the dark.'},
+  tonic:{kind:'cook',cost:{bloodapple:2,spore:1},station:'pot',desc:'Bloodrush for 3 minutes: blows land 25% harder.'},
+  tea:{kind:'cook',cost:{starlily:2,berry:1},station:'pot',desc:'Light step for 3 minutes: 15% faster, breath returns sooner.'},
+  gloomstew:{kind:'cook',cost:{gloomcap:3,meat:1},station:'pot',desc:'Gloomhide for 3 minutes: take 20% less harm.'},
+  gourdsoup:{kind:'cook',cost:{ghostgourd:1,moonroot:1},station:'pot',desc:'Ghostly vigor for 5 minutes: +30 max health.'},
+  loaf:{kind:'cook',cost:{wheat:3},station:'fire',desc:'Well fed for 5 minutes: hunger fades half as fast.'},
   sporemask:{kind:'tool',cost:{glowbloom:4,fiber:4,wood:1},station:'bench',desc:'Filters the Hollow Mire’s spore fog.'},
   gravelight:{kind:'tool',cost:{wispdust:3,ore:3,ember:2},station:'bench',desc:'A wisp-fed lantern bright enough for the Moonshard Crags.'},
   barrowcloak:{kind:'tool',cost:{bone:8,fiber:6,meat:2},station:'bench',desc:'Bone-lined warmth against the Barrow Fields’ grave-chill.'},

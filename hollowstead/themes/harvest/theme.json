@@ -4491,6 +4491,504 @@
         }
       },
       "icon": "./sprites/appleseed-icon.svg?v=home1"
+    },
+    "crop-gloomcap": {
+      "src": "./sprites/crop-gloomcap.svg?v=home2",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "wildgloomcap": {
+      "src": "./sprites/crop-gloomcap.svg?v=home2",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "crop-starlily": {
+      "src": "./sprites/crop-starlily.svg?v=home2",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "wildstarlily": {
+      "src": "./sprites/crop-starlily.svg?v=home2",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "crop-moonpetal": {
+      "src": "./sprites/crop-moonpetal.svg?v=home2",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "wildmoonpetal": {
+      "src": "./sprites/crop-moonpetal.svg?v=home2",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "crop-ghostgourd": {
+      "src": "./sprites/crop-ghostgourd.svg?v=home2",
+      "size": [
+        2.45,
+        3.675
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "wildghostgourd": {
+      "src": "./sprites/crop-ghostgourd.svg?v=home2",
+      "size": [
+        2.45,
+        3.675
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            3
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "gloomcap": {
+      "src": "./sprites/gloomcap.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/gloomcap-icon.svg?v=home2"
+    },
+    "gloomspore": {
+      "src": "./sprites/gloomspore.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/gloomspore-icon.svg?v=home2"
+    },
+    "starlily": {
+      "src": "./sprites/starlily.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/starlily-icon.svg?v=home2"
+    },
+    "lilybulb": {
+      "src": "./sprites/lilybulb.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/lilybulb-icon.svg?v=home2"
+    },
+    "moonpetal": {
+      "src": "./sprites/moonpetal.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moonpetal-icon.svg?v=home2"
+    },
+    "petalseed": {
+      "src": "./sprites/petalseed.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/petalseed-icon.svg?v=home2"
+    },
+    "ghostgourd": {
+      "src": "./sprites/ghostgourd.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/ghostgourd-icon.svg?v=home2"
+    },
+    "gourdseed": {
+      "src": "./sprites/gourdseed.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/gourdseed-icon.svg?v=home2"
+    },
+    "moonbroth": {
+      "src": "./sprites/moonbroth.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moonbroth-icon.svg?v=home2"
+    },
+    "gloomstew": {
+      "src": "./sprites/gloomstew.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/gloomstew-icon.svg?v=home2"
+    },
+    "gourdsoup": {
+      "src": "./sprites/gourdsoup.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/gourdsoup-icon.svg?v=home2"
+    },
+    "loaf": {
+      "src": "./sprites/loaf.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/loaf-icon.svg?v=home2"
+    },
+    "tonic": {
+      "src": "./sprites/tonic.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/tonic-icon.svg?v=home2"
+    },
+    "tea": {
+      "src": "./sprites/tea.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/tea-icon.svg?v=home2"
+    },
+    "greaterelixir": {
+      "src": "./sprites/greaterelixir.svg?v=home2",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/greaterelixir-icon.svg?v=home2"
     }
   },
   "motion": {

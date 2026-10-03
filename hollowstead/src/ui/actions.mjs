@@ -120,14 +120,23 @@ export function keyboardAction(key) {
 }
 
 /** Potions stay in the pack; the hotbar uses the same revision-checked consume intent as inventory. */
+export const POTIONS = Object.freeze(['elixir', 'greaterelixir']);
+/**
+ * Two draughts share the button: the plain one first, the greater one (cauldron, from a moonpetal)
+ * when it is all you have or the wound is deep enough to want it.
+ */
 export function potionHotbar(player, {mode = 'normal', arena = false, pending = false} = {}) {
-  const stacks = (player?.inventory?.slots || []).filter(stack => stack?.itemId === 'elixir' && stack.quantity > 0);
-  const quantity = stacks.reduce((total, stack) => total + stack.quantity, 0);
+  const slots = player?.inventory?.slots || [];
+  const of = id => slots.filter(stack => stack?.itemId === id && stack.quantity > 0);
+  const plain = of('elixir'), greater = of('greaterelixir');
+  const quantity = [...plain, ...greater].reduce((total, stack) => total + stack.quantity, 0);
+  const missing = (player?.maxHp || 100) - (player?.hp ?? 100);
+  const pick = greater.length && (!plain.length || missing > 90) ? greater : plain;
   const usable = quantity > 0 && !arena && !pending && !player?.down && !player?.ghost
     && ['normal', 'inventory', 'chest'].includes(mode);
   return {
-    itemId: 'elixir', quantity,
-    command: usable ? {type: 'consumeItem', uid: stacks[0].uid, inventoryRevision: player.inventory.revision} : null,
+    itemId: pick === greater && greater.length ? 'greaterelixir' : 'elixir', quantity,
+    command: usable ? {type: 'consumeItem', uid: pick[0].uid, inventoryRevision: player.inventory.revision} : null,
   };
 }
 
@@ -350,13 +359,21 @@ export function describeContext(facts) {
       list.push(make('harvest', {targetId: id, command: buildingCommand('harvest', id)}));
     }
   } else if (facts.type === 'bed') {
-    const night = facts.phase === 'night';
+    // After dark a bed inside a closed room sleeps the night away (sleep.mjs); in the open it is too dangerous.
+    const dark = facts.phase && facts.phase !== 'day';
     const hungry = facts.hunger < 20;
-    list.push(make('rest', {
+    if (dark) list.push(make('rest', {
+      targetId: id,
+      label: facts.sleeping ? 'Get up' : 'Sleep',
+      enabled: !!facts.sleeping || !!facts.inRoom,
+      disabledReason: 'Build a room around the bed',
+      command: buildingCommand('rest', id),
+    }));
+    else list.push(make('rest', {
       targetId: id,
       label: facts.resting ? 'Wake' : 'Rest',
-      enabled: !!facts.resting || (!night && !hungry),
-      disabledReason: night ? 'Too dangerous at night' : 'Eat before resting',
+      enabled: !!facts.resting || !hungry,
+      disabledReason: 'Eat before resting',
       command: buildingCommand('rest', id),
     }));
   }

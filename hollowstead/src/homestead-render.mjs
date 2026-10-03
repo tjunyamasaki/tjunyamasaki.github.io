@@ -8,7 +8,7 @@
 // from above and anything behind it is hidden by it. Every box gets a back-face "hull" one notch
 // larger in ink colour, which gives the hand-inked outline the sprites have.
 import * as THREE from '../../hushlight/vendor/three.module.min.js';
-import {BARRIERS, CELL, CROPS, OBJECTS, barrierIndex, cellAt, centerOf, footCenter, objectSpot, gateAxis, groundLinks, keyOf, linksOf, objectScale, sizeOf, tileAt, TOOLS} from './homestead.mjs?v=harvest-18';
+import {BARRIERS, CELL, CROPS, OBJECTS, barrierAt, barrierIndex, cellAt, centerOf, footCenter, objectSpot, gateAxis, groundLinks, keyOf, linksOf, objectScale, sizeOf, tileAt, TOOLS} from './homestead.mjs?v=harvest-18';
 
 const H = CELL / 2; // half a cell: how far a barrier's run reaches toward each neighbour
 
@@ -437,6 +437,74 @@ function addStoneWall(M, x, z, reach){
   }
 }
 
+// Room walls (homestead.mjs ROOM_WALLS): about head height, so they close a room off. Runs are
+// built from a few bold parts (planks, coursed blocks) whose own ink hulls draw the joints.
+const ROOM_H = 1.72;
+function addTimberWall(M, x, z, reach, seed){
+  M.box(x, ROOM_H / 2, z, .3, ROOM_H, .3, WOOD_D);
+  M.box(x, ROOM_H + .05, z, .36, .1, .36, WOOD_D, {ink: .022});
+  for(const [dir, on] of Object.entries(reach)){
+    if(!on)continue;
+    const [dx, dz] = STEP[dir], n = 3, w = (H - .15) / n;
+    for(let k = 0; k < n; k++){
+      const d = .15 + w * (k + .5), px = x + dx * d, pz = z + dz * d, r = hash(Math.round(px * 8), Math.round(pz * 8), 5);
+      const h = ROOM_H - .1 - r * .08, tone = WOOD.clone().multiplyScalar(.88 + r * .24);
+      if(dx)M.box(px, h / 2, pz, w - .015, h, .2, tone, {ink: .02});else M.box(px, h / 2, pz, .2, h, w - .015, tone, {ink: .02});
+    }
+    const mx = x + dx * H / 2, mz = z + dz * H / 2;
+    if(dx){M.box(mx, ROOM_H - .1, mz, H, .13, .27, WOOD_D, {grain: 'x', ink: .022});M.box(mx, .62, mz + .12, H, .1, .05, WOOD_L, {grain: 'x', ink: .018});}
+    else{M.box(mx, ROOM_H - .1, mz, .27, .13, H, WOOD_D, {grain: 'z', ink: .022});M.box(mx + .12, .62, mz, .05, .1, H, WOOD_L, {grain: 'z', ink: .018});M.box(mx - .12, .62, mz, .05, .1, H, WOOD_L, {grain: 'z', ink: .018});}
+  }
+}
+const STONE_D = new THREE.Color('#857f97');
+function addMasonWall(M, x, z, reach){
+  M.box(x, (ROOM_H - .1) / 2, z, .62, ROOM_H - .1, .62, STONE_D);
+  M.box(x, ROOM_H - .04, z, .72, .14, .72, STONE_L, {ink: .022});
+  for(const [dir, on] of Object.entries(reach)){
+    if(!on)continue;
+    const [dx, dz] = STEP[dir], rows = 3, rh = (ROOM_H - .14) / rows, start = .31, span = H - start;
+    for(let row = 0; row < rows; row++){
+      // Courses alternate a long and a short block so the joints never line up.
+      const cuts = row % 2 ? [0, .58, 1] : [0, .36, 1];
+      for(let k = 0; k < cuts.length - 1; k++){
+        const a = start + span * cuts[k], b = start + span * cuts[k + 1], d = (a + b) / 2, len = b - a - .02;
+        const px = x + dx * d, pz = z + dz * d, r = hash(Math.round(px * 8) + row * 31, Math.round(pz * 8), 7), tone = STONE.clone().multiplyScalar(.9 + r * .18);
+        const y = rh * (row + .5), t = .5 - (row === rows - 1 ? .03 : 0);
+        if(dx)M.box(px, y, pz, len, rh - .025, t, tone, {grain: 'x', ink: .02});else M.box(px, y, pz, t, rh - .025, len, tone, {grain: 'z', ink: .02});
+      }
+    }
+    const mx = x + dx * (start + span / 2), mz = z + dz * (start + span / 2);
+    if(dx)M.box(mx, ROOM_H - .07, mz, span, .1, .58, STONE_L, {grain: 'x', ink: .02});else M.box(mx, ROOM_H - .07, mz, .58, .1, span, STONE_L, {grain: 'z', ink: .02});
+  }
+}
+const ROOM_KINDS = new Set(['timberwall', 'masonwall']);
+/** One barrier's parts into its Mesher; `fake` stands in for a placed piece when drawing the ghost. */
+function addBarrier(M, b, x, z, reach, seed){
+  if(b.type === 'fence')addFence(M, x, z, reach, seed);
+  else if(b.type === 'wall')addPalisade(M, b, x, z, reach);
+  else if(b.type === 'stonewall')addStoneWall(M, x, z, reach);
+  else if(b.type === 'timberwall')addTimberWall(M, x, z, reach, seed);
+  else if(b.type === 'masonwall')addMasonWall(M, x, z, reach);
+}
+/**
+ * Room walls stand taller than the wanderer, so the ones in front of the local player (toward the
+ * camera, +z) thin out into an ordered dither while they are close: the room's inside stays readable.
+ * Chains onto bindNight's onBeforeCompile; uPeek = (x, z, strength).
+ */
+function bindPeek(material, peek){
+  const night = material.onBeforeCompile;
+  material.onBeforeCompile = shader => {
+    night(shader);shader.uniforms.uPeek = peek;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uPeek;')
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+{vec2 d=vNightWorld.xz-uPeek.xy;float ahead=smoothstep(-.35,.15,d.y)*(1.0-smoothstep(2.6,3.8,d.y));float side=1.0-smoothstep(1.7,2.9,abs(d.x));
+float cut=uPeek.z*ahead*side*smoothstep(.3,.55,vNightWorld.y);
+vec2 f=floor(gl_FragCoord.xy),h=floor(f*.5);float bayer=fract(dot(h,vec2(.5,h.y*.75)))*.25+fract(dot(f,vec2(.5,f.y*.75)));
+if(cut*.78>bayer+.02)discard;}`);
+  };
+  material.customProgramCacheKey = () => 'hollowstead-night-peek';
+}
+
 // Gate parts in the gate's own frame: the opening runs along x, leaves hinge on the posts.
 const GATE_HALF = H - .06, LEAF = GATE_HALF - .08;
 function gateFrame(M){
@@ -466,6 +534,11 @@ export class HomesteadLayer {
     this.ink = new THREE.MeshBasicMaterial({color: INK, side: THREE.BackSide});renderer.bindNight(this.ink);
     this.wood = new THREE.MeshBasicMaterial({vertexColors: true, map: this.grainTexture('wood')});renderer.bindNight(this.wood);
     this.stone = new THREE.MeshBasicMaterial({vertexColors: true, map: this.grainTexture('stone')});renderer.bindNight(this.stone);
+    this.peek = {value: new THREE.Vector3(0, 0, 0)};
+    const peeking = mat => {renderer.bindNight(mat);bindPeek(mat, this.peek);return mat;};
+    this.roomWood = peeking(new THREE.MeshBasicMaterial({vertexColors: true, map: this.wood.map}));
+    this.roomStone = peeking(new THREE.MeshBasicMaterial({vertexColors: true, map: this.stone.map}));
+    this.roomInk = peeking(new THREE.MeshBasicMaterial({color: INK, side: THREE.BackSide}));
     this.shadowMat = new THREE.MeshBasicMaterial({color: '#241e2c', transparent: true, opacity: .2, depthWrite: false});
     this.ghostMats = {
       ok: new THREE.MeshBasicMaterial({color: '#c8e5a6', transparent: true, opacity: .55, depthWrite: false}),
@@ -527,21 +600,20 @@ export class HomesteadLayer {
   clearBarriers(){for(const m of this.barrierMeshes){this.group.remove(m);m.geometry.dispose();}this.barrierMeshes = [];}
   buildBarriers(world){
     this.clearBarriers();
-    const index = barrierIndex(world), wood = new Mesher(), stone = new Mesher(), shadow = [];
+    const index = barrierIndex(world), wood = new Mesher(), stone = new Mesher(), roomWood = new Mesher(), roomStone = new Mesher(), shadow = [];
+    const into = {fence: wood, wall: wood, stonewall: stone, timberwall: roomWood, masonwall: roomStone};
     for(const b of index.values()){
       if(b.type === 'gate')continue;
       const links = linksOf(b, index), reach = reachOf(b, links), {x, z} = centerOf(b.i, b.j);
       LINKS = links;
-      if(b.type === 'fence')addFence(wood, x, z, reach, hash(b.i, b.j, 2));
-      else if(b.type === 'wall')addPalisade(wood, b, x, z, reach);
-      else if(b.type === 'stonewall')addStoneWall(stone, x, z, reach);
-      shadowOf(shadow, x, z, reach, b.type === 'fence' ? .16 : .3);
+      if(into[b.type])addBarrier(into[b.type], b, x, z, reach, hash(b.i, b.j, 2));
+      shadowOf(shadow, x, z, reach, b.type === 'fence' ? .16 : ROOM_KINDS.has(b.type) ? .36 : .3);
     }
     for(const b of index.values()){if(b.type === 'gate'){const {x, z} = centerOf(b.i, b.j);shadowOf(shadow, x, z, gateAxis(b) === 'ew' ? {e: true, w: true} : {n: true, s: true}, .12);}}
     LINKS = null;
-    for(const [M, mat] of [[wood, this.wood], [stone, this.stone]]){
+    for(const [M, mat, ink] of [[wood, this.wood, this.ink], [stone, this.stone, this.ink], [roomWood, this.roomWood, this.roomInk], [roomStone, this.roomStone, this.roomInk]]){
       if(!M.pos.length)continue;
-      const body = new THREE.Mesh(M.geometry(), mat), hull = new THREE.Mesh(M.hullGeometry(), this.ink);
+      const body = new THREE.Mesh(M.geometry(), mat), hull = new THREE.Mesh(M.hullGeometry(), ink);
       this.group.add(body, hull);this.barrierMeshes.push(body, hull);
     }
     if(shadow.length){
@@ -572,6 +644,30 @@ export class HomesteadLayer {
     }
     for(const [id, g] of this.gates)if(!seen.has(id)){this.group.remove(g.root);this.gates.delete(id);}
   }
+  /** Health bars over walls and gates that have taken blows, like the ones over camp objects (renderer.mjs). */
+  syncHealth(world){
+    const bars = this.bars ||= new Map(), seen = new Set();
+    for(const b of world.buildings){
+      if(!b.grid || !(b.hp > 0) || !(b.hp < b.maxHp))continue;
+      seen.add(b.id);
+      let bar = bars.get(b.id);
+      if(!bar){
+        const back = new THREE.Sprite(new THREE.SpriteMaterial({color: 0x302834, depthWrite: false, depthTest: false})), fill = new THREE.Sprite(new THREE.SpriteMaterial({color: 0xd2c395, depthWrite: false, depthTest: false}));
+        fill.center.set(0, .5);back.renderOrder = fill.renderOrder = 6;this.group.add(back, fill);bar = {back, fill};bars.set(b.id, bar);
+      }
+      const {x, z} = centerOf(b.i, b.j), y = ROOM_KINDS.has(b.type) ? 2.1 : 1.45, k = Math.max(0, b.hp / b.maxHp);
+      bar.back.position.set(x, y, z);bar.back.scale.set(1.1, .09, 1);
+      bar.fill.position.set(x - .51, y, z + .02);bar.fill.scale.set(1.02 * k, .05, 1);bar.fill.material.color.set(k < .35 ? 0xdf9383 : 0xd2c395);
+    }
+    for(const [id, bar] of bars)if(!seen.has(id)){this.group.remove(bar.back, bar.fill);bar.back.material.dispose();bar.fill.material.dispose();bars.delete(id);}
+  }
+  /** Room walls near and in front of the local player dither away; eased so walking past doesn't pop. */
+  syncPeek(world, dt){
+    const p = this.r.localId && world.player?.(this.r.localId), v = this.peek.value;
+    const want = p && !p.down && world.buildings.some(b => b.grid && ROOM_KINDS.has(b.type) && b.hp > 0 && b.z > p.z - .6 && b.z < p.z + 4 && Math.abs(b.x - p.x) < 3.2) ? 1 : 0;
+    if(p){v.x = p.x;v.y = p.z;}
+    v.z += (want - v.z) * Math.min(1, dt * 6);
+  }
   /** Ghost of what the active tool would put under the cursor, joined to what is already there. */
   syncGhost(world, ui){
     const tool = ui && TOOLS[ui.tool];
@@ -594,7 +690,7 @@ export class HomesteadLayer {
       g.rotation.y = fake.rotation % 2 ? Math.PI / 2 : 0;g.position.set(x, 0, z);
     }else{
       const M = new Mesher();LINKS = linksOf(fake, index);
-      if(tool.type === 'fence')addFence(M, x, z, reach, .5);else if(tool.type === 'wall')addPalisade(M, fake, x, z, reach);else addStoneWall(M, x, z, reach);
+      addBarrier(M, fake, x, z, reach, .5);
       LINKS = null;g.add(new THREE.Mesh(M.geometry(), mat));
     }
     g.renderOrder = 3;this.group.add(g);this.ghost = g;
@@ -643,7 +739,7 @@ export class HomesteadLayer {
     this.cursor.material.color.set(!ui.valid ? '#ff8a7e' : tool?.kind === 'remove' ? '#ffb38a' : tool?.kind === 'harvest' || tool?.kind === 'plant' ? '#f6e3a0' : '#bfe8a6');
   }
   effect(ev){
-    const color = ev.tool === 'remove' ? '#b9a48a' : ev.tool === 'harvest' ? '#f4d28a' : ev.tool === 'till' || ev.tool?.startsWith?.('plant') ? '#7a5642' : '#d8c7a6';
+    const color = ev.tool === 'chip:stone' ? '#a8a3b8' : ev.tool === 'chip:wood' ? '#a7744c' : ev.tool === 'remove' ? '#b9a48a' : ev.tool === 'harvest' ? '#f4d28a' : ev.tool === 'till' || ev.tool?.startsWith?.('plant') ? '#7a5642' : '#d8c7a6';
     for(let k = 0; k < 7; k++){
       const m = new THREE.Mesh(this.puffGeo ||= new THREE.PlaneGeometry(.14, .14), new THREE.MeshBasicMaterial({color, transparent: true, depthWrite: false}));
       const a = k / 7 * Math.PI * 2 + Math.random() * .5;
@@ -658,8 +754,15 @@ export class HomesteadLayer {
     for(const b of world.buildings)if(b.grid && b.hp > 0){n++;h = (h * 31 + (b.i * 7349 + b.j * 1931) * 4 + BARRIER_ORDER.indexOf(b.type) * 97 + (b.rotation | 0)) % 1000000007;}
     const barrierKey = `${world.seed}:${n}:${h}`;
     if(barrierKey !== this.barrierKey){this.barrierKey = barrierKey;this.buildBarriers(world);}
-    this.syncGates(world, Math.min(dt, .05));this.syncGhost(world, ui);this.syncObjectGhost(ui);this.syncCursor(ui, clock);
-    for(const ev of world.events)if(ev.id > this.lastEvent){if(ev.type === 'tile' && world.time - ev.at < 1)this.effect(ev);this.lastEvent = ev.id;}
+    this.syncPeek(world, dt);this.syncHealth(world);this.syncGates(world, Math.min(dt, .05));this.syncGhost(world, ui);this.syncObjectGhost(ui);this.syncCursor(ui, clock);
+    for(const ev of world.events)if(ev.id > this.lastEvent){
+      if(world.time - ev.at < 1){
+        if(ev.type === 'tile')this.effect(ev);
+        // A blow on a wall knocks chips off it (mobs.mjs siege).
+        else if(ev.type === 'hit'){const b = barrierAt(world, ...cellAt(ev.x, ev.z));if(b)this.effect({x: ev.x, z: ev.z, tool: b.type === 'stonewall' || b.type === 'masonwall' ? 'chip:stone' : 'chip:wood'});}
+      }
+      this.lastEvent = ev.id;
+    }
     this.effects = this.effects.filter(e => {
       e.life += dt;e.vy -= 7 * dt;e.m.position.x += e.vx * dt;e.m.position.z += e.vz * dt;e.m.position.y = Math.max(.02, e.m.position.y + e.vy * dt);
       e.m.material.opacity = Math.max(0, 1 - e.life * 2.2);e.m.quaternion.copy(this.r.camera.quaternion);
@@ -668,6 +771,7 @@ export class HomesteadLayer {
   }
   dispose(){
     this.clearGround();this.clearBarriers();
+    for(const bar of this.bars?.values() || []){this.group.remove(bar.back, bar.fill);}this.bars?.clear();
     for(const g of this.gates.values())this.group.remove(g.root);this.gates.clear();
     this.groundKey = this.barrierKey = '';this.lastEvent = 0;
   }
@@ -699,8 +803,8 @@ export function paintHomesteadCanvas(r, c, world, frame, ui){
   const list = [...index.values()].sort((p, q) => p.j - q.j);
   for(const b of list){
     const {x, z} = centerOf(b.i, b.j), reach = b.type === 'gate' ? (gateAxis(b) === 'ew' ? {e: true, w: true} : {n: true, s: true}) : reachOf(b, linksOf(b, index));
-    const tall = b.type === 'fence' ? .9 : b.type === 'gate' ? .95 : 1.15, col = b.type === 'stonewall' ? '#9a95ab' : '#8a5a3c';
-    c.lineWidth = Math.max(2, unit * (b.type === 'fence' ? .09 : .3));
+    const room = ROOM_KINDS.has(b.type), tall = b.type === 'fence' ? .9 : b.type === 'gate' ? .95 : room ? 1.7 : 1.15, col = b.type === 'stonewall' || b.type === 'masonwall' ? '#9a95ab' : '#8a5a3c';
+    c.lineWidth = Math.max(2, unit * (b.type === 'fence' ? .09 : room ? .42 : .3));
     for(const [dir, on] of Object.entries(reach)){
       if(!on)continue;
       const [dx, dz] = STEP[dir], e = r.screenPoint(x + dx * H, z + dz * H, tall * .6), s0 = r.screenPoint(x, z, tall * .6);

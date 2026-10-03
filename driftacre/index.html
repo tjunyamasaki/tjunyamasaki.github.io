@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#ffd9c4">
+  <meta name="description" content="Driftacre — a cozy, semi-idle farm on a floating island. Grow crops, and your island grows with them.">
+  <title>Driftacre · A little farm above the clouds</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Fredoka:wght@400;500;600&family=Pixelify+Sans:wght@400;600&family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="app" aria-label="Driftacre">
+    <canvas id="world" tabindex="0" aria-label="Your floating island. Tap tiles to harvest, plant and tend. Drag to paint across many tiles."></canvas>
+    <div class="overlay" aria-hidden="true"></div>
+    <div id="floats" aria-hidden="true"></div>
+
+    <header class="top" id="hud" hidden>
+      <div class="left">
+        <a class="chip back" href="/links/" aria-label="Back to games">↖</a>
+        <div class="chip res" title="Coins"><i class="ico coin" aria-hidden="true"></i><b id="coins">0</b></div>
+        <div class="chip res" title="Wisps — rare sky magic"><i class="ico wisp" aria-hidden="true"></i><b id="wisps">0</b></div>
+        <div class="chip lvl" title="Farmer level"><span>Lv <b id="level">1</b></span><span class="bar"><i id="xpbar"></i></span></div>
+      </div>
+      <button id="heart" class="heart" aria-label="Island heart">
+        <span class="ring" id="heart-ring"><span class="core"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.4-9.3-9C1.2 8.9 3 5 6.6 5c2.1 0 3.6 1.2 5.4 3.2C13.8 6.2 15.3 5 17.4 5 21 5 22.8 8.9 21.3 12 19 16.6 12 21 12 21z"/></svg></span></span>
+        <span class="heart-text"><b id="heart-label">Island heart</b><small id="heart-sub">0 / 6</small></span>
+        <span class="badge" id="land-count" hidden>0</span>
+      </button>
+      <div class="right">
+        <button class="chip icon" id="rot-l" aria-label="Rotate view left">⟲</button>
+        <button class="chip icon" id="rot-r" aria-label="Rotate view right">⟳</button>
+        <button class="chip" id="btn-style" aria-label="Change art style"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5C21 6.4 17 3 12 3zM6.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg><span class="lbl">Style</span></button>
+        <button class="chip icon" id="btn-menu" aria-label="Menu">☰</button>
+      </div>
+    </header>
+
+    <div id="coach" class="coach" hidden></div>
+    <div id="mode-hint" class="mode-hint" hidden><span id="mode-text"></span><button id="mode-done">Done</button></div>
+
+    <nav class="dock" id="dock" hidden aria-label="Tools">
+      <button class="tool active" data-tool="tend" aria-label="Tend: harvest, plant and water">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10m0-4.5v-1a1.5 1.5 0 0 1 3 0V10m0-4a1.5 1.5 0 0 1 3 0v5m-9 0V8a1.5 1.5 0 0 0-3 0v6.5a7 7 0 0 0 7 7h.5a6.5 6.5 0 0 0 6.5-6.5V11"/></svg><span>Tend</span>
+      </button>
+      <button class="tool seed" data-tool="seeds" aria-label="Choose seed"><img id="seed-ico" alt=""><span id="seed-name">Sunwheat</span></button>
+      <button class="tool" data-tool="build" aria-label="Build and decorate">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5M10 20v-5h4v5"/></svg><span>Build</span>
+      </button>
+      <button class="tool" data-tool="land" aria-label="Grow new land">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14h16l-3 6H7zM12 14V6m0 0c0-2 2-3 4-3 0 2-2 3-4 3zm0 2c0-2-2-3-4-3 0 2 2 3 4 3z"/></svg><span>Land</span><i class="badge" id="land-badge" hidden>0</i>
+      </button>
+      <button class="tool" data-tool="shovel" aria-label="Clear a tile">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6M17 7l-7.5 7.5M9.5 14.5 6 18a2 2 0 0 1-3-3l3.5-3.5"/></svg><span>Clear</span>
+      </button>
+      <button class="tool" data-tool="wishes" aria-label="Wishes from travelers">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.8z"/></svg><span>Wishes</span><i class="badge" id="wish-badge" hidden>!</i>
+      </button>
+    </nav>
+
+    <section id="sheet" class="sheet" hidden aria-modal="false" role="dialog" aria-labelledby="sheet-title">
+      <header><h2 id="sheet-title">Seeds</h2><div class="tabs" id="sheet-tabs"></div><button id="sheet-close" class="x" aria-label="Close">×</button></header>
+      <div id="sheet-body" class="sheet-body"></div>
+    </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="banner" class="banner" aria-live="polite"></div>
+
+    <section id="title" class="title-screen">
+      <div class="title-card">
+        <p class="eyebrow">a cozy little idle farm</p>
+        <h1>Drift<span>acre</span></h1>
+        <p class="tag">Grow crops on a floating island.<br>Every harvest helps the island grow too.</p>
+        <div class="style-pick" id="title-styles"></div>
+        <div class="title-actions">
+          <button id="btn-continue" class="primary" hidden>Continue your island</button>
+          <button id="btn-new" class="primary">Start a new island</button>
+        </div>
+        <p class="small">Saves on this device. Crops keep growing while you are away.</p>
+      </div>
+    </section>
+
+    <dialog id="away" class="panel">
+      <p class="eyebrow">WHILE YOU WERE AWAY</p>
+      <h2 id="away-title">The island kept growing.</h2>
+      <ul id="away-list" class="away-list"></ul>
+      <button class="primary" id="away-ok">Lovely</button>
+    </dialog>
+
+    <dialog id="menu" class="panel">
+      <p class="eyebrow">A QUIET MOMENT</p>
+      <h2>Island settings</h2>
+      <div class="toggles">
+        <label><input type="checkbox" id="opt-sound"> Garden sounds</label>
+        <label><input type="checkbox" id="opt-music"> Music box</label>
+      </div>
+      <div class="help">
+        <p><b>Tend</b> Tap or drag across tiles: harvest ripe crops, plant your chosen seed on empty ground, and tap a growing sprout once to help it along.</p>
+        <p><b>Island heart</b> Every harvest feeds it. When it blooms you get a land sprout — use <b>Land</b> to grow a new tile anywhere on the edge.</p>
+        <p><b>Sproutlings</b> Build Sprout Huts. Each one houses a little helper who harvests, replants and tends — even while you are away.</p>
+        <p><b>Sky visitors</b> Tap the sky whale, gift balloons and falling stars.</p>
+        <p class="keys"><b>Keys</b> WASD / arrows pan · Q E rotate · scroll or + − zoom · 1–9 pick seed · B build · L land · Esc back. Right-drag also pans. On touch: drag empty sky to pan, pinch to zoom.</p>
+      </div>
+      <p class="small" id="stats"></p>
+      <button class="primary" id="menu-close">Back to the island</button>
+      <button class="text-button" id="menu-reset">Start over with a new island…</button>
+    </dialog>
+
+    <div id="error" class="error" hidden role="alert"><h1>The island could not lift off.</h1><p>Driftacre needs WebGL. Try another browser or device.</p><a href="/links/">Back to games</a></div>
+    <noscript><div class="error"><h1>Driftacre needs JavaScript.</h1><a href="/links/">Back to games</a></div></noscript>
+  </main>
+  <script type="module">
+    import('./main.js').catch(err => { console.error('Driftacre failed to start', err); document.getElementById('error').hidden = false; });
+  </script>
+</body>
+</html>

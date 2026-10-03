@@ -7,6 +7,7 @@
 
 import {EQUIPMENT, ITEMS, RULES} from './content.mjs?v=harvest-18';
 import {magicItems} from './magic/registry.mjs?v=harvest-18';
+import {isBook} from './refine-mods.mjs?v=harvest-18';
 
 export const CONTRACT = 'hollowstead-contracts-1';
 
@@ -299,6 +300,13 @@ export function itemDefinition(itemId){
       itemId, kind:'supply', stackLimit:STACK_LIMIT, supplyUnits:1, equipmentSlot:null, maxDurability:null,
       use:item.food?'eat':item.heal?'heal':item.boost?'heal':null,
       retainsAtZeroDurability:false,
+    });
+  }
+  // Modifier books (refine-mods.mjs): written into a refine slot at a workbench, never used from the pack.
+  if(isBook(itemId)){
+    return Object.freeze({
+      itemId, kind:'supply', stackLimit:STACK_LIMIT, supplyUnits:1, equipmentSlot:null, maxDurability:null,
+      use:null, retainsAtZeroDurability:false,
     });
   }
   return null;

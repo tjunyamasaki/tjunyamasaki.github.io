@@ -1,6 +1,7 @@
-"""Refinement art: Dread ichor, the creature-only currency that rolls weapon modifiers (src/refine.mjs).
+"""Refinement art: Dread ichor, the creature-only currency that rolls weapon modifiers (src/refine.mjs),
+and the modifier books that each carry one (src/refine-mods.mjs).
 
-    python3 tools/art/build.py --only ichor      (registered in build.py)
+    python3 tools/art/build.py --only ichor,book-arrows,book-blade,book-arcane,book-ward      (registered in build.py)
 
 Same ink style as the rest of the theme: thick outline, flat fill, one soft shade, a brush
 highlight, sparkles and a soft halo for anything that glows.
@@ -36,6 +37,68 @@ def ichor():
     return d, b
 
 
-SPRITES = {"ichor": (ichor, (136, 390, 376, 740))}
-ICONS = {"ichor": ichor}
+# ------------------------------------------------------------------ modifier books
+# One open book per cover: what the modifier fits. Its rune floats up off the pages in the cover's
+# glow, so the four read apart at a glance even at icon size (and none looks like the Grimoire, which
+# is a closed brown tome you fight with).
+COVERS = {
+    "arrows": ("#2f8f86", "#1f5f5a", "#6fd0c2", "#9ff5e4"),   # bows and staves: verdigris
+    "blade": ("#a8343c", "#6e1f2a", "#e0646a", "#ffb0a0"),    # swung weapons: blood red
+    "arcane": ("#6b45a0", "#45296e", "#a47fdc", "#e39cff"),   # any weapon: violet
+    "ward": ("#5d6a86", "#3c4459", "#9aa6c4", "#ffd88a"),     # body armour: iron, a warm ward light
+}
+
+
+def rune(kind, col, light):
+    """The glyph above the pages, centred on (256, 452)."""
+    if kind == "arrows":   # one shot splitting into three
+        b = ""
+        for ang in (-46, 46, 0):
+            b += G(line("M0 0 L0 -84", 13) + line("M0 0 L0 -84", 6, light)
+                   + fill("M-32 -78 L0 -142 L32 -78 Q0 -92 -32 -78 Z", light, 5)
+                   + fill_ns("M0 -136 L24 -82 Q8 -88 0 -88 Z", "#ffffff", .55), 256, 552, ang)
+        return b + f'<circle cx="256" cy="552" r="14" fill="{col}" stroke-width="{sw(6)}"/>'
+    if kind == "blade":    # a crescent slash
+        d = "M168 500 Q222 380 352 392 Q262 410 214 506 Q190 512 168 500 Z"
+        return fill(d, col, 8) + brush((198, 482), (236, 418), (316, 398), 6, light) + sparkle(352, 392, 1.3, "#ffffff")
+    if kind == "arcane":   # a bolt of lightning
+        d = "M276 372 L214 466 L254 466 L226 546 L306 440 L264 440 L298 372 Z"
+        return fill(d, col, 8) + brush((270, 384), (244, 428), (226, 458), 5, light) + sparkle(300, 520, .9, "#ffffff")
+    # ward: a heater shield with a boss
+    d = "M206 384 Q256 400 306 384 L306 452 Q302 510 256 540 Q210 510 206 452 Z"
+    return (fill(d, col, 8) + fill_ns("M256 392 Q300 392 304 388 L304 452 Q300 506 256 534 Z", "#000000", .18)
+            + f'<circle cx="256" cy="452" r="18" fill="{light}" stroke-width="{sw(6)}"/>' + brush((222, 404), (218, 450), (234, 500), 5, "#ffffff", .7))
+
+
+def book(kind):
+    cover, cover_d, cover_l, glow = COVERS[kind]
+
+    def draw():
+        d = []; b = ""
+        b += halo(256, 470, 120, glow, .2) + halo(256, 470, 70, glow, .22)
+        # the cover under the pages, its corners showing, and a ribbon hanging from the spine
+        cover_path = "M80 600 Q168 566 256 602 Q344 566 432 600 L442 712 Q344 680 256 722 Q168 680 70 712 Z"
+        b += shaded(d, cover_path, cover, cover_d, 0, -16, brush((96, 690), (170, 664), (236, 690), 7, cover_l, .8))
+        b += fill("M262 704 L262 760 L278 746 L294 762 L294 700 Z", glow, 6)
+        # the pages, fanned open, a few lines of writing on each
+        for side in (-1, 1):
+            page = (f"M256 596 Q{256 + side * 74} 558 {256 + side * 146} 584 L{256 + side * 150} 654 "
+                    f"Q{256 + side * 76} 630 256 670 Z")
+            b += shaded(d, page, BONE, BONE_D, -side * 10, -6, brush((256 + side * 30, 610), (256 + side * 80, 590), (256 + side * 130, 604), 6, BONE_L))
+            for i in range(2):
+                y = 612 + i * 20
+                b += line(f"M{256 + side * 34} {y + 6} Q{256 + side * 80} {y - 10} {256 + side * 128} {y + 2}", 3, "#b5a684")
+        b += line("M256 598 L256 672", 7)
+        # the rune lifting off the pages
+        b += fill_ns("M226 590 Q256 520 286 590 Z", glow, .35)
+        b += rune(kind, cover_l, glow)
+        b += sparkle(170, 500, 1.1, glow) + sparkle(352, 540, .9, glow) + sparkle(318, 380, .7, "#ffffff", .9)
+        return d, b
+    draw.__name__ = f"book_{kind}"
+    return draw
+
+
+BOOK_FNS = {f"book-{kind}": book(kind) for kind in COVERS}
+SPRITES = {"ichor": (ichor, (136, 390, 376, 740)), **{key: (fn, (76, 360, 436, 750)) for key, fn in BOOK_FNS.items()}}
+ICONS = {"ichor": ichor, **BOOK_FNS}
 WIDE = {}

@@ -37,7 +37,7 @@ import {createUpdateChecker} from './updates.mjs?v=harvest-18';
 import {skillBlock, skillFor} from './skills.mjs?v=harvest-18';
 import {labClear, labDps, labEquip, labLevel, labRank, labResetStats, labSpawn, labStrength, labToggle} from './lab.mjs?v=harvest-18';
 import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/lab.mjs?v=harvest-18';
-import {REFINE_CURRENCY, carriedWeapons, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
+import {REFINE_CURRENCY, bookLines, carriedBooks, carriedGear, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
 import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
 import {createHurtFx} from './hurt-fx.mjs?v=harvest-18';
 import {CHARM} from './trinkets.mjs?v=harvest-18';
@@ -74,8 +74,9 @@ let localActions=null,localActionWorld=null,localClient=null;
 let chestSession=null,chestOpening=false,chestToken=0,chestRenewAt=0,chestRenewing=false;
 let catalog={source:'field',stationId:null,stationType:null,tab:'build'};
 let catalogPending='',catalogPick='';
-// The workbench's Refine panel (src/ui/refine.mjs): which bench, which weapon type, the slot being rolled.
-let refining={stationId:null,itemId:null,pending:-1,fresh:-1,ascending:false};
+// The workbench's Refine panel (src/ui/refine.mjs): which bench, which weapon type or armour, the slot being
+// rolled, the modifier book picked to write (null: slots roll with ichor), and an ascension under way.
+let refining={stationId:null,itemId:null,pending:-1,fresh:-1,book:null,ascending:false};
 let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,pendingOp=null,actionPending=false;
 let liveActions=[],holdKind=null,holdTarget=null,holdSource=null,dismantleStarted=0,ringFrame=0,captured=null;
 const checkForUpdate=createUpdateChecker({canReload:()=>mode==='front'&&!busy&&!network&&!document.hidden});
@@ -453,8 +454,7 @@ function closeSheet(){
 }
 function openFieldBuild(){catalog={source:'field',stationId:null,stationType:null,tab:'build'};category='all';catalogPick='';openSheet('catalog');}
 function openStationCatalog(panel){catalog={source:'station',stationId:panel.stationId,stationType:panel.stationType,tab:panel.tab};category='all';catalogPick='';openSheet('catalog');}
-function openRefine(stationId){const p=me();refining={stationId,itemId:p?.equipment?.weapon?.itemId||carriedWeapons(p)[0]||null,pending:-1,fresh:-1,ascending:false};openSheet('refine');}
-/** Roll (or reroll) a slot of the weapon type shown in the Refine panel. */
+function openRefine(stationId){const p=me();refining={stationId,itemId:p?.equipment?.weapon?.itemId||carriedGear(p)[0]||null,pending:-1,fresh:-1,book:null,ascending:false};openSheet('refine');}
 /** Ascension (src/mastery.mjs): one more ✦ for the weapon type on the Refine panel. */
 async function ascendSelected(){
   const p=me();if(!p||refining.ascending||refining.pending>=0||!refining.itemId)return;
@@ -462,11 +462,12 @@ async function ascendSelected(){
   await send({type:'ascendWeapon',stationId:refining.stationId,itemId:refining.itemId});
   refining.ascending=false;dirty=true;renderSheet();
 }
+/** Roll (or reroll) a slot of the gear shown in the Refine panel, or write the picked book into it. */
 async function refineSlot(slot){
   const p=me();if(!p||refining.pending>=0||!refining.itemId||!Number.isInteger(slot))return;
-  const itemId=refining.itemId;refining.pending=slot;refining.fresh=-1;dirty=true;renderSheet();
-  const result=await send({type:'refine',stationId:refining.stationId,itemId,slot});
-  refining.pending=-1;if(result?.ok&&refining.itemId===itemId){refining.fresh=slot;setTimeout(()=>{if(refining.fresh===slot){refining.fresh=-1;dirty=true;}},1600);}dirty=true;renderSheet();
+  const itemId=refining.itemId,bookId=refining.book;refining.pending=slot;refining.fresh=-1;dirty=true;renderSheet();
+  const result=await send({type:'refine',stationId:refining.stationId,itemId,slot,...(bookId?{bookId}:{})});
+  refining.pending=-1;if(result?.ok&&bookId)refining.book=null;if(result?.ok&&refining.itemId===itemId){refining.fresh=slot;setTimeout(()=>{if(refining.fresh===slot){refining.fresh=-1;dirty=true;}},1600);}dirty=true;renderSheet();
 }
 function toggleInventory(){if(sheet==='inventory'||sheet==='chest')closeSheet();else openSheet('inventory');}
 function toggleFieldBuild(){if(sheet==='catalog'&&catalog.source==='field')closeSheet();else openFieldBuild();}
@@ -603,6 +604,7 @@ function ensurePanel(){
 }
 /** Hover text for an item: trinkets say what they do, weapons their mastery. */
 function itemTip(stack){
+  const book=bookLines(stack.itemId);if(book.length)return [label(stack.itemId),...book].join('\n');
   const p=me(),m=masteryView(world,p,stack.itemId),mods=refineLines(p,stack.itemId);
   if(m||mods.length)return [m?.named?.name?`${m.named.name} (${label(stack.itemId)})`:label(stack.itemId),m?.named?.title||'',m?weaponAbout('',m,null):'',...mods].filter(Boolean).join('\n');
   return trinketTip(stack.itemId,p);
@@ -666,7 +668,7 @@ function guideHTML(){
     ['Brave the frontier','The outer regions punish the unprepared, and every wanderer needs their own answer. The Hollow Mire’s spore fog drains courage, then health: wear a glowcap mask, made from blooms that sprout in the Autumn Woods only after dark. The Moonshard Crags are pitch dark even by day: only your own lit grave lantern, fed by wisp essence that drifts over the Graveyard at night, holds the dark back. The Barrow Fields’ grave-chill slows you: a bone-lined barrow cloak keeps it out. Masks and cloaks wear only inside their region.'],
     ['Grow stronger','Kills, caches, gathering and new regions give experience. Each level adds health and damage. Loot comes in five rarities: common, uncommon, rare, epic and legendary. Bows fire arrows at the nearest foe, staffs throw bursting bolts, broadswords cleave, and the Grimoire of Ash burns everything around you. Heartstones raise your health for good.'],
     ['Wear two trinkets','Trinkets are small relics that each bend one rule. Wear one in the trinket socket; the second socket opens at level 10, or when a Warden or the Hollow King falls while you stand. Some pairs resonate and do something new together: a trinket’s tooltip names its partners, and the chips under your health light up and name the pair. The Hollow mirror strengthens whatever you wear beside it.'],
-    ['Refine your weapons','Creatures drop Dread ichor, and only creatures: briarlings now and then, wraiths, bonewalkers and boglings more often, gravekeepers, golems and the Hollow King by the handful. Stand at a workbench and press Refine: each weapon holds three modifiers, each rolled with a rarity from common to legendary, from sharper crits and faster swings to an extra arrow or star. Reroll any of them with more ichor. Like mastery, refinement is yours, not the item’s. Spare gear can be dismantled from Inventory: loot melts into ichor (more the rarer it is), crafted gear gives back half its materials.'],
+    ['Refine your weapons and armour','Creatures drop Dread ichor, and only creatures: briarlings now and then, wraiths, bonewalkers and boglings more often, gravekeepers, golems and the Hollow King by the handful. Stand at a workbench and press Refine: each weapon and each body armour holds three modifiers, each rolled with a rarity from common to legendary. Some sharpen numbers (crits, speed, reach); others change how you fight: arrows that fork, bounce, burst into shards or fly back; blades that loose cutting waves, swing twice or slam the ground; lightning that leaps, crits that shatter, foes that explode; armour that fights back. Reroll any slot with more ichor. Modifier books turn up like any loot: each carries one modifier at its own rarity, and the Refine panel writes it into the slot you choose, no ichor needed. Like mastery, refinement is yours, not the item’s. Spare gear can be dismantled from Inventory: loot melts into ichor (more the rarer it is), crafted gear gives back half its materials.'],
     ['Outlast the night','Every night is harder than the last, with more creatures and elder champions. Guard the Heartfire: losing it ends the expedition (in the Vigil it is rekindled instead). How many nights can you survive?'],
     ['Go down into the dungeons','Dungeons on the title screen is a crawl of its own, alone or with up to three friends. Every floor is carved fresh: the Barrow Crypt, the Rootwarren and the Moonlit Ossuary each build theirs differently. Chambers wake as you come near; clear them, open their caches and find the Warden by the stairs. Slay it and the stairs open: the whole party stands in them to go down. Shrines bless you once a floor, the camp fire mends you and its workbench refines your weapons. Fallen friends rise when the Warden falls. Every fifth floor, the Hollow King waits. Weapons never wear down there, and a run is never saved: how deep can you go?'],
     ['Read the moon','Tap the moon beside the clock to see tonight’s moon and the next. Under a waxing moon the woods raid your fire in waves. A new moon brings no raid but a darker night: the time to gather what only grows in the dark. A rare blood moon brings the Hollow King, stronger each time he returns, and more waves than any other night. Whatever the moon, creatures stalk anyone who wanders far from the fire after dark, more often deeper in the hollow.'],
@@ -758,13 +760,15 @@ function renderSheet(){
     replaceContent(catalogMarkup({recipes,maintain:model.maintain,pendingId:catalogPending,pickId:catalogPick}));
   }else if(sheet==='refine'){
     title='Refine';kicker='WORKBENCH · MODIFIERS AND ASCENSION';
-    const weapons=carriedWeapons(p);
-    if(!weapons.includes(refining.itemId))refining.itemId=weapons[0]||null;
-    setTabs(refineTabs(weapons.map(itemId=>({itemId,name:weaponName(p,itemId),count:refinesOf(p,itemId).length,max:refineSlots(p,itemId),named:namedView(p,itemId).named})),refining.itemId));
+    const gear=carriedGear(p);
+    if(!gear.includes(refining.itemId))refining.itemId=gear[0]||null;
+    setTabs(refineTabs(gear.map(itemId=>({itemId,name:weaponName(p,itemId),count:refinesOf(p,itemId).length,max:refineSlots(p,itemId),named:namedView(p,itemId).named})),refining.itemId));
     const canPay=cost=>world.canPay(p,cost);
-    const view=refining.itemId?refineView(p,refining.itemId,{have:world.available(p,REFINE_CURRENCY),canPay}):null;
-    const ascend=view?ascendView(p,view.itemId,{have:{sigil:world.available(p,'sigil'),ichor:world.available(p,REFINE_CURRENCY)},canPay}):null;
-    replaceContent(refineMarkup(view,{icons:{weapon:view?icon(view.itemId):'',ichor:icon(REFINE_CURRENCY),sigil:icon('sigil')},pending:refining.pending,fresh:refining.fresh,ascend,ascending:refining.ascending}));
+    const view=refining.itemId?refineView(p,refining.itemId,{have:world.available(p,REFINE_CURRENCY),canPay,books:carriedBooks(world,p),armed:refining.book}):null;
+    if(refining.book&&view?.armed!==refining.book)refining.book=null;
+    // Ascension is a weapon's: armour has none.
+    const ascend=view&&view.kind!=='armour'?ascendView(p,view.itemId,{have:{sigil:world.available(p,'sigil'),ichor:world.available(p,REFINE_CURRENCY)},canPay}):null;
+    replaceContent(refineMarkup(view,{icons:{weapon:view?icon(view.itemId):'',ichor:icon(REFINE_CURRENCY),sigil:icon('sigil')},bookIcon:icon,pending:refining.pending,fresh:refining.fresh,ascend,ascending:refining.ascending}));
   }else if(sheet==='inventory'||sheet==='chest'){
     const cart=sheet==='chest'&&chestBuilding()?.type==='cart';
     title=sheet==='chest'?(cart?'Hand cart':'Chest'):'Inventory';
@@ -1203,7 +1207,7 @@ function setupControls(){
   });
   $('sheet-tabs').onclick=event=>{
     const weapon=event.target.closest('[data-refine-weapon]');
-    if(weapon){refining={...refining,itemId:weapon.dataset.refineWeapon,fresh:-1};dirty=true;renderSheet();return;}
+    if(weapon){refining={...refining,itemId:weapon.dataset.refineWeapon,fresh:-1,book:null};dirty=true;renderSheet();return;}
     const tab=event.target.closest('[data-tab]');const chip=event.target.closest('[data-category]');
     if(tab){catalog={...catalog,tab:tab.dataset.tab};category='all';dirty=true;renderSheet();}
     if(chip){category=chip.dataset.category;dirty=true;renderSheet();}
@@ -1211,6 +1215,7 @@ function setupControls(){
   $('sheet-content').onclick=event=>{
     const button=event.target.closest('button');if(!button)return;
     if(button.dataset.refineSlot!=null){void refineSlot(Number(button.dataset.refineSlot));return;}
+    if(button.dataset.refineBook!=null){if(refining.pending<0){refining.book=refining.book===button.dataset.refineBook?null:button.dataset.refineBook;dirty=true;renderSheet();}return;}
     if(button.dataset.ascend!=null){void ascendSelected();return;}
     if(button.dataset.pick){catalogPick=button.dataset.pick;dirty=true;renderSheet();return;}
     if(button.dataset.recipe){

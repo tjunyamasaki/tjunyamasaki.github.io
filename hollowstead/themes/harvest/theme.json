@@ -4123,6 +4123,94 @@
       },
       "icon": "./sprites/ichor-icon.svg?v=refine1"
     },
+    "book-arrows": {
+      "src": "./sprites/book-arrows.svg?v=books1",
+      "size": [
+        1.2,
+        1.8
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/book-arrows-icon.svg?v=books1"
+    },
+    "book-blade": {
+      "src": "./sprites/book-blade.svg?v=books1",
+      "size": [
+        1.2,
+        1.8
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/book-blade-icon.svg?v=books1"
+    },
+    "book-arcane": {
+      "src": "./sprites/book-arcane.svg?v=books1",
+      "size": [
+        1.2,
+        1.8
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/book-arcane-icon.svg?v=books1"
+    },
+    "book-ward": {
+      "src": "./sprites/book-ward.svg?v=books1",
+      "size": [
+        1.2,
+        1.8
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/book-ward-icon.svg?v=books1"
+    },
     "briarmother": {
       "src": "./sprites/briarmother.svg?v=vigil1",
       "size": [

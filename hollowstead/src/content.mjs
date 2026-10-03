@@ -1,4 +1,5 @@
 import {magicItems} from './magic/registry.mjs?v=harvest-18';
+import {BOOKS} from './refine-mods.mjs?v=harvest-18';
 // Simulation identifiers are deliberately independent of art, names and animations.
 const DAY=180, DUSK=30, NIGHT=100;
 export const SPEED_SCALE = 1.15;
@@ -250,7 +251,7 @@ export const CHARACTERS = [
  */
 export const LOOKS = Object.freeze([{id:'hood',name:'Hooded'},{id:'mask',name:'Masked'},{id:'witch',name:'Witch'}]);
 for(const base of CHARACTERS.slice()) for(const look of LOOKS) CHARACTERS.push({...base,id:`${base.id}-${look.id}`,base:base.id,look:look.id});
-export const label = key => ITEMS[key]?.name || EQUIPMENT[key]?.name || magicItems[key]?.name || STRUCTURES[key]?.name || ENEMIES[key]?.name || key;
+export const label = key => ITEMS[key]?.name || EQUIPMENT[key]?.name || magicItems[key]?.name || BOOKS[key]?.name || STRUCTURES[key]?.name || ENEMIES[key]?.name || key;
 /**
  * Day and night schedules, in seconds. An expedition keeps the standard one. The Vigil (a single save
  * kept for the long haul, vigil.mjs) lets every part of the day run longer, so a day out exploring

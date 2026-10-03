@@ -8,6 +8,7 @@ import {FRONTIER_LINES} from '../regions.mjs?v=harvest-18';
 import {contextActionIds, dismantleRule} from '../interactions.mjs?v=harvest-18';
 import {ARMOR_REDUCTION, rarityOf, weaponStyle} from '../progression.mjs?v=harvest-18';
 import {TRINKET_TEXT} from '../trinkets.mjs?v=harvest-18';
+import {bookLines} from '../refine.mjs?v=harvest-18';
 
 const SPECS = Object.freeze({
   feed: {icon: '▥', label: 'Feed', activation: 'tap'},
@@ -431,6 +432,8 @@ export function effectLine(itemId) {
     if (itemId === 'everlantern') return `${tag}Never runs out · wider light`;
     return tag.replace(/ · $/, '');
   }
+  const book = bookLines(itemId);
+  if (book.length) return tag + book[0];
   const item = ITEMS[itemId];
   if (!item) return '';
   if (item.boost === 'vigor') return `${tag}Use: +15 max health, forever`;

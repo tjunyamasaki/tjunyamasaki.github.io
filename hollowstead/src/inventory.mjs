@@ -2,6 +2,7 @@
 
 import {EQUIPMENT, ITEMS} from './content.mjs?v=harvest-18';
 import {magicItems} from './magic/registry.mjs?v=harvest-18';
+import {bookOf} from './refine-mods.mjs?v=harvest-18';
 import {
   BACKPACK_SLOT_COUNT, CHEST_SLOT_COUNT, CLOCK_V1, CLOCK_V2, DROP_LIFETIME_SECONDS, SPILL_LIFETIME_SECONDS,
   EQUIPMENT_SLOTS, EQUIPMENT_SLOT_ITEMS, RESULT_CODES, SAVE_VERSION_V2, SUPPLY_CAPACITY, SUPPLY_ITEM_IDS,
@@ -448,7 +449,7 @@ export function spriteVariant(theme, key, entity){
 }
 export function itemSpriteKey(itemId){
   if(!itemDefinition(itemId))return null;
-  return ITEMS[itemId]?.icon||EQUIPMENT[itemId]?.icon||magicItems[itemId]?.icon||null;
+  return ITEMS[itemId]?.icon||EQUIPMENT[itemId]?.icon||magicItems[itemId]?.icon||bookOf(itemId)?.icon||null;
 }
 
 export function collectLocations(world){

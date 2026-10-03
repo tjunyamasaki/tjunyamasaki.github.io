@@ -83,7 +83,7 @@ export async function loadTheme(url=new URL('../themes/harvest/theme.json',impor
 }
 /** Swarm fights spray numbers; old labels give way so the DOM stays light on phones. */
 /** Floater colours for 'strike' events: clean harvest strikes (rhythm.mjs) and trinket moments (trinkets.mjs). */
-export const STRIKE_COLORS=Object.freeze({clean:'#ffe6a3',perfect:'#f2c14e',find:'#9fcaff',ward:'#efe6d2',fang:'#b9e2ba',thorn:'#f5c2a9',toll:'#f9dc8e',frenzy:'#ffae5c',choir:'#bfe0ff',veil:'#d7d0f0',key:'#b9e2ba'});
+export const STRIKE_COLORS=Object.freeze({clean:'#ffe6a3',perfect:'#f2c14e',find:'#9fcaff',ward:'#efe6d2',fang:'#b9e2ba',thorn:'#f5c2a9',toll:'#f9dc8e',frenzy:'#ffae5c',choir:'#bfe0ff',veil:'#d7d0f0',key:'#b9e2ba',refine:'#e6c6ff'});
 /**
  * Ground telegraphs and hostile shots. Pooled meshes on shared unit geometries: a swarm winding up
  * and a sky full of orbs must not allocate textures every frame.
@@ -427,7 +427,7 @@ export class Renderer {
     const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;this.paintField(frame);this.paintFlash(weapon);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
     this.paintPlaza(world,frame);if(world.dungeon)this.dungeonLayer?.update(world,frame,this.clock);this.scenery.update(world,frame,dt,this.focus);(this.homestead||=new HomesteadLayer(this)).update(world,frame,dt,homestead,this.clock);this.combat.begin();
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).filter(e=>!e.painted).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind,rig}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
@@ -448,6 +448,7 @@ export class Renderer {
       if(kind==='enemy'&&e.warden){sx*=1.12;sy*=1.12;}
       if((kind==='prop'||kind==='building')&&e.scale){sx*=e.scale;sy*=e.scale;}
       if(key==='gravecraft-skeleton')sy*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
+      if(kind==='projectile'&&e.small){sx*=.7;sy*=.7;} // a fork's arrow or a shard (refine.mjs)
       if(o.hitUntil>this.clock){const squash=Math.sin((o.hitUntil-this.clock)*14)*(motion.hitSquash||0);sx*=1+squash;sy*=1-squash;}
       const flip=(kind==='player'&&e.dx<-.1)||((kind==='magic'||kind==='ally')&&e.facing===-1)||(kind==='enemy'&&e.face===-1);
       o.sprite.scale.set(flip?-sx:sx,sy,1);o.sprite.position.set(o.x,bob+(present?.y||0)+(kind==='projectile'?.9:0),o.z);if(kind==='projectile')o.shadow.visible=false;o.shadow.position.set(o.x,.018,o.z);if(kind==='building'&&e.scale)o.shadow.scale.setScalar(o.def.size[0]*.26*e.scale);

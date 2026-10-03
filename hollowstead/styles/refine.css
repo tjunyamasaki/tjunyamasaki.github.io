@@ -68,3 +68,18 @@
 .hotbar .weapon-slot.ascend-ready .mastery.ascend em{animation:worn-pulse 1.4s ease-in-out infinite}
 .hotbar .weapon-slot .rank .ascend-mark{margin-left:2px;font-weight:700;color:#d6c0ff;letter-spacing:0}
 @media (prefers-reduced-motion:reduce){.hotbar .weapon-slot.ascend-ready .mastery.ascend em{animation:none}}
+/* Modifier books (refine-mods.mjs): picked like a chip, then written into a slot. */
+.refine-books{margin:14px 0 4px;padding-top:12px;border-top:1px solid var(--border)}
+.refine-books h4{margin:0 0 8px;font:13px Georgia,serif;letter-spacing:.4px;color:#ebd7b5}
+.refine-books ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+.refine-book{--tone:var(--common);width:100%;display:grid;grid-template-columns:34px 1fr;gap:8px;align-items:center;text-align:left;padding:6px 8px;min-height:48px;border:1px solid color-mix(in srgb,var(--tone) 40%,transparent);border-left:3px solid var(--tone);border-radius:8px;background:color-mix(in srgb,var(--tone) 7%,#241f2b);color:inherit}
+.refine-book.rarity-uncommon{--tone:var(--uncommon)}.refine-book.rarity-rare{--tone:var(--rare)}.refine-book.rarity-epic{--tone:var(--epic)}.refine-book.rarity-legendary{--tone:var(--legendary)}
+.refine-book .item-icon{width:34px;height:34px;object-fit:contain}
+.refine-book-text{display:flex;flex-direction:column;gap:1px;min-width:0}
+.refine-book-text b{font-size:12px;color:#f0dfbd}
+.refine-book-text small{font:9px ui-monospace,monospace;letter-spacing:1px;text-transform:uppercase;color:var(--tone)}
+.refine-book-text em{font-style:normal;font-size:11px;line-height:1.35;color:#e1d2bb}
+.refine-book.is-armed{background:color-mix(in srgb,var(--tone) 22%,#241f2b);box-shadow:0 0 0 2px var(--tone),0 0 16px color-mix(in srgb,var(--tone) 45%,transparent)}
+.refine-slots.is-writing .refine-slot:not(.is-target){opacity:.55}
+.refine-slot.is-target{box-shadow:0 0 0 1px var(--tone),0 0 12px color-mix(in srgb,var(--tone) 35%,transparent)}
+.world-label.strike-refine{font-size:12px;letter-spacing:.8px;color:#e6c6ff}

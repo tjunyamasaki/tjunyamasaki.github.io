@@ -1,6 +1,7 @@
 // The Long Night rules: regions, rarity, loot tables, experience, weapon styles
 // and the difficulty curve. Pure data and pure functions; no World, DOM or art.
 import {BUFF} from './buffs.mjs?v=harvest-18';
+import {REFINE, bookOf, booksAt} from './refine-mods.mjs?v=harvest-18';
 
 // ------------------------------------------------------------------ regions
 export const REGIONS = Object.freeze({
@@ -102,48 +103,54 @@ const ITEM_RARITY = Object.freeze({
   sigil:'epic',
   haversack:'uncommon',
 });
-export const rarityOf = itemId=>ITEM_RARITY[itemId]||'common';
+export const rarityOf = itemId=>ITEM_RARITY[itemId]||bookOf(itemId)?.rarity||'common';
 export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
 
 // ------------------------------------------------------------------ loot tables
 // Each table: rolls of weighted entries. `n` is [min,max] quantity; `pick` picks one item
 // from a rarity pool so new gear only needs a rarity to join the tables.
+// 'book' (in a pool or a table) is a modifier book (refine-mods.mjs): in a pool, one of the pool's
+// rarity; in a table, of a rarity rolled like a refinement (mostly common, luck raises it).
 const POOLS = Object.freeze({
-  uncommon:['recurve','sword','elixir','elixir','torch','bandage','tinderpouch','crookedkey','soulstitch'],
-  rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem','nightfang','emberheart','crowseye','harvestcharm','wispfeather','gravedust','gutteringcandle','gravechalk','redthread'],
-  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer','pallbearer','frostanklet','boneward','moonlocket','thornknot','hellspur','mournersveil'],
-  legendary:['tome','everlantern','scythe','starfall','wighthorn','hollow-moon','thirteenthbell','hollowmirror'],
+  uncommon:['recurve','sword','elixir','elixir','torch','bandage','tinderpouch','crookedkey','soulstitch','book'],
+  rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem','nightfang','emberheart','crowseye','harvestcharm','wispfeather','gravedust','gutteringcandle','gravechalk','redthread','book','book'],
+  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer','pallbearer','frostanklet','boneward','moonlocket','thornknot','hellspur','mournersveil','book','book'],
+  legendary:['tome','everlantern','scythe','starfall','wighthorn','hollow-moon','thirteenthbell','hollowmirror','book'],
 });
 export const LOOT_TABLES = Object.freeze({
   crate:{xp:12, rolls:[
     {count:[2,3], entries:[['wood',[2,4],3],['stone',[2,4],3],['fiber',[2,4],2],['berry',[2,3],2],['meat',[1,2],1],['bandage',[1,1],1],['seed',[1,3],1],['ore',[1,2],.6]]},
     {chance:.3, entries:[['uncommon',1,1]]},
+    {chance:.07, entries:[['book',1,1]]},
   ]},
   ironchest:{xp:30, rolls:[
     {count:[2,3], entries:[['ore',[2,3],2],['bone',[2,4],2],['shard',[1,2],1],['ember',[1,3],1],['bandage',[1,2],1],['stew',[1,1],.4]]},
     {entries:[['uncommon',1,3],['rare',1,2]]},
+    {chance:.18, entries:[['book',1,1]]},
   ]},
   moonchest:{xp:65, rolls:[
     {count:[2,3], entries:[['shard',[2,4],2],['ore',[2,4],2],['ember',[2,4],2],['elixir',[1,2],1],['bone',[2,4],1]]},
     {entries:[['rare',1,1]]},
     {chance:.45, entries:[['epic',1,1]]},
+    {chance:.28, entries:[['book',1,1]]},
   ]},
   reliquary:{xp:130, rolls:[
     {count:[3,4], entries:[['shard',[3,5],2],['ember',[3,6],2],['elixir',[1,2],1],['ore',[3,5],1]]},
     {entries:[['epic',1,1]]},
     {chance:.5, entries:[['legendary',1,1]]},
+    {chance:.4, entries:[['book',1,1]]},
   ]},
   // Hostiles: bonus drops on top of ENEMIES[type].loot. Elites add +1 luck.
   // Swarm creatures drop little each: there are many more of them.
   // Dread ichor (refinement) comes only from creatures: a little from the swarm, more from the big ones.
-  crawler:{xp:4, rolls:[{chance:.3, entries:[['fiber',[1,2],3],['meat',[1,1],2]]},{chance:.025, entries:[['uncommon',1,1]]},{chance:.14, entries:[['ichor',[1,1],1]]}]},
-  wraith:{xp:8, rolls:[{chance:.06, entries:[['uncommon',1,4],['rare',1,1]]},{chance:.35, entries:[['ichor',[1,1],1]]}]},
-  brute:{xp:34, rolls:[{chance:.26, entries:[['uncommon',1,3],['rare',1,2],['epic',1,.3]]},{entries:[['ichor',[2,3],1]]}]},
-  bonewalker:{xp:11, rolls:[{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.35, entries:[['ichor',[1,1],1]]}]},
-  bogling:{xp:10, rolls:[{chance:.08, entries:[['uncommon',1,3],['elixir',[1,1],2]]},{chance:.4, entries:[['ichor',[1,1],1]]}]},
-  golem:{xp:52, rolls:[{chance:.34, entries:[['rare',1,3],['epic',1,1]]},{entries:[['ichor',[3,4],1]]}]},
+  crawler:{xp:4, rolls:[{chance:.3, entries:[['fiber',[1,2],3],['meat',[1,1],2]]},{chance:.025, entries:[['uncommon',1,1]]},{chance:.14, entries:[['ichor',[1,1],1]]},{chance:.005, entries:[['book',1,1]]}]},
+  wraith:{xp:8, rolls:[{chance:.06, entries:[['uncommon',1,4],['rare',1,1]]},{chance:.35, entries:[['ichor',[1,1],1]]},{chance:.015, entries:[['book',1,1]]}]},
+  brute:{xp:34, rolls:[{chance:.26, entries:[['uncommon',1,3],['rare',1,2],['epic',1,.3]]},{entries:[['ichor',[2,3],1]]},{chance:.08, entries:[['book',1,1]]}]},
+  bonewalker:{xp:11, rolls:[{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.35, entries:[['ichor',[1,1],1]]},{chance:.015, entries:[['book',1,1]]}]},
+  bogling:{xp:10, rolls:[{chance:.08, entries:[['uncommon',1,3],['elixir',[1,1],2]]},{chance:.4, entries:[['ichor',[1,1],1]]},{chance:.015, entries:[['book',1,1]]}]},
+  golem:{xp:52, rolls:[{chance:.34, entries:[['rare',1,3],['epic',1,1]]},{entries:[['ichor',[3,4],1]]},{chance:.1, entries:[['book',1,1]]}]},
   // Dread Ages (ages.mjs): fast pack hunters of the later Vigil.
-  dreadhound:{xp:14, rolls:[{chance:.3, entries:[['bone',[1,2],2],['meat',[1,1],1]]},{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.4, entries:[['ichor',[1,1],1]]}]},
+  dreadhound:{xp:14, rolls:[{chance:.3, entries:[['bone',[1,2],2],['meat',[1,1],1]]},{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.4, entries:[['ichor',[1,1],1]]},{chance:.015, entries:[['book',1,1]]}]},
   // Omens (omens.mjs): rare, hard won, and worth it. Each is a little hoard.
   fallenstar:{xp:120, rolls:[
     {count:[3,4], entries:[['shard',[3,5],3],['ember',[3,4],2],['rime',[2,3],1],['emberglass',[2,3],1],['ore',[3,4],1]]},
@@ -183,7 +190,7 @@ export const LOOT_TABLES = Object.freeze({
   starshard:{xp:0, rolls:[{entries:[['rare',1,2],['epic',1,1]]},{chance:.06, entries:[['legendary',1,1]]}]},
   briarmother:{xp:700, rolls:[]},
   unblinking:{xp:820, rolls:[]},
-  king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]},{entries:[['ichor',[10,14],1]]},{entries:[['sigil',[1,2],1]]}]},
+  king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]},{entries:[['ichor',[10,14],1]]},{entries:[['sigil',[1,2],1]]},{entries:[['book',1,1]]}]},
 });
 
 function between(rng,[lo,hi]){return lo+Math.floor(rng()*(hi-lo+1));}
@@ -193,6 +200,22 @@ function weighted(rng,entries){
   return entries[entries.length-1];
 }
 const upgrade={uncommon:'rare',rare:'epic',epic:'legendary',legendary:'legendary'};
+/** A modifier book of rarity index `tier` (any modifier that has one there, by its weight), or null. */
+export function rollBook(rng, tier){
+  const ids=booksAt(Math.max(0,Math.min(RARITIES.length-1,tier|0)));
+  if(!ids.length)return null;
+  const weight=id=>REFINE.mods[bookOf(id).mod].weight||1;
+  let r=rng()*ids.reduce((sum,id)=>sum+weight(id),0);
+  for(const id of ids){r-=weight(id);if(r<0)return id;}
+  return ids[ids.length-1];
+}
+/** A book's rarity when a table (not a pool) drops one: refinement odds, each point of luck a step up 18% of the time. */
+function bookTier(rng, luck){
+  const total=REFINE.weights.reduce((a,b)=>a+b,0);let r=rng()*total,tier=0;
+  for(;tier<REFINE.weights.length-1;tier++){r-=REFINE.weights[tier];if(r<0)break;}
+  if(luck>0&&rng()<.18*luck)tier=Math.min(RARITIES.length-1,tier+1);
+  return tier;
+}
 
 /**
  * Duplicate guard for gear picked from a rarity pool: a pick the party already holds (`held`, World.heldGear)
@@ -211,10 +234,12 @@ export function rollLoot(tableId, rng, luck=0, held=null){
     const times=roll.count?between(rng,roll.count):1;
     for(let i=0;i<times;i++){
       const [id,qty]=weighted(rng,roll.entries);
+      if(id==='book'){const book=rollBook(rng,bookTier(rng,luck));if(book)add(book,1);continue;}
       if(POOLS[id]){
         let tier=id;if(luck>0&&rng()<.18*luck)tier=upgrade[tier];
         const pool=POOLS[tier];let pick=pool[Math.floor(rng()*pool.length)];
         for(let k=0;k<LOOT_GUARD.rerolls&&owned(pick)&&rarityRank(pick)>=2&&!LOOT_GUARD.stack.includes(pick);k++)pick=pool[Math.floor(rng()*pool.length)];
+        if(pick==='book'){const book=rollBook(rng,RARITIES.indexOf(tier));if(book)add(book,1);continue;}
         add(pick,1);
       }else add(id,Array.isArray(qty)?between(rng,qty):qty);
     }
@@ -232,7 +257,7 @@ export const enemyXp = type=>LOOT_TABLES[type]?.xp??8;
 export const HP_PER_LEVEL=8, POWER_PER_LEVEL=.04, HEARTSTONE_HP=15;
 /** In the battle arena levels are the whole of your growth, so each one is worth more. */
 export const ARENA_GROWTH=Object.freeze({hp:12, power:.06, rank:.22, maxRank:5});
-export function maxHealth(p){return 100+(p?.growth==='arena'?ARENA_GROWTH.hp:HP_PER_LEVEL)*((p?.level||1)-1)+(p?.bonusHp||0)+(p?.buffs?.haunted?BUFF.haunted:0);}
+export function maxHealth(p){return 100+(p?.growth==='arena'?ARENA_GROWTH.hp:HP_PER_LEVEL)*((p?.level||1)-1)+(p?.bonusHp||0)+(p?.buffs?.haunted?BUFF.haunted:0)+armourStat(p,'vital');}
 /**
  * Weapon rank, ★1 to ★5, kept in `p.ranks` by weapon type. The arena ranks a weapon up with cards,
  * the weapon lab sets it by hand, and on an expedition kills with a weapon raise it (MASTERY).
@@ -320,35 +345,14 @@ export const isNamed=(p, itemId)=>typeof namedOf(p, itemId)?.name==='string';
 export const refineSlots=(p, itemId)=>REFINE.slots+(isNamed(p, itemId)?NAMED.slots:0);
 // ------------------------------------------------------------------ refinement
 /**
- * Refinement: up to three modifiers on each weapon type, rolled at a workbench with Dread ichor,
- * which only creatures drop. Each modifier is rolled with a rarity (the loot rarities, `weights`
- * is the chance of each, common first) and the rarity picks its strength from `values`. `min` keeps
- * a modifier out of the lower rarities; `only` limits it to weapons that shoot ('shots') or swing
- * ('melee'); `needs` rolls it only beside another (Cruel beside Keen). `weight` favours a pick. Like mastery it belongs to the wanderer, kept in `p.refine[itemId]` as
- * [{mod, tier}], so a broken weapon's successor keeps it. src/refine.mjs rolls and applies them.
- * Filling slot n costs cost[weapon rarity] x n ichor; rerolling a slot costs twice the base.
+ * Refinement: up to three modifiers on each weapon type and each body armour, rolled at a workbench
+ * with Dread ichor (which only creatures drop) or written there from a modifier book found as loot.
+ * The modifiers and books live in refine-mods.mjs (REFINE, BOOKS); like mastery they belong to the
+ * wanderer, kept in `p.refine[itemId]` as [{mod, tier}], so a broken weapon's successor keeps them.
+ * src/refine.mjs rolls and applies them. Filling slot n costs cost[gear rarity] x n ichor; rerolling
+ * a slot costs twice the base; a book costs nothing but itself.
  */
-export const REFINE=Object.freeze({
-  slots:3,
-  weights:Object.freeze([46,28,16,8,2]),
-  cost:Object.freeze({common:3, uncommon:4, rare:5, epic:6, legendary:8}),
-  rerollCost:2,
-  crit:1.5,        // a critical hit's multiplier before Cruel
-  leechCap:3,      // most health one hit can give back (Thirsting)
-  splitShare:.5,   // damage of each extra whole shot (Split)
-  mods:Object.freeze({
-    keen:{name:'Keen', text:'+{v}% critical chance', values:[5,8,12,18,30]},
-    cruel:{name:'Cruel', text:'+{v}% critical damage', values:[25,35,50,70,100], needs:'keen'},
-    honed:{name:'Honed', text:'+{v}% damage', values:[4,6,9,13,20]},
-    swift:{name:'Swift', text:'{v}% faster attacks', values:[4,6,9,12,18]},
-    fervent:{name:'Fervent', text:'Skill recharges {v}% faster', values:[6,9,12,16,24]},
-    thirst:{name:'Thirsting', text:'{v}% of damage dealt heals you', values:[1.5,2,3,4,6]},
-    bane:{name:'Bane', text:'+{v}% damage to elders and the Hollow King', values:[10,15,25,35,50]},
-    tempered:{name:'Tempered', text:'{v}% less wear', values:[15,25,35,50,70]},
-    reach:{name:'Long', text:'+{v}% reach', values:[8,12,16,22,30], only:'melee'},
-    split:{name:'Split', text:'+{v} {shot}', values:[0,0,0,1,2], min:3, only:'shots', count:true, weight:3},
-  }),
-});
+export {REFINE};
 /**
  * A refinement stat of the weapon in hand (or `itemId`): percentages as fractions (Honed 20 → .2),
  * counts as counts (Split). 0 when unrefined or broken.
@@ -362,6 +366,11 @@ export function refineStat(p, key, itemId){
   let total=0;
   for(const entry of list)if(entry?.mod===key)total+=mod.values[Math.max(0,Math.min(4,entry.tier|0))]||0;
   return mod.count?total:total/100;
+}
+/** A refinement stat of the body armour worn (0 when none, or when it is broken). */
+export function armourStat(p, key){
+  const body=p?.equipment?.body;
+  return body&&body.durability>0?refineStat(p,key,body.itemId):0;
 }
 
 /** Mending at the Heartfire: what it costs and how much of a weapon's condition it gives back. */

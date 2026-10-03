@@ -15,6 +15,7 @@ import {MOON_FX} from './hollow-moon.mjs?v=harvest-18';
 import {THORNHEART_FX} from './thornheart.mjs?v=harvest-18';
 import {DEEPEYE_FX} from './deepeye.mjs?v=harvest-18';
 import {HOLLOW_EVENTS, paintHollow} from './hollow.mjs?v=harvest-18';
+import {REFINE_EVENTS, paintWave} from './refine.mjs?v=harvest-18';
 import {magicItems} from '../magic/registry.mjs?v=harvest-18';
 import {rankOf} from '../progression.mjs?v=harvest-18';
 
@@ -36,7 +37,7 @@ export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAP
 const FOE_FX = WEAPON_FX.filter(fx => fx.foes);
 const FX_BY_ID = new Map(WEAPON_FX.map(fx => [fx.id, fx]));
 
-const EVENTS = Object.assign({...FLAIR_EVENTS, ...STARFALL_EVENTS, ...SKILL_EVENTS, ...HOLLOW_EVENTS}, ...WEAPON_FX.map(fx => fx.events || {}));
+const EVENTS = Object.assign({...FLAIR_EVENTS, ...STARFALL_EVENTS, ...SKILL_EVENTS, ...HOLLOW_EVENTS, ...REFINE_EVENTS}, ...WEAPON_FX.map(fx => fx.events || {}));
 const BEATS = Object.assign({...SKILL_BEATS, ...STARFALL_BEATS}, ...WEAPON_FX.map(fx => fx.beats || {}));
 /** Which weapon an event belongs to, for events that name the wielder but not the item. */
 const EVENT_OWNER = new Map(WEAPON_FX.flatMap(fx => Object.keys(fx.events || {}).map(key => [key, fx])));
@@ -99,7 +100,8 @@ export class WeaponFx {
       if(tt < b.at){if(spec.pending) spec.pending(d, b, tt, clock, lead);}
       else if(spec.lasting && b.started && !b.done) spec.lasting(d, b, tt-b.at, clock, lead);
     }
-    for(const shot of world.projectiles || []) paintProjectile(d, shot, lead, clock);
+    // A Crescent's wave (refine.mjs) has no sprite: it is painted whole here.
+    for(const shot of world.projectiles || []){if(shot.kind === 'wave') paintWave(d, shot, lead, clock); else paintProjectile(d, shot, lead, clock);}
     // The hollow's own effects: blasts, omens, gilded creatures, the great bosses, lava (src/fx/hollow.mjs).
     paintHollow(d, world, lead, clock);
     const ctx = {lead, clock, time: frame?.time ?? world.time, world, rig: id => this.rigs.get(id), player: id => players.get(id)};

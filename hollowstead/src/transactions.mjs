@@ -16,7 +16,7 @@ function validWorldAction(cmd){
   if(['interact','move'].includes(cmd.type)&&cmd.target!=null&&typeof cmd.target!=='string')return false;
   if(cmd.type==='tile'&&(typeof cmd.tool!=='string'||!Array.isArray(cmd.cells)||cmd.cells.length>64))return false;
   if(cmd.type==='hotbar'&&!(Number.isInteger(cmd.slot)&&cmd.slot>=0&&cmd.slot<HOTBAR_SLOTS))return false;
-  if(cmd.type==='refine'&&(typeof cmd.stationId!=='string'||typeof cmd.itemId!=='string'||!Number.isInteger(cmd.slot)))return false;
+  if(cmd.type==='refine'&&(typeof cmd.stationId!=='string'||typeof cmd.itemId!=='string'||!Number.isInteger(cmd.slot)||(cmd.bookId!=null&&typeof cmd.bookId!=='string')))return false;
   if(cmd.type==='ascendWeapon'&&(typeof cmd.stationId!=='string'||typeof cmd.itemId!=='string'))return false;
   if(cmd.type==='arenaPick'&&(!Number.isInteger(cmd.choice)||(cmd.replace!=null&&!(Number.isInteger(cmd.replace)&&cmd.replace>=0&&cmd.replace<HOTBAR_SLOTS))))return false;
   return true;

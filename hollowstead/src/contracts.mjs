@@ -290,8 +290,9 @@ export function itemDefinition(itemId){
     return Object.freeze({
       itemId, kind:'equipment', stackLimit:1, supplyUnits:0, equipmentSlot:equipmentSlotFor(itemId),
       maxDurability:EQUIPMENT[itemId].durability, use:null,
-      // Broken gear crumbles; a broken weapon stays (useless until mended at the Heartfire).
-      retainsAtZeroDurability:equipmentSlotFor(itemId)==='weapon'||itemId==='everlantern',
+      // Broken gear crumbles; a broken weapon or body armour stays (useless until mended at the Heartfire),
+      // so its refinements are never lost with it.
+      retainsAtZeroDurability:equipmentSlotFor(itemId)==='weapon'||equipmentSlotFor(itemId)==='body'||itemId==='everlantern',
     });
   }
   if(Object.hasOwn(ITEMS, itemId)){

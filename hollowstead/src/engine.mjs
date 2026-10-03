@@ -370,7 +370,7 @@ export class World {
     if(slot==='weapon'||slot==='body'){const tempered=refineStat(p,'tempered',current.itemId);if(tempered>0)amount*=1-tempered;}
     const worn=wearStack(current, amount);
     p.equipment[slot]=worn.stack;
-    if(slot==='weapon')warnWear(this, p, current, worn.stack);
+    if(slot==='weapon'||slot==='body')warnWear(this, p, current, worn.stack, slot);
     // Ownership revisions track socket changes, not continuously burning fuel.
     // Transfers always read current host durability rather than a client copy.
     if(worn.removed)p.equipmentRevision++;

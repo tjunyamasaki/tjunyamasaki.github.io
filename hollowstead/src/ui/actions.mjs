@@ -326,11 +326,11 @@ export function describeContext(facts) {
         command: buildingCommand('awaken', id),
       }));
     }
-    // Mend the weapon in hand with a soul ember (mastery.mjs mendPlan); shown only when it is worn.
+    // Mend the weapon in hand or the armour worn, the more worn first, with a soul ember (mastery.mjs mendPlan).
     if (facts.type === 'hearth' && facts.mend?.itemId) {
       list.push(make('mend', {
         targetId: id,
-        label: `Mend +${Math.max(1, Math.round((facts.mend.boost || 0) * 100))}%`,
+        label: `Mend${facts.mend.slot === 'body' ? ' armour' : ''} +${Math.max(1, Math.round((facts.mend.boost || 0) * 100))}%`,
         enabled: !!facts.mend.ok,
         disabledReason: facts.mend.reason || 'Needs 1 soul ember',
         command: buildingCommand('mend', id),

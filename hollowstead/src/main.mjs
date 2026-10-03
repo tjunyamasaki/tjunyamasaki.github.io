@@ -20,7 +20,7 @@ import {
 } from './ui/actions.mjs?v=harvest-18';
 import {catalogMarkup,catalogModel,inCategory,pickRecipe} from './ui/catalog.mjs?v=harvest-18';
 import {actionNeedsConfirm,actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-18';
-import {salvageText} from './salvage.mjs?v=harvest-18';
+import {salvageText,salvageYield} from './salvage.mjs?v=harvest-18';
 import {loadMagicModules} from './magic/load.mjs?v=harvest-18';
 import {installMagicSprites,isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {waveLeft} from './arena.mjs?v=harvest-18';
@@ -202,6 +202,70 @@ function currentMode(){
 function cancelPlacement(){placement=null;grid?.stop();}
 function cancelMaintenance(){maintenance=false;maintenanceTarget=null;maintenanceCell=null;endContextHold();}
 function clearSelection(){selection=null;pendingOp=null;qtyMode='all';chosenQty=1;}
+/**
+ * Select mode in the pack and chest: `picks` holds the uids picked (null when off). Transfer moves every
+ * picked stack to the other side; Dismantle (asks once, showing what comes back) takes apart every picked gear
+ * item in the pack. Worn gear is never picked.
+ */
+let picks=null,multiPending=null;
+const pickable=loc=>!!loc?.stack&&['pack','chest','overflow'].includes(loc.where);
+function endPicks(){picks=null;multiPending=null;}
+function toggleSelectMode(){
+  if(picks){endPicks();refresh();return;}
+  picks=new Set();multiPending=null;
+  const loc=selection&&locateUid(me(),selection.uid);if(pickable(loc))picks.add(loc.stack.uid);
+  clearSelection();refresh();
+}
+function pickedLocs(p){return [...(picks||[])].map(uid=>locateUid(p,uid)).filter(pickable);}
+function multiView(p){
+  for(const uid of [...picks])if(!pickable(locateUid(p,uid)))picks.delete(uid);
+  const locs=pickedLocs(p),ops=[];
+  const moving=chestSession?locs:[],breaking=locs.filter(loc=>loc.where==='pack'&&salvageYield(loc.stack.itemId));
+  if(multiPending==='multi-dismantle'&&breaking.length){
+    const total=new Map();for(const loc of breaking)for(const [id,n] of salvageYield(loc.stack.itemId))total.set(id,(total.get(id)||0)+n);
+    ops.push({op:'multi-dismantle',label:`Confirm dismantle ${breaking.length}`,confirm:[...total].map(([id,n])=>`+${n} ${label(id)}`).join(', '),danger:true},{op:'multi-cancel',label:'Back'});
+  }else{
+    if(moving.length)ops.push({op:'multi-transfer',label:`Transfer ${moving.length}`});
+    if(breaking.length)ops.push({op:'multi-dismantle',label:`Dismantle ${breaking.length}`,danger:true});
+    ops.push({op:'multi-all',label:'All'});
+  }
+  const hint=locs.length&&!moving.length&&!breaking.length?'nothing to dismantle':'';
+  return {count:locs.length,ops,hint};
+}
+async function runMulti(op){
+  const p=me();if(!p||!picks||actionPending)return;
+  if(op==='multi-done'){endPicks();refresh();return;}
+  if(op==='multi-cancel'){multiPending=null;refresh();return;}
+  if(op==='multi-all'){
+    const every=[...p.inventory.slots,...(chestSession?chestBuilding()?.store?.slots||[]:[])].filter(Boolean).map(stack=>stack.uid);
+    if(every.every(uid=>picks.has(uid)))picks.clear();else for(const uid of every)picks.add(uid);
+    multiPending=null;refresh();return;
+  }
+  if(op==='multi-transfer'){
+    if(!chestSession)return;
+    let moved=0,failure=null;
+    for(const uid of [...picks]){
+      let loc=locateUid(me(),uid);if(!pickable(loc))continue;
+      const dest=()=>loc.where==='pack'?{where:'chest',slot:0,stack:null}:{where:'pack',slot:0,stack:null};
+      let result=await commitMove(loc,dest(),loc.stack.quantity,{insert:true});
+      if(result?.code==='staleRevision'){loc=locateUid(me(),uid);if(pickable(loc))result=await commitMove(loc,dest(),loc.stack.quantity,{insert:true});}
+      if(result?.ok){moved++;picks.delete(uid);}else{failure=result;break;}
+    }
+    if(failure)toast(`${moved?`Moved ${moved}. `:''}${commandError(failure)}`);
+    refresh();return;
+  }
+  if(op==='multi-dismantle'){
+    if(multiPending!==op){multiPending=op;refresh();return;}
+    multiPending=null;
+    for(const uid of [...picks]){
+      let loc=locateUid(me(),uid);if(loc?.where!=='pack'||!salvageYield(loc.stack.itemId))continue;
+      let result=await withPending({type:'dismantleItem',uid,inventoryRevision:me().inventory.revision});
+      if(result?.code==='staleRevision')result=await withPending({type:'dismantleItem',uid,inventoryRevision:me().inventory.revision});
+      if(result?.ok)picks.delete(uid);else{toast(commandError(result));break;}
+    }
+    refresh();
+  }
+}
 function refresh(){dirty=true;ui();}
 function discardPanel(){inventoryPanel?.destroy();inventoryPanel=null;}
 function prepareWorld(resume=false,dungeon=null,vigil=null){
@@ -447,7 +511,7 @@ function openSheet(name){
   dirty=true;renderSheet();
 }
 function closeSheet(){
-  inventoryPanel?.cancelDrag();inventoryPanel?.closeCard?.();
+  inventoryPanel?.cancelDrag();inventoryPanel?.closeCard?.();endPicks();
   if(chestSession||chestOpening)releaseChestUI();
   if(sheet==='menu'&&mode==='solo')paused=false;
   sheet=null;$('sheet').hidden=true;clearSelection();dirty=true;
@@ -585,10 +649,15 @@ async function commitMove(from,to,quantity,{insert=false}={}){
   const cmd={type:chestSide?'chestTransfer':'inventoryMove',sourceContainerId:source.id,sourceSlot:from.slot,destinationContainerId:dest.id,destinationSlot:insert?null:to.slot,uid:from.stack.uid,quantity,sourceRevision:source.revision,destinationRevision:dest.revision};
   if(chestSide){if(!chestSession)return;Object.assign(cmd,chestSession);}
   selection=null;pendingOp=null;
-  await withPending(cmd);
+  return await withPending(cmd);
 }
 async function onSlot(key,empty){
   if(actionPending)return;
+  if(picks){
+    const loc=stackByKey(me(),key);if(empty||!pickable(loc))return;
+    if(picks.has(loc.stack.uid))picks.delete(loc.stack.uid);else picks.add(loc.stack.uid);
+    multiPending=null;refresh();return;
+  }
   if(!selection){if(!empty)selectKey(key);return;}
   if(key===selection.key){clearSelection();refresh();return;}
   const from=locateUid(me(),selection.uid),to=stackByKey(me(),key);
@@ -614,6 +683,7 @@ async function organizeChest(op){
   await withPending(cmd);
 }
 async function operate(op){
+  if(String(op).startsWith('multi-')){await runMulti(op);return;}
   const p=me();if(!p||actionPending)return;
   if(!selection)return;
   const loc=locateUid(p,selection.uid);if(!loc?.stack){clearSelection();dirty=true;return;}
@@ -647,7 +717,7 @@ function activateSelection(){if(!selection)return;if(pendingOp){void operate(pen
 function ensurePanel(){
   if(inventoryPanel?.root?.isConnected)return;
   discardPanel();
-  inventoryPanel=createInventoryPanel($('sheet-content'),{onSlot:(key,empty)=>void onSlot(key,empty),onSelect:selectKey,onMove:(from,to)=>void moveKeys(from,to),onOperate:op=>void operate(op),onQuantity,onShift,onPackSort:()=>void sortPack(),onChestOrganize:op=>void organizeChest(op),onActivate:activateSelection,cardFor:key=>{const loc=stackByKey(me(),key);return loc?.stack?itemCard(loc.stack,loc.where):null;},onDragChange(){endContextHold();hold.attack=false;stick={x:0,z:0};}});
+  inventoryPanel=createInventoryPanel($('sheet-content'),{onSlot:(key,empty)=>void onSlot(key,empty),onSelect:selectKey,onMove:(from,to)=>void moveKeys(from,to),onOperate:op=>void operate(op),onQuantity,onShift,onPackSort:()=>void sortPack(),onSelectMode:toggleSelectMode,onChestOrganize:op=>void organizeChest(op),onActivate:activateSelection,cardFor:key=>{const loc=stackByKey(me(),key);return loc?.stack?itemCard(loc.stack,loc.where):null;},onDragChange(){endContextHold();hold.attack=false;stick={x:0,z:0};}});
   sheetMarkup='';
 }
 /** Hover text for an item: trinkets say what they do, weapons their mastery. */
@@ -715,7 +785,7 @@ function makeCell(key,stack,kind,index,mark=''){
   const equipped=kind==='socket'&&!!stack;
   const name=stack?label(stack.itemId):mark;
   const maxDurability=stack?stackMaxDurability(stack.itemId):null;
-  return {key,stack,mark,maxDurability,equipped,accept:kind!=='recovery',selected:!!(stack&&selection?.uid===stack.uid),tip:stack?itemTip(stack):'',iconHTML:stack?icon(stack.itemId):'',aria:slotLabel({empty:!stack,name,quantity:stack?.quantity||0,durability:stack?.durability??null,maxDurability,equipped,index,kind:kind==='socket'?'socket':kind})};
+  return {key,stack,mark,maxDurability,equipped,accept:kind!=='recovery',selected:!!(stack&&selection?.uid===stack.uid),picked:!!(stack&&picks?.has(stack.uid)),tip:stack?itemTip(stack):'',iconHTML:stack?icon(stack.itemId):'',aria:slotLabel({empty:!stack,name,quantity:stack?.quantity||0,durability:stack?.durability??null,maxDurability,equipped,index,kind:kind==='socket'?'socket':kind})};
 }
 function inventoryView(p){
   const chest=chestBuilding();
@@ -740,7 +810,7 @@ function inventoryView(p){
     detail={name:label(loc.stack.itemId),chosen:chosenQuantity(loc.stack),maxQuantity:loc.stack.quantity,ops,pendingOp,confirmText:pendingOp==='dismantle'?salvageText(loc.stack.itemId):'',info:itemInfo(loc.stack)};
   }
   const sprite=theme.sprites[p.character]||theme.sprites.ember;
-  return {portraitHTML:`${portrait(p.character)}<small>${escapeHtml(p.name)}</small>`,occupied:p.inventory.slots.filter(Boolean).length,slotMax:p.inventory.slots.length,charm:!!p.charm,sockets,slots,recovery,chest:chestView,selection:detail,pending:actionPending||chestOpening,pendingText:chestOpening?'Opening chest…':actionPending?'Waiting for camp…':'',sprite};
+  return {portraitHTML:`${portrait(p.character)}<small>${escapeHtml(p.name)}</small>`,occupied:p.inventory.slots.filter(Boolean).length,slotMax:p.inventory.slots.length,charm:!!p.charm,sockets,slots,recovery,chest:chestView,selection:detail,multi:picks?multiView(p):null,pending:actionPending||chestOpening,pendingText:chestOpening?'Opening chest…':actionPending?'Waiting for camp…':'',sprite};
 }
 const SOCKET_NAME={chop:'Chop',mine:'Mine',weapon:'Weapon',body:'Armor',light:'Light',head:'Head',back:'Back',trinket:'Trinket',charm:'Trinket II',bag:'Bag'};
 function guideHTML(){
@@ -1355,6 +1425,7 @@ function setupControls(){
     if([' ','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key))event.preventDefault();
     if(key==='r'&&placement?.grid&&!sheet&&!event.repeat){grid?.rotate();dirty=true;return;}
     if(key==='escape'&&inventoryPanel?.cardOpen?.()){inventoryPanel.closeCard();return;}
+    if(key==='escape'&&picks&&(sheet==='inventory'||sheet==='chest')){endPicks();refresh();return;}
     if(key==='escape'){
       const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!(selection&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement||showcaseTool==='remove',maintaining:maintenance});
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();

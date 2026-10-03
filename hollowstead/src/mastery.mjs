@@ -173,43 +173,58 @@ export function conditionOf(stack){
   return max > 0 && typeof stack.durability === 'number' ? Math.max(0, Math.min(1, stack.durability/max)) : null;
 }
 
+/** What can be mended: the weapon in hand and the body armour worn. */
+const MENDABLE = Object.freeze({weapon: 'weapon', body: 'body'});
 /**
- * What mending the weapon in hand would do. `canPay` says whether the cost is at hand (World.canPay).
- * {itemId, name, share (condition now), gain, boost (gain as a share), ok, reason}; itemId is null
+ * What mending would do. It takes the more worn of the weapon in hand and the body armour worn (by share of
+ * condition); press again for the other. `canPay` says whether the cost is at hand (World.canPay).
+ * {itemId, slot, name, share (condition now), gain, boost (gain as a share), ok, reason}; itemId is null
  * when nothing needs mending.
  */
 export function mendPlan(p, canPay){
-  const weapon = p?.equipment?.weapon, def = weapon && itemDefinition(weapon.itemId);
-  if(!weapon || !def?.maxDurability || equipmentSlotFor(weapon.itemId) !== 'weapon') return {itemId: null, ok: false, reason: 'Hold a weapon to mend it'};
-  const max = def.maxDurability, missing = Math.max(0, max-weapon.durability);
-  const name = label(weapon.itemId), share = weapon.durability/max;
-  if(missing < 1) return {itemId: null, name, share, ok: false, reason: `${name} is in good shape`};
+  let pick = null, anyGear = false;
+  for(const slot of Object.keys(MENDABLE)){
+    const stack = p?.equipment?.[slot], def = stack && itemDefinition(stack.itemId);
+    if(!stack || !def?.maxDurability || equipmentSlotFor(stack.itemId) !== slot) continue;
+    anyGear = true;
+    const max = def.maxDurability, missing = Math.max(0, max-stack.durability);
+    if(missing < 1) continue;
+    const share = stack.durability/max;
+    if(!pick || share < pick.share) pick = {slot, stack, max, missing, share};
+  }
+  if(!pick){
+    const worn = p?.equipment?.weapon || p?.equipment?.body;
+    return anyGear ? {itemId: null, name: worn ? label(worn.itemId) : '', ok: false, reason: 'Your gear is in good shape'} : {itemId: null, ok: false, reason: 'Hold a weapon or wear armour to mend it'};
+  }
+  const {slot, stack, max, missing, share} = pick, name = label(stack.itemId);
   const gain = Math.min(missing, Math.ceil(max*MEND.share)), boost = gain/max;
-  if(!canPay) return {itemId: weapon.itemId, name, share, gain, boost, ok: false, reason: 'Needs 1 soul ember'};
-  return {itemId: weapon.itemId, name, share, gain, boost, ok: true, reason: ''};
+  if(!canPay) return {itemId: stack.itemId, slot, name, share, gain, boost, ok: false, reason: 'Needs 1 soul ember'};
+  return {itemId: stack.itemId, slot, name, share, gain, boost, ok: true, reason: ''};
 }
 
-/** Host: mend the weapon in hand at the Heartfire `hearth`. */
+/** Host: mend the weapon in hand or the armour worn (mendPlan picks) at the Heartfire `hearth`. */
 export function mendWeapon(world, p, hearth){
   const plan = mendPlan(p, world.canPay(p, MEND.cost));
   if(!plan.ok){world.tell(p, plan.reason); return {ok: false, code: 'rejected'};}
   if(!world.pay(p, MEND.cost)){world.tell(p, 'Needs 1 soul ember'); return {ok: false, code: 'rejected'};}
-  const weapon = p.equipment.weapon, max = itemDefinition(weapon.itemId).maxDurability;
-  p.equipment.weapon = {...weapon, durability: Math.min(max, weapon.durability+plan.gain)};
-  p.wearWarned = null;
+  const slot = plan.slot || 'weapon', weapon = p.equipment[slot], max = itemDefinition(weapon.itemId).maxDurability;
+  p.equipment[slot] = {...weapon, durability: Math.min(max, weapon.durability+plan.gain)};
+  if(slot === 'body') p.armourWarned = null; else p.wearWarned = null;
   p.cooldown = .5;
-  const share = Math.round(p.equipment.weapon.durability/max*100);
+  const share = Math.round(p.equipment[slot].durability/max*100);
   world.event('heal', p.x, p.z, `${plan.name} mended · ${share}%`, {player: p.id});
   world.event('mend', p.x, p.z, '', {player: p.id, itemId: weapon.itemId, hx: hearth.x, hz: hearth.z});
   world.assertItems?.();
   return {ok: true, code: 'ok'};
 }
 
-/** After the weapon in hand wore down: a one-time hint when it gets low. */
-export function warnWear(world, p, before, after){
+/** After the weapon in hand or the armour worn wore down: a one-time hint when it gets low, and word when it breaks. */
+export function warnWear(world, p, before, after, slot = 'weapon'){
   if(!expedition(world) || !after || before?.uid !== after.uid) return;
-  const was = conditionOf(before), now = conditionOf(after);
-  if(was == null || now == null || !(was > MEND.warnAt) || now > MEND.warnAt || p.wearWarned === after.uid) return;
-  p.wearWarned = after.uid;
+  const was = conditionOf(before), now = conditionOf(after), field = slot === 'body' ? 'armourWarned' : 'wearWarned';
+  if(was == null || now == null) return;
+  if(slot === 'body' && was > 0 && now <= 0){world.tell(p, `${label(after.itemId)} is broken and guards nothing. Mend it at the Heartfire with a soul ember`); return;}
+  if(!(was > MEND.warnAt) || now > MEND.warnAt || p[field] === after.uid) return;
+  p[field] = after.uid;
   world.tell(p, `${label(after.itemId)} is wearing thin. Mend it at the Heartfire with a soul ember`);
 }

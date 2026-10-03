@@ -139,6 +139,7 @@ export function createInventoryPanel(root, hooks) {
           <div id="inv-meta" class="bag-meta"></div>
           <div class="storage-tools" id="pack-tools">
             <button type="button" id="pack-sort" data-pack-op="sort">Sort</button>
+            <button type="button" id="pack-select" data-pack-op="select" aria-pressed="false" title="Pick several items, then transfer or dismantle them together">Select</button>
             <div id="detail-ops" class="detail-ops"></div>
             <div id="detail-qty" class="qty-row" hidden aria-label="Quantity">
               <button type="button" data-qty="one">1</button>
@@ -161,6 +162,7 @@ export function createInventoryPanel(root, hooks) {
             <button type="button" data-chest-op="store">Store all</button>
             <button type="button" data-chest-op="stack">Stack</button>
             <button type="button" data-chest-op="sort">Sort</button>
+            <button type="button" data-pack-op="select" aria-pressed="false" title="Pick several items, then transfer them together">Select</button>
           </div>
         </div>
         <div class="grid-fit"><div id="chest-grid" class="slot-grid chest-grid" role="grid"></div></div>
@@ -217,7 +219,7 @@ export function createInventoryPanel(root, hooks) {
   card.className = 'item-card-backdrop';
   card.hidden = true;
   document.body.append(card);
-  let press = null, cardAt = 0;
+  let press = null, cardAt = -1e9;
   function closeCard() { card.hidden = true; card.replaceChildren(); }
   function openCard(key) {
     const data = key && hooks.cardFor?.(key);
@@ -249,6 +251,7 @@ export function createInventoryPanel(root, hooks) {
     if (tip) { el.dataset.tip = tip; el.title = tip; }
     else { delete el.dataset.tip; el.removeAttribute('title'); }
     el.classList.toggle('is-selected', !!cell.selected);
+    el.classList.toggle('is-picked', !!cell.picked);
     el.classList.toggle('is-equipped', !!cell.equipped);
     el.classList.toggle('is-locked', !!cell.locked);
     el.setAttribute('aria-label', cell.aria);
@@ -355,8 +358,40 @@ export function createInventoryPanel(root, hooks) {
     }
   }
 
+  /** Select mode: several items picked at once; the action row works on all of them (main.mjs runMulti). */
+  function paintMulti(multi, pending) {
+    const text = multi.count ? `${multi.count} selected${multi.hint ? ` · ${multi.hint}` : ''}` : 'Select mode · tap items to pick them';
+    if (detailSig !== `multi:${text}`) {
+      detailSig = `multi:${text}`;
+      detail.replaceChildren();
+      detail.classList.remove('is-empty');
+      const title = document.createElement('b'); title.textContent = text; detail.append(title);
+    }
+    qtyRow.hidden = true;
+    const sig = `multi|${multi.ops.map(o => `${o.op}:${o.label}:${o.confirm || ''}`).join(',')}`;
+    if (ops.dataset.sig !== sig) {
+      ops.dataset.sig = sig;
+      ops.replaceChildren();
+      for (const o of multi.ops) {
+        const el = button(o.op, o.label);
+        if (o.confirm) {
+          el.classList.add('confirm-op');
+          el.innerHTML = `<b></b><small></small>`;
+          el.querySelector('b').textContent = o.label;
+          el.querySelector('small').textContent = o.confirm;
+        }
+        if (o.danger) el.classList.add('danger-op');
+        ops.append(el);
+      }
+    }
+    for (const el of ops.querySelectorAll('button')) el.disabled = !!pending;
+  }
+
   function paintDetails(view) {
     const selection = view.selection;
+    panel.classList.toggle('is-multi', !!view.multi);
+    for (const el of panel.querySelectorAll('[data-pack-op="select"]')) { el.setAttribute('aria-pressed', String(!!view.multi)); el.textContent = view.multi ? 'Done' : 'Select'; el.disabled = !!view.pending; }
+    if (view.multi) { panel.classList.add('has-selection'); paintMulti(view.multi, view.pending); return; }
     paintInfo(selection);
     panel.classList.toggle('has-selection', !!selection);
     if (!selection) {
@@ -464,7 +499,7 @@ export function createInventoryPanel(root, hooks) {
     const chestOp = event.target.closest('[data-chest-op]');
     if (chestOp) { hooks.onChestOrganize?.(chestOp.dataset.chestOp); return; }
     const packOp = event.target.closest('[data-pack-op]');
-    if (packOp) { hooks.onPackSort?.(); return; }
+    if (packOp) { if (packOp.dataset.packOp === 'select') hooks.onSelectMode?.(); else hooks.onPackSort?.(); return; }
     const op = event.target.closest('[data-op]');
     if (op) { hooks.onOperate(op.dataset.op); return; }
     const slot = slotFromEvent(event);

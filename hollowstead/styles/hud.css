@@ -237,3 +237,10 @@ body.arena #heal-swap,body.arena #heal-picker{display:none}
 .item-card__uses{margin:0;font-size:11.5px;color:var(--muted)}
 @keyframes item-card-in{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.item-card-backdrop{animation:none}}
+/* Select mode (ui/inventory.mjs paintMulti): picked slots carry a tick; the Select button stays lit. */
+.rpg-panel [data-pack-op="select"][aria-pressed="true"]{border-color:var(--orange);background:#8d6c4366;color:var(--cream)}
+.rpg-panel.is-multi .item-slot:not([data-empty="true"]){cursor:pointer}
+.rpg-panel.is-multi .item-slot.is-selected{outline:none}
+.item-slot.is-picked{position:relative;border-color:var(--orange)!important;box-shadow:inset 0 0 0 2px #edb47a99,0 0 10px #edb47a55;background:#8d6c4344}
+.item-slot.is-picked::after{content:'✓';position:absolute;left:3px;top:2px;width:16px;height:16px;border-radius:50%;background:var(--orange);color:#2b2233;font:700 11px/16px Arial,Helvetica,sans-serif;text-align:center;pointer-events:none}
+.rpg-panel.is-multi #pack-sort,.rpg-panel.is-multi #chest-tools [data-chest-op],.rpg-panel.is-multi .bag-meta{display:none}

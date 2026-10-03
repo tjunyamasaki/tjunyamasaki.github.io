@@ -16,7 +16,7 @@ import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS,STORAGE_TYPE
 import {cartFacts} from './cart.mjs?v=harvest-18';
 import {
   allowsCombat,allowsMovement,clusterFor,escapeStep,isHarvestAction,keyboardAction,
-  keyboardPrimary,healHotbar,resolveMode,showsLantern,usableLantern,
+  keyboardPrimary,healHotbar,resolveMode,showsLantern,usableLantern,effectLine,
 } from './ui/actions.mjs?v=harvest-18';
 import {catalogMarkup,catalogModel,inCategory,pickRecipe} from './ui/catalog.mjs?v=harvest-18';
 import {actionNeedsConfirm,actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-18';
@@ -447,7 +447,7 @@ function openSheet(name){
   dirty=true;renderSheet();
 }
 function closeSheet(){
-  inventoryPanel?.cancelDrag();
+  inventoryPanel?.cancelDrag();inventoryPanel?.closeCard?.();
   if(chestSession||chestOpening)releaseChestUI();
   if(sheet==='menu'&&mode==='solo')paused=false;
   sheet=null;$('sheet').hidden=true;clearSelection();dirty=true;
@@ -490,6 +490,47 @@ async function confirmPlace(){
   if(pending.grid){const result=await grid.place();if(placement!==pending)return;pending.pending=false;if(result?.ok&&pending.tool.startsWith('obj:'))cancelPlacement();refresh();return;}
   const result=await send({type:'placeBuilding',recipeId:pending.key,x:pending.x,z:pending.z,rotation:pending.rotation||0,stationId:pending.stationId??null});
   if(placement!==pending)return;pending.pending=false;if(result?.ok)placement=null;refresh();
+}
+/**
+ * Tapping a camp object. Within reach you stay put: a chest opens, a workbench or cauldron opens its list.
+ * Out of reach you walk up to it (stopping beside it, not into it) and it opens when you arrive.
+ */
+const TAP_OPENS=Object.freeze({chest:'open',cart:'open',bench:'craft',pot:'cook'});
+let tapOpen=null;
+function buildingUnder(point){
+  let best=null,bd=Infinity;
+  for(const b of world.buildings){
+    if(!(b.hp>0)||(b.grid&&b.type!=='gate'))continue;
+    const inFoot=b.foot&&(()=>{const [i,j]=cellAt(point.x,point.z);return i>=b.foot.i&&i<b.foot.i+b.foot.w&&j>=b.foot.j&&j<b.foot.j+b.foot.h;})();
+    const d=Math.hypot(point.x-b.x,point.z-b.z),r=(b.radius||STRUCTURES[b.type]?.radius||.6)+.45;
+    if((inFoot||d<r)&&d<bd){bd=d;best=b;}
+  }
+  return best;
+}
+function inReach(p,b){return !!p&&!!b&&!!world.target(p,b.id);}
+function tapBuilding(b){
+  const p=me();if(!p)return;
+  selected=b.id;tapOpen=null;
+  if(inReach(p,b)){refresh();openOnTap(b);return;}
+  // Walk to the near side of it, just inside reach.
+  const d=Math.max(.01,distance(p,b)),stand=Math.min(d,RULES.reach-.7);
+  void send({type:'move',x:b.x+(p.x-b.x)/d*stand,z:b.z+(p.z-b.z)/d*stand});
+  if(TAP_OPENS[b.type])tapOpen={id:b.id,until:performance.now()+8000};
+  refresh();
+}
+/** The panel a tapped object opens, if it has one (chests, workbench, cauldron). */
+function openOnTap(b){
+  const id=TAP_OPENS[b.type];if(!id)return;
+  const action=liveActions.find(a=>a&&a.id===id&&a.targetId===b.id);
+  if(action?.enabled)void runAction(action);
+}
+/** A walk toward a tapped chest or station ends by opening it (cancelled by steering, or after a few seconds). */
+function stepTapOpen(p){
+  if(!tapOpen)return;
+  if(performance.now()>tapOpen.until||stick.x||stick.z||keys.size||!p){tapOpen=null;return;}
+  const b=world.buildings.find(entry=>entry.id===tapOpen.id&&entry.hp>0);
+  if(!b){tapOpen=null;return;}
+  if(inReach(p,b)){tapOpen=null;selected=b.id;openOnTap(b);}
 }
 /** Build menu → Remove (grid worlds): the 'clear' tool stays in hand like a floor; tap a cell and Remove, or drag across a line of them. */
 function startRemoveTool(){
@@ -592,7 +633,7 @@ async function operate(op){
     if(captured.where==='equipment')cmd.equipmentRevision=p.equipmentRevision;
     await withPending(cmd);return;
   }
-  if(op==='eat'||op==='heal'){await withPending({type:'consumeItem',uid:captured.uid,inventoryRevision:p.inventory.revision});return;}
+  if(op==='eat'||op==='heal'||op==='use'){await withPending({type:'consumeItem',uid:captured.uid,inventoryRevision:p.inventory.revision});return;}
   if(op==='take'){await commitMove(loc,{where:'pack',slot:0,stack:null},captured.quantity,{insert:true});return;}
   if(op==='transfer'){
     const chest=chestBuilding();if(!chest||!chestSession)return;
@@ -602,11 +643,11 @@ async function operate(op){
 }
 function onQuantity(op){const loc=selection&&locateUid(me(),selection.uid);if(!loc?.stack||!pendingOp)return;qtyMode=op==='inc'||op==='dec'?'set':op;chosenQty=adjustQuantity(loc.stack.quantity,chosenQuantity(loc.stack),op);void operate(pendingOp);}
 function onShift(key){selectKey(key);if(!chestSession||!selection)return;pendingOp=null;qtyMode='all';const loc=locateUid(me(),selection.uid);if(loc)void operate('transfer');}
-function activateSelection(){if(!selection)return;if(pendingOp){void operate(pendingOp);return;}const loc=locateUid(me(),selection.uid);if(!loc?.stack)return;const ops=operationsFor({itemId:loc.stack.itemId,where:loc.where,chestOpen:!!chestSession});const preferred=['transfer','equip','eat','heal','take','unequip'].find(op=>ops.includes(op));if(preferred)void operate(preferred);}
+function activateSelection(){if(!selection)return;if(pendingOp){void operate(pendingOp);return;}const loc=locateUid(me(),selection.uid);if(!loc?.stack)return;const ops=operationsFor({itemId:loc.stack.itemId,where:loc.where,chestOpen:!!chestSession});const preferred=['transfer','equip','eat','heal','use','take','unequip'].find(op=>ops.includes(op));if(preferred)void operate(preferred);}
 function ensurePanel(){
   if(inventoryPanel?.root?.isConnected)return;
   discardPanel();
-  inventoryPanel=createInventoryPanel($('sheet-content'),{onSlot:(key,empty)=>void onSlot(key,empty),onSelect:selectKey,onMove:(from,to)=>void moveKeys(from,to),onOperate:op=>void operate(op),onQuantity,onShift,onPackSort:()=>void sortPack(),onChestOrganize:op=>void organizeChest(op),onActivate:activateSelection,onDragChange(){endContextHold();hold.attack=false;stick={x:0,z:0};}});
+  inventoryPanel=createInventoryPanel($('sheet-content'),{onSlot:(key,empty)=>void onSlot(key,empty),onSelect:selectKey,onMove:(from,to)=>void moveKeys(from,to),onOperate:op=>void operate(op),onQuantity,onShift,onPackSort:()=>void sortPack(),onChestOrganize:op=>void organizeChest(op),onActivate:activateSelection,cardFor:key=>{const loc=stackByKey(me(),key);return loc?.stack?itemCard(loc.stack,loc.where):null;},onDragChange(){endContextHold();hold.attack=false;stick={x:0,z:0};}});
   sheetMarkup='';
 }
 /** Hover text for an item: trinkets say what they do, weapons their mastery. */
@@ -628,7 +669,47 @@ function itemInfo(stack){
   if(max&&typeof stack.durability==='number'&&max<999)facts.push(`condition ${Math.ceil(stack.durability)}/${max}`);
   const rarity=rarityOf(stack.itemId);
   lines.splice(1,0,[rarity[0].toUpperCase()+rarity.slice(1),...facts].join(' · '));
+  // What it does, when the tooltip does not already say (a heartstone, armour, a lantern…).
+  const effect=plainEffect(stack.itemId);
+  if(effect&&!lines.includes(effect)&&!facts.length)lines.splice(2,0,effect);
+  if(ITEM_NOTES[stack.itemId])lines.push(ITEM_NOTES[stack.itemId]);
   return lines.join('\n');
+}
+/** Items whose use the numbers do not explain. */
+const ITEM_NOTES=Object.freeze({
+  heartstone:'Select it in your pack and press Absorb. It heals you fully too.',
+  ichor:'Spend it at a workbench (Refine) to roll or reroll a modifier on a weapon or body armour.',
+  sigil:'With ichor, ascends a mastered weapon at a workbench (Refine).',
+  ember:'Mends the weapon in your hand at the Heartfire (Mend).',
+});
+/** effectLine without its rarity tag. */
+function plainEffect(itemId){return String(effectLine(itemId)||'').replace(/^(Common|Uncommon|Rare|Epic|Legendary) · /,'').trim();}
+/** What kind of thing an item is, for its card. */
+function itemKind(itemId){
+  const slot=equipmentSlotFor(itemId),item=ITEMS[itemId];
+  if(bookLines(itemId).length)return 'Modifier book';
+  if(slot)return ({weapon:'Weapon',body:'Body armour',head:'Headgear',back:'Cloak',light:'Light',chop:'Axe',mine:'Pick',trinket:'Trinket',charm:'Trinket',bag:'Bag'})[slot]||SOCKET_NAME[slot]||'Gear';
+  if(item?.boost)return 'Keepsake';
+  if(item?.food)return 'Food';
+  if(item?.heal)return 'Healing';
+  if(Object.values(CROPS).some(c=>c.seed===itemId))return 'Seed';
+  return 'Material';
+}
+/**
+ * The full card for a stack (ui/inventory.mjs itemCardNode): everything the slot's tooltip says, its effect,
+ * its condition, and what it is used to make.
+ */
+function itemCard(stack,where=''){
+  const itemId=stack.itemId,rarity=rarityOf(itemId),tip=itemTip(stack),lines=tip?tip.split('\n').filter(Boolean):[label(itemId)];
+  const name=lines.shift()||label(itemId),effect=plainEffect(itemId);
+  const facts=[];
+  if(stack.quantity>1)facts.push(`×${stack.quantity}`);
+  const max=stackMaxDurability(itemId);
+  if(max&&typeof stack.durability==='number'&&max<999)facts.push(`Condition ${Math.ceil(stack.durability)}/${max}`);
+  if(where==='equipment')facts.push('Worn');
+  const uses=Object.entries(RECIPES).filter(([,r])=>r.cost&&Object.hasOwn(r.cost,itemId)).map(([id,r])=>r.name||label(r.result||id));
+  return {name,rarity:rarity[0].toUpperCase()+rarity.slice(1),color:RARITY_COLORS[rarity],iconHTML:icon(itemId),kind:itemKind(itemId),
+    effect:effect&&!lines.includes(effect)?effect:'',lines,facts,note:ITEM_NOTES[itemId]||'',uses:[...new Set(uses)].slice(0,8)};
 }
 function makeCell(key,stack,kind,index,mark=''){
   const equipped=kind==='socket'&&!!stack;
@@ -882,6 +963,7 @@ function paintCluster(modeName,p){
   // Dungeons: the camp's bench refines and crafts, its fire cooks; nothing is built, fed or taken apart.
   const shown=world?.dungeon?actions.filter(action=>action&&!['build','repair','feed','dismantle'].includes(action.id)):actions;
   liveActions=shown;
+  if(tapOpen&&modeName==='normal')stepTapOpen(p);
   CONTEXT_BUTTONS.forEach((id,index)=>paintAction($(id),shown[index]||null,modeName));
   const combat=allowsCombat(modeName);
   for(const id of ['attack','dodge','skill']){const el=$(id);if(!el)continue;el.classList.toggle('is-off',!combat);el.tabIndex=combat?0:-1;el.setAttribute('aria-hidden',combat?'false':'true');}
@@ -1229,7 +1311,9 @@ function setupControls(){
     if(picked&&world.nodes.includes(picked)){selected=picked.id;void send({type:'setHarvestTarget',nodeId:picked.id,mode:'auto'});return;}
     if(picked&&world.drops.includes(picked)){selected=picked.id;void send({type:'move',x:picked.x,z:picked.z,target:picked.id});return;}
     if(picked&&world.enemies.includes(picked)){selected=picked.id;if(distance(me(),picked)<3.4)void send({type:'attack'});else void send({type:'move',x:picked.x,z:picked.z});return;}
-    if(picked&&world.buildings.includes(picked)){selected=picked.id;if(distance(me(),picked)>=RULES.reach)void send({type:'move',x:picked.x,z:picked.z});refresh();return;}
+    // A camp object tapped by its art rather than its middle (a big bench, a bed): find it by what stands under the tap.
+    const building=picked&&world.buildings.includes(picked)?picked:(!picked||!world.enemies.includes(picked))?buildingUnder(point):null;
+    if(building){tapBuilding(building);return;}
     selected=null;void send({type:'move',x:point.x,z:point.z});
   });
   $('sheet-tabs').onclick=event=>{
@@ -1270,6 +1354,7 @@ function setupControls(){
     const key=event.key.toLowerCase();
     if([' ','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key))event.preventDefault();
     if(key==='r'&&placement?.grid&&!sheet&&!event.repeat){grid?.rotate();dirty=true;return;}
+    if(key==='escape'&&inventoryPanel?.cardOpen?.()){inventoryPanel.closeCard();return;}
     if(key==='escape'){
       const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!(selection&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement||showcaseTool==='remove',maintaining:maintenance});
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();

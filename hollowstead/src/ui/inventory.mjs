@@ -11,7 +11,7 @@ export const SOCKET_LABELS = Object.freeze({
 
 const OP_LABELS = Object.freeze({
   equip: 'Equip', unequip: 'Unequip', eat: 'Eat', heal: 'Heal', drop: 'Drop',
-  transfer: 'Transfer', take: 'Take', dismantle: 'Dismantle',
+  transfer: 'Transfer', take: 'Take', dismantle: 'Dismantle', use: 'Absorb',
 });
 
 export function adjustQuantity(total, current, op) {
@@ -78,6 +78,8 @@ export function operationsFor({itemId, where, chestOpen = false} = {}) {
   else if (equipmentSlotFor(itemId)) ops.push('equip');
   if (where === 'pack' && item?.food) ops.push('eat');
   else if (where === 'pack' && item?.heal) ops.push('heal');
+  // Keepsakes used up for good (a heartstone: +max health).
+  else if (where === 'pack' && item?.boost) ops.push('use');
   if (where !== 'chest') ops.push('drop');
   if (chestOpen) ops.push('transfer');
   else if ((where === 'pack' || where === 'equipment') && equipmentSlotFor(itemId)) ops.push('dismantle');
@@ -210,6 +212,25 @@ export function createInventoryPanel(root, hooks) {
   ghost.className = 'drag-ghost';
   ghost.hidden = true;
   document.body.append(ghost);
+  // The item card: press and hold a slot (right-click with a mouse, or tap the detail line) to read an item in full.
+  const card = document.createElement('div');
+  card.className = 'item-card-backdrop';
+  card.hidden = true;
+  document.body.append(card);
+  let press = null, cardAt = 0;
+  function closeCard() { card.hidden = true; card.replaceChildren(); }
+  function openCard(key) {
+    const data = key && hooks.cardFor?.(key);
+    if (!data) return false;
+    clearTimeout(press?.timer); press = null;
+    card.replaceChildren(itemCardNode(data, closeCard));
+    card.hidden = false;
+    cardAt = performance.now();
+    card.querySelector('.item-card__close')?.focus({preventScroll: true});
+    return true;
+  }
+  card.addEventListener('pointerdown', event => { if (event.target === card) { event.preventDefault(); closeCard(); } });
+  card.addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); closeCard(); } });
 
   let drag = null;
   let suppressClick = false;
@@ -323,7 +344,7 @@ export function createInventoryPanel(root, hooks) {
     detailSig = sig;
     detail.replaceChildren();
     detail.classList.toggle('is-empty', !selection);
-    if (!selection) { detail.textContent = 'Tap an item to see it. Drag to move it.'; return; }
+    if (!selection) { detail.textContent = 'Tap an item to see it, hold it to read it in full. Drag to move it.'; return; }
     const title = document.createElement('b');
     title.textContent = name;
     detail.append(title);
@@ -387,10 +408,22 @@ export function createInventoryPanel(root, hooks) {
   }
 
   panel.addEventListener('pointerdown', event => {
+    // A long press that never produced its click must not swallow the next tap.
+    if (performance.now() - cardAt > 600) suppressClick = false;
     const slot = slotFromEvent(event);
     if (!slot || slot.dataset.empty === 'true') return;
     if (event.button != null && event.button !== 0) return;
     drag = {pointerId: event.pointerId, key: slot.dataset.slotKey, x: event.clientX, y: event.clientY, active: false, slot};
+    clearTimeout(press?.timer);
+    const key = slot.dataset.slotKey, pointerId = event.pointerId;
+    press = {pointerId, timer: setTimeout(() => { if (drag?.pointerId === pointerId && !drag.active && openCard(key)) { drag = null; suppressClick = true; } }, 450)};
+  });
+  // Mouse: right-click a slot for its card. Touch: stops the browser's own long-press menu on the icons.
+  panel.addEventListener('contextmenu', event => {
+    const slot = slotFromEvent(event);
+    if (!slot || slot.dataset.empty === 'true') return;
+    event.preventDefault();
+    if (performance.now() - cardAt > 600) openCard(slot.dataset.slotKey);
   });
   panel.addEventListener('pointermove', event => {
     if (!drag || event.pointerId !== drag.pointerId || drag.active) {
@@ -401,6 +434,7 @@ export function createInventoryPanel(root, hooks) {
       return;
     }
     if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 12) return;
+    clearTimeout(press?.timer); press = null;
     drag.active = true;
     try { drag.slot.setPointerCapture?.(event.pointerId); } catch { /* Synthetic or cancelled pointers still finish the drag. */ }
     ghost.innerHTML = drag.slot.querySelector('.slot-icon')?.innerHTML || '';
@@ -411,13 +445,20 @@ export function createInventoryPanel(root, hooks) {
     event.preventDefault();
   });
   panel.addEventListener('pointerup', event => {
+    if (press?.pointerId === event.pointerId) { clearTimeout(press.timer); press = null; }
     if (!drag || event.pointerId !== drag.pointerId) return;
     endDrag(true, event);
   });
-  panel.addEventListener('pointercancel', () => endDrag(false));
+  panel.addEventListener('pointercancel', () => { clearTimeout(press?.timer); press = null; endDrag(false); });
   panel.addEventListener('lostpointercapture', () => { if (drag?.active) endDrag(false); });
   panel.addEventListener('click', event => {
-    if (suppressClick) { suppressClick = false; event.preventDefault(); event.stopPropagation(); return; }
+    if (suppressClick || performance.now() - cardAt < 600) { suppressClick = false; event.preventDefault(); event.stopPropagation(); return; }
+    // The detail line opens the selected item's card.
+    if (event.target.closest('#inv-detail') && panel.classList.contains('has-selection')) {
+      const picked = panel.querySelector('.item-slot.is-selected');
+      if (picked) openCard(picked.dataset.slotKey);
+      return;
+    }
     const qty = event.target.closest('[data-qty]');
     if (qty) { hooks.onQuantity(qty.dataset.qty); return; }
     const chestOp = event.target.closest('[data-chest-op]');
@@ -448,7 +489,35 @@ export function createInventoryPanel(root, hooks) {
   }
   function activateFocused() { hooks.onActivate(); }
 
-  return {root: panel, update, cancelDrag, detailsOpen, dragging, focusStep, activateFocused, destroy() { resize?.disconnect(); ghost.remove(); panel.remove(); }};
+  return {root: panel, update, cancelDrag, detailsOpen, dragging, focusStep, activateFocused, cardOpen: () => !card.hidden, closeCard,
+    destroy() { resize?.disconnect(); clearTimeout(press?.timer); ghost.remove(); card.remove(); panel.remove(); }};
+}
+
+/**
+ * The item card's contents. `data`: {name, rarity, color, iconHTML, kind, effect, note, lines[], facts[], uses[]}
+ * (main.mjs itemCard). Text goes in as text; only the icon is markup.
+ */
+export function itemCardNode(data, close) {
+  const box = document.createElement('div');
+  box.className = 'item-card';
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-modal', 'true');
+  box.setAttribute('aria-label', data.name || 'Item');
+  box.style.setProperty('--rarity', data.color || '#d8d2c2');
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const head = el('div', 'item-card__head');
+  const art = el('div', 'item-card__icon'); art.innerHTML = data.iconHTML || '';
+  const titles = el('div', 'item-card__titles');
+  titles.append(el('h3', '', data.name || ''), el('p', 'item-card__kind', [data.rarity, data.kind].filter(Boolean).join(' · ')));
+  const shut = el('button', 'item-card__close', '✕'); shut.type = 'button'; shut.setAttribute('aria-label', 'Close'); shut.addEventListener('click', close);
+  head.append(art, titles, shut);
+  box.append(head);
+  if (data.effect) box.append(el('p', 'item-card__effect', data.effect));
+  if (data.facts?.length) { const row = el('div', 'item-card__facts'); for (const f of data.facts) row.append(el('span', '', f)); box.append(row); }
+  if (data.lines?.length) { const list = el('ul', 'item-card__lines'); for (const line of data.lines) list.append(el('li', '', line)); box.append(list); }
+  if (data.note) box.append(el('p', 'item-card__note', data.note));
+  if (data.uses?.length) box.append(el('p', 'item-card__uses', `Used to make: ${data.uses.join(', ')}`));
+  return box;
 }
 
 export function stackMaxDurability(itemId) {

@@ -214,3 +214,26 @@ body.arena #heal-swap,body.arena #heal-picker{display:none}
 }
 /* Portrait: the card stays under the grid, at one taller fixed height. */
 @media(max-width:700px) and (orientation:portrait){.rpg-panel .item-detail{height:126px;min-height:126px}}
+/* Item card (ui/inventory.mjs itemCardNode): hold a slot, right-click it, or tap the detail line. */
+.rpg-panel .item-detail:not(.is-empty){cursor:pointer}
+.rpg-panel .item-detail:not(.is-empty)::after{content:'Hold an item or tap here for more';font-size:9px;color:#b9ac9988;margin-top:auto}
+.item-card-backdrop{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:#140f1ab3;backdrop-filter:blur(2px);animation:item-card-in .14s ease-out}
+.item-card-backdrop[hidden]{display:none}
+.item-card{--rarity:#d8d2c2;position:relative;width:min(380px,100%);max-height:100%;overflow:auto;overscroll-behavior:contain;padding:14px 16px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--rarity) 55%,transparent);border-top:3px solid var(--rarity);background:linear-gradient(#352d3cf7,#2a2431f7);box-shadow:0 14px 40px #0c0812aa,0 0 24px color-mix(in srgb,var(--rarity) 18%,transparent);color:var(--cream);font:13px/1.45 Arial,Helvetica,sans-serif}
+.item-card__head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.item-card__icon{flex:none;width:64px;height:64px;display:grid;place-items:center;border-radius:12px;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--rarity) 22%,#211c28),#211c28 72%);border:1px solid color-mix(in srgb,var(--rarity) 40%,transparent)}
+.item-card__icon .item-icon{width:50px;height:50px;min-width:0;min-height:0;margin:0;object-fit:contain}
+.item-card__titles{flex:1;min-width:0}
+.item-card__titles h3{margin:0;font:20px/1.15 Georgia,serif;font-weight:normal;color:var(--rarity)}
+.item-card__kind{margin:3px 0 0;font:10px ui-monospace,monospace;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.item-card__close{flex:none;align-self:flex-start;width:36px;height:36px;min-width:36px;min-height:36px;padding:0;border-radius:10px;border:1px solid #dac29a40;background:#211c28;color:var(--cream);font-size:15px}
+.item-card__effect{margin:0 0 10px;padding:8px 10px;border-radius:8px;background:#211c28aa;border-left:3px solid var(--rarity);font-size:14px;color:#f6e7c8}
+.item-card__facts{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.item-card__facts span{padding:3px 8px;border-radius:999px;border:1px solid #dac29a33;background:#211c28;font-size:11px;color:var(--muted)}
+.item-card__lines{margin:0 0 10px;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+.item-card__lines li{padding-left:12px;position:relative;color:#e6d6b8}
+.item-card__lines li::before{content:'';position:absolute;left:0;top:.6em;width:5px;height:5px;border-radius:50%;background:var(--rarity);opacity:.7}
+.item-card__note{margin:0 0 8px;color:var(--orange);font-size:12.5px}
+.item-card__uses{margin:0;font-size:11.5px;color:var(--muted)}
+@keyframes item-card-in{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.item-card-backdrop{animation:none}}

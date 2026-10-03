@@ -71,6 +71,8 @@ export const ATTACKS = Object.freeze({
   bite:   {shape: 'circle', windup: .42, trigger: 1.35, reach: .95, radius: .95, lunge: .55, dmg: 1},
   swipe:  {shape: 'circle', windup: .5, trigger: 1.6, reach: 1.1, radius: 1.15, lunge: .3, dmg: .8},
   charge: {shape: 'line', windup: .62, trigger: 5.6, min: 2.2, length: 5.6, width: 1.15, speed: 15*1.15, dmg: 1},
+  // A dreadhound's leap (ages.mjs): a short, quick line that a well-timed dodge still beats.
+  pounce: {shape: 'line', windup: .42, trigger: 4.6, min: 1.4, length: 4.4, width: 1, speed: 17*1.15, dmg: 1},
   orb:    {shape: 'aim', windup: .55, trigger: 8.5, length: 2.6, width: .5, speed: 5.4*1.15, radius: .34, life: 3.4, dmg: 1},
   lob:    {shape: 'circle', windup: .3, trigger: 7.5, radius: 1.4, flight: .6, dmg: 1},
   slam:   {shape: 'cone', windup: .6, trigger: 2.6, radius: 3.1, arc: 110, push: 1.4, dmg: 1},
@@ -91,6 +93,7 @@ export const ATTACKS = Object.freeze({
 export const MOVES = Object.freeze({
   crawler:    {body: .52, accel: 16, flank: 55, attacks: ['bite']},
   bonewalker: {body: .5, accel: 10, flank: 30, retreat: .8, attacks: ['charge', 'swipe']},
+  dreadhound: {body: .5, accel: 20, flank: 75, retreat: .5, attacks: ['pounce', 'bite']},
   wraith:     {body: .45, accel: 6, fly: true, keep: 6, orbit: .8, attacks: ['orb']},
   bogling:    {body: .55, accel: 7, keep: 5, orbit: .4, attacks: ['lob']},
   brute:      {body: .8, accel: 4, flank: 10, attacks: ['slam']},
@@ -377,7 +380,7 @@ function release(world, e, target){
     world.move(e, (e.tx-e.x)/d*spec.lunge/.05, (e.tz-e.z)/d*spec.lunge/.05, .05, world.frameObstacles);
     strikeArea(world, e, spec, amount, (x, z, pad) => inShape(e, spec, x, z, pad));
     e.atk = ''; e.back = (moveOf(e.type).retreat || 0)*e.cooldown;
-  }else if(id === 'charge'){
+  }else if(id === 'charge' || id === 'pounce'){
     e.act = spec.length/spec.speed; e.hitIds = [];
     world.event('charge', e.x, e.z, '', {dx: Math.cos(e.ang), dz: Math.sin(e.ang)});
   }else if(id === 'orb'){

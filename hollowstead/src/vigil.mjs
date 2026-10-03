@@ -1,6 +1,7 @@
 // The Vigil: one save kept for the long haul. Days and nights run longer (content.mjs CLOCKS.vigil),
 // and the hollow answers how strong the party has grown instead of how many days went by: its
 // **Dread**. A lost Heartfire or a wiped party is a setback, never the end of the save.
+// Every 10 Dread the hollow enters a new Dread Age (ages.mjs), and changes for good.
 //
 // Also kept here, for every expedition: the saga (`world.saga`), the record of what the party has
 // done that the world remembers: bosses slain, the highest level and the best gear anyone has held.

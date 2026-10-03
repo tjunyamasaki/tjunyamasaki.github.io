@@ -90,6 +90,12 @@ export class Sound {
     if(type==='gilded'||type==='gildfall'){for(let i=0;i<(type==='gildfall'?6:3);i++)this.sweep(1800+i*220,2600+i*220,.12,'sine',.01,i*.05);return;}
     if(type==='rekindle'){this.sweep(80,320,.9,'sawtooth',.03);this.sweep(200,600,.8,'triangle',.02,.1);return;}
     if(type==='dread'){this.sweep(98,96,1.4,'sine',.05);this.sweep(147,145,1.2,'sine',.02,.05);return;}
+    // Dread Ages (ages.mjs): a deep bell under a falling minor; thorns a dry rasp.
+    if(type==='dreadage'){this.sweep(73,72,2.6,'sine',.07);this.sweep(110,109,2.2,'triangle',.03,.05);for(const [i,f] of [440,415,349,294].entries())this.sweep(f,f*.99,.6,'sine',.018,.4+i*.28);return;}
+    if(type==='thorns'){this.sweep(1400,600,.07,'sawtooth',.008);return;}
+    // Named weapons and ascension (mastery.mjs): a bright fanfare; a rising violet shimmer.
+    if(type==='named'){for(const [i,f] of [392,523,659,784,1047].entries())this.sweep(f,f,i===4?1.2:.3,'triangle',.045,i*.11);this.sweep(1568,1572,1.1,'sine',.018,.55);return;}
+    if(type==='weaponascend'){this.sweep(220,880,.9,'sine',.03);for(const [i,f] of [659,831,988,1319].entries())this.sweep(f,f*1.01,.45,'sine',.016,.2+i*.1);return;}
     if(type==='ascend'){for(const [i,f] of [392,523,659,784].entries())this.sweep(f,f*1.01,.5,'sine',.014,i*.12);return;}
     if(type.startsWith('lunar')){
       // The Hollow Moon: a low whoosh as it leaves, a hollow gulp and a cold chime when it swallows, fuller as it waxes.

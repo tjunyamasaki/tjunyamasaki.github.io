@@ -179,11 +179,11 @@ export function bossRelease(world, e, id, target, amount){
 /**
  * What a boss leaves. The first time each falls it always drops its own weapon (Thornmother's Heart,
  * the Eye of the Deep); after that a third of the time. Always a legendary and an epic roll, heartstones,
- * a hoard of Dread ichor and its area's finds.
+ * a hoard of Dread ichor, its area's finds and three Dread sigils (they ascend weapons, mastery.mjs).
  */
 export const BOSS_LOOT = Object.freeze({
-  briarmother: {weapon: 'thornheart', again: .33, extra: [['emberglass', 6], ['rime', 6], ['ember', 10]]},
-  unblinking: {weapon: 'deepeye', again: .33, extra: [['shard', 8], ['ember', 12]]},
+  briarmother: {weapon: 'thornheart', again: .33, extra: [['emberglass', 6], ['rime', 6], ['ember', 10], ['sigil', 3]]},
+  unblinking: {weapon: 'deepeye', again: .33, extra: [['shard', 8], ['ember', 12], ['sigil', 3]]},
 });
 export function bossLoot(world, e, times){
   const spec = BOSS_LOOT[e.type]; if(!spec) return;

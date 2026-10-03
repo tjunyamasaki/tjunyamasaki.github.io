@@ -7,6 +7,8 @@
 //   mimic         a lonely chest: maybe treasure, maybe teeth (a huge elder that drops a hoard)
 //   cauldron      a witch's cauldron left bubbling: one sip each, a blessing (or a hex) until the dawn after next
 //   goldpumpkin   a golden pumpkin: a heartstone and an epic, if you find it before it rots
+//   altar         a bleeding altar (a Vigil from the Age of Bleeding, ages.mjs): hold to wake its Dread champion,
+//                 a named great elder with an escort; slay it for Dread sigils (they ascend weapons), an epic and more
 // They are rare (about one every day and a half) and each one completed is announced as an Omen fulfilled.
 //
 // world.omens      [{id, kind, x, z, until, state, ...}]  saved and sent to guests; their nodes are rebuilt from it
@@ -18,6 +20,7 @@
 import {hollowTime, scheduleOf} from './content.mjs?v=harvest-18';
 import {REGIONS, pickWeighted} from './progression.mjs?v=harvest-18';
 import {areasOf, clearanceAt, iceAt} from './worldgen.mjs?v=harvest-18';
+import {AGE, ageOf} from './ages.mjs?v=harvest-18';
 
 export const OMENS = Object.freeze({
   fallenstar: Object.freeze({name: 'Fallen star', glyph: '✶', color: '#ffd27a', node: 'fallenstar', weight: 3,
@@ -30,7 +33,12 @@ export const OMENS = Object.freeze({
     line: dir => `Smoke rises to the ${dir}: a witch has left her cauldron bubbling.`}),
   goldpumpkin: Object.freeze({name: 'Golden pumpkin', glyph: '●', color: '#f2a93b', node: 'goldpumpkin', weight: 1,
     line: dir => `Something gleams gold in the grass to the ${dir}.`}),
+  // `age`: only on a Vigil that has reached this Dread Age (ages.mjs).
+  altar: Object.freeze({name: 'Bleeding altar', glyph: '✠', color: '#e0465a', node: 'dreadaltar', weight: 2.2, age: AGE.altars,
+    line: dir => `Something old and red stirs to the ${dir}: a bleeding altar.`}),
 });
+/** Omen kinds this world can see (an altar needs its Dread Age). */
+export const omenKinds = world => Object.entries(OMENS).filter(([, o]) => !o.age || ageOf(world) >= o.age);
 /**
  * Pacing, in days (one day and night: scheduleOf(world).cycle): the first may come after `first`, then one
  * every `every` on average (jittered by ±`jitter`), at most `max` at once (`maxVigil` on a Vigil), each lasting `life`.
@@ -41,7 +49,11 @@ export const OMENS = Object.freeze({
  */
 export const OMEN = Object.freeze({first: .7, every: 1.6, jitter: .3, max: 1, maxVigil: 2, life: 2, near: 20, ring: [30, 132],
   wake: 14, guards: 4, guardsPer: 2, tierUp: 1, leaderHp: 1.6, riftWake: 8, riftWaves: 4, mimic: .55, mimicHp: 2.2,
-  xp: Object.freeze({fallenstar: 120, soulrift: 150, mimic: 100, goldpumpkin: 60}), share: 26});
+  championHp: 2.6, escort: 3, escortPer: 1,
+  xp: Object.freeze({fallenstar: 120, soulrift: 150, mimic: 100, goldpumpkin: 60, altar: 140}), share: 26});
+/** A Dread champion's name: one of these, and one of those. */
+const CHAMPION_NAMES = Object.freeze(['Grisk', 'Morrow', 'Vael', 'Ossa', 'Thane', 'Krell', 'Ysolde', 'Murk', 'Corvin', 'Hesk', 'Brann', 'Sallow']);
+const CHAMPION_TITLES = Object.freeze(['the Unburied', 'the Hungering', 'Who Drinks', 'the Red Tithe', 'of the Thorn', 'the Last Mourner', 'the Hollowed', 'the Bled']);
 /** Cauldron brews: what a sip does until the dawn after next. */
 export const BREWS = Object.freeze({
   fury: Object.freeze({name: 'Fury', text: 'Your blows land 30% harder until the dawn after next', weight: 3}),
@@ -89,7 +101,7 @@ export function stepOmens(world, dt){
 
 /** Make an omen (a kind, or a weighted pick). Returns it, or null when no spot was found. */
 export function spawnOmen(world, kind = null, cycle = scheduleOf(world).cycle){
-  kind ||= pickWeighted(world.spawnRng, Object.entries(OMENS).map(([id, o]) => [id, o.weight]));
+  kind ||= pickWeighted(world.spawnRng, omenKinds(world).map(([id, o]) => [id, o.weight]));
   const rng = world.spawnRng, lair = areasOf(world.seed).find(a => a.id === 'briarlair');
   for(let t = 0; t < 60; t++){
     const a = rng()*Math.PI*2, r = OMEN.ring[0]+Math.sqrt(rng())*(OMEN.ring[1]-OMEN.ring[0]), x = Math.cos(a)*r, z = Math.sin(a)*r;
@@ -115,7 +127,8 @@ const tierAtOmen = (world, o) => REGIONS[world.regionOf(o.x, o.z)]?.tier ?? 1;
 /** True while any of these creatures still stands. */
 const anyAlive = (world, ids) => (ids || []).some(id => world.enemies.some(e => e.id === id && e.hp > 0));
 /** A fight under way keeps its omen past its time. */
-const engaged = (world, o) => (o.kind === 'soulrift' && o.state === 'open') || (o.kind === 'fallenstar' && o.state === 'guarded' && anyAlive(world, o.guards));
+const engaged = (world, o) => (o.kind === 'soulrift' && o.state === 'open') || (o.kind === 'fallenstar' && o.state === 'guarded' && anyAlive(world, o.guards))
+  || (o.kind === 'altar' && o.state === 'awake' && anyAlive(world, [o.champion]));
 
 /**
  * An omen was completed: its hoard, experience for everyone close, and the moment marked for everyone
@@ -155,6 +168,10 @@ function stepOmen(world, o, dt){
       o.freed = true; o.until = Math.max(o.until, hollowTime(world)+90);
       world.event('announce', o.x, o.z, 'The last guardian falls. The star is yours to open.');
     }
+  }
+  if(o.kind === 'altar' && o.state === 'awake' && !anyAlive(world, [o.champion])){
+    // Its champion wandered off and faded: the altar waits to be woken again.
+    o.state = 'new'; o.champion = null; o.spawn = [];
   }
   if(o.kind === 'soulrift'){
     if(o.state === 'new' && near(OMEN.riftWake)){o.state = 'open'; o.wave = 0; o.spawn = []; riftWave(world, o, tier);}
@@ -230,6 +247,11 @@ export function useOmen(world, node, ids){
     fulfil(world, o, {finder});
     finish(world, o); return true;
   }
+  if(o.kind === 'altar'){
+    if(o.state !== 'awake') wakeChampion(world, o, tier, finder);
+    else if(finder) world.tell(finder, 'The altar has drunk. Its champion still stands');
+    return true;
+  }
   if(o.kind === 'cauldron'){
     for(const id of ids){
       const p = world.player(id); if(!p || o.sipped.includes(id)) continue;
@@ -245,10 +267,36 @@ export function useOmen(world, node, ids){
   return false;
 }
 
-/** A mimic fell: it gives up its hoard (World.tick, on any creature's death). */
+/**
+ * A bleeding altar drinks: its Dread champion rises, a named great elder of the heavy kind that lives
+ * there, with an escort (dreadhounds once they run, briarlings before). Slay it to fulfil the omen.
+ */
+function wakeChampion(world, o, tier, finder){
+  const rng = world.spawnRng, level = Math.max(1, tier)+OMEN.tierUp+1;
+  const e = world.spawnEnemy(tier >= 2 ? 'golem' : 'brute', o.x, o.z+1.6, {elite: true, home: true, leash: 16, tier: level});
+  if(!e) return;
+  e.hp = e.maxHp = Math.round(e.maxHp*OMEN.championHp);
+  e.aggro = true; e.omen = o.id; e.champion = `${CHAMPION_NAMES[Math.floor(rng()*CHAMPION_NAMES.length)]} ${CHAMPION_TITLES[Math.floor(rng()*CHAMPION_TITLES.length)]}`;
+  o.state = 'awake'; o.champion = e.id; o.spawn = [e.id];
+  const escort = ageOf(world) >= AGE.hounds ? 'dreadhound' : 'crawler', n = OMEN.escort+OMEN.escortPer*(humans(world)-1);
+  for(let i = 0; i < n; i++){
+    const a = i/n*Math.PI*2, m = world.spawnEnemy(escort, o.x+Math.cos(a)*3, o.z+Math.sin(a)*3, {home: true, leash: 16, tier: level-1});
+    if(m){m.aggro = true; m.omen = o.id; o.spawn.push(m.id);}
+  }
+  world.event('bossrise', e.x, e.z, '', {boss: 'champion'});
+  world.event('announce', o.x, o.z, `${finder ? `${finder.name} wakes the altar. ` : ''}It drinks, and ${e.champion}, a Dread champion, rises`);
+}
+
+/** A mimic or a Dread champion fell: it gives up its hoard (World.tick, on any creature's death). */
 export function omenKill(world, e){
-  if(!e.mimic) return;
+  if(!e.mimic && !e.champion) return;
   const o = (world.omens || []).find(entry => entry.id === e.omen) || {x: e.x, z: e.z};
+  if(e.champion){
+    world.event('announce', e.x, e.z, `${e.champion} falls. The altar is dry`);
+    fulfil(world, {...o, kind: 'altar'}, {x: e.x, z: e.z, finder: world.player(e.lastHitBy)});
+    if(o.id) finish(world, o);
+    return;
+  }
   fulfil(world, {...o, kind: 'mimic'}, {x: e.x, z: e.z, finder: world.player(e.lastHitBy)});
 }
 

@@ -35,6 +35,8 @@ export const ITEMS = {
   ichor:{name:'Dread ichor',icon:'ichor'},
   // Areas (worldgen.mjs): what only Frostmere and the Ashen Scar give. They awaken the Heartfire past its third level.
   rime:{name:'Rime shard',icon:'rime'},emberglass:{name:'Emberglass',icon:'emberglass'},
+  // Torn from a great foe (the Hollow King, Mother Briar, The Unblinking, a Dread champion): ascends a mastered weapon (mastery.mjs ASCEND).
+  sigil:{name:'Dread sigil',icon:'sigil'},
   // Homestead crops (homestead.mjs CROPS): what grows in tilled soil, and its seeds.
   moonroot:{name:'Moonroot',icon:'moonroot',food:14,heal:4,courage:10},bloodapple:{name:'Bloodapple',icon:'bloodapple',food:10,heal:8},
   wheat:{name:'Duskwheat sheaf',icon:'wheat'},
@@ -140,6 +142,10 @@ export const NODES = {
   wildstarlily:{name:'Wild starlily',hits:1,workSeconds:1.4,handRate:1,output:'backpack',loot:{starlily:1,lilybulb:2},regrow:99999,radius:0,night:true},
   wildmoonpetal:{name:'Moonpetal bloom',hits:1,workSeconds:2,handRate:1,output:'backpack',loot:{moonpetal:1,petalseed:2},regrow:99999,radius:0,night:true},
   wildghostgourd:{name:'Ghostgourd',hits:1,workSeconds:2.2,handRate:1,output:'backpack',loot:{ghostgourd:1,gourdseed:2},regrow:99999,radius:.3,night:true},
+  // Dread Ages (ages.mjs): thorns that grow over the trails on a Vigil. Not solid: they slow and scratch whoever wades through.
+  thornpatch:{name:'Dread thorns',hits:2,workSeconds:1.6,handRate:.5,tool:'axe',toolRate:1.6,output:'backpack',loot:{fiber:3},regrow:99999,radius:0},
+  // An omen of the later Dread Ages (omens.mjs): hold the action to wake its champion.
+  dreadaltar:{name:'Bleeding altar',hits:1,workSeconds:2.4,handRate:1,output:'floor',loot:{},regrow:0,radius:.75,omen:true},
 };
 export const STRUCTURES = {
   hearth:{name:'Heartfire',hp:600,radius:1,light:8},fire:{name:'Campfire',hp:160,radius:.55,light:6},
@@ -226,6 +232,8 @@ export const ENEMIES = {
   bonewalker:{name:'Bonewalker',hp:48,speed:2.5*SPEED_SCALE,damage:24,range:5.6,period:2.1,loot:{bone:1}},
   bogling:{name:'Bogling',hp:52,speed:1.8*SPEED_SCALE,damage:20,range:7.5,period:3,loot:{spore:1}},
   golem:{name:'Moonshard golem',hp:320,speed:1.05*SPEED_SCALE,damage:72,range:2.7,period:3,loot:{shard:2,stone:2}},
+  // Dread Ages (ages.mjs): from the Age of the Hunt a Vigil's nights and roaming packs bring dreadhounds.
+  dreadhound:{name:'Dreadhound',hp:40,speed:6.2,damage:16,range:4.6,period:1.7,loot:{bone:1}},
   // The great bosses (bosses.mjs): Mother Briar on her throne, The Unblinking at the bottom of a delve.
   briarmother:{name:'Mother Briar',hp:2400,speed:1.55*SPEED_SCALE,damage:58,range:4.2,period:2.1,boss:true,loot:{ember:12}},
   unblinking:{name:'The Unblinking',hp:2200,speed:1.1*SPEED_SCALE,damage:62,range:6,period:2,boss:true,loot:{ember:14}},

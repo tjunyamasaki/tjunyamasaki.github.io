@@ -7,6 +7,7 @@ import {EQUIPMENT, RULES, STRUCTURES, hollowTime, scheduleOf} from './content.mj
 import {RANGES} from './contracts.mjs?v=harvest-18';
 import {equippedLanternLit} from './inventory.mjs?v=harvest-18';
 import {moonLighting} from './night.mjs?v=harvest-18';
+import {ageLighting} from './ages.mjs?v=harvest-18';
 import {GRAVELIGHT_RADIUS_SCALE, regionDarkness} from './regions.mjs?v=harvest-18';
 import {DUNGEON, layoutOf} from './dungeon/run.mjs?v=harvest-18';
 import {variantOf} from './dungeon/variants.mjs?v=harvest-18';
@@ -217,6 +218,9 @@ export function frameLighting(world, theme, viewer=null){
     // Tonight's moon may tint or deepen the dark; some regions are dark even by day (per viewer).
     const moon=moonLighting(world);
     if(moon){lighting={...lighting};if(moon.tint)lighting.nightTint=moon.tint;if(moon.ambient>0)lighting.ambientNight=Math.min(1,lighting.ambientNight*moon.ambient);}
+    // A Vigil's Dread Age (ages.mjs) reddens the dark, and from the Thorning dims the day a little; a moon's own tint wins.
+    const aged=ageLighting(world);
+    if(aged){lighting={...lighting};if(aged.tint&&!moon?.tint)lighting.nightTint=aged.tint;if(aged.day)lighting.dayTint=aged.day;}
     const regional=regionDarkness(world, viewer);
     if(regional>darkness)darkness=Math.min(1,regional);
   }

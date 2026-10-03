@@ -200,6 +200,8 @@ export const CONTEXT_ACTIONS = Object.freeze({
   wildstarlily: Object.freeze(['gather']),
   wildmoonpetal: Object.freeze(['gather']),
   wildghostgourd: Object.freeze(['gather']),
+  thornpatch: Object.freeze(['cut']),
+  dreadaltar: Object.freeze(['wake']),
   drop: Object.freeze([]),
 });
 

@@ -5270,6 +5270,109 @@
         }
       },
       "icon": "./sprites/greaterelixir-icon.svg?v=home2"
+    },
+    "dreadhound": {
+      "src": "./sprites/dreadhound.svg?v=dread1",
+      "size": [
+        2.3,
+        3.45
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 11
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 7
+        }
+      }
+    },
+    "thornpatch": {
+      "src": "./sprites/thornpatch.svg?v=dread1",
+      "size": [
+        3.2,
+        4.8
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "dreadaltar": {
+      "src": "./sprites/dreadaltar.svg?v=dread1",
+      "size": [
+        2.6,
+        3.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "sigil": {
+      "src": "./sprites/sigil.svg?v=dread1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/sigil-icon.svg?v=dread1"
     }
   },
   "motion": {

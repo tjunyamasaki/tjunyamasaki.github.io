@@ -98,6 +98,8 @@ const ITEM_RARITY = Object.freeze({
   // Refinement currency: only creatures drop it (LOOT_TABLES below, REFINE).
   ichor:'uncommon',
   rime:'uncommon', emberglass:'uncommon',
+  // Torn from great foes; ascends a mastered weapon (ASCEND below).
+  sigil:'epic',
   haversack:'uncommon',
 });
 export const rarityOf = itemId=>ITEM_RARITY[itemId]||'common';
@@ -140,6 +142,8 @@ export const LOOT_TABLES = Object.freeze({
   bonewalker:{xp:11, rolls:[{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.35, entries:[['ichor',[1,1],1]]}]},
   bogling:{xp:10, rolls:[{chance:.08, entries:[['uncommon',1,3],['elixir',[1,1],2]]},{chance:.4, entries:[['ichor',[1,1],1]]}]},
   golem:{xp:52, rolls:[{chance:.34, entries:[['rare',1,3],['epic',1,1]]},{entries:[['ichor',[3,4],1]]}]},
+  // Dread Ages (ages.mjs): fast pack hunters of the later Vigil.
+  dreadhound:{xp:14, rolls:[{chance:.3, entries:[['bone',[1,2],2],['meat',[1,1],1]]},{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.4, entries:[['ichor',[1,1],1]]}]},
   // Omens (omens.mjs): rare, hard won, and worth it. Each is a little hoard.
   fallenstar:{xp:120, rolls:[
     {count:[3,4], entries:[['shard',[3,5],3],['ember',[3,4],2],['rime',[2,3],1],['emberglass',[2,3],1],['ore',[3,4],1]]},
@@ -161,6 +165,14 @@ export const LOOT_TABLES = Object.freeze({
     {chance:.3, entries:[['legendary',1,1]]},
     {entries:[['ichor',[4,6],1]]},
   ]},
+  // A bleeding altar's champion (omens.mjs, from the Age of Bleeding on a Vigil): the surest Dread sigils.
+  altar:{xp:140, rolls:[
+    {entries:[['sigil',[2,3],1]]},
+    {entries:[['epic',1,1]]},
+    {chance:.3, entries:[['legendary',1,1]]},
+    {entries:[['ichor',[6,9],1]]},
+    {count:[1,2], entries:[['ember',[3,5],2],['shard',[2,4],1]]},
+  ]},
   goldpumpkin:{xp:60, rolls:[
     {entries:[['heartstone',[1,1],1]]},
     {entries:[['epic',1,1]]},
@@ -171,7 +183,7 @@ export const LOOT_TABLES = Object.freeze({
   starshard:{xp:0, rolls:[{entries:[['rare',1,2],['epic',1,1]]},{chance:.06, entries:[['legendary',1,1]]}]},
   briarmother:{xp:700, rolls:[]},
   unblinking:{xp:820, rolls:[]},
-  king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]},{entries:[['ichor',[10,14],1]]}]},
+  king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]},{entries:[['ichor',[10,14],1]]},{entries:[['sigil',[1,2],1]]}]},
 });
 
 function between(rng,[lo,hi]){return lo+Math.floor(rng()*(hi-lo+1));}
@@ -262,8 +274,50 @@ export function powerOf(p){
   const honed=1+refineStat(p,'honed');
   // `boon`: a blessing that lasts a while (a dungeon's Fury shrine, until the next stairs).
   const boon=(p?.boon>0?p.boon:1)*(p?.buffs?.fury?BUFF.fury:1);
-  return level*(1+(arena?ARENA_GROWTH.rank:MASTERY.rank)*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might*honed*boon;
+  // Ascension past ★5 (ASCEND below): small gains that keep coming.
+  const ascended=arena?1:1+ascendBonus(ascensionOf(p,p?.equipment?.weapon?.itemId).level);
+  return level*(1+(arena?ARENA_GROWTH.rank:MASTERY.rank)*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might*honed*boon*ascended;
 }
+/**
+ * Ascension: past ★5 a weapon type keeps growing. Every `step` more mastery points readies the next
+ * ascension, which costs Dread sigils (torn from great foes) and ichor at a workbench (mastery.mjs
+ * ascendWeapon). Level k adds `gain`/(1+`fade` x (k-1)) damage: each a little less than the last,
+ * and never the end (about +22% at ten, +30% at twenty). Kept in `p.ascend[itemId]`, like mastery.
+ */
+export const ASCEND=Object.freeze({step:160, gain:.04, fade:.25, sigils:Object.freeze({base:1, every:4}), ichor:Object.freeze({base:8, per:4})});
+/** Damage a weapon type gains from `level` ascensions (as a fraction: .2 is +20%). */
+export function ascendBonus(level){
+  let total=0;
+  for(let k=0;k<Math.max(0,level|0);k++)total+=ASCEND.gain/(1+ASCEND.fade*k);
+  return total;
+}
+/** What the next ascension costs, from the level a weapon type stands at. */
+export function ascendCost(level){
+  const n=Math.max(0,level|0);
+  return {sigil:ASCEND.sigils.base+Math.floor(n/ASCEND.sigils.every), ichor:ASCEND.ichor.base+ASCEND.ichor.per*n};
+}
+/**
+ * Where a wanderer stands with ascending a weapon type: {level, bonus, mastered, from, to, progress, ready}.
+ * `ready` once the mastery points reach the next step; the points keep counting while it waits.
+ */
+export function ascensionOf(p, itemId){
+  const raw=Math.floor(Number(p?.ascend?.[itemId]))||0, level=Math.max(0,raw);
+  const points=Math.max(0, Number(p?.mastery?.[itemId])||0), top=MASTERY.steps[MASTERY.steps.length-1];
+  const mastered=points>=top, from=top+ASCEND.step*level, to=from+ASCEND.step;
+  return {level, bonus:ascendBonus(level), mastered, points, from, to, progress:mastered?Math.max(0,Math.min(1,(points-from)/ASCEND.step)):0, ready:mastered&&points>=to};
+}
+/**
+ * Named weapons: a weapon type that has felled `elders` elders in a wanderer's hands earns a name and a
+ * fourth refinement slot (refine.mjs). The Hollow King counts as `king` elders, a great boss as `boss`,
+ * a dungeon Warden as `warden`. Kept in `p.named[itemId]` = {elders, foes:{type:count}, name, title}.
+ */
+export const NAMED=Object.freeze({elders:25, king:5, boss:10, warden:3, slots:1});
+/** A wanderer's record with a weapon type, or null. */
+export const namedOf=(p, itemId)=>{const n=itemId&&p?.named?.[itemId];return n&&typeof n==='object'?n:null;};
+/** True once a weapon type has earned its name. */
+export const isNamed=(p, itemId)=>typeof namedOf(p, itemId)?.name==='string';
+/** Refinement slots a wanderer has on a weapon type: three, four once it is named. */
+export const refineSlots=(p, itemId)=>REFINE.slots+(isNamed(p, itemId)?NAMED.slots:0);
 // ------------------------------------------------------------------ refinement
 /**
  * Refinement: up to three modifiers on each weapon type, rolled at a workbench with Dread ichor,
@@ -392,9 +446,10 @@ export function waveSize(day, humans){return Math.min(40, 2+Math.floor(Math.max(
 export const NIGHT_CAP = 48;
 export const isBossNight = day=>day>0&&day%5===0;
 
-/** Weighted night roster for a given day. */
-export function nightRoster(day){
+/** Weighted night roster for a given day. `age`: a Vigil's Dread Age (ages.mjs); from the Hunt dreadhounds run too. */
+export function nightRoster(day, age=0){
   const roster=[['crawler',9]];
+  if(age>=4)roster.push(['dreadhound',2.5+(age>=5?1.5:0)]);
   if(day>=2)roster.push(['wraith',2]);
   if(day>=3)roster.push(['bonewalker',3]);
   if(day>=4)roster.push(['brute',.6+Math.min(1.4,day/10)]);
@@ -408,4 +463,5 @@ export function pickWeighted(rng, roster){
   return roster[0][0];
 }
 /** Residents roam in packs: `pack` is how many briarlings (or bonewalkers) turn up together. */
-export const ROAM = Object.freeze({interval:9, spawnMin:15, spawnMax:21, despawn:46, leash:14, aggro:10, cap:[0,6,10], chance:[0,.3,.55], pack:{crawler:[2,4], bonewalker:[1,2]}});
+/** `hounds`: on a Vigil from the Age of the Hunt (ages.mjs), the share of packs that are dreadhounds. */
+export const ROAM = Object.freeze({interval:9, spawnMin:15, spawnMax:21, despawn:46, leash:14, aggro:10, cap:[0,6,10], chance:[0,.3,.55], pack:{crawler:[2,4], bonewalker:[1,2], dreadhound:[2,3]}, hounds:.3});

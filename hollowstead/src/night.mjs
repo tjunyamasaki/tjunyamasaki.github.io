@@ -12,6 +12,7 @@
 
 import {RULES, STRUCTURES, dayAt, dayOf, hollowTime, scheduleOf} from './content.mjs?v=harvest-18';
 import {isVigil, threatOf} from './vigil.mjs?v=harvest-18';
+import {ageOf} from './ages.mjs?v=harvest-18';
 import {hushedAt} from './hush.mjs?v=harvest-18';
 import {STARRAIN, stepMoon} from './moons.mjs?v=harvest-18';
 import {NIGHT_CAP, REGIONS, RESIDENTS, nightRoster, pickWeighted, regionAt, waveSize} from './progression.mjs?v=harvest-18';
@@ -209,7 +210,7 @@ export function spawnWave(world){
   // A blood moon's waves are bigger, but never push the crowd past what a phone can carry.
   if(blood)count=Math.max(0,Math.min(Math.round(count*BLOOD.size),NIGHT_CAP-world.invaders().length));
   if(moon==='starrain')count=Math.max(1,Math.round(count*STARRAIN.waves));
-  const roster=nightRoster(threat);
+  const roster=nightRoster(threat, ageOf(world));
   // The night comes from one to three directions at once, each a loose pack, so the camp is swarmed rather than trickled.
   const groups=Math.min(3,1+Math.floor(count/8)),heading=[...Array(groups)].map(()=>world.rng()*Math.PI*2);
   for(let i=0;i<count;i++){const a=heading[i%groups]+(world.rng()-.5)*.7,r=16+world.rng()*6;const type=i===0&&threat>=3&&day%2===1?'brute':pickWeighted(world.rng, roster);const lim=RULES.radius-4;const x=clamp(hearth.x+Math.cos(a)*r,-lim,lim),z=clamp(hearth.z+Math.sin(a)*r,-lim,lim);const at=onLand(world,x,z,hearth);world.spawnEnemy(type,at.x,at.z);}
@@ -300,7 +301,7 @@ function hunterType(world, region, day){
   const pool=RESIDENTS[region]||[];
   if(pool.length&&world.spawnRng()<.6)return pool[Math.floor(world.spawnRng()*pool.length)];
   // `day` here is the threat (vigil.mjs threatOf).
-  return pickWeighted(world.spawnRng, nightRoster(day));
+  return pickWeighted(world.spawnRng, nightRoster(day, ageOf(world)));
 }
 
 /** Where a group may appear: near-far from the wanderer, behind them first, on open walkable ground, in the dark. */

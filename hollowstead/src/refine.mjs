@@ -9,7 +9,7 @@
 import {trinketHit} from './trinkets.mjs?v=harvest-18';
 import {label} from './content.mjs?v=harvest-18';
 import {equipmentSlotFor, inCraftRange} from './contracts.mjs?v=harvest-18';
-import {RARITIES, REFINE, maxHealth, rarityOf, refineStat, weaponStyle} from './progression.mjs?v=harvest-18';
+import {NAMED, RARITIES, REFINE, maxHealth, namedOf, rarityOf, refineSlots, refineStat, weaponStyle} from './progression.mjs?v=harvest-18';
 import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 
 export const REFINE_CURRENCY = 'ichor';
@@ -55,7 +55,7 @@ export function modText(key, tier, itemId){
   const v = mod.values[tier] || 0, noun = SHOTS[itemId] || ['shot', 'shots'];
   return mod.text.replace('{v}', String(v)).replace('{shot}', v === 1 ? noun[0] : noun[1]);
 }
-/** A wanderer's modifiers on a weapon type: [{mod, tier}], at most REFINE.slots. */
+/** A wanderer's modifiers on a weapon type: [{mod, tier}], at most refineSlots (four once it is named). */
 export function refinesOf(p, itemId){
   const list = p?.refine?.[itemId];
   return Array.isArray(list) ? list : [];
@@ -86,17 +86,19 @@ export function carriedWeapons(p){
  * cost and whether it is at hand.
  */
 export function refineView(p, itemId, {have = 0, canPay = () => false} = {}){
-  const list = refinesOf(p, itemId);
-  const slots = Array.from({length: REFINE.slots}, (_, index) => {
+  const list = refinesOf(p, itemId), count = refineSlots(p, itemId), rec = namedOf(p, itemId);
+  const slots = Array.from({length: count}, (_, index) => {
     const entry = list[index]; if(!entry || !REFINE.mods[entry.mod]) return null;
     const tier = tierOf(entry);
     return {index, mod: entry.mod, tier, rarity: RARITIES[tier], name: REFINE.mods[entry.mod].name, text: modText(entry.mod, tier, itemId)};
   });
-  const open = list.length < REFINE.slots ? list.length : -1;
+  const open = list.length < count ? list.length : -1;
   const fillCost = open >= 0 ? refineCost(itemId, open) : null, rerollCost = refineCost(itemId, 0, true);
   return {
     itemId, name: label(itemId), rarity: rarityOf(itemId), kind: refineKind(itemId), have,
     slots,
+    // Named weapons (mastery.mjs): the fourth slot opens once enough elders have fallen to it.
+    named: {name: rec?.name || null, title: rec?.title || null, elders: Math.floor(rec?.elders || 0), need: NAMED.elders},
     fill: fillCost ? {slot: open, cost: fillCost[REFINE_CURRENCY], ok: !!canPay(fillCost)} : null,
     reroll: {cost: rerollCost[REFINE_CURRENCY], ok: !!canPay(rerollCost)},
   };
@@ -126,7 +128,7 @@ export function sanitizeRefine(p){
   if(!p.refine || typeof p.refine !== 'object' || Array.isArray(p.refine)){delete p.refine; return;}
   for(const [itemId, list] of Object.entries(p.refine)){
     const clean = Array.isArray(list) && isRefinable(itemId)
-      ? list.filter(entry => entry && Object.hasOwn(REFINE.mods, entry.mod) && Number.isInteger(entry.tier) && entry.tier >= 0 && entry.tier < RARITIES.length).slice(0, REFINE.slots)
+      ? list.filter(entry => entry && Object.hasOwn(REFINE.mods, entry.mod) && Number.isInteger(entry.tier) && entry.tier >= 0 && entry.tier < RARITIES.length).slice(0, refineSlots(p, itemId))
       : [];
     if(clean.length) p.refine[itemId] = clean.map(entry => ({mod: entry.mod, tier: entry.tier}));
     else delete p.refine[itemId];
@@ -135,7 +137,7 @@ export function sanitizeRefine(p){
 
 /**
  * Host: {type: 'refine', stationId, itemId, slot}. Slot n equal to the number already rolled fills
- * the next one; a filled slot is rerolled (it may come back as anything the other two are not).
+ * the next one; a filled slot is rerolled (it may come back as anything the others are not).
  */
 export function refineWeapon(world, p, cmd){
   const reject = (text, code = 'rejected') => {if(text) world.tell(p, text); return {ok: false, code};};
@@ -145,7 +147,7 @@ export function refineWeapon(world, p, cmd){
   const itemId = cmd.itemId;
   if(typeof itemId !== 'string' || !isRefinable(itemId) || !carriedWeapons(p).includes(itemId)) return reject('Carry the weapon you want to refine');
   const list = refinesOf(p, itemId), slot = cmd.slot;
-  if(!Number.isInteger(slot) || slot < 0 || slot >= REFINE.slots || slot > list.length) return reject('', 'invalidCommand');
+  if(!Number.isInteger(slot) || slot < 0 || slot >= refineSlots(p, itemId) || slot > list.length) return reject('', 'invalidCommand');
   const reroll = slot < list.length, cost = refineCost(itemId, slot, reroll);
   if(!world.pay(p, cost)) return reject(`Needs ${cost[REFINE_CURRENCY]} ${label(REFINE_CURRENCY).toLowerCase()}`);
   const taken = list.filter((_, index) => index !== slot).map(entry => entry.mod);

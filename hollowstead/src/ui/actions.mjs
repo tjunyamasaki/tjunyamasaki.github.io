@@ -39,10 +39,12 @@ const SPECS = Object.freeze({
   refine: {icon: '◈', label: 'Refine', activation: 'tap'},
   descend: {icon: '⇩', label: 'Descend', activation: 'hold'},
   sip: {icon: '♨', label: 'Sip', activation: 'hold'},
+  cut: {icon: '✂', label: 'Cut', activation: 'hold'},
+  wake: {icon: '✠', label: 'Wake', activation: 'hold'},
   ascend: {icon: '⇧', label: 'Climb out', activation: 'tap'},
 });
 
-const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock', 'descend', 'sip']);
+const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock', 'descend', 'sip', 'cut', 'wake']);
 /** Context buttons the action cluster can show at once (main.mjs CONTEXT_BUTTONS). */
 const CONTEXT_SLOTS = 4;
 

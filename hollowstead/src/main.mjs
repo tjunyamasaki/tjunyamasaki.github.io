@@ -25,8 +25,9 @@ import {loadMagicModules} from './magic/load.mjs?v=harvest-18';
 import {installMagicSprites,isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 import {waveLeft} from './arena.mjs?v=harvest-18';
 import {hotbarView,offerMarkup,rankStars,replaceMarkup} from './ui/arena.mjs?v=harvest-18';
-import {DASH, MEND} from './progression.mjs?v=harvest-18';
-import {conditionOf, masteryView, mendPlan} from './mastery.mjs?v=harvest-18';
+import {DASH, MEND, refineSlots} from './progression.mjs?v=harvest-18';
+import {ascendView, conditionOf, masteryView, mendPlan, namedView, weaponName} from './mastery.mjs?v=harvest-18';
+import {AGES, ageInfo} from './ages.mjs?v=harvest-18';
 import {clampShowcaseMobCount, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-18';
 import {cachedSrc,loadImage} from './assets.mjs?v=harvest-18';
 import {bindFeatureHud, frameFeatureHud, paintFeatureHud} from './ui/features.mjs?v=harvest-18';
@@ -74,7 +75,7 @@ let chestSession=null,chestOpening=false,chestToken=0,chestRenewAt=0,chestRenewi
 let catalog={source:'field',stationId:null,stationType:null,tab:'build'};
 let catalogPending='',catalogPick='';
 // The workbench's Refine panel (src/ui/refine.mjs): which bench, which weapon type, the slot being rolled.
-let refining={stationId:null,itemId:null,pending:-1,fresh:-1};
+let refining={stationId:null,itemId:null,pending:-1,fresh:-1,ascending:false};
 let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,pendingOp=null,actionPending=false;
 let liveActions=[],holdKind=null,holdTarget=null,holdSource=null,dismantleStarted=0,ringFrame=0,captured=null;
 const checkForUpdate=createUpdateChecker({canReload:()=>mode==='front'&&!busy&&!network&&!document.hidden});
@@ -260,7 +261,7 @@ function paintVigilPanel(){
   const w=plan.save.world,clock=w.mode==='vigil'?{cycle:430}:{cycle:RULES.cycle},day=Math.floor((Math.max(0,(w.time||0)-(w.below||0)))/clock.cycle)+1;
   const host=(w.players||[]).find(q=>q.id==='host')||w.players?.[0],saga=w.saga||{},dread=Math.floor(saga.dread||1),bosses=(saga.king||0)+(saga.briar||0)+(saga.eye||0);
   const when=Number.isFinite(doc.savedAt)?new Date(doc.savedAt).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'';
-  $('vigil-save').innerHTML=`<b>${escapeHtml(host?.name||'Wanderer')}’s vigil</b>Kept on this browser${when?` · last ${escapeHtml(when)}`:''}${w.dungeon?' · resting in a delve':''}<div class="vigil-stats"><span><b>${day}</b>DAY</span><span><b>${dread}</b>DREAD</span><span><b>${host?.level||1}</b>LEVEL</span><span><b>${bosses}</b>BOSSES</span><span><b>${w.omensDone||0}</b>OMENS</span></div>`;
+  $('vigil-save').innerHTML=`<b>${escapeHtml(host?.name||'Wanderer')}’s vigil</b>Kept on this browser${when?` · last ${escapeHtml(when)}`:''}${w.dungeon?' · resting in a delve':''}<div class="vigil-stats"><span><b>${day}</b>DAY</span><span><b>${dread}</b>DREAD</span><span><b>${AGES[ageFromDread(dread)].numeral||'–'}</b>AGE</span><span><b>${host?.level||1}</b>LEVEL</span><span><b>${bosses}</b>BOSSES</span><span><b>${w.omensDone||0}</b>OMENS</span></div>`;
 }
 function deleteVigil(){
   if(!readStored(SAVE_KEYS.vigil))return;
@@ -269,7 +270,9 @@ function deleteVigil(){
   try{localStorage.removeItem(SAVE_KEYS.vigil);}catch{}
   showStatus('The vigil is over. Its fire is out.');paintVigilPanel();syncVigilHint();
 }
-function syncVigilHint(){const doc=readStored(SAVE_KEYS.vigil),hint=$('vigil-hint');if(!hint)return;if(!doc){hint.textContent='Endless save';return;}const w=doc.world||{},day=Math.floor((Math.max(0,(w.time||0)-(w.below||0)))/430)+1;hint.textContent=`Day ${day} · dread ${Math.floor(w.saga?.dread||1)}`;}
+function syncVigilHint(){const doc=readStored(SAVE_KEYS.vigil),hint=$('vigil-hint');if(!hint)return;if(!doc){hint.textContent='Endless save';return;}const w=doc.world||{},day=Math.floor((Math.max(0,(w.time||0)-(w.below||0)))/430)+1,dread=Math.floor(w.saga?.dread||1),age=AGES[ageFromDread(dread)];hint.textContent=`Day ${day} · dread ${dread}${age.numeral?` · ${age.name}`:''}`;}
+/** The Dread Age a saved vigil stands in (ages.mjs), read straight from its Dread. */
+function ageFromDread(dread){let age=0;for(let i=1;i<AGES.length;i++)if(dread>=AGES[i].at)age=i;return age;}
 function showShowcase(open){
   const panel=$('showcase-panel');if(!panel)return;
   if(!open){
@@ -450,8 +453,15 @@ function closeSheet(){
 }
 function openFieldBuild(){catalog={source:'field',stationId:null,stationType:null,tab:'build'};category='all';catalogPick='';openSheet('catalog');}
 function openStationCatalog(panel){catalog={source:'station',stationId:panel.stationId,stationType:panel.stationType,tab:panel.tab};category='all';catalogPick='';openSheet('catalog');}
-function openRefine(stationId){const p=me();refining={stationId,itemId:p?.equipment?.weapon?.itemId||carriedWeapons(p)[0]||null,pending:-1,fresh:-1};openSheet('refine');}
+function openRefine(stationId){const p=me();refining={stationId,itemId:p?.equipment?.weapon?.itemId||carriedWeapons(p)[0]||null,pending:-1,fresh:-1,ascending:false};openSheet('refine');}
 /** Roll (or reroll) a slot of the weapon type shown in the Refine panel. */
+/** Ascension (src/mastery.mjs): one more ✦ for the weapon type on the Refine panel. */
+async function ascendSelected(){
+  const p=me();if(!p||refining.ascending||refining.pending>=0||!refining.itemId)return;
+  refining.ascending=true;dirty=true;renderSheet();
+  await send({type:'ascendWeapon',stationId:refining.stationId,itemId:refining.itemId});
+  refining.ascending=false;dirty=true;renderSheet();
+}
 async function refineSlot(slot){
   const p=me();if(!p||refining.pending>=0||!refining.itemId||!Number.isInteger(slot))return;
   const itemId=refining.itemId;refining.pending=slot;refining.fresh=-1;dirty=true;renderSheet();
@@ -594,7 +604,7 @@ function ensurePanel(){
 /** Hover text for an item: trinkets say what they do, weapons their mastery. */
 function itemTip(stack){
   const p=me(),m=masteryView(world,p,stack.itemId),mods=refineLines(p,stack.itemId);
-  if(m||mods.length)return [label(stack.itemId),m?weaponAbout('',m,null):'',...mods].filter(Boolean).join('\n');
+  if(m||mods.length)return [m?.named?.name?`${m.named.name} (${label(stack.itemId)})`:label(stack.itemId),m?.named?.title||'',m?weaponAbout('',m,null):'',...mods].filter(Boolean).join('\n');
   return trinketTip(stack.itemId,p);
 }
 /** The inventory's detail line for a selected stack: name, rarity and what it does. */
@@ -664,6 +674,8 @@ function guideHTML(){
     ['Seek the new places','Every hollow hides three places somewhere new. Frostmere is a frozen lake you slide across: you keep your speed and turn slowly, so plan your dodges; rime crystals stand round the ice. The Ashen Scar is a burnt crater pooled with lava, where the ground erupts under you every few seconds: lure creatures onto the vents, and mine emberglass. Rime and emberglass awaken the Heartfire to its fourth and fifth levels.'],
     ['Wake the great bosses','Mother Briar sleeps on the Briar Throne, a lair walled in thorn on the wild edge of the hollow with one gate facing home: step inside and she wakes. The Sunken Stair, somewhere in the outer regions, leads down a delve of five floors; The Unblinking waits on the last. The whole party gathers at the stair to go down, the hollow’s clock stops while you are below, and the camp fire on any floor takes everyone back up. Both bosses come back stronger, and the first time each falls it drops its own legendary weapon.'],
     ['Follow the omens','Omens are rare, about one every day and a half, and they are marked on your map, with an arrow on the minimap’s edge when they are far. A fallen star is sealed until its guardians, led by an elder, all fall. A soul rift pours out four waves before it seals, the last led by a great elder. A lonely chest might have teeth. A witch’s cauldron gives one sip each, a blessing or a hex until the dawn after next. A golden pumpkin holds a heartstone. Each one you complete is an Omen fulfilled: a hoard (often an epic, sometimes a legendary), experience for everyone near, and a tally kept for the hollow.'],
+    ['Name and ascend your weapons','Every elder you fell with a weapon type is remembered (the Hollow King counts for five, a great boss for ten). After 25 it earns a name of its own, like Gravesong, Bane of Gravekeepers, and a fourth modifier slot at the workbench. Past ★5 mastery keeps counting: every 160 more readies an ascension, paid for at the workbench’s Refine panel with Dread sigils and ichor. Each ascension adds a little less damage than the last, and there is always another. Dread sigils are torn from great foes: the Hollow King, Mother Briar, The Unblinking, and on a Vigil a bleeding altar’s champion.'],
+    ['The ages of Dread','On a Vigil, every 10 Dread the hollow enters a new age, for good. Age I, the Stirring: roaming packs follow an elder and run larger. Age II, the Bleeding: bleeding altars join the omens; wake one and slay its champion for Dread sigils. Age III, the Thorning: Dread thorns grow over the trails, slowing and scratching whoever wades through (dodge through them, or cut them with an axe). Age IV, the Hunt: dreadhounds, faster than you, run with the night. Age V, the Deep Dread: two elders lead each pack, the thorns grow thick and the hounds hunt by day. The night sky reddens with every age. The clock shows your age beside the Dread.'],
     ['Keep the Vigil','The Vigil on the title screen is one save kept for as long as you like, in a slot of its own that only its own Delete button clears. Days and nights run longer, and the hollow grows with you instead of the days: its Dread rises with your highest level, the best gear you have held and every boss you slay. A fallen fire is rekindled a level lower, a fallen party wakes by it, and your last-chance charm comes back each dawn.'],
   ];
   return `<p class="guide-intro">The woods are unkind.<br>Your friends don’t have to be.</p>${steps.map(([title,text],index)=>`<div class="guide-step"><b>${String(index+1).padStart(2,'0')}</b><div><h3>${title}</h3><p>${text}</p></div></div>`).join('')}<div class="key-help"><span>WASD / arrows · Move</span><span>E · Context action</span><span>Space · Attack</span><span>Shift · Dodge</span><span>R · Swap weapon</span><span>I · Inventory</span><span>B · Build</span><span>F · Lantern</span><span>M · Map</span><span>1–4 · More actions</span><span>Esc · Menu</span></div><p class="muted small">The host saves the expedition automatically. Continue it alone, or host the saved expedition to open a new camp. Keep the host’s tab open during co-op; switching away pauses everyone.</p>`;
@@ -745,12 +757,14 @@ function renderSheet(){
     catalogPick=pickRecipe(recipes,catalogPick)?.id||'';
     replaceContent(catalogMarkup({recipes,maintain:model.maintain,pendingId:catalogPending,pickId:catalogPick}));
   }else if(sheet==='refine'){
-    title='Refine';kicker='WORKBENCH · WEAPON MODIFIERS';
+    title='Refine';kicker='WORKBENCH · MODIFIERS AND ASCENSION';
     const weapons=carriedWeapons(p);
     if(!weapons.includes(refining.itemId))refining.itemId=weapons[0]||null;
-    setTabs(refineTabs(weapons.map(itemId=>({itemId,name:label(itemId),count:refinesOf(p,itemId).length})),refining.itemId));
-    const view=refining.itemId?refineView(p,refining.itemId,{have:world.available(p,REFINE_CURRENCY),canPay:cost=>world.canPay(p,cost)}):null;
-    replaceContent(refineMarkup(view,{icons:{weapon:view?icon(view.itemId):'',ichor:icon(REFINE_CURRENCY)},pending:refining.pending,fresh:refining.fresh}));
+    setTabs(refineTabs(weapons.map(itemId=>({itemId,name:weaponName(p,itemId),count:refinesOf(p,itemId).length,max:refineSlots(p,itemId),named:namedView(p,itemId).named})),refining.itemId));
+    const canPay=cost=>world.canPay(p,cost);
+    const view=refining.itemId?refineView(p,refining.itemId,{have:world.available(p,REFINE_CURRENCY),canPay}):null;
+    const ascend=view?ascendView(p,view.itemId,{have:{sigil:world.available(p,'sigil'),ichor:world.available(p,REFINE_CURRENCY)},canPay}):null;
+    replaceContent(refineMarkup(view,{icons:{weapon:view?icon(view.itemId):'',ichor:icon(REFINE_CURRENCY),sigil:icon('sigil')},pending:refining.pending,fresh:refining.fresh,ascend,ascending:refining.ascending}));
   }else if(sheet==='inventory'||sheet==='chest'){
     const cart=sheet==='chest'&&chestBuilding()?.type==='cart';
     title=sheet==='chest'?(cart?'Hand cart':'Chest'):'Inventory';
@@ -899,23 +913,27 @@ async function drinkPotion(){
 function paintHotbar(p){
   const slots=hotbarView(p).map(slot=>({...slot,mastery:slot.itemId?masteryView(world,p,slot.itemId):null,condition:slot.stack&&!world.arena?conditionOf(slot.stack):null}));
   const refined=itemId=>refinesOf(p,itemId).map(entry=>`${entry.mod}${entry.tier}`).join(',');
-  const sig=slots.map(slot=>`${slot.itemId||''}:${slot.active?1:0}:${slot.rank}:${slot.mastery?Math.floor(slot.mastery.progress*40):''}:${slot.condition==null?'':Math.ceil(slot.condition*40)}:${slot.itemId?refined(slot.itemId):''}`).join('|')+(world.arena?'a':'');
+  const sig=slots.map(slot=>{const m=slot.mastery;return `${slot.itemId||''}:${slot.active?1:0}:${slot.rank}:${m?Math.floor(m.progress*40):''}:${m?.ascend?`${m.ascend.level}/${Math.floor(m.ascend.progress*40)}`:''}:${m?.named?.name||''}:${slot.condition==null?'':Math.ceil(slot.condition*40)}:${slot.itemId?refined(slot.itemId):''}`;}).join('|')+(world.arena?'a':'');
   if(sig===hotbarSig)return;hotbarSig=sig;
   document.querySelectorAll('#weapon-bar .weapon-slot').forEach((el,i)=>{
     const slot=slots[i];if(!slot)return;
     const m=slot.mastery,rank=m?m.rank:slot.rank;
+    const up=m?.ascend,climbing=!!up?.mastered;
     el.classList.toggle('active',slot.active);el.classList.toggle('empty',!slot.itemId);el.classList.toggle('mastered',!!m);
+    el.classList.toggle('named',!!m?.named?.name);el.classList.toggle('ascending',climbing);el.classList.toggle('ascend-ready',!!up?.ready);
     el.classList.toggle('worn',slot.condition!=null&&slot.condition<=MEND.warnAt);el.classList.toggle('broken',slot.condition===0);
     el.innerHTML=slot.itemId?`${icon(slot.itemId)}`
       +(m&&m.to!=null?`<span class="mastery" aria-hidden="true"><em style="width:${(m.progress*100).toFixed(1)}%"></em></span>`:'')
-      +((world.arena||m)&&rank>1?`<small class="rank">${rankStars(rank)}</small>`:'')
+      +(climbing?`<span class="mastery ascend" aria-hidden="true"><em style="width:${(up.progress*100).toFixed(1)}%"></em></span>`:'')
+      +((world.arena||m)&&rank>1?`<small class="rank">${rankStars(rank)}${up?.level?`<b class="ascend-mark">✦${up.level}</b>`:''}</small>`:'')
       +(slot.condition!=null?`<span class="wear" aria-hidden="true"><em style="width:${(slot.condition*100).toFixed(1)}%"></em></span>`:'')
       +(slot.condition===0?'<small class="broken-tag" aria-hidden="true">BROKEN</small>':'')
       +refineGems(p,slot.itemId)
       :'<span aria-hidden="true">+</span>';
     const about=slot.itemId?[weaponAbout(slot.name,m,slot.condition),...refineLines(p,slot.itemId)].filter(Boolean).join(' · '):'';
-    el.setAttribute('aria-label',slot.itemId?`${slot.name}${slot.active?', in hand':''}${about?`. ${about}`:''}`:`Empty weapon slot ${i+1}`);
-    el.setAttribute('aria-pressed',String(slot.active));el.title=slot.itemId?`${slot.name}${about?`\n${about}`:''}`:'Empty slot';
+    const shown=m?.named?.name?`${m.named.name} (${slot.name}), ${m.named.title}`:slot.name;
+    el.setAttribute('aria-label',slot.itemId?`${shown}${slot.active?', in hand':''}${about?`. ${about}`:''}`:`Empty weapon slot ${i+1}`);
+    el.setAttribute('aria-pressed',String(slot.active));el.title=slot.itemId?`${shown}${about?`\n${about}`:''}`:'Empty slot';
   });
 }
 /** One gem per refinement on a hotbar weapon, in its rarity's colour (src/refine.mjs). */
@@ -926,7 +944,11 @@ function refineGems(p,itemId){
 /** Mastery and condition in words, for titles and screen readers. */
 function weaponAbout(name,m,condition){
   const parts=[];
-  if(m)parts.push(m.to==null?`Mastery ${rankStars(m.rank)} (max)`:`Mastery ${rankStars(m.rank)} · ${Math.floor(m.points)} / ${m.to} to ${rankStars(m.rank+1)}`);
+  const up=m?.ascend;
+  if(m)parts.push(m.to!=null?`Mastery ${rankStars(m.rank)} · ${Math.floor(m.points)} / ${m.to} to ${rankStars(m.rank+1)}`
+    :up?`Mastery ${rankStars(m.rank)} ✦${up.level}${up.level?` (+${Math.round(up.bonus*1000)/10}% damage)`:''} · ${up.ready?'ready to ascend at a workbench':`${Math.floor(up.points-up.from)} / ${Math.round(up.to-up.from)} to ✦${up.level+1}`}`
+    :`Mastery ${rankStars(m.rank)} (max)`);
+  if(m?.named&&!m.named.name&&m.named.elders>0)parts.push(`Elders felled ${m.named.elders} / ${m.named.need} to earn a name`);
   if(condition===0)parts.push('Broken: mend it at the Heartfire');
   else if(condition!=null)parts.push(`Condition ${Math.ceil(condition*100)}%`);
   return parts.join(' · ');
@@ -1011,13 +1033,13 @@ function ui(){
     if(world.arena||world.dungeon){const chip=$('dread-chip');if(chip)chip.hidden=true;}
     if(world.arena)paintArenaClock();
     else if(world.dungeon)paintDungeonClock();
-    else{const clock=scheduleOf(world);$('day-number').textContent=`DAY ${String(dayOf(world)).padStart(2,'0')}`;const vs=vigilStatus(world),chip=$('dread-chip');if(chip){chip.hidden=!vs;if(vs){const text=`DREAD ${vs.dread}`;if(chip.textContent!==text)chip.textContent=text;}}
+    else{const clock=scheduleOf(world);$('day-number').textContent=`DAY ${String(dayOf(world)).padStart(2,'0')}`;const vs=vigilStatus(world),chip=$('dread-chip');if(chip){chip.hidden=!vs;if(vs){const age=ageInfo(world),text=`DREAD ${vs.dread}${age.numeral?` · ${age.numeral}`:''}`;if(chip.textContent!==text){chip.textContent=text;chip.title=`${age.numeral?`Age ${age.numeral} · `:''}${age.name}. ${age.line}${age.next?` The next age comes at Dread ${age.next}.`:''}`;}}}
     $('day-progress').style.left=`${(hollowTime(world)%clock.cycle)/clock.cycle*100}%`;
     paintClock();}
     paintHotbar(p);paintPotion(p);paintAttack(p);paintArenaPick(p);paintFeatureHud(featureContext(p));
     $('party').innerHTML=world.players.filter(q=>q.id!==localId).map(q=>`<div class="party-row"><span class="party-dot" style="background:${CHARACTERS.find(c=>c.id===q.character)?.color}"></span><b>${escapeHtml(q.name)}</b><span>${!q.online?'away':q.down?'needs help!':q.ghost?(world.dungeon?'rises with the Warden':'returns at dawn'):''}</span></div>`).join('');
     if(p.noticeAt&&p.noticeAt!==lastNotice){toast(p.notice);lastNotice=p.noticeAt;}
-    for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(ev.type==='dread')toast(ev.text);if(ev.type==='omenfulfilled')achievement('OMEN FULFILLED',OMENS[ev.kind]?.name||'',ev.count>1?`${ev.count} omens fulfilled in this hollow`:'The first omen of this hollow');if(ev.type==='rare'&&distance(p,ev)<14)toast(`Found ${ev.text} · ${rarityOf(ev.itemId)}`);if(distance(p,ev)<20||['phase','descend','ascend','bossrise','bossphase','omen','dread','rekindle','riftclose','omenfulfilled'].includes(ev.type))sound.play(ev.type,ev);}}
+    for(const ev of world.events)if(ev.id>lastEvent){lastEvent=ev.id;if(world.time-ev.at<2){if(['announce','phase'].includes(ev.type))announce(ev.text);if(ev.type==='dread')toast(ev.text);if(ev.type==='dreadage')achievement(`AGE ${AGES[ev.age]?.numeral||''} OF DREAD`,ev.name||'',ev.line||'');if(ev.type==='named'){if(ev.player===localId)achievement('A WEAPON EARNS ITS NAME',ev.name||'',`${label(ev.itemId)} · ${ev.title||''} · a fourth modifier slot opens`);else if(distance(p,ev)<24)toast(`${ev.name}, ${ev.title}`);}if(ev.type==='weaponascend'&&ev.player!==localId&&distance(p,ev)<14)toast(`${ev.text}`);if(ev.type==='omenfulfilled')achievement('OMEN FULFILLED',OMENS[ev.kind]?.name||'',ev.count>1?`${ev.count} omens fulfilled in this hollow`:'The first omen of this hollow');if(ev.type==='rare'&&distance(p,ev)<14)toast(`Found ${ev.text} · ${rarityOf(ev.itemId)}`);if(distance(p,ev)<20||['phase','descend','ascend','bossrise','bossphase','omen','dread','dreadage','rekindle','riftclose','omenfulfilled'].includes(ev.type))sound.play(ev.type,ev);}}
     $('downed').hidden=!p.down&&!p.ghost;
     if(p.down||p.ghost){$('downed-text').textContent=world.dungeon?(p.charm?'Use your one last-chance charm, or let a friend hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds.`:'You keep your pack. You rise when the Warden falls, or at the next stairs.'):world.arena&&world.players.filter(q=>q.online).length<2?'The swarm has you.':p.charm?'Use your one last-chance charm, or let a teammate hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds until your supplies drop.`:'Your supplies are on the ground. You return at dawn if the camp survives.';$('use-charm').hidden=!p.charm;if(sheet)closeSheet();cancelPlacement();cancelMaintenance();inventoryPanel?.cancelDrag();}
     const boss=world.enemies.find(e=>e.hp>0&&ENEMIES[e.type]?.boss&&distance(p,e)<32)||world.enemies.find(e=>e.type==='king'||(e.warden&&e.hp>0));$('boss-bar').hidden=!boss;document.body.classList.toggle('boss',!!boss);if(boss){$('boss-bar').querySelector('em').style.width=`${boss.hp/boss.maxHp*100}%`;const name=boss.type==='king'?'THE HOLLOW KING':ENEMIES[boss.type]?.boss?`${label(boss.type)}${boss.phase>1?` · ${'I'.repeat(boss.phase)}`:''}`.toUpperCase():`${label(boss.type)} WARDEN`.toUpperCase();const tag=$('boss-bar').querySelector('span');if(tag.textContent!==name)tag.textContent=name;}
@@ -1189,6 +1211,7 @@ function setupControls(){
   $('sheet-content').onclick=event=>{
     const button=event.target.closest('button');if(!button)return;
     if(button.dataset.refineSlot!=null){void refineSlot(Number(button.dataset.refineSlot));return;}
+    if(button.dataset.ascend!=null){void ascendSelected();return;}
     if(button.dataset.pick){catalogPick=button.dataset.pick;dirty=true;renderSheet();return;}
     if(button.dataset.recipe){
       if(catalogPending)return;

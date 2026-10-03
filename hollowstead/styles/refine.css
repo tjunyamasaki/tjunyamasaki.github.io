@@ -34,3 +34,37 @@
 /* Critical hits (Keen) float bigger and gold; a fresh roll floats in its rarity's colour. */
 .world-label.crit-label{font-size:17px;letter-spacing:.3px;text-shadow:0 2px 3px #181421,0 0 10px #7a4a0a}
 .world-label.refine-label{font-size:14px;letter-spacing:.4px}
+/* Named weapons (src/mastery.mjs): a gold name over the weapon, and the slot it waits for. */
+.refine-head.is-named .item-icon{filter:drop-shadow(0 0 6px #f2c14e88)}
+.refine-name.is-named{color:var(--legendary);letter-spacing:.3px;text-shadow:0 0 12px #f2c14e44}
+.refine-head .refine-title{margin:-2px 0 4px;font:10px ui-monospace,monospace;letter-spacing:.6px;text-transform:uppercase;color:#d9b36a}
+.refine-slot.is-name{--tone:var(--legendary)}
+.refine-slot.is-name .refine-gem{color:var(--legendary)}
+.name-bar{display:block;height:3px;margin-top:6px;border-radius:2px;background:#f2c14e22;overflow:hidden}
+.name-bar em{display:block;height:100%;background:var(--legendary);box-shadow:0 0 6px #f2c14eaa}
+.chip.is-named{border-color:#f2c14e88;color:#f6d27a}
+/* Ascension: past ★5, one violet ✦ at a time, for Dread sigils and ichor. */
+.ascend{--tone:#b48cff;margin:14px 0 0;padding:10px 10px 10px 8px;border:1px solid #b48cff55;border-left:3px solid var(--tone);border-radius:8px;background:color-mix(in srgb,var(--tone) 10%,#241f2b)}
+.ascend.is-ready{box-shadow:0 0 18px #b48cff40;animation:ascend-glow 2.4s ease-in-out infinite}
+.ascend.is-locked{opacity:.6;border-style:dashed;border-left-style:solid}
+@keyframes ascend-glow{50%{box-shadow:0 0 26px #b48cff66}}
+@media (prefers-reduced-motion:reduce){.ascend.is-ready{animation:none}}
+.ascend-head{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center}
+.ascend-star{font-size:22px;line-height:1;text-align:center;color:var(--tone);text-shadow:0 0 10px #b48cffaa}
+.ascend h4{margin:0;font:13px Georgia,serif;color:#f0dfbd}
+.ascend-head p{margin:2px 0 0;font-size:12px;color:#e1d2bb}
+.ascend-level{font:13px ui-monospace,monospace;color:#d6c0ff}
+.ascend-head small{color:#cbb8ee;font-size:11px}
+.ascend button{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:86px;min-height:44px;padding:5px 9px;font-size:11px}
+.ascend-cost{display:flex;gap:6px}
+.ascend-bar{display:block;height:3px;margin:9px 0 0 36px;border-radius:2px;background:#b48cff22;overflow:hidden}
+.ascend-bar em{display:block;height:100%;background:var(--tone);box-shadow:0 0 6px #b48cffaa}
+.refine-price.is-short{color:#e0776b}
+/* Hotbar: a named weapon wears a gold rim; past ★5 the mastery bar turns violet toward the next ✦. */
+.hotbar .weapon-slot.named{border-color:#f2c14eaa;box-shadow:0 0 0 1px #f2c14e33 inset,0 0 8px #f2c14e33}
+.hotbar .weapon-slot.named.active{box-shadow:0 0 0 1px var(--orange) inset,0 0 12px #f2c14e77}
+.hotbar .weapon-slot .mastery.ascend{background:#b48cff2e}
+.hotbar .weapon-slot .mastery.ascend em{background:#b48cff;box-shadow:0 0 4px #b48cffaa}
+.hotbar .weapon-slot.ascend-ready .mastery.ascend em{animation:worn-pulse 1.4s ease-in-out infinite}
+.hotbar .weapon-slot .rank .ascend-mark{margin-left:2px;font-weight:700;color:#d6c0ff;letter-spacing:0}
+@media (prefers-reduced-motion:reduce){.hotbar .weapon-slot.ascend-ready .mastery.ascend em{animation:none}}

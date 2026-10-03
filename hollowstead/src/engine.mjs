@@ -21,7 +21,8 @@ import {
   keepsKnockback, rankOf, tierAt, waveSize, weaponStyle, xpToNext, REFINE, refineStat,
 } from './progression.mjs?v=harvest-18';
 import {stepSkills, useSkill} from './skills.mjs?v=harvest-18';
-import {creditKill, mendWeapon, syncMastery, warnWear} from './mastery.mjs?v=harvest-18';
+import {ascendWeapon, creditKill, mendWeapon, syncMastery, warnWear} from './mastery.mjs?v=harvest-18';
+import {packRule, stepAges, thornNodes, thornSpeed} from './ages.mjs?v=harvest-18';
 import {refineHit as refinedHit, refineWeapon, refinedStyle, sanitizeRefine, splitBefore, splitMagic, splitMarks} from './refine.mjs?v=harvest-18';
 import {HEARTH_MEND, stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
 import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
@@ -692,7 +693,7 @@ export class World {
     if(this.status!=='playing')return {ok:false,code:'unavailable'};
     if(p.down||p.ghost){if(cmd.type==='interact'&&p.charm>0){p.charm--;this.revivePlayer(p);this.event('heal',p.x,p.z,'Last charm');return {ok:true,code:'ok'};}return {ok:false,code:'unavailable'};}
     if(Object.hasOwn(INTENTS,cmd.type))return inventoryIntent(this,p,cmd);
-    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill','refine','tile'].includes(cmd.type))return {ok:false,code:'cooldown'};
+    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill','refine','ascendWeapon','tile'].includes(cmd.type))return {ok:false,code:'cooldown'};
     switch(cmd.type){
       case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){const gx=clamp(cmd.x,-this.radius+1,this.radius-1),gz=clamp(cmd.z,-this.radius+1,this.radius-1),land=this.walkable(gx,gz)?null:this.landNear(gx,gz,6);p.goal={x:land?land.x:gx,z:land?land.z:gz,target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
       case 'craft':return this.performCraft(p, cmd.recipe, cmd.stationId);
@@ -717,6 +718,7 @@ export class World {
       case 'attack':this.attack(p);break;
       case 'skill':return useSkill(this, p);
       case 'refine':return refineWeapon(this, p, cmd);
+      case 'ascendWeapon':return ascendWeapon(this, p, cmd);
       case 'dash':return this.dodge(p);
       case 'hotbar':return this.selectHotbar(p, cmd.slot);
       case 'arenaPick':return this.arena?arenaPick(this, p, cmd.choice, cmd.replace):{ok:false,code:'unavailable'};
@@ -768,7 +770,7 @@ export class World {
     const inRange=entity=>distance(p,entity)<RULES.reach;
     const revive=this.players.find(q=>q.id!==p.id&&q.online&&q.down&&inRange(q));
     const candidates=[
-      ...this.nodes.filter(n=>!(n.ready>this.time)&&nodeAwake(n,this)&&inRange(n)&&(NODES[n.type].handRate||NODES[n.type].tool)).map(e=>({kind:'node',entity:e,label:e.type==='tree'?'Chop':['rock','ore','grave','shardrock','rimecrystal','embervent'].includes(e.type)?'Mine':isCache(e.type)||e.type==='fallenstar'||e.type==='mimic'?'Open':e.type==='witchcauldron'?'Sip':NODES[e.type].landmark==='delve'?'Descend':'Gather'})),
+      ...this.nodes.filter(n=>!(n.ready>this.time)&&nodeAwake(n,this)&&inRange(n)&&(NODES[n.type].handRate||NODES[n.type].tool)).map(e=>({kind:'node',entity:e,label:e.type==='tree'?'Chop':['rock','ore','grave','shardrock','rimecrystal','embervent'].includes(e.type)?'Mine':isCache(e.type)||e.type==='fallenstar'||e.type==='mimic'?'Open':e.type==='witchcauldron'?'Sip':e.type==='thornpatch'?'Cut':e.type==='dreadaltar'?'Wake':NODES[e.type].landmark==='delve'?'Descend':'Gather'})),
       ...this.buildings.filter(b=>b.hp>0&&inRange(b)&&!(b.grid&&b.type!=='gate')&&(typeof id==='string'||b.towedBy!==p.id)).map(e=>({kind:'building',entity:e,label:this.buildingLabel(e)})),
       ...cropTargets(this,p),
       ...(revive?[{kind:'revive',entity:revive,label:'Revive teammate'}]:[]),
@@ -1451,7 +1453,7 @@ export class World {
   walkable(x,z){if(this.dungeon){const floor=layoutOf(this);return floor?dungeonWalkable(floor,x,z):false;}return this.arena||this.showcase?Math.hypot(x,z)<this.radius-1:walkableAt(this.seed,x,z);}
   /** Dungeons only: true when rock does not stand between two points (a resting creature needs to see you). */
   /** The hollow's nodes again, from the seed, with what had been taken from them (a delve's way back up). */
-  rebuildNodes(changes=[]){this.nodes=makeMap(this.seed).concat(omenNodes(this));for(const change of changes){const node=this.nodes.find(n=>n.id===change.id);if(node){node.hits=change.hits;node.ready=change.ready;}}}
+  rebuildNodes(changes=[]){this.nodes=makeMap(this.seed).concat(omenNodes(this),thornNodes(this));for(const change of changes){const node=this.nodes.find(n=>n.id===change.id);if(node){node.hits=change.hits;node.ready=change.ready;}}}
   /** Region or seeded area under a point (worldgen.mjs zoneAt); the plain rings off an expedition. */
   regionOf(x,z){return this.arena||this.dungeon||this.showcase?regionAt(x,z):zoneAt(this.seed,x,z);}
   /** True on Frostmere's ice (worldgen.mjs iceAt). */
@@ -1462,7 +1464,7 @@ export class World {
   /** The nearest walkable point within maxR units (the spot itself when it is walkable), or null. */
   landNear(x,z,maxR=6){if(this.dungeon){const floor=layoutOf(this);return floor?dungeonLandNear(floor,x,z,maxR):null;}if(this.arena||this.showcase){const r=Math.hypot(x,z),R=this.radius-1.05;return r<R?{x,z}:r>0?{x:x*R/r,z:z*R/r}:{x:0,z:0};}return landNear(this.seed,x,z,maxR);}
   /** Walk speed multiplier from region hazards, a pulled cart and the worn trinket. */
-  speedFactor(p){return (buffed(p,'swift')?BUFF.swift:1)*(this.arena?1:this.dungeon?trinketSpeed(this,p):regionSpeed(this,p)*cartSpeed(this,p)*trinketSpeed(this,p)*brewSpeed(p));}
+  speedFactor(p){return (buffed(p,'swift')?BUFF.swift:1)*(this.arena?1:this.dungeon?trinketSpeed(this,p):regionSpeed(this,p)*cartSpeed(this,p)*trinketSpeed(this,p)*brewSpeed(p)*thornSpeed(this,p));}
   /**
    * Solid things a walker cannot enter. Returns the few camp structures as a plain array and hangs
    * the many standing trees and rocks on `.grid`, a 4-unit spatial hash cached until a node is felled,
@@ -1602,8 +1604,10 @@ export class World {
     }
   }
   /** Region residents roam near wanderers who travel beyond the meadow, day or night. */
-  roam(dt){
+  roam(dt,phase='day'){
     if(this.showcase||!this.ambient)return;
+    // Dread Ages on a Vigil (ages.mjs): elders lead the packs, and later dreadhounds run with them.
+    const rule=packRule(this),hounds=rule.hounds&&(phase!=='day'||rule.houndsByDay);
     this.roamTimer-=dt;if(this.roamTimer>0)return;this.roamTimer=ROAM.interval;
     for(const p of this.players){
       if(!p.online||p.down||p.ghost||hushedAt(this,p.x,p.z))continue;
@@ -1615,8 +1619,9 @@ export class World {
         const a=this.spawnRng()*Math.PI*2,r=ROAM.spawnMin+this.spawnRng()*(ROAM.spawnMax-ROAM.spawnMin),x=p.x+Math.cos(a)*r,z=p.z+Math.sin(a)*r;
         if(!this.walkable(x,z)||!(REGIONS[this.regionOf(x,z)]?.tier>=1)||hushedAt(this,x,z))continue;
         if(this.players.some(q=>q.online&&distance(q,{x,z})<ROAM.spawnMin-2))continue;
-        const type=pool[Math.floor(this.spawnRng()*pool.length)],[lo,hi]=ROAM.pack[type]||[1,1],n=lo+Math.floor(this.spawnRng()*(hi-lo+1));
-        for(let k=0;k<n;k++){const b=this.spawnRng()*Math.PI*2,s=k?.8+this.spawnRng()*1.2:0;this.spawnEnemy(type,x+Math.cos(b)*s,z+Math.sin(b)*s,{home:true,roamer:true,tier:tier-1,leash:ROAM.leash});}
+        const type=hounds&&this.spawnRng()<ROAM.hounds?'dreadhound':pool[Math.floor(this.spawnRng()*pool.length)],[lo,hi]=ROAM.pack[type]||[1,1],n=lo+Math.floor(this.spawnRng()*(hi-lo+1))+(ROAM.pack[type]?rule.extra:0);
+        const elders=n>1?Math.min(rule.elders,n-1):0;
+        for(let k=0;k<n;k++){const b=this.spawnRng()*Math.PI*2,s=k?.8+this.spawnRng()*1.2:0;this.spawnEnemy(type,x+Math.cos(b)*s,z+Math.sin(b)*s,{home:true,roamer:true,tier:tier-1,leash:ROAM.leash,elite:k<elders?true:undefined});}
         break;
       }
     }
@@ -1667,8 +1672,8 @@ export class World {
     if(!this.showcase&&dayOf(this)!==oldDay&&this.bossSlain&&!this.endless){this.status='victory';this.event('announce',0,0,'The curse is broken. Your fire still burns.');return;}
     // A bag taken off any other way (dismantled, spilled) still leaves the pack its right size.
     for(const p of this.players)this.fitPack(p);
-    stepSaga(this,dt);stepNight(this,dt,before,phase);stepBlooms(this,before,phase);stepSleep(this);stepSunburn(this,dt,phase);
-    this.maintainGuards();this.roam(dt);stepAreas(this,dt,phase);stepOmens(this,dt);
+    stepSaga(this,dt);stepAges(this,dt,before,phase);stepNight(this,dt,before,phase);stepBlooms(this,before,phase);stepSleep(this);stepSunburn(this,dt,phase);
+    this.maintainGuards();this.roam(dt,phase);stepAreas(this,dt,phase);stepOmens(this,dt);
     for(const n of this.nodes)if(n.ready&&n.ready<this.time){n.ready=0;n.hits=NODES[n.type].hits;}
     }
     const obstacles=this.obstacles();
@@ -1748,7 +1753,7 @@ export class World {
       // The sun did most of the work (sunburn.mjs): no loot, experience or mastery, just ash.
       const burnt=sunTook(e);
       const loot=ENEMIES[e.type]?.loot;if(loot&&!burnt)for(const[itemId, count]of Object.entries(loot))this.dropNew(itemId, count, e.x+(this.rng()-.5), e.z+(this.rng()-.5));
-      if(!isMagicAlly(e)){this.kills++;if(this.dungeon)dungeonKill(this,e);if(e.mimic&&!burnt)omenKill(this,e);if(e.gilded&&!burnt)gildedLoot(this,e);if((e.warden||e.type==='king')&&!this.showcase)for(const q of this.players)if(q.online&&!q.ghost)unlockCharm(this,q,e.type==='king'?'the Hollow King fell':'the Warden fell');if(!this.showcase&&!burnt){this.spillLoot(this.roll(e.type,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)+(e.warden?1:0)+dungeonLuck(this)+moonLuck(this)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}
+      if(!isMagicAlly(e)){this.kills++;if(this.dungeon)dungeonKill(this,e);if((e.mimic||e.champion)&&!burnt)omenKill(this,e);if(e.gilded&&!burnt)gildedLoot(this,e);if((e.warden||e.type==='king')&&!this.showcase)for(const q of this.players)if(q.online&&!q.ghost)unlockCharm(this,q,e.type==='king'?'the Hollow King fell':'the Warden fell');if(!this.showcase&&!burnt){this.spillLoot(this.roll(e.type,(e.elite?ELITE.luck:0)+(e.guardOf?.5:0)+(e.warden?1:0)+dungeonLuck(this)+moonLuck(this)),e.x,e.z,this.player(e.lastHitBy)?.name);this.shareXp(e.x,e.z,enemyXp(e.type)*(e.elite?ELITE.xp:1)*(1+.08*((e.level||1)-1)));}const killer=burnt?null:this.player(e.lastHitBy);if(killer&&killer.online&&!killer.down&&!killer.ghost)trinketEvent(this,killer,'kill',{enemy:e,phase});if(killer&&!killer.ghost)creditKill(this,killer,e);}
       this.event('kill',e.x,e.z);if(burnt)this.event('ashes',e.x,e.z,'',{creature:e.type,king:e.type==='king'});
       if((e.type==='king'||ENEMIES[e.type]?.boss)&&!burnt){const times=noteBossKill(this,e.type);areaBossFell(this,e);if(ENEMIES[e.type]?.boss)bossLoot(this,e,times);}
       if(e.type==='king'&&!this.dungeon){this.bossSlain=true;this.event('announce',e.x,e.z,burnt?'The Hollow King burns away in the daylight, and takes his treasure with him.':'The Hollow King falls. His treasure spills across the grass.');}
@@ -1791,7 +1796,7 @@ export class World {
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
       projectiles:this.projectiles, allies:this.allies, zones:this.zones, beats:this.beats, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
-      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone, tiles:this.tiles, homestead:this.homestead, wilds:this.wilds,
+      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone, tiles:this.tiles, homestead:this.homestead, wilds:this.wilds, thorns:this.thorns,
       ...magicSnapshotFields(this),
     };
     // Where each random stream stands, so a reloaded save carries on rather than replaying the seed.
@@ -1804,7 +1809,7 @@ export class World {
     if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
     // A dungeon floor is rebuilt from its seed (dungeon/layout.mjs), never from the hollow's map.
     const world=new World(data.seed,data.dungeon?{bare:true}:{});
-    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','below','saga','surface','delves','lair','omens','omenT','omensDone','tiles','homestead','wilds'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','below','saga','surface','delves','lair','omens','omenT','omensDone','tiles','homestead','wilds','thorns'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     if(world.arena){world.nodes=[];}if(world.dungeon)world.nodes=dungeonNodes(world);if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||(!world.arena&&!world.dungeon))world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
     for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);sanitizeRefine(p);}
@@ -1812,6 +1817,8 @@ export class World {
     // Omens (omens.mjs) live after the hollow's own nodes; a delve's floor has none.
     if(!world.dungeon&&!world.arena&&!world.showcase&&Array.isArray(world.omens))world.nodes.push(...omenNodes(world));
     if(!world.dungeon&&!world.arena&&Array.isArray(world.wilds))world.nodes.push(...wildNodes(world));
+    // Dread thorns (ages.mjs) grow over the trails on a Vigil; their nodes come from world.thorns, like omens.
+    if(!world.dungeon&&!world.arena&&Array.isArray(world.thorns))world.nodes.push(...thornNodes(world));
     for(const change of data.nodeChanges||[]){const at=world.nodes[Number(String(change.id).slice(1))],node=at?.id===change.id?at:world.nodes.find(entry=>entry.id===change.id);if(node){node.hits=change.hits;node.ready=change.ready;}}
     if(typeof data.worldId==='string')world.networkId=data.worldId;
     world.transactionRevision=data.transactionRevision||0;

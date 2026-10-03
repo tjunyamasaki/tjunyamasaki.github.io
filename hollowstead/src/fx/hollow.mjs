@@ -1,7 +1,8 @@
 // The hollow's own effects (not a weapon's): blasts on the ground before and as they go off (Ashen Scar
 // vents, falling stars, Mother Briar's roots and thorns, The Unblinking's gaze and tendrils), the great
 // bosses rising, omens marked by a beam of light you can see from afar, gilded creatures glittering, and
-// the glow of lava at night. Drawn by both renderers through WeaponFx (index.mjs). Presentation only.
+// the glow of lava at night; a Dread Age dawning, Dread champions, weapons earning names and ascending.
+// Drawn by both renderers through WeaponFx (index.mjs). Presentation only.
 import {INK, TAU, at, bump, clamp01, easeIn, easeOut, fade, rnd} from './kit.mjs?v=harvest-18';
 import {ENEMIES} from '../content.mjs?v=harvest-18';
 import {areasOf} from '../worldgen.mjs?v=harvest-18';
@@ -178,6 +179,34 @@ export const HOLLOW_EVENTS = {
   gildfall: {life: () => 1.4, kick: () => ({shake: .15}), paint(d, ev, age, seed){const t = age/1.4; d.sparks(ev.x, ev.z, .8, 22, t, '#ffd25a', fade(t), seed, {speed: 6, up: 6}); d.bloom(ev.x, ev.z, .8, 2*(1-t), '#ffd25a', .6*fade(t));}},
   rekindle: {life: () => 2, kick: () => ({shake: .3, flash: .15, color: '#ffcf8a'}), paint(d, ev, age, seed){const t = age/2; d.beam(ev.x, ev.z, 0, 10, 1.4*fade(t), '#ffb14e', .6*fade(t)); d.sparks(ev.x, ev.z, .8, 20, t, '#ffe2a0', fade(t), seed, {up: 8});}},
   ascend: {life: () => 1.6, paint(d, ev, age){const t = age/1.6; d.beam(ev.x, ev.z, 0, 8, 1.6*fade(t), '#c49bff', .5*fade(t));}},
+  // Dread Ages (ages.mjs): the whole sky flinches red, and a ring of it rolls out from the Heartfire.
+  dreadage: {life: () => 3.2, kick: () => ({shake: .5, flash: .26, color: '#ff4a5e'}), paint(d, ev, age, seed){
+    const t = age/3.2;
+    d.stain(ev.x, ev.z, 10*easeOut(t*1.6), '#3a0e18', .45*fade(t));
+    for(let i = 0; i < 4; i++) d.ring(ev.x, ev.z, 2+i*3+easeOut(t)*14, .18, i%2 ? '#ff4a5e' : '#7a1426', .7*fade(t), {glow: true});
+    d.groundRays(ev.x, ev.z, 18, 1.5, 16*easeOut(t*1.3), .16, '#ff4a5e', .5*fade(t), seed);
+  }},
+  // Dread thorns bite: a few red flecks.
+  thorns: {life: () => .45, paint(d, ev, age, seed){const t = age/.45; d.sparks(ev.x, ev.z, .5, 5, t, '#e0465a', fade(t), seed, {speed: 2.5, up: 1.5});}},
+  // A weapon earns its name (mastery.mjs): a gold column, a crown of rings and a shower of sparks.
+  named: {life: () => 2.4, kick: () => ({shake: .25, flash: .2, color: '#ffe7a8'}), paint(d, ev, age, seed){
+    const t = age/2.4;
+    d.beam(ev.x, ev.z, 0, 6*easeOut(age/.5), 1.4, '#f2c14e', .6*fade(t));
+    d.beam(ev.x, ev.z, 0, 6.2*easeOut(age/.5), .3, '#fff6d8', .9*fade(t));
+    for(let i = 0; i < 3; i++) d.ring(ev.x, ev.z, .6+i*.9+easeOut(Math.min(1, t*2))*2.6, .1, i ? '#f2c14e' : '#fff6d8', .9*fade(t), {glow: true});
+    d.sparks(ev.x, ev.z, 1.2, 30, t, '#ffe7a8', fade(t), seed, {up: 8, speed: 4});
+    d.light(ev.x, ev.z, 6*fade(t));
+  }},
+  // A weapon ascends (mastery.mjs): violet light climbs from the bench into the wielder.
+  weaponascend: {life: () => 1.8, kick: () => ({shake: .15, flash: .12, color: '#d6c0ff'}), paint(d, ev, age, seed){
+    const t = age/1.8;
+    if(Number.isFinite(ev.bx)) d.pool(ev.bx, ev.bz, 1.4, '#b48cff', .45*fade(t));
+    d.beam(ev.x, ev.z, 0, 4.5*easeOut(age/.4), 1.1, '#b48cff', .55*fade(t));
+    d.beam(ev.x, ev.z, 0, 4.7*easeOut(age/.4), .22, '#f4ecff', .9*fade(t));
+    d.ring(ev.x, ev.z, .5+2.4*easeOut(t), .1, '#d6c0ff', .9*fade(t), {glow: true});
+    d.motes(ev.x, ev.z, 16, t, 1, '#e6d8ff', fade(t), seed, {rise: 3, size: .1});
+    d.light(ev.x, ev.z, 4*fade(t));
+  }},
 };
 
 /** Every frame: pending blasts, omen beacons, gilded glitter, boss glows, lava glow. */
@@ -211,6 +240,8 @@ export function paintHollow(d, world, lead, clock){
   for(const e of world.enemies || []){
     if(!(e.hp > 0) || !d.near(e.x, e.z, 4)) continue;
     if(e.gilded){d.motes(e.x, e.z, 4, (clock*.9+e.x*.1)%1, .7, '#ffe08a', .8, Number(String(e.id).slice(1)) || 1, {rise: 1.2, size: .07}); d.pool(e.x, e.z, 1.2, '#ffd25a', .3); d.light(e.x, e.z, 2.2);}
+    // A bleeding altar's Dread champion (omens.mjs) walks in a slow red pulse.
+    if(e.champion){const beat = .5+.5*Math.sin(clock*3+e.x); d.pool(e.x, e.z, 2.2, '#e0465a', .22+.1*beat); d.ring(e.x, e.z, 1.8+.25*beat, .08, '#ff4a5e', .45, {glow: true}); d.light(e.x, e.z, 2.6);}
     if(ENEMIES[e.type]?.boss){
       const c = e.type === 'unblinking' ? STYLE.void : STYLE.thorn, rage = (e.phase || 1)-1;
       d.pool(e.x, e.z, 3+rage, c.glow, .22+.1*rage);

@@ -444,7 +444,7 @@ export class Renderer {
       const bob=rig?rig.bob:moving?Math.abs(Math.sin(this.clock*10+e.x))*motion.walkBob:kind==='enemy'&&key==='wraith'?.2+Math.sin(this.clock*3)*.1:0;
       let sx=o.def.size[0],sy=o.def.size[1];if(rig){sx*=rig.scale[0];sy*=rig.scale[1];}if(kind==='drop'&&present?.t){sx*=1-present.t*0.35;sy*=1-present.t*0.35;}
       if(e.down||e.ghost){sx*=.8;sy*=.65;}
-      if(kind==='enemy'&&e.elite){sx*=1.3;sy*=1.3;}
+      if(kind==='enemy'&&e.elite){sx*=1.3;sy*=1.3;}if(kind==='enemy'&&e.champion){sx*=1.18;sy*=1.18;}
       if(kind==='enemy'&&e.warden){sx*=1.12;sy*=1.12;}
       if((kind==='prop'||kind==='building')&&e.scale){sx*=e.scale;sy*=e.scale;}
       if(key==='gravecraft-skeleton')sy*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);

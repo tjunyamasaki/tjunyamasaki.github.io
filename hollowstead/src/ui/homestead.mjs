@@ -43,6 +43,8 @@ const paints = toolId => TOOLS[toolId] && TOOLS[toolId].kind !== 'object';
 export function createGridControls({getWorld, me, send, toast = () => {}, onPlaced = () => {}}){
   const state = {tool: '', stationId: null, rotation: 0, hover: null, pinned: null, stroke: null, queue: [], timer: 0};
   const world = () => getWorld();
+  /** What 'same' means for the tool in hand: nothing left to take down, or that piece is already there. */
+  const sameText = () => TOOLS[state.tool]?.kind === 'remove' ? 'Nothing to remove here' : 'Already built here';
 
   /** The cell a piece is anchored at (its north-west cell) when the pointer is at (x, z): a big piece centres on the pointer. */
   function anchor(x, z){
@@ -66,7 +68,7 @@ export function createGridControls({getWorld, me, send, toast = () => {}, onPlac
   function view(){
     if(!state.tool || !world() || !me()) return null;
     const c = cursor(), why = reasonAt(c);
-    return {tool: state.tool, cursor: c, valid: !why, reason: why === 'same' ? 'Already built here' : why, rotation: state.rotation, rotates: rotates(state.tool)};
+    return {tool: state.tool, cursor: c, valid: !why, reason: why === 'same' ? sameText() : why, rotation: state.rotation, rotates: rotates(state.tool)};
   }
   function start(toolId, stationId = null){
     state.tool = TOOLS[toolId] ? toolId : '';state.stationId = stationId;
@@ -97,7 +99,7 @@ export function createGridControls({getWorld, me, send, toast = () => {}, onPlac
   /** The Place button: the piece goes where the cursor is. Resolves to the host's answer. */
   async function place(){
     const c = cursor(), why = reasonAt(c);
-    if(why){toast(why === 'same' ? 'Already built here' : why);return null;}
+    if(why){toast(why === 'same' ? sameText() : why);return null;}
     const tool = state.tool;
     const result = await send({type: 'tile', tool, cells: [[c.i, c.j]], rotation: state.rotation, stationId: state.stationId});
     if(result?.ok){state.pinned = null;onPlaced(tool);}

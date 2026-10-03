@@ -124,7 +124,9 @@
           <button type="button" id="context-3" class="round context-extra is-off" tabindex="-1" aria-hidden="true"></button>
         </div>
         <button type="button" id="dodge" class="round small-round" aria-label="Dodge, 2 of 2" data-charges="2">↝<small>Dodge</small><span class="dodge-count" aria-hidden="true">2</span></button>
-        <button type="button" id="hotbar-potion" class="round potion-round is-disabled" aria-label="Drink Vigor draught (H)"><small>Potion</small></button>
+        <button type="button" id="hotbar-potion" class="round potion-round is-disabled" aria-label="Use healing item (H)"><small>Heal</small></button>
+        <button type="button" id="heal-swap" class="heal-swap" aria-label="Choose the healing item" aria-expanded="false" aria-controls="heal-picker" title="Choose the healing item">⇅</button>
+        <div id="heal-picker" class="heal-picker" role="group" aria-label="Healing items" hidden></div>
         <button type="button" id="skill" class="round skill-round is-off" tabindex="-1" aria-label="Skill">✦<small>Skill</small></button>
         <button type="button" id="attack" class="round attack" aria-label="Attack, hold to repeat">⚔<small>Attack</small></button>
         <div class="stamina-track" aria-hidden="true"><i id="stamina-bar"></i></div>

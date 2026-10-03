@@ -524,6 +524,14 @@ function gateLeaf(M, side){
 }
 
 // ------------------------------------------------------------------ the layer
+/** How visible a building's health bar is: full for a few seconds after its hp changes (a blow or a repair), then it fades out.
+ *  `memo` is any object kept per building; a building first seen already damaged stays hidden until it is hit again. */
+export const BAR_LINGER = 3.5, BAR_FADE = .6;
+export function recentHit(memo, hp, clock){
+  if(memo.hpSeen === undefined){memo.hpSeen = hp;memo.hpAt = -1e9;}
+  if(hp !== memo.hpSeen){memo.hpSeen = hp;memo.hpAt = clock;}
+  return Math.max(0, Math.min(1, 1 - (clock - memo.hpAt - BAR_LINGER) / BAR_FADE));
+}
 export class HomesteadLayer {
   constructor(renderer){
     this.r = renderer;this.scene = renderer.scene;
@@ -645,21 +653,26 @@ export class HomesteadLayer {
     for(const [id, g] of this.gates)if(!seen.has(id)){this.group.remove(g.root);this.gates.delete(id);}
   }
   /** Health bars over walls and gates that have taken blows, like the ones over camp objects (renderer.mjs). */
-  syncHealth(world){
-    const bars = this.bars ||= new Map(), seen = new Set();
+  syncHealth(world, clock){
+    const bars = this.bars ||= new Map(), seen = new Set(), memo = this.hpMemo ||= new Map();
     for(const b of world.buildings){
-      if(!b.grid || !(b.hp > 0) || !(b.hp < b.maxHp))continue;
+      if(!b.grid || !(b.hp > 0))continue;
+      let m = memo.get(b.id);if(!m){m = {};memo.set(b.id, m);}
+      const show = recentHit(m, b.hp, clock);
+      if(!(b.hp < b.maxHp) || show <= .02)continue;
       seen.add(b.id);
       let bar = bars.get(b.id);
       if(!bar){
         const back = new THREE.Sprite(new THREE.SpriteMaterial({color: 0x302834, depthWrite: false, depthTest: false})), fill = new THREE.Sprite(new THREE.SpriteMaterial({color: 0xd2c395, depthWrite: false, depthTest: false}));
-        fill.center.set(0, .5);back.renderOrder = fill.renderOrder = 6;this.group.add(back, fill);bar = {back, fill};bars.set(b.id, bar);
+        fill.center.set(0, .5);back.renderOrder = fill.renderOrder = 6;back.material.transparent = fill.material.transparent = true;this.group.add(back, fill);bar = {back, fill};bars.set(b.id, bar);
       }
+      bar.back.material.opacity = bar.fill.material.opacity = show;
       const {x, z} = centerOf(b.i, b.j), y = ROOM_KINDS.has(b.type) ? 2.1 : 1.45, k = Math.max(0, b.hp / b.maxHp);
       bar.back.position.set(x, y, z);bar.back.scale.set(1.1, .09, 1);
       bar.fill.position.set(x - .51, y, z + .02);bar.fill.scale.set(1.02 * k, .05, 1);bar.fill.material.color.set(k < .35 ? 0xdf9383 : 0xd2c395);
     }
     for(const [id, bar] of bars)if(!seen.has(id)){this.group.remove(bar.back, bar.fill);bar.back.material.dispose();bar.fill.material.dispose();bars.delete(id);}
+    if(memo.size > bars.size + 64){const live = new Set(world.buildings.map(b => b.id));for(const id of memo.keys())if(!live.has(id))memo.delete(id);}
   }
   /** Room walls near and in front of the local player dither away; eased so walking past doesn't pop. */
   syncPeek(world, dt){
@@ -754,7 +767,7 @@ export class HomesteadLayer {
     for(const b of world.buildings)if(b.grid && b.hp > 0){n++;h = (h * 31 + (b.i * 7349 + b.j * 1931) * 4 + BARRIER_ORDER.indexOf(b.type) * 97 + (b.rotation | 0)) % 1000000007;}
     const barrierKey = `${world.seed}:${n}:${h}`;
     if(barrierKey !== this.barrierKey){this.barrierKey = barrierKey;this.buildBarriers(world);}
-    this.syncPeek(world, dt);this.syncHealth(world);this.syncGates(world, Math.min(dt, .05));this.syncGhost(world, ui);this.syncObjectGhost(ui);this.syncCursor(ui, clock);
+    this.syncPeek(world, dt);this.syncHealth(world, clock);this.syncGates(world, Math.min(dt, .05));this.syncGhost(world, ui);this.syncObjectGhost(ui);this.syncCursor(ui, clock);
     for(const ev of world.events)if(ev.id > this.lastEvent){
       if(world.time - ev.at < 1){
         if(ev.type === 'tile')this.effect(ev);

@@ -16,7 +16,7 @@ import {CHEST_RENEW_SECONDS,CHEST_SLOT_COUNT,DISMANTLE_HOLD_SECONDS,STORAGE_TYPE
 import {cartFacts} from './cart.mjs?v=harvest-18';
 import {
   allowsCombat,allowsMovement,clusterFor,escapeStep,isHarvestAction,keyboardAction,
-  keyboardPrimary,potionHotbar,resolveMode,showsLantern,usableLantern,
+  keyboardPrimary,healHotbar,resolveMode,showsLantern,usableLantern,
 } from './ui/actions.mjs?v=harvest-18';
 import {catalogMarkup,catalogModel,inCategory,pickRecipe} from './ui/catalog.mjs?v=harvest-18';
 import {actionNeedsConfirm,actionNeedsCount,adjustQuantity,createInventoryPanel,itemActionClearsSelection,operationsFor,slotLabel,stackMaxDurability} from './ui/inventory.mjs?v=harvest-18';
@@ -63,7 +63,7 @@ let lastNotice=0,lastEvent=0,lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,
 let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:0},dirty=true;
 let stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
 let connectionText='',saveText='';
-let autoAttack=true,pickPending=null,arenaMarkup='',hotbarSig='',attackSig='',skillSig='',zoomBeforeArena=null;
+let healPick='elixir',healHad=false,healPicker=false,autoAttack=true,pickPending=null,arenaMarkup='',hotbarSig='',attackSig='',skillSig='',zoomBeforeArena=null;
 /** Dungeons: the variation picked on the title screen ('' = a new one every floor). */
 let dungeonPick='';
 /** Weapon lab panel state (presentation only; the lab's rules live in lab.mjs). */
@@ -86,7 +86,7 @@ function readStored(key){try{const raw=localStorage.getItem(key);if(!raw)return 
 function continuePlan(){return planContinue({v2:readStored(SAVE_KEYS.expeditionV2),v1:readStored(SAVE_KEYS.expeditionV1)});}
 /** The Vigil's own slot (SAVE_KEYS.vigil): read like an expedition save, never shared with one. */
 function vigilPlan(){const doc=readStored(SAVE_KEYS.vigil);return doc?planContinue({v2:doc,v1:null}):{ok:false,code:'none',message:'No vigil is kept on this browser.'};}
-function storeProfile(){try{localStorage.setItem(PROFILE,JSON.stringify({name:$('player-name').value,character,sound:sound.enabled,autoAttack}));}catch{}}
+function storeProfile(){try{localStorage.setItem(PROFILE,JSON.stringify({name:$('player-name').value,character,sound:sound.enabled,autoAttack,healPick}));}catch{}}
 /** Title screen: one panel at a time on the right (modes, expedition, join, dungeons, vigil, waiting camp). */
 const FRONT_PANELS=['home-panel','expedition-panel','join-panel','dungeon-panel','vigil-panel','room-panel'];
 function showFrontPanel(id){for(const name of FRONT_PANELS){const el=$(name);if(el)el.hidden=name!==id;}}
@@ -491,6 +491,13 @@ async function confirmPlace(){
   const result=await send({type:'placeBuilding',recipeId:pending.key,x:pending.x,z:pending.z,rotation:pending.rotation||0,stationId:pending.stationId??null});
   if(placement!==pending)return;pending.pending=false;if(result?.ok)placement=null;refresh();
 }
+/** Build menu → Remove (grid worlds): the 'clear' tool stays in hand like a floor; tap a cell and Remove, or drag across a line of them. */
+function startRemoveTool(){
+  if(!me()||!gridWorld(world))return;
+  closeSheet();cancelMaintenance();endContextHold();
+  grid.start('clear',null);placement={key:'clear',grid:true,tool:'clear',valid:false,pending:false,reason:'',stationId:null,remove:true};selected=null;refresh();
+  toast('Tap a wall or floor, then Remove · or drag across them');
+}
 function placeRecipe(key){
   const p=me();if(!p)return;
   if(chestSession||chestOpening)releaseChestUI();
@@ -757,7 +764,7 @@ function renderSheet(){
       return {id,name:recipe.name||label(resultId),desc:recipe.desc,icon:(onGrid&&!OBJECTS[id]&&gridGlyph(id))||icon(resultId),action:model.action,reason,costs:Object.entries(recipe.cost).map(([itemId,need])=>{const have=world.available(p,itemId,recipe.kind==='build');return {have,need,name:label(itemId),short:have<need,icon:icon(itemId)};})};
     });
     catalogPick=pickRecipe(recipes,catalogPick)?.id||'';
-    replaceContent(catalogMarkup({recipes,maintain:model.maintain,pendingId:catalogPending,pickId:catalogPick}));
+    replaceContent(catalogMarkup({recipes,maintain:model.maintain,remove:model.remove?gridGlyph('remove'):'',pendingId:catalogPending,pickId:catalogPick}));
   }else if(sheet==='refine'){
     title='Refine';kicker='WORKBENCH · MODIFIERS AND ASCENSION';
     const gear=carriedGear(p);
@@ -869,7 +876,7 @@ function paintCluster(modeName,p){
   const building=maintenance?world.buildings.find(entry=>entry.id===maintenanceTarget&&entry.hp>0):null;
   const actions=clusterFor(modeName,{
     context:p?contextFacts(p):null,
-    placement:placement?{valid:!!placement.valid,pending:!!placement.pending,reason:placement.reason||'',rotates:!!(placement.grid&&grid?.view()?.rotates)}:null,
+    placement:placement?{valid:!!placement.valid,pending:!!placement.pending,reason:placement.reason||'',rotates:!!(placement.grid&&grid?.view()?.rotates),remove:!!placement.remove}:null,
     maintenance:{building:building?{id:building.id,type:building.type,hp:building.hp,maxHp:building.maxHp}:null,locked:!!(building&&world.chestSessions.get(building.id)&&world.chestSessions.get(building.id).ownerId!==localId),wood:p?world.available(p,'wood'):0,inRange:!!(p&&building&&distance(p,building)<RULES.reach),tile:maintenanceTile(p)},
   });
   // Dungeons: the camp's bench refines and crafts, its fire cooks; nothing is built, fed or taken apart.
@@ -886,32 +893,47 @@ function paintCluster(modeName,p){
   $('hotbar-inventory').classList.toggle('active',sheet==='inventory'||sheet==='chest');
   $('hotbar-build').classList.toggle('active',sheet==='catalog'&&catalog.source==='field');
 }
-/** The potion shortcut always reflects the draughts currently carried in the pack. */
+/** The heal button holds the healing item you picked (⇅ beside it, or right-click). It shows how many of it you carry. */
+function healView(p){return healHotbar(p,{selected:healPick,mode:currentMode(),arena:!!world?.arena,pending:false});}
 function paintPotion(p){
   // Pending is left out of the look on purpose: the button must not flicker or go dead while another action settles.
-  const el=$('hotbar-potion'),view=potionHotbar(p,{mode:currentMode(),arena:!!world?.arena,pending:false});
-  const low=p&&p.hp/maxHealth(p)<.35&&!!view.command;
+  const el=$('hotbar-potion'),view=healView(p);
+  // The picked item just ran out: the button moves down to the next weaker one you carry (healHotbar) and keeps it.
+  if(view.fallback&&view.quantity>0&&healHad){healPick=view.itemId;view.fallback=false;storeProfile();if(healPicker)paintHealPicker();}
+  healHad=view.quantity>0&&!view.fallback;
+  if(healPicker){const box=$('heal-picker'),list=view.choices.map(c=>`${c.itemId}${c.quantity}`).join()+view.itemId;if(box.dataset.sig!==list){box.dataset.sig=list;paintHealPicker();}if(world?.arena||!['normal','inventory','chest'].includes(currentMode()))toggleHealPicker(false);}
+  const low=p&&p.hp/maxHealth(p)<.35&&!!view.command,name=label(view.itemId),heal=ITEMS[view.itemId]?.heal||0;
   const sig=`${view.itemId}:${view.quantity}:${!!view.command}:${low}`;
   if(el.dataset.state===sig)return;el.dataset.state=sig;
-  el.innerHTML=`${icon(view.itemId)}<b class="potion-count" aria-hidden="true">${view.quantity}</b><small>Potion</small>`;
+  el.innerHTML=`${icon(view.itemId)}<b class="potion-count" aria-hidden="true">${view.quantity}</b><small>Heal</small>`;
   el.classList.toggle('is-disabled',!view.command);el.classList.toggle('is-low',low);
   el.setAttribute('aria-disabled',String(!view.command));
-  el.setAttribute('aria-label',`Drink Vigor draught, ${view.quantity} potions available (H)`);
-  el.title=view.quantity?'Drink Vigor draught (H) · Restore 60 health and 20 courage':'No potions · Craft Vigor draughts at a workbench';
+  el.setAttribute('aria-label',`Use ${name}, ${view.quantity} carried (H)`);
+  el.title=view.quantity?`Use ${name} (H) · Restore ${heal} health · ⇅ or right-click to choose`:'Nothing to heal with · Brew Vigor draughts at a cauldron';
 }
+/** The little list of carried healing items over the heal button; picking one puts it on the button. */
+function paintHealPicker(){
+  const box=$('heal-picker');if(!box)return;
+  box.hidden=!healPicker;$('heal-swap')?.setAttribute('aria-expanded',String(healPicker));
+  if(!healPicker){box.innerHTML='';return;}
+  const view=healView(me());
+  box.innerHTML=view.choices.length?view.choices.map(c=>`<button type="button" class="heal-choice${c.itemId===view.itemId?' is-picked':''}" data-heal="${escapeHtml(c.itemId)}" aria-pressed="${c.itemId===view.itemId}" aria-label="${escapeHtml(label(c.itemId))}, heals ${c.heal}, ${c.quantity} carried">${icon(c.itemId)}<b>${c.quantity}</b><small>+${c.heal}</small></button>`).join(''):'<p class="heal-empty">No healing items in your pack</p>';
+}
+function toggleHealPicker(open=!healPicker){healPicker=!!open;paintHealPicker();}
+function pickHeal(itemId){if(!(ITEMS[itemId]?.heal>0))return;healPick=itemId;healHad=false;storeProfile();toggleHealPicker(false);const el=$('hotbar-potion');if(el)el.dataset.state='';paintPotion(me());toast(`Heal button: ${label(itemId)}`);}
 /**
- * The potion answers on press (pointerdown), so it works while the other thumb steers.
- * A short guard keeps a spammed tap from drinking two; a stale pack (loot picked up mid-fight) retries once.
+ * The heal button answers on press (pointerdown), so it works while the other thumb steers.
+ * A short guard keeps a spammed tap from using two; a stale pack (loot picked up mid-fight) retries once.
  */
 let potionAt=0;
 async function drinkPotion(){
   const now=performance.now();if(now-potionAt<450)return;
-  const p=me(),view=potionHotbar(p,{mode:currentMode(),arena:!!world?.arena,pending:false});
-  if(!view.command){if(!world?.arena&&!p?.down&&!p?.ghost)toast(view.quantity?'You cannot drink right now':'No potions · Brew Vigor draughts at a cauldron');return;}
+  const p=me(),view=healView(p);
+  if(!view.command){if(!world?.arena&&!p?.down&&!p?.ghost)toast(view.quantity?'You cannot do that right now':'Nothing to heal with · Brew Vigor draughts at a cauldron');return;}
   if(actionPending)return;
   potionAt=now;
   const result=await withPending(view.command);
-  if(result?.code==='staleRevision'){const again=potionHotbar(me(),{mode:currentMode(),arena:!!world?.arena,pending:false});if(again.command)await withPending(again.command);}
+  if(result?.code==='staleRevision'){const again=healView(me());if(again.command)await withPending(again.command);}
 }
 /** Weapon icons, mastery, condition and refinements, repainted only when changed. */
 function paintHotbar(p){
@@ -1150,7 +1172,9 @@ function setupControls(){
     if(button.id==='attack'){if(!allowsCombat(currentMode()))return;hold.attack=true;captured={pointerId:event.pointerId,kind:'attack'};void send({type:'attack'});return;}
     if(button.id==='skill'){if(!allowsCombat(currentMode()))return;void send({type:'skill'},{quiet:true});return;}
     if(button.id==='dodge'){const actor=me();if(!actor||(actor.dashCharges??0)<1||(!world.arena&&actor.stamina<DASH.stamina)||actor.down||actor.ghost)return;void send({type:'dash'},{quiet:true});return;}
-    if(button.id==='hotbar-potion'){void drinkPotion();return;}
+    if(button.id==='hotbar-potion'){if(event.button===2)return;void drinkPotion();return;}
+    if(button.id==='heal-swap'){toggleHealPicker();return;}
+    if(button.dataset.heal){pickHeal(button.dataset.heal);return;}
     const slot=CONTEXT_BUTTONS.indexOf(button.id),action=slot>=0&&liveActions[slot]?.id===button.dataset.action?liveActions[slot]:liveActions.find(entry=>entry.id===button.dataset.action);
     captured={pointerId:event.pointerId,kind:'context',mode:button.dataset.mode,id:action?.id};
     if(!action)return;
@@ -1163,6 +1187,9 @@ function setupControls(){
     if(captured?.kind==='context'&&holdSource==='pointer'&&(!event||event.pointerId===captured.pointerId))endContextHold();
     if(!event||event.pointerId===captured?.pointerId)captured=null;
   };
+  // Heal picker: right-click the heal button (or tap ⇅) to choose; a press anywhere else closes it.
+  $('hotbar-potion').addEventListener('contextmenu',e=>{e.preventDefault();toggleHealPicker();});
+  document.addEventListener('pointerdown',e=>{if(healPicker&&!e.target.closest?.('#heal-picker,#heal-swap,#hotbar-potion'))toggleHealPicker(false);},true);
   cluster.addEventListener('pointerup',releasePointer);cluster.addEventListener('pointercancel',releasePointer);cluster.addEventListener('lostpointercapture',()=>releasePointer());
   const joystick=$('joystick');
   joystick.addEventListener('pointerdown',e=>{if(!allowsMovement(currentMode()))return;e.preventDefault();pointer=e.pointerId;try{joystick.setPointerCapture(pointer);}catch{}sound.unlock();moveStick(e);});
@@ -1234,6 +1261,7 @@ function setupControls(){
     if(cmd==='fullscreen')void toggleFullscreen();
     if(cmd==='zoom-in')renderer.setZoom(renderer.zoom+.15);if(cmd==='zoom-out')renderer.setZoom(renderer.zoom-.15);
     if(cmd==='maintain'){closeSheet();maintenance=true;maintenanceTarget=null;selected=null;dirty=true;}
+    if(cmd==='remove-tool')startRemoveTool();
   };
   $('new-expedition').onclick=()=>{if(world?.dungeon){const pin=world.dungeon.forced;$('end-screen').hidden=true;lastEnd='';if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World((Math.random()*0xffffffff)>>>0,{dungeon:{variant:pin}});for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();document.body.classList.add('dungeon');announce(dungeonWelcome());network.broadcast();}else startDungeon(pin||'');return;}if(world?.arena){$('end-screen').hidden=true;lastEnd='';if(world.arena.lab)startLab();else startArena();return;}if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World();for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();lastEnd='';$('end-screen').hidden=true;network.broadcast();save();}else solo();};
   $('end-home').onclick=goHome;$('endless').onclick=()=>{world.status='playing';world.endless=true;world.bossSpawned=true;lastEnd='';$('end-screen').hidden=true;save();network?.broadcast();};
@@ -1329,7 +1357,7 @@ function frame(now){
 async function init(){
   if(await checkForUpdate())return;
   await loadMagicModules();
-  theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;autoAttack=prefs.autoAttack!==false;syncSoundButton();
+  theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;autoAttack=prefs.autoAttack!==false;if(typeof prefs.healPick==='string'&&ITEMS[prefs.healPick]?.heal>0)healPick=prefs.healPick;syncSoundButton();
   paintClock();demoWorld();setupControls();paintModeIcons();syncSoundButton();bindFeatureHud(featureContext(null));syncSaveOption();syncVigilHint();const params=new URLSearchParams(location.search);
   const code=params.has('showcase')||params.has('homestead')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showFrontPanel('join-panel');showStatus('A place by the fire is waiting. Choose a name and join.');}
   grid=createGridControls({getWorld:()=>world,me,send,toast});

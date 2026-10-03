@@ -18,7 +18,7 @@ import {RopeLayer} from './cart-rope.mjs?v=harvest-18';
 import {DungeonLayer} from './dungeon/three.mjs?v=harvest-18';
 import {dungeonProps} from './dungeon/art.mjs?v=harvest-18';
 import {layoutOf} from './dungeon/run.mjs?v=harvest-18';
-import {HomesteadLayer, cropGlow} from './homestead-render.mjs?v=harvest-18';
+import {HomesteadLayer, cropGlow, recentHit} from './homestead-render.mjs?v=harvest-18';
 import {cropEntities} from './homestead.mjs?v=harvest-18';
 /** The Heartfire plaza is kept flat (no standing props) so buildings and drops read on it; the arena keeps its runestones. */
 export function plazaProps(){return [];}
@@ -481,7 +481,8 @@ export class Renderer {
       if(kind==='crop'){const hue=e.ripe&&cropGlow(e.type);if(hue){this.glow(o,1.15);o.glow.material.color.set(hue);o.glow.material.opacity=(.08+.42*frame.darkness)*(.8+.2*Math.sin(this.clock*2.2+e.x));}else if(o.glow)o.glow.visible=false;}
       if(kind==='prop'&&e.light>0){this.glow(o,e.light*.75);o.glow.material.color.set(e.tint||'#ffffff');o.glow.material.opacity=(.1+frame.darkness*.18)*(1+Math.sin(this.clock*7+e.x*3)*.06);}
       if(kind==='building'&&key==='gate'&&e.open)o.sprite.scale.x*=.35;
-      if((kind==='enemy'||kind==='building'||(kind==='ally'&&key!=='crow'))&&e.hp<e.maxHp&&fade>0.04){if(!o.health){const back=new THREE.Sprite(new THREE.SpriteMaterial({color:0x302834,transparent:true,depthWrite:false})),fill=new THREE.Sprite(new THREE.SpriteMaterial({color:kind==='enemy'?0xdf9383:kind==='ally'?0x9fd8a8:0xd2c395,transparent:true,depthWrite:false}));fill.center.set(0,.5);this.scene.add(back,fill);o.health={back,fill};}const y=kind==='ally'?({wight:4.3,jack:2.4}[key]||1.6):(kind==='enemy'?({king:5.4,brute:3.3,wraith:2.2,golem:3.4,bonewalker:2.4,bogling:1.6,briarmother:6.6,unblinking:6.2}[key]||1.3)*(e.elite?1.3:1):key==='hearth'?3.6:1.8);o.health.back.position.set(o.x,y,o.z);o.health.fill.position.set(o.x-.65,y,o.z+.025);o.health.back.scale.set(1.4,.1,1);o.health.fill.scale.set(1.3*Math.max(0,e.hp/e.maxHp),.055,1);o.health.back.material.opacity=o.health.fill.material.opacity=fade;o.health.back.visible=o.health.fill.visible=true;}
+      const barShow=kind==='building'?recentHit(o,e.hp,this.clock):1;
+      if((kind==='enemy'||kind==='building'||(kind==='ally'&&key!=='crow'))&&e.hp<e.maxHp&&fade*barShow>0.04){if(!o.health){const back=new THREE.Sprite(new THREE.SpriteMaterial({color:0x302834,transparent:true,depthWrite:false})),fill=new THREE.Sprite(new THREE.SpriteMaterial({color:kind==='enemy'?0xdf9383:kind==='ally'?0x9fd8a8:0xd2c395,transparent:true,depthWrite:false}));fill.center.set(0,.5);this.scene.add(back,fill);o.health={back,fill};}const y=kind==='ally'?({wight:4.3,jack:2.4}[key]||1.6):(kind==='enemy'?({king:5.4,brute:3.3,wraith:2.2,golem:3.4,bonewalker:2.4,bogling:1.6,briarmother:6.6,unblinking:6.2}[key]||1.3)*(e.elite?1.3:1):key==='hearth'?3.6:1.8);o.health.back.position.set(o.x,y,o.z);o.health.fill.position.set(o.x-.65,y,o.z+.025);o.health.back.scale.set(1.4,.1,1);o.health.fill.scale.set(1.3*Math.max(0,e.hp/e.maxHp),.055,1);o.health.back.material.opacity=o.health.fill.material.opacity=fade*barShow;o.health.back.visible=o.health.fill.visible=true;}else if(o.health){o.health.back.visible=o.health.fill.visible=false;}
       if(kind==='enemy'){const tg=telegraphOf(e);if(tg){const reach=tg.radius||tg.length||2;if(warningVisible(frame, tg.x, tg.z, reach, p))this.combat.telegraph(tg,frame.darkness>0.5?.75:1,this.clock);
         // The creature itself brightens as its blow comes due.
         o.sprite.material.color.lerp(new THREE.Color(tg.heavy?'#ffb3a0':'#fff1e0'),.15+.35*tg.fill);}}

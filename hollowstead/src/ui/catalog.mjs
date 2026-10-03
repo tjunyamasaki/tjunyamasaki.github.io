@@ -42,6 +42,8 @@ export function catalogModel({source = 'field', stationType = null, tab = 'build
     categories,
     recipeIds,
     maintain: !cooking && (source === 'field' || tab === 'build'),
+    // Grid worlds: a Remove tool takes walls, gates and floors back down (homestead.mjs TOOLS.clear).
+    remove: grid && !cooking && (source === 'field' || tab === 'build'),
     action: cooking ? 'Cook' : tab === 'build' || source === 'field' ? 'Place' : 'Craft',
   };
 }
@@ -73,7 +75,7 @@ export function pickRecipe(recipes = [], pickId = '') {
  * action button. `recipes` entries: {id, name, desc, icon, costs:[{have, need, name, short, icon}], reason, action}.
  * `reason` is host-observed text. This function does not invent one.
  */
-export function catalogMarkup({recipes = [], maintain = false, pendingId = '', pickId = ''} = {}) {
+export function catalogMarkup({recipes = [], maintain = false, remove = '', pendingId = '', pickId = ''} = {}) {
   const picked = pickRecipe(recipes, pickId);
   const tiles = recipes.map(recipe => {
     const ready = !recipe.reason;
@@ -82,6 +84,10 @@ export function catalogMarkup({recipes = [], maintain = false, pendingId = '', p
   }).join('');
   const maintainTile = maintain
     ? '<button type="button" class="craft-tile craft-tile--maintain" data-command="maintain"><span class="craft-tile__icon" aria-hidden="true">⚒</span><span class="craft-tile__name">Maintain camp</span></button>'
+    : '';
+  // `remove`: the icon of the Remove tool, when the world builds on the grid.
+  const removeTile = remove
+    ? `<button type="button" class="craft-tile craft-tile--maintain craft-tile--remove" data-command="remove-tool"><span class="craft-tile__icon" aria-hidden="true">${remove}</span><span class="craft-tile__name">Remove</span></button>`
     : '';
   let detail = '<div class="craft-detail is-empty"><p class="empty">Nothing to make here.</p></div>';
   if (picked) {
@@ -95,5 +101,5 @@ export function catalogMarkup({recipes = [], maintain = false, pendingId = '', p
       <div class="craft-detail__foot">${picked.reason ? `<p class="reason">${escape(picked.reason)}</p>` : '<p class="reason ok">Ready</p>'}<button type="button" class="primary craft-go" data-recipe="${escape(picked.id)}" ${blocked ? 'disabled' : ''}>${escape(waiting ? 'Working…' : (picked.action || 'Craft'))}</button></div>
     </div>`;
   }
-  return `<div class="craft-layout"><div class="craft-tiles" role="listbox" aria-label="Recipes">${tiles}${maintainTile}${recipes.length || maintain ? '' : '<p class="empty">Nothing to make here.</p>'}</div>${detail}</div>`;
+  return `<div class="craft-layout"><div class="craft-tiles" role="listbox" aria-label="Recipes">${tiles}${removeTile}${maintainTile}${recipes.length || maintain ? '' : '<p class="empty">Nothing to make here.</p>'}</div>${detail}</div>`;
 }

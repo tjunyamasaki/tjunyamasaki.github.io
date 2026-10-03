@@ -29,7 +29,7 @@ import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
 import {stepMobs} from './mobs.mjs?v=harvest-18';
-import {applyTiles, carriedSeeds, cropTargets, gridWorld, roomOfBuilding, setupHomestead, stepTiles, wildSeeds} from './homestead.mjs?v=harvest-18';
+import {applyTiles, carriedSeeds, cropTargets, gridWorld, refund, roomOfBuilding, setupHomestead, stepTiles, wildSeeds} from './homestead.mjs?v=harvest-18';
 import {stepSleep} from './sleep.mjs?v=harvest-18';
 import {BUFF, buffed, giveBuff, stepBuffs} from './buffs.mjs?v=harvest-18';
 import {stepBlooms, wildNodes} from './nightbloom.mjs?v=harvest-18';
@@ -861,7 +861,9 @@ export class World {
   }
   finishDismantle(p, building){
     if(!building||building.type==='hearth'||this.chestSessions.has(building.id))return;
-    if(!this.homestead?.free)for(const [itemId, count] of Object.entries(RECIPES[building.type]?.cost||{}))this.give(p, itemId, Math.ceil(count*.5));
+    // Grid pieces give back what they cost (homestead.mjs refund); the old free-placed camp keeps its half refund.
+    if(building.grid||building.foot){const got=refund(this, p, RECIPES[building.type]?.cost||{}, building);if(got)this.event('loot',building.x,building.z,got);}
+    else if(!this.homestead?.free)for(const [itemId, count] of Object.entries(RECIPES[building.type]?.cost||{}))this.give(p, itemId, Math.ceil(count*.5));
     if(building.grid||building.foot)this.gridRev=(this.gridRev||0)+1;
     this.dropContainer(building.store, building.x, building.z);
     if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);

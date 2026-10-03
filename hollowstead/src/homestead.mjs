@@ -125,6 +125,9 @@ export const TOOLS = Object.freeze({
   ...Object.fromEntries(CROP_TYPES.map(id => [`plant:${id}`, {kind: 'plant', crop: id, name: `Plant ${CROPS[id].name.toLowerCase()}`}])),
   harvest: {kind: 'harvest', name: 'Harvest'},
   remove: {kind: 'remove', name: 'Remove'},
+  // The Build menu's Remove tool: walls, gates, floors, soil and empty camp pieces, never a growing crop or a full chest,
+  // so a careless drag cannot lose anything. Everything taken down gives back what it cost (refund).
+  clear: {kind: 'remove', name: 'Remove', pieces: true},
   use: {kind: 'use', name: 'Use'},
 });
 
@@ -307,8 +310,10 @@ export function cellReason(world, p, toolId, i, j, {stationId = null} = {}){
     if(object && !barrier){
       if(object.type === 'hearth' || object.fixed) return 'That stays';
       if(world.chestSessions?.has(object.id)) return 'Someone has it open';
+      if(tool.pieces && [object.store, object.overflow].some(c => c?.slots?.some(Boolean))) return 'Empty it first';
       return '';
     }
+    if(tool.pieces && !barrier && tile?.crop) return 'Harvest the crop first';
     return barrier || tile ? '' : 'same';
   }else if(tool.kind === 'use'){
     if(barrier?.type === 'gate') return '';
@@ -350,9 +355,16 @@ function harvestTile(world, p, tile, i, j){
   world.stats.harvested = (world.stats.harvested || 0) + 1;
 }
 
-function refund(world, p, cost){
-  if(free(world)) return;
-  for(const [itemId, count] of Object.entries(cost)) world.give(p, itemId, Math.ceil(count * .5));
+/**
+ * Taking a grid piece down (or building over it) gives back what it cost: all of it while it is whole,
+ * less as it has been knocked about (a battered wall is not a free repair). `piece`: the building, if any.
+ */
+export function refund(world, p, cost, piece = null){
+  if(free(world)) return '';
+  const k = piece && piece.maxHp > 0 ? Math.max(0, Math.min(1, piece.hp / piece.maxHp)) : 1;
+  const got = [];
+  for(const [itemId, count] of Object.entries(cost)){const n = Math.round(count * k);if(n > 0){world.give(p, itemId, n);got.push(`+${n} ${ITEMS[itemId]?.name || itemId}`);}}
+  return got.join(' · ');
 }
 
 /** Apply one tool to one cell. Assumes cellReason() said ''. */
@@ -374,7 +386,7 @@ function applyCell(world, p, toolId, i, j, rotation){
     tiles.rev++;
     world.event('tile', x, z, '', {tool: toolId});
   }else if(tool.kind === 'barrier'){
-    if(barrier){refund(world, p, recipeCost(barrier.type));world.buildings = world.buildings.filter(b => b !== barrier);}
+    if(barrier){refund(world, p, recipeCost(barrier.type), barrier);world.buildings = world.buildings.filter(b => b !== barrier);}
     world.gridRev = (world.gridRev || 0) + 1;
     const b = world.structure(tool.type, x, z);
     Object.assign(b, {grid: true, i, j, radius: BARRIERS[tool.type].radius, rotation: orient(world, tool.type, i, j, rotation | 0), open: false});
@@ -389,9 +401,10 @@ function applyCell(world, p, toolId, i, j, rotation){
     if(barrier?.type === 'gate'){barrier.open = !barrier.open;world.event('tile', x, z, '', {tool: barrier.open ? 'open' : 'close'});}
     else harvestTile(world, p, tile, i, j);
   }else if(tool.kind === 'remove'){
+    let got = '';
     if(barrier || object){
       const gone = barrier || object;
-      refund(world, p, recipeCost(gone.type));
+      got = refund(world, p, recipeCost(gone.type), gone);
       world.dropContainer?.(gone.store, gone.x, gone.z);
       if(gone.overflow) world.dropContainer?.(gone.overflow, gone.x, gone.z);
       world.buildings = world.buildings.filter(b => b !== gone);world.gridRev = (world.gridRev || 0) + 1;
@@ -400,10 +413,11 @@ function applyCell(world, p, toolId, i, j, rotation){
       else if(ripe(tile)) harvestTile(world, p, tile, i, j);
       tile.crop = null;tile.growth = 0;
     }else if(tile){
-      refund(world, p, recipeCost(GROUNDS[tile.g].recipe));
+      got = refund(world, p, recipeCost(GROUNDS[tile.g].recipe));
       delete tiles.cells[key];tiles.rev++;
     }
     world.event('tile', x, z, '', {tool: 'remove'});
+    if(got) world.event('loot', x, z, got);
   }
   return true;
 }

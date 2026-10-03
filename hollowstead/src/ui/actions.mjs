@@ -54,7 +54,7 @@ function make(id, extra = {}) {
   const enabled = extra.enabled !== false;
   return {
     id,
-    icon: spec.icon,
+    icon: extra.icon || spec.icon,
     label: extra.label || spec.label,
     enabled,
     disabledReason: enabled ? '' : (extra.disabledReason || 'Not available'),
@@ -145,6 +145,39 @@ export function potionHotbar(player, {mode = 'normal', arena = false, pending = 
   };
 }
 
+/** Everything that mends wounds, weakest first: draughts, bandages and the healing foods (ITEMS `heal` > 0). */
+export const HEALS = Object.freeze(Object.keys(ITEMS).filter(id => ITEMS[id].heal > 0).sort((a, b) => ITEMS[a].heal - ITEMS[b].heal || (a < b ? -1 : 1)));
+const healOf = id => ITEMS[id]?.heal || 0;
+
+/** The healing items carried in the pack, strongest first: [{itemId, quantity, heal}]. */
+export function healChoices(player) {
+  const counts = new Map();
+  for (const stack of player?.inventory?.slots || []) {
+    if (stack?.quantity > 0 && healOf(stack.itemId) > 0) counts.set(stack.itemId, (counts.get(stack.itemId) || 0) + stack.quantity);
+  }
+  return [...counts].map(([itemId, quantity]) => ({itemId, quantity, heal: healOf(itemId)})).sort((a, b) => b.heal - a.heal || (a.itemId < b.itemId ? -1 : 1));
+}
+
+/**
+ * The heal button: drinks (or eats) the item the player chose for it. When that runs out it falls back to the
+ * strongest carried item weaker than the choice, and only when nothing weaker is left to the weakest stronger one.
+ * `selected`: the chosen item id (default the Vigor draught). `itemId` is what the button holds now; `fallback`
+ * is true when that is not the chosen item.
+ */
+export function healHotbar(player, {selected = 'elixir', mode = 'normal', arena = false, pending = false} = {}) {
+  const choices = healChoices(player), want = healOf(selected) > 0 ? selected : 'elixir', bar = healOf(want);
+  const shown = choices.find(c => c.itemId === want)
+    || choices.find(c => c.heal < bar || (c.heal === bar && c.itemId !== want))
+    || choices.slice().reverse().find(c => c.heal > bar) || null;
+  const itemId = shown?.itemId || want, quantity = shown?.quantity || 0;
+  const stack = shown && (player.inventory.slots || []).find(s => s?.itemId === itemId && s.quantity > 0);
+  const usable = !!stack && !arena && !pending && !player?.down && !player?.ghost && ['normal', 'inventory', 'chest'].includes(mode);
+  return {
+    itemId, quantity, selected: want, fallback: itemId !== want, choices,
+    command: usable ? {type: 'consumeItem', uid: stack.uid, inventoryRevision: player.inventory.revision} : null,
+  };
+}
+
 export function keyboardPrimary(actions, mode) {
   if (!actions?.length) return null;
   if (mode === 'placement') return actions.find(action => action.id === 'place') || null;
@@ -182,11 +215,12 @@ export function usableLantern(player) {
 }
 
 /** `rotates`: a grid piece that turns (homestead.mjs rotates) gets a Rotate button between Place and Cancel. */
-export function describePlacement({valid = false, pending = false, reason = '', rotates = false} = {}) {
+export function describePlacement({valid = false, pending = false, reason = '', rotates = false, remove = false} = {}) {
   return [
     make('place', {
       enabled: !!valid && !pending,
-      disabledReason: reason || 'Cannot place that here',
+      disabledReason: reason || (remove ? 'Nothing to remove here' : 'Cannot place that here'),
+      ...(remove ? {label: 'Remove', icon: '⌫'} : {}),
     }),
     ...(rotates ? [make('rotate', {enabled: !pending})] : []),
     make('cancel', {enabled: !pending}),

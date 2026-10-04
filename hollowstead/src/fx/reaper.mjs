@@ -1,7 +1,7 @@
 // The Reaper's scythe, drawn. Presentation only: the host owns Doom, the reaping and the souls
-// (src/reaper.mjs). The shade of Death stands behind the wielder (a rig): a hooded cloak, two eyes in the
-// dark, bony hands on a great spectral scythe, and the souls it has taken burning round its hood. It grows
-// with every soul. Each swing is its scythe sweeping round; Doom shows as tally hooks over a foe, and a foe
+// (src/reaper.mjs). The shade of Death floats behind the wielder (a rig): a hooded robe with a tattered hem,
+// a skull in the dark of the cowl, bony hands on a long snath whose hooked blade looms over the wielder, and
+// the souls it has taken circling its hood as little comets. It grows with every soul. Each swing is its scythe sweeping round; Doom shows as tally hooks over a foe, and a foe
 // that can be reaped has its soul already leaning out of it, eyes red.
 //
 // Rank ladder: ★1 the shade, the sweep, marks and souls; ★2 glowing eyes and souls, a halo under the
@@ -15,7 +15,7 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
 const PACK = 'scythe';
 const P = hue(PACK);
 const CLOAK = '#1f2e30', CLOAK_LIGHT = '#34494b', VOID = '#040808', BONE = '#ddd5c2', BLADE = '#e2faf2', BLOOD = '#ff3c4c', SOUL = '#e8fff8';
-const INKD = '#0b1515';
+const INKD = '#0b1515', SLEEVE = '#26393b', STEEL = '#b4cbc5', STEEL_DARK = '#5f7874', WOOD = '#3d3036', WOOD_LIGHT = '#6a5560';
 const rankOfOwner = p => p && typeof p === 'object' ? rankOf(p, PACK) : 1;
 
 // ------------------------------------------------------------------ pieces
@@ -38,61 +38,153 @@ function soul(d, x, z, y, r, alpha, {tu = 0, tv = -1, phase = 0, red = false} = 
   for(const s of [-1, 1]){const e = at(x, z, y, nu*s*r*.34-tu*r*.1, nv*s*r*.34-tv*r*.1+r*.08); d.orb(e[0], e[2], e[1], r*.16, red ? BLOOD : INKD, alpha);}
 }
 
-/** A scythe blade: a crescent hooked off the top of a shaft at `tip`, curving toward `side`. Billboard space. */
-function blade(q, tip, ang, side, len, width){
-  const pts = [], back = [];
-  for(let i = 0; i <= 12; i++){
-    const t = i/12, a = ang+side*(Math.PI*.5+t*1.1), r = len*t, w = width*Math.sin(Math.PI*Math.min(1, t*1.1))*(1-t*.6);
-    const cu = tip[0]+Math.cos(ang+side*Math.PI*.5)*r+Math.cos(a)*r*.25, cv = tip[1]+Math.sin(ang+side*Math.PI*.5)*r-t*t*len*.45;
-    pts.push(q(cu, cv+w)); back.push(q(cu, cv-w*.3));
+/** A strip between two matched edges, filled as a ribbon so a concave side stays clean. */
+const ribbon = (left, right) => [...left, ...right.slice().reverse()];
+/** A shape that is star-shaped round its centre `c`, filled as a fan from the centre. */
+const blob = (c, ring) => [c, ...ring, ring[0]];
+
+/**
+ * The scythe blade, billboard space: it leaves the snath at `heel` heading along `dir` (radians), then
+ * curls down to its point. Returns the thick back and the concave cutting edge, matched point for point.
+ */
+function bladeShape(heel, dir, len, width, turn){
+  const back = [], edge = [], n = 16, step = len/n;
+  let x = heel[0], y = heel[1], a = dir;
+  for(let i = 0; i <= n; i++){
+    const t = i/n, w = width*(1-t)**.7*(.82+.18*Math.min(1, t*6)), nx = -Math.sin(a), ny = Math.cos(a);
+    back.push([x+nx*w*.32, y+ny*w*.32]); edge.push([x-nx*w*.68, y-ny*w*.68]);
+    a -= turn*(.35+1.3*t*t)/n/.78; x += Math.cos(a)*step; y += Math.sin(a)*step;
   }
-  return [...pts, ...back.reverse()];
+  return {back, edge};
 }
 
 /**
- * The shade of Death at (x, z), standing on y0, size `s`. `raise` 0..1 lifts the scythe overhead,
- * `hide` 0..1 hides the scythe (while a sweep draws it), `blood` turns its eyes and edge red.
+ * The shade of Death at (x, z), floating on y0, size `s`: a hooded robe that ripples and tatters, a skull in
+ * the dark of the hood, bony hands on a long snath and a hooked blade looming forward over the wielder.
+ * `raise` 0..1 lifts the scythe back over its head, `hide` 0..1 hides the scythe (while a sweep draws it),
+ * `blood` turns its eyes and edge red.
  */
 function shade(d, x, z, y0, s, {raise = 0, hide = 0, blood = 0, T = tier(1), clock = 0, seed = 0, side = 1, drift = 0} = {}){
-  const q = (u, v) => at(x, z, y0, u*s*side, v*s);
-  // The cloak: hood, shoulders, a hem that ripples and tatters.
-  const hem = [];
-  for(let i = 0; i <= 8; i++){const t = i/8, u = -.5+t, v = (i%2 ? .12 : 0)+Math.sin(clock*3+i+seed)*.04; hem.push([u+drift*.12*(1-t), v]);}
-  const outline = [[-.13, 1.95], [.12, 1.96], [.26, 1.72], [.38, 1.28], [.47, .45], ...hem.slice().reverse(), [-.47, .45], [-.38, 1.28], [-.26, 1.72]];
-  const body = outline.map(([u, v]) => q(u, v)), inkBody = outline.map(([u, v]) => q(u*1.08, v*1.02-.02));
-  d.path(inkBody, 0, INKD, 1, {fill: true});
-  d.path(body, 0, CLOAK, 1, {fill: true});
-  d.path([q(-.2, 1.8), q(-.3, 1.3), q(-.36, .5)], .05*s, CLOAK_LIGHT, 1);
-  d.path([...body, body[0]], .03*s, P.glow, .7);
+  const q = (u, v) => at(x, z, y0, u*s*side, v*s), Q = ([u, v]) => q(u, v);
+  const sway = t => drift*.16*t*t+Math.sin(clock*2.1+seed+t*2.4)*.035*t;
+  // The robe: shoulders under the hood, a waist, a hem that flares and drifts behind the way you move.
+  const backEdge = [], frontEdge = [], spine = [];
+  for(let i = 0; i <= 9; i++){
+    const t = i/9, v = lerp(1.52, .14, t), u = sway(t)-.03-.05*Math.sin(Math.PI*t)*t, hw = .13+.11*Math.min(1, t*5)**.6+.24*t**2.2-.02*Math.sin(Math.PI*t);
+    spine.push([u, v]); backEdge.push([u-hw, v]); frontEdge.push([u+hw*.94, v]);
+  }
+  const hemB = backEdge[9], hemF = frontEdge[9];
+  // Tattered hem: torn points hanging under it, each swaying on its own.
+  const tatters = [];
+  for(let i = 0; i < 6; i++){
+    const a = i/6, b = (i+1)/6, m = (a+b)/2, drop = .13+.09*((i*7+3)%4)/3;
+    const lu = lerp(hemB[0], hemF[0], a), ru = lerp(hemB[0], hemF[0], b), mu = lerp(hemB[0], hemF[0], m)-drift*.08+Math.sin(clock*3+i*1.7+seed)*.035;
+    tatters.push([[lu, hemB[1]+.02], [ru, hemB[1]+.02], [mu, hemB[1]-drop]]);
+  }
+  for(const tri of tatters) d.path(tri.map(([u, v]) => q(u+(u-tri[2][0])*.18, v+(v === tri[2][1] ? -.04 : .02))), 0, INKD, 1, {fill: true});
+  d.path(ribbon(backEdge.map(([u, v]) => q(u-.04, v+.02)), frontEdge.map(([u, v]) => q(u+.04, v+.02))), 0, INKD, 1, {fill: 'ribbon'});
+  d.path(ribbon(backEdge.map(Q), frontEdge.map(Q)), 0, CLOAK, 1, {fill: 'ribbon'});
+  for(const tri of tatters) d.path(tri.map(Q), 0, CLOAK, 1, {fill: true});
+  // Light on the side it faces, and folds falling from the waist.
+  d.path(ribbon(spine.map(([u, v], i) => q(u+.06+.04*i/9, v)), frontEdge.map(([u, v]) => q(u-.035, v))), 0, CLOAK_LIGHT, .8, {fill: 'ribbon'});
+  for(const f of [-.13, .02]){
+    const line = spine.slice(3).map(([u, v], i) => q(u+f*(1+i*.18)+Math.sin(clock*2+i+f*9)*.01, v));
+    d.path(line, .03*s, INKD, .45, {taper: .6});
+  }
+  d.path([...backEdge.map(Q), ...frontEdge.slice().reverse().map(Q)], .025*s, P.glow, .45);
   // ★3: streamers torn off the hem, trailing away from the way you move.
   if(T.rays) for(let i = 0; i < 3; i++){
-    const u0 = -.35+i*.33, line = [];
-    for(let k = 0; k <= 4; k++){const t = k/4; line.push(q(u0-drift*.5*t+Math.sin(clock*4+i*2+t*3)*.08*t, .05-t*.1+t*.25));}
-    d.path(line, .07*s, CLOAK, 1, {taper: .9});
+    const u0 = lerp(hemB[0], hemF[0], .2+i*.3), line = [];
+    for(let k = 0; k <= 4; k++){const t = k/4; line.push(q(u0-drift*.5*t-.15*t+Math.sin(clock*4+i*2+t*3)*.08*t, hemB[1]-.05-t*.18+Math.sin(clock*3+i)*.05*t));}
+    d.path(line, .07*s, CLOAK, .9, {taper: .9});
   }
-  // The hood's dark and the eyes in it.
-  const hood = [];
-  for(let i = 0; i <= 12; i++){const a = i/12*TAU; hood.push(q(Math.cos(a)*.13, 1.64+Math.sin(a)*.16));}
-  d.path(hood, 0, VOID, 1, {fill: true});
-  const eye = blood > .5 ? BLOOD : P.main;
-  for(const u of [-.055, .055]){
-    const e = q(u, 1.66);
-    d.orb(e[0], e[2], e[1], .03*s, eye, 1);
-    if(T.glow) d.bloom(e[0], e[2], e[1], .1*s, blood > .5 ? BLOOD : P.glow, .7);
-  }
-  // Bony hands on the shaft; the scythe raised or held low across the body.
+
+  // The scythe: a long, slightly bowed snath, two grips, the blade hooked forward off its top.
+  const ang = lerp(Math.PI/2+.13, Math.PI/2+.8, raise), base = [lerp(.4, .34, raise), lerp(.24, .5, raise)], len = 2.4;
+  const dir = [Math.cos(ang), Math.sin(ang)], perp = [dir[1], -dir[0]];
+  const shaftAt = (t, bow = .05) => [base[0]+dir[0]*len*t+perp[0]*Math.sin(Math.PI*t)*bow, base[1]+dir[1]*len*t+perp[1]*Math.sin(Math.PI*t)*bow];
+  const shaft = []; for(let i = 0; i <= 8; i++) shaft.push(shaftAt(i/8));
+  const handHi = shaftAt(.62), handLo = shaftAt(.4), alpha = 1-hide;
+  const sleeve = (from, to, w0, w1, sag) => {
+    const left = [], right = [];
+    for(let i = 0; i <= 6; i++){
+      const t = i/6, mx = (from[0]+to[0])/2, my = (from[1]+to[1])/2-sag;
+      const px = (1-t)**2*from[0]+2*(1-t)*t*mx+t*t*to[0], py = (1-t)**2*from[1]+2*(1-t)*t*my+t*t*to[1];
+      const tx = 2*(1-t)*(mx-from[0])+2*t*(to[0]-mx), ty = 2*(1-t)*(my-from[1])+2*t*(to[1]-my), l = Math.hypot(tx, ty) || 1, w = lerp(w0, w1, t*t);
+      left.push([px-ty/l*w, py+tx/l*w]); right.push([px+ty/l*w, py-tx/l*w]);
+    }
+    d.path(ribbon(left.map(([u, v]) => q(u, v)), right.map(([u, v]) => q(u, v))), .05*s, INKD, 1);
+    d.path(ribbon(left.map(Q), right.map(Q)), 0, SLEEVE, 1, {fill: 'ribbon'});
+    d.path(left.slice(1).map(Q), .025*s, CLOAK_LIGHT, .9);
+    d.path([Q(left[6]), Q(right[6])], .045*s, INKD, .9);
+  };
+  // The far arm reaches across the body to the high grip before the snath is drawn over it.
+  sleeve([-.08, 1.36], [handHi[0]-.05, handHi[1]-.04], .07, .1, .02);
   if(hide < .98){
-    const a = lerp(1.15, 1.75, raise), base = [-.42+.2*raise, .3+.9*raise], len = 2.3;
-    const top = [base[0]+Math.cos(a)*len, base[1]+Math.sin(a)*len];
-    const shaft = [q(...base), q(...top)], alpha = 1-hide;
-    d.path(shaft, .1*s, INKD, alpha);
-    d.path(shaft, .055*s, BONE, alpha);
-    const blade_ = blade(q, top, a, 1, .95, .16);
-    d.path([...blade_, blade_[0]], .05, INKD, alpha);
-    d.path(blade_, 0, BLADE, alpha, {fill: true});
-    if(T.glow) d.path(blade_.slice(0, 13), .05*s, blood > .5 && T.prism ? BLOOD : P.main, alpha, {glow: true});
-    for(const t of [.3, .55]){const h = q(lerp(base[0], top[0], t), lerp(base[1], top[1], t)); d.orb(h[0], h[2], h[1], .07*s, BONE, alpha); d.orb(h[0], h[2], h[1], .07*s+.02, INKD, alpha*.4);}
+    const sp = shaft.map(Q);
+    d.path(sp, .13*s, INKD, alpha);
+    d.path(sp, .075*s, WOOD, alpha);
+    d.path(shaft.slice(1, 8).map(([u, v]) => q(u-perp[0]*.012, v-perp[1]*.012)), .02*s, WOOD_LIGHT, alpha*.9);
+    // The blade, mounted just under the snath's tip.
+    const heel = shaftAt(.955, 0), turn = 1.45, bl = bladeShape(heel, ang-Math.PI/2+.12, 1.08, .24, turn);
+    const outline = [...bl.back, ...bl.edge.slice().reverse()].map(Q);
+    d.path([...outline, outline[0]], .07*s, INKD, alpha);
+    d.path(ribbon(bl.back.map(Q), bl.edge.map(Q)), 0, STEEL, alpha, {fill: 'ribbon'});
+    const bevel = bl.back.map(([u, v], i) => [lerp(u, bl.edge[i][0], .55), lerp(v, bl.edge[i][1], .55)]);
+    d.path(ribbon(bevel.map(Q), bl.edge.map(Q)), 0, BLADE, alpha, {fill: 'ribbon'});
+    d.path(bl.back.slice(0, 15).map(Q), .022*s, STEEL_DARK, alpha*.9);
+    const red = blood > .5 && T.prism;
+    d.path(bl.edge.slice(1).map(Q), .03*s, red ? BLOOD : P.main, alpha, {glow: T.glow, taper: .7});
+    // Collar where the blade meets the snath, and the snath's capped end above it.
+    const tip = shaftAt(1, 0), cap = q(...tip), collar = q(...heel);
+    d.orb(collar[0], collar[2], collar[1], .07*s, INKD, alpha); d.orb(collar[0], collar[2], collar[1], .045*s, STEEL_DARK, alpha);
+    d.orb(cap[0], cap[2], cap[1], .05*s, INKD, alpha); d.orb(cap[0], cap[2], cap[1], .03*s, BONE, alpha);
+    // The lower grip, sticking out from the snath.
+    const g0 = shaftAt(.4), g1 = [g0[0]+perp[0]*.17+dir[0]*.04, g0[1]+perp[1]*.17+dir[1]*.04];
+    d.path([Q(g0), Q(g1)], .1*s, INKD, alpha); d.path([Q(g0), Q(g1)], .055*s, WOOD_LIGHT, alpha);
   }
+  // The near arm, down to the lower grip, and both bony hands closed round the wood.
+  sleeve([.17, 1.34], [handLo[0]+perp[0]*.12, handLo[1]+perp[1]*.12-.02], .08, .12, .1);
+  for(const [h, k] of [[handHi, 0], [[handLo[0]+perp[0]*.15, handLo[1]+perp[1]*.15], 1]]){
+    const c = Q(h);
+    d.orb(c[0], c[2], c[1], .085*s, INKD, 1);
+    d.orb(c[0], c[2], c[1], .062*s, BONE, 1);
+    for(const f of [-.035, 0, .035]){
+      const a = Q([h[0]+dir[0]*f-perp[0]*.05, h[1]+dir[1]*f-perp[1]*.05]), b = Q([h[0]+dir[0]*f+perp[0]*(k ? -.02 : .05), h[1]+dir[1]*f+perp[1]*(k ? -.02 : .05)]);
+      d.path([a, b], .028*s, BONE, 1);
+    }
+  }
+
+  // The hood: a deep cowl with a peak falling back, dark inside, a skull looking out of the dark.
+  const hc = [-.01, 1.66], hood = [], ink = [];
+  for(let i = 0; i < 20; i++){
+    const a = -Math.PI/2+i/20*TAU, c = Math.cos(a), sn = Math.sin(a);
+    const peak = Math.max(0, Math.cos(a-2.15))**6, r = 1+.32*peak, w = .25*(c < 0 ? 1.04 : 1), h = .27;
+    hood.push([hc[0]+c*w*r-.04*peak, hc[1]+sn*h*r+(sn < -.3 ? .03 : 0)]);
+  }
+  for(const [u, v] of hood) ink.push(q(hc[0]+(u-hc[0])*1.14, hc[1]+(v-hc[1])*1.1));
+  d.path(blob(q(...hc), ink), 0, INKD, 1, {fill: true});
+  d.path(blob(q(...hc), hood.map(Q)), 0, CLOAK, 1, {fill: true});
+  d.path(hood.slice(15, 20).concat(hood.slice(0, 3)).map(([u, v]) => q(u-.01, v)), .035*s, CLOAK_LIGHT, .9);
+  const fc = [.07, 1.61], face = [];
+  for(let i = 0; i < 14; i++){const a = i/14*TAU; face.push(q(fc[0]+Math.cos(a)*.15, fc[1]+Math.sin(a)*(Math.sin(a) > 0 ? .17 : .15)));}
+  d.path(blob(q(...fc), face), 0, VOID, 1, {fill: true});
+  // The skull: a pale dome, the jaw narrower, sockets and a nose in shadow, a row of teeth.
+  const sc = [.095, 1.585], skull = [];
+  for(let i = 0; i < 16; i++){const a = i/16*TAU, sn = Math.sin(a); skull.push(q(sc[0]+Math.cos(a)*.1*(sn < 0 ? .78 : 1), sc[1]+sn*(sn < 0 ? .11 : .1)));}
+  d.path(blob(q(...sc), skull), 0, BONE, 1, {fill: true});
+  const lid = []; for(let i = 0; i <= 8; i++){const a = Math.PI*(.05+.9*i/8); lid.push(q(sc[0]+Math.cos(a)*.115, sc[1]+.02+Math.sin(a)*.1));}
+  d.path(lid, .05*s, VOID, .85);
+  const eye = blood > .5 ? BLOOD : P.main, flick = .85+.15*Math.sin(clock*7+seed);
+  for(const u of [-.04, .04]){
+    const e = q(sc[0]+u, sc[1]+.005);
+    d.orb(e[0], e[2], e[1], .034*s, VOID, 1);
+    d.orb(e[0], e[2], e[1], .016*s, eye, flick);
+    if(T.glow) d.bloom(e[0], e[2], e[1], .09*s, blood > .5 ? BLOOD : P.glow, .6*flick);
+  }
+  const nose = q(sc[0], sc[1]-.045); d.orb(nose[0], nose[2], nose[1], .012*s, VOID, .9);
+  d.path([q(sc[0]-.045, sc[1]-.078), q(sc[0]+.045, sc[1]-.078)], .012*s, VOID, .7);
+  for(const u of [-.022, 0, .022]) d.path([q(sc[0]+u, sc[1]-.064), q(sc[0]+u, sc[1]-.092)], .008*s, VOID, .7);
 }
 
 // ------------------------------------------------------------------ the rig: Death behind you
@@ -110,13 +202,24 @@ function paintShade(d, world, p, anchor, motion, clock, time){
   d.stain(x, z, .55*s, INKD, .35);
   if(T.glow) d.pool(x, z, .8*s, full && T.prism ? '#8a1020' : P.glow, .25+.05*souls);
   if(T.sigil && full) d.sigil(x, z, .9*s, P.main, .55, {spin: -clock, sides: 5, glow: T.prism});
+  const fronts = [], backs = [];
+  for(let i = 0; i < souls; i++){const a = clock*1.6+i*TAU/souls; (Math.sin(a) > 0 ? fronts : backs).push(a);}
+  // Its souls circle the hood as little comets, tails trailing along the orbit; the ones behind it are
+  // painted first and without glow (the glow layer draws over everything).
+  const red = full && T.prism;
+  const comet = (a, lit) => {
+    const spot = b => [x+Math.cos(b)*.48*s, y+(1.72+Math.sin(b*2+seed)*.05)*s+Math.sin(b)*.07*s, z+Math.sin(b)*.22*s];
+    const head = spot(a), tail = [];
+    for(let k = 0; k <= 6; k++){const p = spot(a-k*.13); tail.push([p[0], p[1]+Math.sin(clock*6+k)*.012*k, p[2]]);}
+    d.path(tail, .11*s, INKD, .5, {taper: 1});
+    d.path(tail, .075*s, red ? '#ff9aa2' : SOUL, .85, {taper: 1, glow: T.glow && lit});
+    d.orb(head[0], head[2], head[1], .065*s, INKD, .8);
+    d.orb(head[0], head[2], head[1], .048*s, red ? '#ffd2d6' : SOUL, 1);
+    if(T.glow && lit) d.bloom(head[0], head[2], head[1], .16*s, red ? BLOOD : P.glow, .5);
+  };
+  for(const a of backs) comet(a, false);
   shade(d, x, z, y, s, {raise, hide, blood: full ? 1 : 0, T, clock, seed, side, drift: Math.max(-1, Math.min(1, motion.vx*.25))*side});
-  // Its souls burning round the hood.
-  for(let i = 0; i < souls; i++){
-    const a = clock*1.6+i*TAU/souls, hx = x+Math.cos(a)*.45*s, hz = z+Math.sin(a)*.2*s, hy = y+1.75*s+Math.sin(a)*.1*s*.69;
-    soul(d, hx, hz, hy, .075*s, 1, {tu: -Math.sin(a)*.8, tv: -.4, phase: clock+i, red: full && T.prism});
-    if(T.glow) d.bloom(hx, hz, hy, .18*s, full && T.prism ? BLOOD : P.glow, .45);
-  }
+  for(const a of fronts) comet(a, true);
   if(T.glow && souls) d.light(x, z, .8+.25*souls);
   return {origin: {x, y: 0, z}};
 }

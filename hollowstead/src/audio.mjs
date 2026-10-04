@@ -89,6 +89,7 @@ export class Sound {
     if(type==='brew'){for(let i=0;i<4;i++)this.sweep(300+i*90,600+i*90,.1,'sine',.015,i*.07);return;}
     if(type==='gilded'||type==='gildfall'){for(let i=0;i<(type==='gildfall'?6:3);i++)this.sweep(1800+i*220,2600+i*220,.12,'sine',.01,i*.05);return;}
     if(type==='rekindle'){this.sweep(80,320,.9,'sawtooth',.03);this.sweep(200,600,.8,'triangle',.02,.1);return;}
+    if(type==='warp'){this.sweep(300,1200,.6,'sine',.03);this.sweep(600,1800,.5,'triangle',.015,.08);return;}
     if(type==='dread'){this.sweep(98,96,1.4,'sine',.05);this.sweep(147,145,1.2,'sine',.02,.05);return;}
     // Dread Ages (ages.mjs): a deep bell under a falling minor; thorns a dry rasp.
     if(type==='dreadage'){this.sweep(73,72,2.6,'sine',.07);this.sweep(110,109,2.2,'triangle',.03,.05);for(const [i,f] of [440,415,349,294].entries())this.sweep(f,f*.99,.6,'sine',.018,.4+i*.28);return;}

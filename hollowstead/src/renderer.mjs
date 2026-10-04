@@ -314,7 +314,7 @@ export class Renderer {
     }
   }
   paintPlaza(world,frame){
-    const hearth=world.buildings.find(b=>b.type==='hearth')||(world.arena?{x:0,z:0,level:1}:null);
+    const hearth=world.mode==='vigil'&&!world.dungeon?{x:0,z:0,level:1}:world.buildings.find(b=>b.type==='hearth')||(world.arena?{x:0,z:0,level:1}:null);
     if(!hearth||!this.textures.has('plaza')){if(this.plaza){this.plaza.base.visible=false;if(this.plaza.glow)this.plaza.glow.visible=false;}return;}
     if(!this.plaza){const size=this.theme.sprites.plaza.size[0];const mk=(key,add)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(size,size),new THREE.MeshBasicMaterial({map:this.textures.get(key),transparent:true,depthWrite:false,blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));m.rotation.x=-Math.PI/2;m.renderOrder=add?-1:-2;this.scene.add(m);return m;};this.plaza={base:mk('plaza'),glow:this.textures.has('plaza-glow')?mk('plaza-glow',true):null};}
     const {base,glow}=this.plaza;base.visible=true;base.position.set(hearth.x,.012,hearth.z);base.material.color.setScalar(Math.min(1,entityBrightness(frame,hearth.x,hearth.z,{emissive:true})));
@@ -461,9 +461,9 @@ export class Renderer {
       // Crops lean in the wind (duskwheat most); a ripe one breathes a little so it reads as ready.
       if(kind==='crop'){const wheat=key==='crop-duskwheat';o.sprite.material.rotation=Math.sin(this.clock*(wheat?2.1:1.4)+e.x*1.7+e.z*.9)*(wheat?.055:.025);if(e.ripe){const b=1+Math.sin(this.clock*3.2+e.x*2)*.025;o.sprite.scale.x*=b;o.sprite.scale.y*=2-b;}}
       const lootGlow=kind==='drop'?dropGlow(e):null;
-      const emissive=(kind==='crop'&&e.ripe&&!!cropGlow(e.type))||(kind==='prop'&&e.glow)||(kind==='building'&&STRUCTURES[key]?.light&&(key==='lantern'||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e))||!!lootGlow;
+      const emissive=(kind==='crop'&&e.ripe&&!!cropGlow(e.type))||(kind==='prop'&&e.glow)||(kind==='building'&&STRUCTURES[key]?.light&&(STRUCTURES[key]?.fuelless||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e))||!!lootGlow;
       let display=entityBrightness(frame, o.x, o.z, {local:kind==='player'&&e.id===localId, emissive});
-      if(kind==='building'&&STRUCTURES[key]?.light&&key!=='lantern'&&!(e.fuel>0))display*=0.45;
+      if(kind==='building'&&STRUCTURES[key]?.light&&!STRUCTURES[key]?.fuelless&&!(e.fuel>0))display*=0.45;
       const lamp=brightnessAt(frame.sources, o.x, o.z, 1, frame.lighting);
       const lampStrength=lamp>frame.lighting.ambientNight?Math.min(1,(lamp-frame.lighting.ambientNight)/Math.max(0.01, frame.lighting.litBrightness-frame.lighting.ambientNight)):0;
       this.shadeSprite(o.sprite.material, display, lampStrength, frame.darkness, frame.lighting);
@@ -473,7 +473,7 @@ export class Renderer {
       if(kind==='building'&&key==='farm'&&e.growth>=100&&display>0.55)o.sprite.material.color.lerp(new THREE.Color('#efd394'), .45);
       if(kind!=='zone')o.sprite.material.opacity=kind==='drop'?dropBlink(e,world.time,this.clock):e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:1;
       const fade=labelOpacity(display, frame.darkness, frame.lighting);
-      if(kind==='building'&&STRUCTURES[key].light){const lit=key==='lantern'||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
+      if(kind==='building'&&STRUCTURES[key].light){const lit=STRUCTURES[key]?.fuelless||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
       if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;if(rig){this.syncRigParts(e,o,rig,alive);const old=this.objects.get('held'+e.id);if(old)this.remove(old);}else{const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);}this.syncWeaponRig(e,o,world,weapon);}
       // Night-only finds (regions.mjs) glow in the dark so they can be found from afar.
       if(kind==='node'){const hue=nightGlow(e);if(hue){this.glow(o,1.1);o.glow.material.color.set(hue);o.glow.material.opacity=(.16+.42*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));}}

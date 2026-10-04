@@ -52,6 +52,8 @@ export const ITEMS = {
   tonic:{name:'Bloodapple tonic',icon:'tonic',food:4,heal:4,buff:'fury'},tea:{name:'Starlily tea',icon:'tea',food:4,courage:10,buff:'swift'},
   gloomstew:{name:'Gloomcap stew',icon:'gloomstew',food:40,heal:10,buff:'warded'},gourdsoup:{name:'Ghostgourd soup',icon:'gourdsoup',food:50,heal:15,buff:'haunted'},
   greaterelixir:{name:'Greater vigor draught',icon:'greaterelixir',heal:120,courage:40},
+  // The Vigil (vigil.mjs WARP): read it and you are carried home to your Heartfire.
+  warpscroll:{name:'Homeward scroll',icon:'warpscroll',warp:true},
 };
 export const EQUIPMENT = {
   axe:{name:'Woodcutter’s axe',icon:'axe',durability:70},pick:{name:'Flint pick',icon:'pick',durability:70},
@@ -153,9 +155,12 @@ export const STRUCTURES = {
   bench:{name:'Workbench',hp:180,radius:.65},chest:{name:'Supply chest',hp:180,radius:.65},
   wall:{name:'Palisade',hp:280,radius:.72},gate:{name:'Camp gate',hp:240,radius:.7},
   trap:{name:'Briar trap',hp:100,radius:0},farm:{name:'Pumpkin patch',hp:120,radius:0},
-  pot:{name:'Cauldron',hp:160,radius:.55},lantern:{name:'Soul lantern',hp:140,radius:.3,light:6},
+  pot:{name:'Cauldron',hp:160,radius:.55},lantern:{name:'Soul lantern',hp:140,radius:.3,light:6,fuelless:true},
   bed:{name:'Bedroll',hp:100,radius:0},ward:{name:'Warding totem',hp:200,radius:.55},hushstone:{name:'Hushing stone',hp:220,radius:.6},
   cart:{name:'Hand cart',hp:220,radius:.55},
+  // A standing stone whose runes glow after dark. One stands in the middle of every Vigil, where the Heartfire used to be.
+  // `fuelless`: its light never needs wood (like the soul lantern).
+  glimmer:{name:'Glimmerstone',hp:300,radius:.45,light:5,fuelless:true},
   // Homestead barriers (homestead.mjs): only ever placed on the grid.
   fence:{name:'Fence',hp:120,radius:.42},stonewall:{name:'Stone wall',hp:420,radius:.48},
   timberwall:{name:'Timber wall',hp:360,radius:.7},masonwall:{name:'Masonry wall',hp:560,radius:.72},
@@ -203,6 +208,10 @@ export const RECIPES = {
   gravelight:{kind:'tool',cost:{wispdust:3,ore:3,ember:2},station:'bench',desc:'A wisp-fed lantern bright enough for the Moonshard Crags.'},
   barrowcloak:{kind:'tool',cost:{bone:8,fiber:6,meat:2},station:'bench',desc:'Bone-lined warmth against the Barrow Fields’ grave-chill.'},
   cart:{kind:'build',cost:{wood:8,fiber:4,stone:2},desc:'A chest on wheels. Pull it along, open it anywhere.'},
+  // The Vigil's home (vigil.mjs): built anywhere, one at a time. Taken down and rebuilt, it keeps its awakening.
+  hearth:{kind:'build',cost:{wood:10,stone:10},desc:'Your home: light, mending by day, and a place to wake if you set it. Only one can burn; move it and it keeps its awakening.'},
+  glimmer:{kind:'build',cost:{stone:4,ember:1},desc:'A standing stone whose runes glow after dark. Light that needs no wood.'},
+  warpscroll:{kind:'item',cost:{fiber:2,wood:1,ember:1},station:'bench',desc:'Read it to be carried home to your Heartfire. Keep still: a blow breaks the spell.'},
   // Grid pieces (homestead.mjs): built a cell at a time on the Vigil and in the Homestead, never free-placed.
   // `grid` marks them; their cost is per cell. Floors and soil have no structure of their own.
   till:{kind:'build',grid:true,name:'Tilled soil',cost:{},desc:'Turn a cell of earth for sowing. Plant seeds in it from the action buttons.'},

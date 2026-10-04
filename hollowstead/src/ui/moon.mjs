@@ -96,7 +96,7 @@ export function paint(ctx){
   }
   if(!card.hidden){const line = announcement(); if(line && line !== cardAnnounce) hideCard();}
   status = nightStatus(world);
-  const omen = status.moon === 'blood' && phaseOf(world) !== 'day';
+  const omen = (status.moon === 'blood' && phaseOf(world) !== 'day') || status.moon === 'siege';
   const next = `${status.moon}|${status.next}|${status.day}|${omen}`;
   if(next !== sig){
     sig = next;

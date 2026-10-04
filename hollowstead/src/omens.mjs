@@ -23,6 +23,7 @@ import {hollowTime, scheduleOf} from './content.mjs?v=harvest-18';
 import {REGIONS, pickWeighted} from './progression.mjs?v=harvest-18';
 import {areasOf, clearanceAt, iceAt} from './worldgen.mjs?v=harvest-18';
 import {AGE, ageOf} from './ages.mjs?v=harvest-18';
+import {builtAt} from './homestead.mjs?v=harvest-18';
 
 export const OMENS = Object.freeze({
   fallenstar: Object.freeze({name: 'Fallen star', glyph: '✶', color: '#ffd27a', node: 'fallenstar', weight: 3,
@@ -101,6 +102,8 @@ export function stepOmens(world, dt){
   spawnOmen(world, null, cycle);
 }
 
+/** How far an omen keeps from anything built (a camp can be anywhere on a Vigil). */
+const OMEN_CAMP = 10;
 /** Make an omen (a kind, or a weighted pick). Returns it, or null when no spot was found. */
 export function spawnOmen(world, kind = null, cycle = scheduleOf(world).cycle){
   kind ||= pickWeighted(world.spawnRng, omenKinds(world).map(([id, o]) => [id, o.weight]));
@@ -111,6 +114,8 @@ export function spawnOmen(world, kind = null, cycle = scheduleOf(world).cycle){
     if(lair && Math.hypot(x-lair.x, z-lair.z) < lair.r+lair.wall+4) continue;
     if(world.players.some(p => p.online && Math.hypot(p.x-x, p.z-z) < OMEN.near)) continue;
     if(world.nodes.some(n => Math.hypot(n.x-x, n.z-z) < 2.4)) continue;
+    // Never on someone's floors, fields or walls, nor close enough to a camp to fight in it.
+    if(builtAt(world, x, z, 1.5) || world.buildings.some(b => b.type !== 'glimmer' && Math.hypot(b.x-x, b.z-z) < OMEN_CAMP)) continue;
     const o = {id: world.nextId('o'), kind, x: +x.toFixed(2), z: +z.toFixed(2), until: hollowTime(world)+OMEN.life*cycle, state: 'new', sipped: [], spawn: []};
     (world.omens ||= []).push(o);
     world.nodes.push(...omenNodes({omens: [o]}));

@@ -179,6 +179,10 @@ export const HOLLOW_EVENTS = {
   gildfall: {life: () => 1.4, kick: () => ({shake: .15}), paint(d, ev, age, seed){const t = age/1.4; d.sparks(ev.x, ev.z, .8, 22, t, '#ffd25a', fade(t), seed, {speed: 6, up: 6}); d.bloom(ev.x, ev.z, .8, 2*(1-t), '#ffd25a', .6*fade(t));}},
   rekindle: {life: () => 2, kick: () => ({shake: .3, flash: .15, color: '#ffcf8a'}), paint(d, ev, age, seed){const t = age/2; d.beam(ev.x, ev.z, 0, 10, 1.4*fade(t), '#ffb14e', .6*fade(t)); d.sparks(ev.x, ev.z, .8, 20, t, '#ffe2a0', fade(t), seed, {up: 8});}},
   ascend: {life: () => 1.6, paint(d, ev, age){const t = age/1.6; d.beam(ev.x, ev.z, 0, 8, 1.6*fade(t), '#c49bff', .5*fade(t));}},
+  // The Homeward scroll (vigil.mjs WARP): pale motes gather while it is read, a column of light carries you off and sets you down.
+  warpcast: {life: ev => ev.cast || 1.6, paint(d, ev, age, seed){const life = ev.cast || 1.6, t = age/life; d.motes(ev.x, ev.z, 16, t, 1.4*(1-t)+.3, '#bfe6ff', .9, seed, {rise: 1.6, size: .1}); d.ring(ev.x, ev.z, 1.3*(1-t)+.35, .08, '#bfe6ff', .4+.5*t, {glow: true});}},
+  warp: {life: () => 1.1, kick: ev => ev.arrive ? {flash: .1, color: '#d8f0ff'} : null, paint(d, ev, age, seed){const t = age/1.1; d.beam(ev.x, ev.z, 0, 9, 1.1*fade(t), '#bfe6ff', .75*fade(t)); d.sparks(ev.x, ev.z, .6, 18, t, '#e8f6ff', fade(t), seed, {up: 7, speed: 3}); d.light(ev.x, ev.z, 4*fade(t));}},
+  warpbreak: {life: () => .5, paint(d, ev, age, seed){const t = age/.5; d.sparks(ev.x, ev.z, .4, 8, t, '#9fb8c8', fade(t), seed, {speed: 2.5, up: 1.5});}},
   // Dread Ages (ages.mjs): the whole sky flinches red, and a ring of it rolls out from the Heartfire.
   dreadage: {life: () => 3.2, kick: () => ({shake: .5, flash: .26, color: '#ff4a5e'}), paint(d, ev, age, seed){
     const t = age/3.2;

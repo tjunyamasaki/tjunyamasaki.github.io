@@ -14,6 +14,7 @@ const SPECS = Object.freeze({
   feed: {icon: '▥', label: 'Feed', activation: 'tap'},
   cook: {icon: '◕', label: 'Cook', activation: 'tap'},
   awaken: {icon: '✦', label: 'Awaken', activation: 'tap'},
+  home: {icon: '⌂', label: 'Make home', activation: 'tap'},
   mend: {icon: '✺', label: 'Mend', activation: 'tap'},
   repair: {icon: '✚', label: 'Repair', activation: 'tap'},
   craft: {icon: '⚒', label: 'Craft', activation: 'tap'},
@@ -247,7 +248,7 @@ export function describeMaintenance({building = null, locked = false, wood = 0, 
         command: buildingCommand('repair', building.id),
       }));
     }
-    if (dismantleRule(building.type, locked).ok) {
+    if (dismantleRule(building.type, locked, {movable: !!building.movable}).ok) {
       actions.push(make('dismantle', {
         targetId: building.id,
         command: {type: 'dismantle', target: building.id, hold: true},
@@ -313,6 +314,10 @@ export function describeContext(facts) {
       disabledReason: fed ? 'Needs 1 wood' : 'The fire has plenty of fuel',
       command: buildingCommand('feed', id),
     }));
+    // The Vigil (vigil.mjs): choose this Heartfire as the place you wake. Gone once it is home.
+    if (facts.type === 'hearth' && facts.vigil && !facts.home) {
+      list.push(make('home', {targetId: id, command: buildingCommand('home', id)}));
+    }
     list.push(make('cook', {
       targetId: id,
       command: buildingCommand('cook', id),
@@ -471,6 +476,7 @@ export function effectLine(itemId) {
   const item = ITEMS[itemId];
   if (!item) return '';
   if (item.boost === 'vigor') return `${tag}Use: +15 max health, forever`;
+  if (item.warp) return `${tag}Use: carried home to your Heartfire · hold still`;
   const parts = [];
   if (item.food) parts.push(`Hunger +${item.food}`);
   if (item.heal) parts.push(`Health ${item.heal > 0 ? '+' : ''}${item.heal}`);

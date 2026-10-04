@@ -46,7 +46,7 @@ export const structureHit = b => b.type === 'hearth' ? HEARTH_HIT : STRUCTURE_HI
  * `wall` is how long being walled out is remembered.
  */
 export const SIEGE = Object.freeze({wall: 2.5, reach: 2.8, roam: 6, prey: 7});
-const SPARED = new Set(['hearth', 'cart', 'trap', 'farm']);
+const SPARED = new Set(['hearth', 'cart', 'trap', 'farm', 'glimmer']);
 const radiusOf = b => b.radius || STRUCTURES[b.type]?.radius || .5;
 /**
  * A creature sees a wanderer it has picked up within its sight range (preyFor: 12 units, 40 when hunting).
@@ -59,6 +59,12 @@ function seesPrey(world, e, prey){
   if(e.sightOf === prey.id && world.time - (e.sightAt ?? -99) < .3) return e.sightOk;
   e.sightOf = prey.id; e.sightAt = world.time; e.sightOk = world.canSee(e, prey);
   return e.sightOk;
+}
+/** The closest of `list` to `e`, at any distance (null when the list is empty). */
+function nearestOf(list, e){
+  let best = null, bd = Infinity;
+  for(const q of list){const d = dist(q, e); if(d < bd){bd = d; best = q;}}
+  return best;
 }
 /** `prey`: the wanderer or cart being hunted, or null. `fallback`: where it heads otherwise (the hearth). */
 function siegeTarget(world, e, prey, fallback = null){
@@ -587,8 +593,10 @@ export function stepMobs(world, dt, obstacles){
       target = preyFor(world, e, people, 999);
     }else{
       // `hunt`: creatures sent after wanderers in the dark (night.mjs) look much farther for prey.
-      const near = preyFor(world, e, prey, e.hunt ? HUNT_RANGE : 12);
-      target = near || hearth || (world.showcase ? people[0] : null);
+      // `raid`: a Vigil's night wave (night.mjs spawnWave) hunts the wanderers, however far, and never the Heartfire.
+      let near = preyFor(world, e, prey, e.hunt || e.raid ? HUNT_RANGE : 12);
+      if(!near && e.raid) near = nearestOf(people, e);
+      target = near || (e.raid ? null : hearth) || (world.showcase ? people[0] : null);
       if(!e.minion) target = siegeTarget(world, e, near, target) || target;
       e.chase = !!(near && target === near && seesPrey(world, e, near));
     }

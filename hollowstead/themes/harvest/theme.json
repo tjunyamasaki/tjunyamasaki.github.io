@@ -1619,6 +1619,28 @@
       },
       "icon": "./sprites/elixir-icon.svg?v=art3"
     },
+    "warpscroll": {
+      "src": "./sprites/warpscroll.svg?v=home1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/warpscroll-icon.svg?v=home1"
+    },
     "heartstone": {
       "src": "./sprites/heartstone.svg?v=art3",
       "size": [
@@ -4506,6 +4528,28 @@
       },
       "icon": "./sprites/moon-gilded-icon.svg?v=vigil1"
     },
+    "moon-siege": {
+      "src": "./sprites/moon-siege-icon.svg?v=home1",
+      "size": [
+        1.0,
+        1.0
+      ],
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/moon-siege-icon.svg?v=home1"
+    },
     "moon-starrain": {
       "src": "./sprites/moon-starrain-icon.svg?v=vigil1",
       "size": [
@@ -4644,6 +4688,31 @@
         }
       },
       "icon": "./sprites/hushstone-icon.svg?v=haul1"
+    },
+    "glimmer": {
+      "src": "./sprites/glimmer.svg?v=home1",
+      "size": [
+        2.4,
+        3.6
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 3
+        }
+      },
+      "icon": "./sprites/glimmer-icon.svg?v=home1"
     },
     "crop-pumpkin": {
       "src": "./sprites/crop-pumpkin.svg?v=home1",

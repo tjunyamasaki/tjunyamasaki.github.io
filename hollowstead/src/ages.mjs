@@ -15,6 +15,7 @@ import {NODES} from './content.mjs?v=harvest-18';
 import {INNER_RING, REGIONS} from './progression.mjs?v=harvest-18';
 import {iceAt, worldShape} from './worldgen.mjs?v=harvest-18';
 import {isVigil, sagaOf} from './vigil.mjs?v=harvest-18';
+import {builtAt} from './homestead.mjs?v=harvest-18';
 
 /** The ages, by the Dread that opens each. `line` is what the banner says the hollow now does. */
 export const AGES = Object.freeze([
@@ -109,6 +110,7 @@ export function growThorns(world, n){
     if(thorns.some(o => Math.hypot(o.x-x, o.z-z) < THORNS.gap)) continue;
     if(world.players.some(p => p.online && Math.hypot(p.x-x, p.z-z) < THORNS.clear)) continue;
     if(world.nodes.some(o => o.type !== 'grass' && Math.hypot(o.x-x, o.z-z) < 1.6)) continue;
+    if(builtAt(world, x, z, .8)) continue;
     const thorn = {id: world.nextId('th'), x: +x.toFixed(2), z: +z.toFixed(2)};
     thorns.push(thorn); made.push(thorn);
   }

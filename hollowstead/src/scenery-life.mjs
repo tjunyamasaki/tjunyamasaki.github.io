@@ -10,7 +10,7 @@ export const LIFE = Object.freeze({
   scare:4, crowAway:[18, 34], crowReturnClear:7, crowFlight:2.2, crowReturn:2.4, crowsDark:.5,
   frogScare:2.6, frogUnder:[10, 18], frogClear:3.5, ripple:.9,
   firefly:{start:176, full:196, hold:250, end:276}, batDark:.5, batPass:9, batPassChance:.55, batPassTime:4.2, mothDark:.22,
-  moths:{hearth:5, fire:3, lantern:3, player:2}, mothHeight:{hearth:2.2, fire:1.2, lantern:1.95, player:1.45},
+  moths:{hearth:5, fire:3, lantern:3, glimmer:3, player:2}, mothHeight:{hearth:2.2, fire:1.2, lantern:1.95, glimmer:1.9, player:1.45},
   caps:{crows:14, frogs:10, fireflies:48, bats:8, moths:20, ripples:8},
 });
 

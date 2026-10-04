@@ -112,11 +112,11 @@ export function phaseDarkness(time, schedule=clockSchedule(), lighting=resolveLi
   return smoothstep((t-duskStart)/(fullAt-duskStart));
 }
 
-/** Gameplay radius. Soul lanterns need no fuel. Heartfire grows by HEARTH_LEVEL_STEP per level above 1. */
+/** Gameplay radius. Soul lanterns and Glimmerstones (STRUCTURES fuelless) need no fuel. Heartfire grows by HEARTH_LEVEL_STEP per level above 1. */
 export function structureLightRadius(building){
   const base=STRUCTURES[building?.type]?.light||0;
   if(!(base>0))return 0;
-  if(building.type!=='lantern'&&!(building.fuel>0))return 0;
+  if(!STRUCTURES[building.type]?.fuelless&&!(building.fuel>0))return 0;
   const bonus=building.type==='hearth'?Math.max(0, (Number(building.level)||1)-1)*HEARTH_LEVEL_STEP:0;
   return base+bonus;
 }

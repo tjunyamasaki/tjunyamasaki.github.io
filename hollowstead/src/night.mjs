@@ -7,6 +7,9 @@
 //   waxing  the usual defence: the night's waves come for the Heartfire.
 //   new     no raid: a darker night for exploring and night-only gathering.
 //   blood   the Hollow King comes, with an extra, bigger wave.
+//   siege   (the Vigil only) the night marches on the Heartfire, wherever it was built.
+// On a Vigil the waves hunt the wanderers wherever they are (each group finds one of them), and only a
+// siege moon comes for the Heartfire. An expedition's waves always come for the fire.
 // Day and night, creatures hunt wanderers outside the Heartfire's light at a random pace
 // (stepHunters), twice as often at night, except someone resting by the Heartfire under a new moon.
 
@@ -30,6 +33,8 @@ export const MOONS = Object.freeze({
   // Rare moons (moons.mjs).
   gilded: Object.freeze({id:'gilded', name:'Gilded moon', detail:'No raid. Golden creatures heavy with treasure run from you in the dark. Hunt them down.'}),
   starrain: Object.freeze({id:'starrain', name:'Star rain', detail:'Stars fall all night and leave pieces of themselves behind. Fewer waves, but watch the sky.'}),
+  // The Vigil's rare siege (VIGIL_MOONS): told at the dawn before, so there is a day to get ready.
+  siege: Object.freeze({id:'siege', name:'Siege moon', detail:'The woods march on your Heartfire, more of them than any waxing night. Hold your home until dawn.'}),
 });
 
 /**
@@ -41,6 +46,15 @@ export const MOONS = Object.freeze({
  * 60% new (no raid), 30% waxing (waves) and 10% blood (tests/night-moon.test.mjs).
  */
 export const MOON_RULES = Object.freeze({waxingUntil:2, bloodFrom:4, firstChance:.2, firstStep:.1, firstBy:8, step:.015, pity:13, newShare:.67, rareFrom:3, gilded:.065, starrain:.065});
+/**
+ * The Vigil's moons. Nights 1-2 are waxing. A blood moon is a flat `blood` chance a night from `bloodFrom`,
+ * a siege a flat `siege` chance from `siegeFrom` (a few days to build a home first); neither comes two nights
+ * running, nor right after the other. The rest are new or waxing (`newShare`), with the rare moons as above.
+ * Over 400 nights: about 5% blood, 5% siege (tests can call nextMoon).
+ */
+export const VIGIL_MOONS = Object.freeze({waxingUntil:2, bloodFrom:4, blood:.05, siegeFrom:5, siege:.05, newShare:.67, rareFrom:3, gilded:.065, starrain:.065});
+/** A siege's waves: blood moon timing, each `size` times a waxing wave (the crowd still stops at NIGHT_CAP). */
+export const SIEGE = Object.freeze({size:1.25});
 
 /** Blood moon waves: one more than a waxing night, each `bloodSize` times bigger (the crowd still stops at NIGHT_CAP). */
 export const BLOOD_WAVE_FRACTIONS = Object.freeze([0, .26, .52, .78]);
@@ -76,9 +90,10 @@ function roll(seed, n, salt){
 }
 /** Per seed: moons[n] for night n (index 0 unused), and visits[n] = blood moons among nights 1..n. */
 const SEQUENCES=new Map();
-function sequence(seed, day){
-  seed=seed>>>0;let s=SEQUENCES.get(seed);
-  if(!s){if(SEQUENCES.size>8)SEQUENCES.clear();s={moons:['waxing'], visits:[0], last:0};SEQUENCES.set(seed,s);}
+function sequence(seed, day, vigil=false){
+  seed=seed>>>0;const key=vigil?`v${seed}`:seed;let s=SEQUENCES.get(key);
+  if(!s){if(SEQUENCES.size>8)SEQUENCES.clear();s={moons:['waxing'], visits:[0], last:0};SEQUENCES.set(key,s);}
+  if(vigil)return vigilSequence(s, seed, day);
   const R=MOON_RULES;
   while(s.moons.length<=day){
     const n=s.moons.length,prev=s.moons[n-1];let moon='waxing';
@@ -97,6 +112,24 @@ function sequence(seed, day){
   }
   return s;
 }
+/** The Vigil's calendar (VIGIL_MOONS): the same per-seed dice, flat odds for blood and siege. */
+function vigilSequence(s, seed, day){
+  const R=VIGIL_MOONS;
+  while(s.moons.length<=day){
+    const n=s.moons.length,prev=s.moons[n-1];let moon='waxing';
+    if(n>R.waxingUntil){
+      const calm=prev!=='blood'&&prev!=='siege';
+      const big=roll(seed,n,0x6d6f6f6e);
+      if(calm&&n>=R.bloodFrom&&big<R.blood)moon='blood';
+      else if(calm&&n>=R.siegeFrom&&big>=R.blood&&big<R.blood+R.siege)moon='siege';
+      else moon=roll(seed,n,0x2e6e6577)<R.newShare?'new':'waxing';
+      if(moon!=='blood'&&moon!=='siege'&&n>=R.rareFrom&&prev!=='gilded'&&prev!=='starrain'){const r=roll(seed,n,0x67696c64);if(r<R.gilded)moon='gilded';else if(r<R.gilded+R.starrain)moon='starrain';}
+    }
+    if(moon==='blood')s.last=n;
+    s.moons.push(moon);s.visits.push(s.visits[n-1]+(moon==='blood'?1:0));
+  }
+  return s;
+}
 const nightDay=world=>Math.max(1,dayOf(world));
 
 /** Moon over night `day` (defaults to tonight). Deterministic from the seed; the arena has none. */
@@ -105,7 +138,7 @@ export function moonOf(world, day=nightDay(world)){
   day=Math.max(1,Math.floor(day)||1);
   const night=world.night;
   if(night&&night.day===day&&MOONS[night.moon])return night.moon;
-  return sequence(world.seed||0, day).moons[day];
+  return sequence(world.seed||0, day, isVigil(world)).moons[day];
 }
 
 /** How many times the Hollow King has come by night `day`, counting tonight if it is a blood moon. Scales him (World.mobScale). */
@@ -114,7 +147,7 @@ export function kingVisits(world, day=nightDay(world)){
   day=Math.max(1,Math.floor(day)||1);
   const night=world.night;
   if(night&&night.day===day&&Number.isInteger(night.visit))return night.visit;
-  return sequence(world.seed||0, day).visits[day];
+  return sequence(world.seed||0, day, isVigil(world)).visits[day];
 }
 
 /** First night at or after `from` with this moon (tests, tools and the showcase). */
@@ -127,7 +160,7 @@ export function nextMoon(world, moon, from=1, within=400){
 export function tonight(world){
   const day=nightDay(world);let night=world.night;
   if(!night||night.day!==day){
-    const s=sequence(world.seed||0, day+1);
+    const s=sequence(world.seed||0, day+1, isVigil(world));
     night=world.night={day, moon:s.moons[day], next:s.moons[day+1], visit:s.visits[day], told:0, hunt:{}, sweep:0};
   }
   return night;
@@ -139,6 +172,7 @@ export const MOON_LIGHT = Object.freeze({
   blood: Object.freeze({tint:'#5a1418', ambient:1.1}),
   gilded: Object.freeze({tint:'#4a3612', ambient:1.12}),
   starrain: Object.freeze({tint:'#16183a', ambient:.95}),
+  siege: Object.freeze({tint:'#4a2412', ambient:1.05}),
 });
 /**
  * Lighting hints for tonight, read by lighting.frameLighting on every frame (host and guests).
@@ -151,10 +185,17 @@ export function moonLighting(world){
   return MOON_LIGHT[moonOf(world, dayAt(time, scheduleOf(world)))]||null;
 }
 
+/** On a Vigil the waves hunt you, not the fire: the moons that bring them say so. */
+const VIGIL_DETAIL = Object.freeze({
+  waxing:'The night’s waves hunt you wherever you are. Stand together.',
+  blood:'The Hollow King hunts you, with more waves than any night.',
+  starrain:'Stars fall all night and leave pieces of themselves behind. Fewer waves hunt you, but watch the sky.',
+});
 /** HUD summary for the local wanderer: {moon, name, detail, day, next, nextName, visit}. */
 export function nightStatus(world){
   const day=nightDay(world),moon=moonOf(world, day),next=moonOf(world, day+1);
-  return {moon, name:MOONS[moon]?.name||'', detail:MOONS[moon]?.detail||'', day, next, nextName:MOONS[next]?.name||'', visit:moon==='blood'?kingVisits(world, day):0};
+  const detail=(isVigil(world)&&VIGIL_DETAIL[moon])||MOONS[moon]?.detail||'';
+  return {moon, name:MOONS[moon]?.name||'', detail, day, next, nextName:MOONS[next]?.name||'', visit:moon==='blood'?kingVisits(world, day):0};
 }
 
 // ------------------------------------------------------------------ waves
@@ -164,18 +205,31 @@ export function stepNight(world, dt, before, phase){
   const night=tonight(world);
   // Tell everyone tonight's moon a few seconds into dusk, after the dusk call has been read.
   const clock=scheduleOf(world),now=hollowTime(world);
-  if(phase==='dusk'&&night.told!==night.day&&(now%clock.cycle)-clock.day>=4.2){night.told=night.day;if(!world.showcase)world.event('announce',0,0,duskLine(night),{moon:night.moon});}
+  if(phase==='dusk'&&night.told!==night.day&&(now%clock.cycle)-clock.day>=4.2){night.told=night.day;if(!world.showcase)world.event('announce',0,0,duskLine(night, world),{moon:night.moon});}
+  if(before!==phase&&phase==='day'&&isVigil(world)&&!world.showcase&&moonOf(world)==='siege')world.event('announce',0,0,siegeWarning(world),{moon:'siege'});
   if(before!==phase&&phase==='night'){if(!world.showcase)startNight(world, night);armNextWave(world);}
   if(phase==='night'&&now>=world.nextSpawn){if(!world.showcase&&night.moon!=='new'&&night.moon!=='gilded'&&world.invaders().length<NIGHT_CAP)spawnWave(world);armNextWave(world);}
   if(phase==='night')stepMoon(world, dt, night);
   stepHunters(world, dt, night, phase==='night');
 }
 
-function duskLine(night){
+const heartfire=world=>world.buildings.find(b=>b.type==='hearth'&&b.hp>0)||null;
+/** Dawn before a siege: there is a day to get ready. */
+function siegeWarning(world){
+  return heartfire(world)?'An omen at dawn: tonight a siege moon rises, and the woods will march on your Heartfire. Make ready.'
+    :'An omen at dawn: tonight a siege moon rises. You keep no Heartfire, so the woods will hunt you instead.';
+}
+
+function duskLine(night, world){
+  const vigil=isVigil(world);
+  if(night.moon==='blood'&&vigil)return night.visit>1?'A blood moon rises. The Hollow King is hunting you again.':'A blood moon rises. Something is hunting you tonight.';
+  if(night.moon==='siege'&&!heartfire(world))return 'A siege moon rises. With no Heartfire to march on, the woods will hunt you.';
+  if(night.moon==='waxing'&&vigil)return 'A waxing moon rises. The woods will hunt you tonight.';
   if(night.moon==='blood')return night.visit>1?'A blood moon rises. The Hollow King is coming back.':'A blood moon rises. Something is coming for your fire.';
   if(night.moon==='new')return 'A new moon tonight. No raid, but the wilds grow dark.';
   if(night.moon==='gilded')return 'A gilded moon rises! Treasure runs loose in the dark tonight.';
   if(night.moon==='starrain')return 'The sky is restless. Stars will fall tonight.';
+  if(night.moon==='siege')return 'A siege moon rises. They are coming for your Heartfire.';
   return 'A waxing moon rises. The woods will come for the fire.';
 }
 
@@ -188,7 +242,7 @@ function startNight(world, night){
 /** Wave start times into the night for a moon, in seconds. */
 export function waveOffsets(moon, night=RULES.night){
   if(moon==='new'||moon==='gilded')return [];
-  if(moon==='blood')return BLOOD_WAVE_FRACTIONS.map(f=>f*night);
+  if(moon==='blood'||moon==='siege')return BLOOD_WAVE_FRACTIONS.map(f=>f*night);
   return remainingNightWaveOffsets(-1, night);
 }
 
@@ -204,21 +258,28 @@ export function armNextWave(world){
 
 export function spawnWave(world){
   // `day` is the night's number (its moon); `threat` how hard it hits: the days survived on an expedition, the Dread on a Vigil.
-  const day=dayOf(world),threat=isVigil(world)?Math.floor(threatOf(world)):day,humans=world.players.filter(p=>p.online).length;world.wave++;
-  const moon=moonOf(world, day),blood=moon==='blood';
-  let count=waveSize(threat, humans);const hearth=world.buildings.find(b=>b.type==='hearth')||{x:0,z:0};
-  // A blood moon's waves are bigger, but never push the crowd past what a phone can carry.
-  if(blood)count=Math.max(0,Math.min(Math.round(count*BLOOD.size),NIGHT_CAP-world.invaders().length));
+  const day=dayOf(world),threat=isVigil(world)?Math.floor(threatOf(world)):day,humans=world.players.filter(p=>p.online).length;
+  const moon=moonOf(world, day),blood=moon==='blood',siege=moon==='siege';
+  // Where the night comes from. An expedition's waves (and a Vigil's siege) march on the Heartfire. Otherwise a
+  // Vigil's waves hunt the wanderers wherever they are: each group finds one of them (mobs.mjs e.raid).
+  const fire=heartfire(world),hunts=isVigil(world)&&!(siege&&fire);
+  const anchors=hunts?world.players.filter(p=>p.online&&!p.down&&!p.ghost):[world.buildings.find(b=>b.type==='hearth')||{x:0,z:0}];
+  if(!anchors.length)return;
+  world.wave++;
+  let count=waveSize(threat, humans);
+  // A blood moon's (and a siege's) waves are bigger, but never push the crowd past what a phone can carry.
+  if(blood||siege)count=Math.max(0,Math.min(Math.round(count*(blood?BLOOD.size:SIEGE.size)),NIGHT_CAP-world.invaders().length));
   if(moon==='starrain')count=Math.max(1,Math.round(count*STARRAIN.waves));
   const roster=nightRoster(threat, ageOf(world));
   // The night comes from one to three directions at once, each a loose pack, so the camp is swarmed rather than trickled.
-  const groups=Math.min(3,1+Math.floor(count/8)),heading=[...Array(groups)].map(()=>world.rng()*Math.PI*2);
-  for(let i=0;i<count;i++){const a=heading[i%groups]+(world.rng()-.5)*.7,r=16+world.rng()*6;const type=i===0&&threat>=3&&day%2===1?'brute':pickWeighted(world.rng, roster);const lim=RULES.radius-4;const x=clamp(hearth.x+Math.cos(a)*r,-lim,lim),z=clamp(hearth.z+Math.sin(a)*r,-lim,lim);const at=onLand(world,x,z,hearth);world.spawnEnemy(type,at.x,at.z);}
+  // Hunting a party, there is at least one pack for each wanderer.
+  const packs=Math.min(3,1+Math.floor(count/8)),groups=hunts?Math.max(anchors.length,packs):packs,heading=[...Array(groups)].map(()=>world.rng()*Math.PI*2);
+  for(let i=0;i<count;i++){const g=i%groups,anchor=anchors[g%anchors.length];const a=heading[g]+(world.rng()-.5)*.7,r=16+world.rng()*6;const type=i===0&&threat>=3&&day%2===1?'brute':pickWeighted(world.rng, roster);const lim=RULES.radius-4;const x=clamp(anchor.x+Math.cos(a)*r,-lim,lim),z=clamp(anchor.z+Math.sin(a)*r,-lim,lim);const at=onLand(world,x,z,anchor);const e=world.spawnEnemy(type,at.x,at.z);if(e&&hunts)e.raid=true;}
   if(blood&&world.bossNight!==day&&!world.enemies.some(e=>e.type==='king')){
-    const visit=kingVisits(world, day);world.bossNight=day;world.bossSpawned=true;world.bossSlain=false;const at=onLand(world,hearth.x,hearth.z-19,hearth);world.spawnEnemy('king',at.x,at.z);
-    world.event('announce',0,0,visit<=1?'Blood moon. The Hollow King has found your fire.':`Blood moon. The Hollow King returns, stronger. Night ${day}.`,{moon});
+    const visit=kingVisits(world, day),anchor=anchors[0];world.bossNight=day;world.bossSpawned=true;world.bossSlain=false;const at=onLand(world,anchor.x,anchor.z-19,anchor);const king=world.spawnEnemy('king',at.x,at.z);if(king&&hunts)king.raid=true;
+    world.event('announce',0,0,hunts?(visit<=1?'Blood moon. The Hollow King has caught your scent.':`Blood moon. The Hollow King hunts you again, stronger. Night ${day}.`):visit<=1?'Blood moon. The Hollow King has found your fire.':`Blood moon. The Hollow King returns, stronger. Night ${day}.`,{moon});
   }
-  else world.event('announce',0,0,blood?`Night ${day} • the blood moon calls them all`:`Night ${day} • the woods are waking`,{moon});
+  else world.event('announce',0,0,siege?(hunts?`Night ${day} • the siege moon finds no fire, and hunts you`:`Night ${day} • the siege moon: they march on your Heartfire`):blood?`Night ${day} • the blood moon calls them all`:hunts?`Night ${day} • the woods are hunting you`:`Night ${day} • the woods are waking`,{moon});
 }
 
 /** A wave's spawn point pulled back toward the fire until it stands on walkable ground. */

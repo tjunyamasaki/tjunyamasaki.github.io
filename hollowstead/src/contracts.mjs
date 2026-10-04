@@ -129,9 +129,9 @@ export const FIRE_STATION_TYPES = Object.freeze(['hearth', 'fire']);
 export const FIELD_BUILD_RECIPES = Object.freeze(['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed', 'cart']);
 export const WORKBENCH_BUILD_RECIPES = Object.freeze([...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone']);
 /** Building on the grid (homestead.mjs gridWorld: the Vigil and the Homestead): walls, floors and soil a cell at a time. */
-export const GRID_FIELD_BUILD_RECIPES = Object.freeze(['fire', 'bench', 'chest', 'bed', 'trap', 'cart', 'till', 'plank', 'roughplank', 'fieldstone', 'fence', 'wall', 'gate']);
+export const GRID_FIELD_BUILD_RECIPES = Object.freeze(['hearth', 'fire', 'bench', 'chest', 'bed', 'trap', 'cart', 'glimmer', 'till', 'plank', 'roughplank', 'fieldstone', 'fence', 'wall', 'gate']);
 export const GRID_WORKBENCH_BUILD_RECIPES = Object.freeze([...GRID_FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone', 'boards', 'flagstone', 'cobble', 'slabs', 'stonewall', 'timberwall', 'masonwall']);
-export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack']);
+export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack', 'warpscroll']);
 export const FIRE_COOK_RECIPES = Object.freeze(['roast', 'roastMeat', 'roastCaps', 'loaf']);
 export const CAULDRON_COOK_RECIPES = Object.freeze(['stew', 'elixir', 'greaterelixir', 'moonbroth', 'tonic', 'tea', 'gloomstew', 'gourdsoup']);
 
@@ -152,7 +152,7 @@ export const MODE_PRECEDENCE = Object.freeze([
 ]);
 
 export const CONTEXT_ACTIONS = Object.freeze({
-  hearth: Object.freeze(['feed', 'cook', 'awaken', 'mend', 'repair']),
+  hearth: Object.freeze(['feed', 'home', 'cook', 'awaken', 'mend', 'repair']),
   fire: Object.freeze(['feed', 'cook', 'repair']),
   bench: Object.freeze(['craft', 'build', 'refine', 'repair']),
   pot: Object.freeze(['cook', 'repair']),

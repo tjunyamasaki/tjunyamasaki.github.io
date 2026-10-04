@@ -19,6 +19,7 @@
 import {ITEMS, RECIPES, RULES, STRUCTURES, NODES} from './content.mjs?v=harvest-18';
 import {stationLabel} from './interactions.mjs?v=harvest-18';
 import {hushReason} from './hush.mjs?v=harvest-18';
+import {hearthReason, kindleHearth, bankHearth} from './vigil.mjs?v=harvest-18';
 
 export const CELL = 1.5;
 export const MAX_CELLS = 48;
@@ -75,6 +76,9 @@ export const OBJECTS = Object.freeze({
   trap: {w: 1, h: 1, art: 1.56},
   ward: {w: 1, h: 1, art: .98},
   hushstone: {w: 1, h: 1, art: 1.49},
+  // The Vigil's home (vigil.mjs): the big fire takes four cells.
+  hearth: {w: 2, h: 2, art: 3.8},
+  glimmer: {w: 1, h: 1, art: 1.22},
 });
 export const OBJECT_TYPES = Object.freeze(Object.keys(OBJECTS));
 /** Art fills 88% of the footprint's width; small art grows a little, never past 1.12. */
@@ -167,6 +171,30 @@ export function objectAt(world, i, j){
   return world.buildings.find(b => b.foot && b.hp > 0 && i >= b.foot.i && i < b.foot.i + b.foot.w && j >= b.foot.j && j < b.foot.j + b.foot.h) || null;
 }
 
+/**
+ * True when something is built on the cell under (x, z), or on the cells within `r` of it: a floor or soil,
+ * a wall, or a camp object. Trees, rocks and the like never grow back there (World.tick), and nothing new
+ * (omens, thorns, night blooms) comes up on it.
+ */
+export function builtAt(world, x, z, r = 0){
+  if(!world) return false;
+  const cells = world.tiles?.cells;
+  const spots = r > 0 ? [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]] : [[0, 0]];
+  for(const [dx, dz] of spots){
+    const [i, j] = cellAt(x + dx, z + dz);
+    if(cells?.[keyOf(i, j)] || barrierAt(world, i, j) || objectAt(world, i, j)) return true;
+  }
+  return false;
+}
+/** Small wild things standing in a cell that was just built over (grass, mooncaps) wilt; they come back if it is cleared. */
+function bury(world, i, j, w = 1, h = 1){
+  for(const n of world.nodes || []){
+    if(n.ready || NODES[n.type]?.omen || NODES[n.type]?.landmark) continue;
+    const [a, b] = cellAt(n.x, n.z);
+    if(a >= i && a < i + w && b >= j && b < j + h){n.ready = (world.time || 0) + 1;n.hits = 0;}
+  }
+}
+
 /** The world's tile layer, made on first use. `rev` changes whenever any ground changes. */
 export function tilesOf(world){
   if(!world.tiles || typeof world.tiles !== 'object' || !world.tiles.cells) world.tiles = {rev: 0, cells: {}};
@@ -241,6 +269,8 @@ export function stepTiles(world, dt, phase){
 }
 
 const free = world => !!world.homestead?.free;
+/** The Heartfire can be taken down (and rebuilt elsewhere) only on the Vigil. */
+const hearthMoves = world => world.mode === 'vigil';
 function costOf(toolId){
   const tool = TOOLS[toolId];
   if(tool?.kind === 'plant') return {[CROPS[tool.crop].seed]: 1};
@@ -281,6 +311,7 @@ export function cellReason(world, p, toolId, i, j, {stationId = null} = {}){
     if(world.players.some(q => q.online && !q.ghost && Math.abs(q.x - fx) < w * CELL / 2 + .2 && Math.abs(q.z - fz) < h * CELL / 2 + .2)) return 'A wanderer is standing here';
     const why = blockedByThings(world, fx, fz, Math.min(w, h) * CELL * .45);if(why) return why;
     if(tool.type === 'hushstone' && hushReason(world)) return hushReason(world);
+    if(tool.type === 'hearth' && hearthReason(world)) return hearthReason(world);
     if(world.buildings.length >= BUILDING_LIMIT) return 'The camp has reached its structure limit';
   }else if(object && ['barrier', 'plant', 'harvest'].includes(tool.kind) || object && tool.ground === 'soil'){
     // Floors may run under furniture; soil, crops and walls may not.
@@ -290,6 +321,7 @@ export function cellReason(world, p, toolId, i, j, {stationId = null} = {}){
     if(tile?.crop) return 'Harvest or remove the crop first';
     if(tool.ground === 'soil' && barrier) return 'Something is built here';
     if(tool.ground === 'soil'){const why = blockedByThings(world, x, z, .3);if(why) return why;}
+    else if(world.nodes.some(n => !n.ready && (NODES[n.type]?.radius || 0) > .2 && Math.hypot(n.x - x, n.z - z) < NODES[n.type].radius + .3)) return 'Clear this spot first';
   }else if(tool.kind === 'barrier'){
     // Painting one barrier over another swaps it (a gate dropped into a fence line, a fence rebuilt in stone).
     if(barrier?.type === tool.type) return 'same';
@@ -308,7 +340,7 @@ export function cellReason(world, p, toolId, i, j, {stationId = null} = {}){
     return '';
   }else if(tool.kind === 'remove'){
     if(object && !barrier){
-      if(object.type === 'hearth' || object.fixed) return 'That stays';
+      if(object.fixed || (object.type === 'hearth' && !hearthMoves(world))) return 'That stays';
       if(world.chestSessions?.has(object.id)) return 'Someone has it open';
       if(tool.pieces && [object.store, object.overflow].some(c => c?.slots?.some(Boolean))) return 'Empty it first';
       return '';
@@ -376,6 +408,8 @@ function applyCell(world, p, toolId, i, j, rotation){
     const {w, h} = OBJECTS[tool.type], c = objectSpot(i, j, w, h);
     const b = world.structure(tool.type, c.x, c.z);
     Object.assign(b, {foot: {i, j, w, h}, scale: objectScale(tool.type)});
+    if(tool.type === 'hearth') kindleHearth(world, b);
+    bury(world, i, j, w, h);
     world.buildings.push(b);world.stats.built++;
     world.event('tile', c.x, c.z, '', {tool: toolId});world.event('build', c.x, c.z, STRUCTURES[tool.type]?.name || tool.type);
     return true;
@@ -383,13 +417,14 @@ function applyCell(world, p, toolId, i, j, rotation){
   if(tool.kind === 'ground'){
     if(tile?.g) refund(world, p, recipeCost(GROUNDS[tile.g].recipe));
     tiles.cells[key] = {g: tool.ground, crop: null, growth: 0};
-    tiles.rev++;
+    tiles.rev++;bury(world, i, j);
     world.event('tile', x, z, '', {tool: toolId});
   }else if(tool.kind === 'barrier'){
     if(barrier){refund(world, p, recipeCost(barrier.type), barrier);world.buildings = world.buildings.filter(b => b !== barrier);}
     world.gridRev = (world.gridRev || 0) + 1;
     const b = world.structure(tool.type, x, z);
     Object.assign(b, {grid: true, i, j, radius: BARRIERS[tool.type].radius, rotation: orient(world, tool.type, i, j, rotation | 0), open: false});
+    bury(world, i, j);
     world.buildings.push(b);world.stats.built++;
     world.event('tile', x, z, '', {tool: toolId});
   }else if(tool.kind === 'plant'){
@@ -404,6 +439,7 @@ function applyCell(world, p, toolId, i, j, rotation){
     let got = '';
     if(barrier || object){
       const gone = barrier || object;
+      if(gone.type === 'hearth') bankHearth(world, gone);
       got = refund(world, p, recipeCost(gone.type), gone);
       world.dropContainer?.(gone.store, gone.x, gone.z);
       if(gone.overflow) world.dropContainer?.(gone.overflow, gone.x, gone.z);

@@ -11,7 +11,7 @@ export const SOCKET_LABELS = Object.freeze({
 
 const OP_LABELS = Object.freeze({
   equip: 'Equip', unequip: 'Unequip', eat: 'Eat', heal: 'Heal', drop: 'Drop',
-  transfer: 'Transfer', take: 'Take', dismantle: 'Dismantle', use: 'Absorb',
+  transfer: 'Transfer', take: 'Take', dismantle: 'Dismantle', use: 'Absorb', read: 'Read',
 });
 
 export function adjustQuantity(total, current, op) {
@@ -80,6 +80,8 @@ export function operationsFor({itemId, where, chestOpen = false} = {}) {
   else if (where === 'pack' && item?.heal) ops.push('heal');
   // Keepsakes used up for good (a heartstone: +max health).
   else if (where === 'pack' && item?.boost) ops.push('use');
+  // A Homeward scroll (vigil.mjs WARP): read it to go home.
+  else if (where === 'pack' && item?.warp) ops.push('read');
   if (where !== 'chest') ops.push('drop');
   if (chestOpen) ops.push('transfer');
   else if ((where === 'pack' || where === 'equipment') && equipmentSlotFor(itemId)) ops.push('dismantle');

@@ -1,7 +1,7 @@
 import {slideMove, steer} from './pathing.mjs?v=harvest-18';
 import {dropLifetime} from './drops.mjs?v=harvest-18';
 import {RULES, PICKUP, ITEMS, EQUIPMENT, NODES, STRUCTURES, RECIPES, ENEMIES, CHARACTERS, phaseAt, dayAt, phaseOf, dayOf, label, nodeAwake} from './content.mjs?v=harvest-18';
-import {VIGIL, isVigil, noteBossKill, rekindle, sagaOf, stepSaga, threatOf, wakeAtFire} from './vigil.mjs?v=harvest-18';
+import {VIGIL, WARP, CENTER, bankHearth, besideHearth, hearthOf, isVigil, noteBossKill, rekindle, sagaOf, stepSaga, threatOf, wakeAtFire, wakeSpot} from './vigil.mjs?v=harvest-18';
 import {
   CLOCK_V2, DROP_LIFETIME_SECONDS, EQUIPMENT_SLOTS, SAVE_VERSION_V2, SPILL_LIFETIME_SECONDS,
   cloneContainer, cloneEquipment, cloneStack, collectLocations, countItem, createBackpack, createChest, createContainer,
@@ -29,7 +29,7 @@ import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
 import {stepMobs} from './mobs.mjs?v=harvest-18';
-import {applyTiles, carriedSeeds, cropTargets, gridWorld, refund, roomOfBuilding, setupHomestead, stepTiles, wildSeeds} from './homestead.mjs?v=harvest-18';
+import {applyTiles, builtAt, carriedSeeds, cropTargets, gridWorld, refund, roomOfBuilding, setupHomestead, stepTiles, wildSeeds} from './homestead.mjs?v=harvest-18';
 import {stepSleep} from './sleep.mjs?v=harvest-18';
 import {BUFF, buffed, giveBuff, stepBuffs} from './buffs.mjs?v=harvest-18';
 import {stepBlooms, wildNodes} from './nightbloom.mjs?v=harvest-18';
@@ -207,7 +207,8 @@ export class World {
     for(const key of ['frameObstacles','fieldBudget','obstacleCache','flowFields'])Object.defineProperty(this,key,{value:key==='flowFields'?new Map():null,writable:true,configurable:true,enumerable:false});
     const bare=this.showcase||options?.arena===true||options?.lab===true||!!options?.dungeon||options?.bare===true;
     this.nodes=bare?[]:makeMap(seed);
-    this.buildings=bare?[]:[this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
+    // A Vigil begins with no Heartfire (vigil.mjs): the Glimmerstone stands in the middle, where it used to burn.
+    this.buildings=bare?[]:[this.mode==='vigil'?Object.assign(this.structure('glimmer',CENTER.x,CENTER.z),{fixed:true,scale:1.5}):this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
     this.idCounter=1;this.eventId=0;this.wave=0;this.nextSpawn=0;this.kills=0;this.bossSlain=false;this.bossSpawned=false;this.endless=true;this.wipe=0;this.bossNight=0;this.roamTimer=ROAM.interval;this.guardsDay=0;this.projectiles=[];this.allies=[];this.zones=[];this.beats=[];this.best={day:1,level:1,loot:null,lootRank:-1};this.ambient=options?.ambient!==false;
     this.networkId=crypto.randomUUID();this.transactionRevision=0;this.chestSessions=new Map();this.night=null;
     this.harvestWork=new Map();this.reviveWork=new Map();this.activations=new Map();this.dismantleHolds=new Map();this.toolNoticeAt=new Map();this.damagedAt=new Map();this.pickupDwell=new Map();this.packNoticeAt=new Map();this.previewUid=1;
@@ -703,7 +704,7 @@ export class World {
         let stack=null;
         if(typeof cmd.uid==='string'){stack=p.inventory.slots.find(slot=>slot?.uid===cmd.uid)||null;if(!stack)return {ok:false,code:'unknownItem'};}
         if(!stack)return {ok:false,code:'unknownItem'};
-        const item=ITEMS[stack.itemId];if(!item||(!item.food&&!item.heal&&!item.boost&&!item.buff))return;
+        const item=ITEMS[stack.itemId];if(item?.warp)return this.beginWarp(p);if(!item||(!item.food&&!item.heal&&!item.boost&&!item.buff))return;
         const top=maxHealth(p);
         if(p.hunger>=100&&item.food&&p.hp>=top&&!item.buff){this.tell(p,'You are already full');return;}
         const consumed=planConsume({inventory:p.inventory, inventoryRevision:cmd.inventoryRevision, uid:stack.uid, quantity:1});
@@ -846,21 +847,59 @@ export class World {
     if(actionId==='dismantle')return this.beginDismantle(p, targetId, true);
     if(actionId==='repair')return this.action(p.id,{type:'repair',target:targetId});
     if(actionId==='awaken')return this.performUpgrade(p, targetId);
+    if(actionId==='home')return this.makeHome(p, building);
     if(actionId==='mend'){if(p.cooldown>.05)return {ok:false,code:'cooldown'};return mendWeapon(this, p, building);}
     if(actionId==='cook'||actionId==='craft'||actionId==='build'||actionId==='open'||actionId==='refine')return {ok:true,code:'ok'};
     return this.interact(p, targetId);
   }
+  /** A Vigil's Heartfire on the grid may be taken down and rebuilt elsewhere (vigil.mjs keeps its awakening). */
+  hearthMoves(b){return !!b?.foot&&isVigil(this);}
+  /** Make this Heartfire the wanderer's home (vigil.mjs wakeSpot): they wake beside it. Again to give it up. */
+  makeHome(p, hearth){
+    if(!isVigil(this)||hearth?.type!=='hearth')return {ok:false,code:'rejected'};
+    if(p.home===hearth.id){p.home=null;this.tell(p,'You will wake by the Glimmerstone again');return {ok:true,code:'ok'};}
+    p.home=hearth.id;p.cooldown=.4;
+    this.event('rekindle',hearth.x,hearth.z,'',{level:hearth.level,home:true});
+    this.tell(p,'This Heartfire is home now. You will wake beside it');
+    return {ok:true,code:'ok'};
+  }
+  /** Read a Homeward scroll (vigil.mjs WARP): hold still and it carries you to the Heartfire. Used up on arrival. */
+  beginWarp(p){
+    if(!isVigil(this)||this.arena){this.tell(p,'The scroll only knows the way home on a Vigil');return {ok:false,code:'rejected'};}
+    if(this.dungeon){this.tell(p,'The scroll cannot find home from down here');return {ok:false,code:'rejected'};}
+    if(!hearthOf(this)){this.tell(p,'You have no Heartfire to go home to. Build one first');return {ok:false,code:'rejected'};}
+    if(p.warp)return {ok:true,code:'ok'};
+    p.warp={at:this.time+WARP.cast,from:this.time,x:p.x,z:p.z};p.goal=null;p.rest=false;p.cooldown=.4;
+    this.event('warpcast',p.x,p.z,'',{player:p.id,cast:WARP.cast});this.tell(p,'Hold still…');
+    return {ok:true,code:'ok'};
+  }
+  stepWarp(p){
+    const w=p.warp,hurt=this.damagedAt.get(p.id);
+    if(Math.hypot(p.x-w.x,p.z-w.z)>WARP.still||(hurt!=null&&hurt>=w.from)||this.dungeon){p.warp=null;this.event('warpbreak',p.x,p.z,'',{player:p.id});this.tell(p,'The spell breaks');return;}
+    if(this.time<w.at)return;
+    p.warp=null;
+    const hearth=hearthOf(this),stack=p.inventory.slots.find(slot=>slot?.itemId==='warpscroll');
+    if(!hearth||!stack){this.tell(p,hearth?'The scroll is gone':'The Heartfire is gone');return;}
+    const used=planConsume({inventory:p.inventory, uid:stack.uid, quantity:1});if(!used.ok)return;
+    p.inventory.slots=used.slots;p.inventory.revision=used.revision;
+    releaseChests(this,p.id);
+    for(const b of this.buildings)if(b.type==='cart'&&b.towedBy===p.id)cartAction(this,p,{op:'release',cartId:b.id});
+    this.event('warp',p.x,p.z,'',{player:p.id});
+    const at=besideHearth(this,hearth);p.x=at.x;p.z=at.z;p.vx=p.vz=0;p.goal=null;
+    this.event('warp',p.x,p.z,'Home',{player:p.id,arrive:true});
+  }
   beginDismantle(p, targetId, holding){
     if(!holding){this.dismantleHolds.delete(p.id);return {ok:true,code:'ok'};}
     const building=this.buildings.find(b=>b.id===targetId&&b.hp>0&&distance(p,b)<4);
-    if(!building||building.type==='hearth'||building.fixed)return {ok:false,code:'rejected'};
+    if(!building||(building.type==='hearth'&&!this.hearthMoves(building))||building.fixed)return {ok:false,code:'rejected'};
     if(this.chestSessions.has(building.id))return {ok:false,code:'chestInUse'};
     const current=this.dismantleHolds.get(p.id);
     if(!current||current.buildingId!==building.id)this.dismantleHolds.set(p.id,{buildingId:building.id,elapsed:0});
     return {ok:true,code:'ok'};
   }
   finishDismantle(p, building){
-    if(!building||building.type==='hearth'||this.chestSessions.has(building.id))return;
+    if(!building||(building.type==='hearth'&&!this.hearthMoves(building))||this.chestSessions.has(building.id))return;
+    if(building.type==='hearth')bankHearth(this, building);
     // Grid pieces give back what they cost (homestead.mjs refund); the old free-placed camp keeps its half refund.
     if(building.grid||building.foot){const got=refund(this, p, RECIPES[building.type]?.cost||{}, building);if(got)this.event('loot',building.x,building.z,got);}
     else if(!this.homestead?.free)for(const [itemId, count] of Object.entries(RECIPES[building.type]?.cost||{}))this.give(p, itemId, Math.ceil(count*.5));
@@ -1576,7 +1615,11 @@ export class World {
       return;
     }const guarded=trinketEvent(this,p,'hurt',{amount,source});if(Number.isFinite(guarded))amount=guarded;if(!(amount>0))return;
     this.damagedAt.set(p.id,this.time);const armor=p.equipment.body;if(armor&&ARMOR_REDUCTION[armor.itemId]&&armor.durability>0){this.wearEquipped(p,'body',amount);amount*=1-ARMOR_REDUCTION[armor.itemId];}if(buffed(p,'warded'))amount*=BUFF.warded;amount=refineHurt(this,p,amount,source);p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
-  revivePlayer(p){p.down=0;p.ghost=false;p.hp=Math.round(maxHealth(p)/2);p.mendAfter=this.time+HEARTH_MEND.calm;p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}this.event('heal',p.x,p.z,'Back on your feet');}
+  revivePlayer(p){p.down=0;p.ghost=false;p.hp=Math.round(maxHealth(p)/2);p.mendAfter=this.time+HEARTH_MEND.calm;p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;p.warp=null;
+    // A Vigil wakes you at the Heartfire you made home, or by the Glimmerstone in the middle (vigil.mjs wakeSpot).
+    if(isVigil(this)&&!this.dungeon){const at=wakeSpot(this,p);p.x=at.x;p.z=at.z;}
+    else{const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}}
+    this.event('heal',p.x,p.z,'Back on your feet');}
   /** Strength of a new creature: by day survived (and region tier) on an expedition, by wave in the arena. */
   mobScale(tier=0){
     if(this.arena){const wave=Math.max(1,this.arena.wave||1);return {scale:arenaScale(wave),level:wave,elite:arenaEliteChance(wave),boss:1+.3*Math.max(0,Math.floor(wave/10)-1)};}
@@ -1685,13 +1728,15 @@ export class World {
     for(const p of this.players)this.fitPack(p);
     stepSaga(this,dt);stepAges(this,dt,before,phase);stepNight(this,dt,before,phase);stepBlooms(this,before,phase);stepSleep(this);stepSunburn(this,dt,phase);
     this.maintainGuards();this.roam(dt,phase);stepAreas(this,dt,phase);stepOmens(this,dt);
-    for(const n of this.nodes)if(n.ready&&n.ready<this.time){n.ready=0;n.hits=NODES[n.type].hits;}
+    // Nothing grows back through a floor, soil, a wall or a camp object (homestead.mjs builtAt): it waits until the cell is cleared.
+    for(const n of this.nodes)if(n.ready&&n.ready<this.time){if(this.tiles&&builtAt(this,n.x,n.z,NODES[n.type].radius||0)){n.ready=this.time+20;continue;}n.ready=0;n.hits=NODES[n.type].hits;}
     }
     const obstacles=this.obstacles();
     for(const p of this.players){
       if(!p.online)continue;p.cooldown=Math.max(0,p.cooldown-dt);this.tickDash(p,dt);p.iframes=Math.max(0,(p.iframes||0)-dt);
-      if(p.ghost){p.dash=0;continue;}
-      if(p.down){p.dash=0;p.down-=dt;if(p.down<=0){p.down=0;p.ghost=true;p.revive=0;this.reviveWork.delete(p.id);
+      if(p.ghost){p.dash=0;p.warp=null;continue;}
+      if(p.warp&&!p.down)this.stepWarp(p);
+      if(p.down){p.dash=0;p.warp=null;p.down-=dt;if(p.down<=0){p.down=0;p.ghost=true;p.revive=0;this.reviveWork.delete(p.id);
         // Down in a dungeon a fallen wanderer keeps their pack: they rise when the Warden falls, or at the next stairs.
         if(this.dungeon)this.event('announce',p.x,p.z,`${p.name} will rise when the Warden falls`);
         else{this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}}continue;}

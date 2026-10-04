@@ -59,8 +59,9 @@ export function contextActionIds(kind){
   return CONTEXT_ACTIONS[kind]?[...CONTEXT_ACTIONS[kind]]:[];
 }
 
-export function dismantleRule(type, locked){
-  if(type==='hearth')return {ok:false, code:'rejected', hold:DISMANTLE_HOLD_SECONDS};
+/** `movable`: a Vigil's Heartfire on the grid, which can be taken down and rebuilt elsewhere (vigil.mjs). */
+export function dismantleRule(type, locked, {movable=false}={}){
+  if(type==='hearth'&&!movable)return {ok:false, code:'rejected', hold:DISMANTLE_HOLD_SECONDS};
   if(locked)return {ok:false, code:'chestInUse', hold:DISMANTLE_HOLD_SECONDS};
   return {ok:true, code:'ok', hold:DISMANTLE_HOLD_SECONDS};
 }

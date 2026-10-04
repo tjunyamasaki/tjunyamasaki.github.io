@@ -56,7 +56,7 @@ test('the moon is fixed by the seed and the night, and lands near 60/30/10 new/w
   assert.ok(share('blood')>.06&&share('blood')<.14, `blood ${share('blood')}`);
   assert.ok(share('gilded')>.03&&share('gilded')<.09, `gilded ${share('gilded')}`);
   assert.ok(share('starrain')>.03&&share('starrain')<.09, `starrain ${share('starrain')}`);
-  assert.deepEqual(Object.keys(MOONS).sort(), ['blood', 'gilded', 'new', 'starrain', 'waxing']);
+  assert.deepEqual(Object.keys(MOONS).sort(), ['blood', 'gilded', 'new', 'siege', 'starrain', 'waxing']);
 });
 
 test('nights 1-2 are waxing; no blood moon before night 4 or twice running; one comes at least every MOON_RULES.pity nights', () => {

@@ -1,12 +1,13 @@
 // The Reaper's scythe, drawn. Presentation only: the host owns Doom, the reaping and the souls
 // (src/reaper.mjs). The shade of Death floats behind the wielder (a rig): a hooded robe with a tattered hem,
-// a skull in the dark of the cowl, bony hands on a long snath whose hooked blade looms over the wielder, and
-// the souls it has taken circling its hood as little comets. It grows with every soul. Each swing is its scythe sweeping round; Doom shows as tally hooks over a foe, and a foe
-// that can be reaped has its soul already leaning out of it, eyes red.
+// an empty cowl, bony hands on a long snath whose hooked blade looms over the wielder, and the souls it has
+// taken circling its hood as little comets. It grows with every soul. Each swing is its scythe sweeping
+// round; Doom shows as tally hooks over a foe, and a foe that can be reaped has its soul already leaning out
+// of it, eyes red.
 //
-// Rank ladder: ★1 the shade, the sweep, marks and souls; ★2 glowing eyes and souls, a halo under the
+// Rank ladder: ★1 the shade, the sweep, marks and souls; ★2 glowing souls, a halo under the
 // shade, a lit edge on the sweep; ★3 tattered hem streamers, sparks, a blood moon on Last Harvest; ★4 a
-// sigil under a full shade, an afterimage of the sweep, camera kick; ★5 blood-red eyes and blade edge at
+// sigil under a full shade, an afterimage of the sweep, camera kick; ★5 a blood-red blade edge and souls at
 // five souls, a flash on the great reap.
 import {INK, TAU, at, bump, clamp01, easeIn, easeOut, fade, hue, lerp, rnd, tier} from './kit.mjs?v=harvest-18';
 import {DOOM, doomOf, reapable} from '../reaper.mjs?v=harvest-18';
@@ -15,7 +16,7 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
 const PACK = 'scythe';
 const P = hue(PACK);
 const CLOAK = '#1f2e30', CLOAK_LIGHT = '#34494b', VOID = '#040808', BONE = '#ddd5c2', BLADE = '#e2faf2', BLOOD = '#ff3c4c', SOUL = '#e8fff8';
-const INKD = '#0b1515', SLEEVE = '#26393b', STEEL = '#b4cbc5', STEEL_DARK = '#5f7874', WOOD = '#3d3036', WOOD_LIGHT = '#6a5560';
+const INKD = '#0b1515', VOID_EDGE = '#0a1213', SLEEVE = '#26393b', STEEL = '#b4cbc5', STEEL_DARK = '#5f7874', WOOD = '#3d3036', WOOD_LIGHT = '#6a5560';
 const rankOfOwner = p => p && typeof p === 'object' ? rankOf(p, PACK) : 1;
 
 // ------------------------------------------------------------------ pieces
@@ -59,10 +60,10 @@ function bladeShape(heel, dir, len, width, turn){
 }
 
 /**
- * The shade of Death at (x, z), floating on y0, size `s`: a hooded robe that ripples and tatters, a skull in
- * the dark of the hood, bony hands on a long snath and a hooked blade looming forward over the wielder.
+ * The shade of Death at (x, z), floating on y0, size `s`: a hooded robe that ripples and tatters, an empty
+ * hood with only dark inside, bony hands on a long snath and a hooked blade looming forward over the wielder.
  * `raise` 0..1 lifts the scythe back over its head, `hide` 0..1 hides the scythe (while a sweep draws it),
- * `blood` turns its eyes and edge red.
+ * `blood` turns its blade edge red.
  */
 function shade(d, x, z, y0, s, {raise = 0, hide = 0, blood = 0, T = tier(1), clock = 0, seed = 0, side = 1, drift = 0} = {}){
   const q = (u, v) => at(x, z, y0, u*s*side, v*s), Q = ([u, v]) => q(u, v);
@@ -155,7 +156,7 @@ function shade(d, x, z, y0, s, {raise = 0, hide = 0, blood = 0, T = tier(1), clo
     }
   }
 
-  // The hood: a deep cowl with a peak falling back, dark inside, a skull looking out of the dark.
+  // The hood: a deep cowl with a peak falling back, and nothing in it but the dark.
   const hc = [-.01, 1.66], hood = [], ink = [];
   for(let i = 0; i < 20; i++){
     const a = -Math.PI/2+i/20*TAU, c = Math.cos(a), sn = Math.sin(a);
@@ -166,25 +167,18 @@ function shade(d, x, z, y0, s, {raise = 0, hide = 0, blood = 0, T = tier(1), clo
   d.path(blob(q(...hc), ink), 0, INKD, 1, {fill: true});
   d.path(blob(q(...hc), hood.map(Q)), 0, CLOAK, 1, {fill: true});
   d.path(hood.slice(15, 20).concat(hood.slice(0, 3)).map(([u, v]) => q(u-.01, v)), .035*s, CLOAK_LIGHT, .9);
-  const fc = [.07, 1.61], face = [];
-  for(let i = 0; i < 14; i++){const a = i/14*TAU; face.push(q(fc[0]+Math.cos(a)*.15, fc[1]+Math.sin(a)*(Math.sin(a) > 0 ? .17 : .15)));}
-  d.path(blob(q(...fc), face), 0, VOID, 1, {fill: true});
-  // The skull: a pale dome, the jaw narrower, sockets and a nose in shadow, a row of teeth.
-  const sc = [.095, 1.585], skull = [];
-  for(let i = 0; i < 16; i++){const a = i/16*TAU, sn = Math.sin(a); skull.push(q(sc[0]+Math.cos(a)*.1*(sn < 0 ? .78 : 1), sc[1]+sn*(sn < 0 ? .11 : .1)));}
-  d.path(blob(q(...sc), skull), 0, BONE, 1, {fill: true});
-  const lid = []; for(let i = 0; i <= 8; i++){const a = Math.PI*(.05+.9*i/8); lid.push(q(sc[0]+Math.cos(a)*.115, sc[1]+.02+Math.sin(a)*.1));}
-  d.path(lid, .05*s, VOID, .85);
-  const eye = blood > .5 ? BLOOD : P.main, flick = .85+.15*Math.sin(clock*7+seed);
-  for(const u of [-.04, .04]){
-    const e = q(sc[0]+u, sc[1]+.005);
-    d.orb(e[0], e[2], e[1], .034*s, VOID, 1);
-    d.orb(e[0], e[2], e[1], .016*s, eye, flick);
-    if(T.glow) d.bloom(e[0], e[2], e[1], .09*s, blood > .5 ? BLOOD : P.glow, .6*flick);
+  // Nothing inside: the opening is a well of dark, deepest at its back, with the cowl's lip shading its top.
+  const fc = [.07, 1.61], face = [], deep = [];
+  for(let i = 0; i < 14; i++){
+    const a = i/14*TAU, c = Math.cos(a), sn = Math.sin(a);
+    const arch = 1-.4*Math.max(0, sn)**2;  // the opening narrows to a soft point at the top, like a cowl's
+    face.push(q(fc[0]+c*.15*arch, fc[1]+sn*(sn > 0 ? .19 : .15)));
+    deep.push(q(fc[0]-.015+c*.095*arch, fc[1]+.015+sn*(sn > 0 ? .12 : .1)));
   }
-  const nose = q(sc[0], sc[1]-.045); d.orb(nose[0], nose[2], nose[1], .012*s, VOID, .9);
-  d.path([q(sc[0]-.045, sc[1]-.078), q(sc[0]+.045, sc[1]-.078)], .012*s, VOID, .7);
-  for(const u of [-.022, 0, .022]) d.path([q(sc[0]+u, sc[1]-.064), q(sc[0]+u, sc[1]-.092)], .008*s, VOID, .7);
+  d.path(blob(q(...fc), face), 0, VOID_EDGE, 1, {fill: true});
+  d.path(blob(q(fc[0]-.015, fc[1]+.015), deep), 0, VOID, 1, {fill: true});
+  const lip = []; for(let i = 0; i <= 8; i++){const a = Math.PI*(.08+.84*i/8); const sn = Math.sin(a), arch = 1-.4*sn*sn; lip.push(q(fc[0]+Math.cos(a)*.15*arch, fc[1]+.005+sn*.185));}
+  d.path(lip, .045*s, INKD, .9);
 }
 
 // ------------------------------------------------------------------ the rig: Death behind you

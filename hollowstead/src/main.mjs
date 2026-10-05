@@ -85,8 +85,14 @@ const checkForUpdate=createUpdateChecker({canReload:()=>mode==='front'&&!busy&&!
 function profile(){try{return JSON.parse(localStorage.getItem(PROFILE)||'{}');}catch{return {};}}
 function readStored(key){try{const raw=localStorage.getItem(key);if(!raw)return null;const data=JSON.parse(raw);return data&&typeof data==='object'?data:{invalid:true};}catch{return {invalid:true};}}
 function continuePlan(){return planContinue({v2:readStored(SAVE_KEYS.expeditionV2),v1:readStored(SAVE_KEYS.expeditionV1)});}
-/** The Vigil's own slot (SAVE_KEYS.vigil): read like an expedition save, never shared with one. */
-function vigilPlan(){const doc=readStored(SAVE_KEYS.vigil);return doc?planContinue({v2:doc,v1:null}):{ok:false,code:'none',message:'No vigil is kept on this browser.'};}
+/** Vigil save slots. Slot 1 is the original key (SAVE_KEYS.vigil), so a vigil kept before slots existed stays where it was; the others sit beside it. Never shared with an expedition. */
+const VIGIL_SLOTS=3;
+function vigilKey(slot=vigilSlot){return slot>1?`${SAVE_KEYS.vigil}.slot${slot}`:SAVE_KEYS.vigil;}
+/** The slot picked on the Vigil panel (remembered), and the key the vigil being played writes to (fixed when it starts). */
+let vigilSlot=1,playingVigilKey=SAVE_KEYS.vigil;
+try{const kept=Number(localStorage.getItem('hollowstead.vigilSlot'));if(Number.isInteger(kept)&&kept>=1&&kept<=VIGIL_SLOTS)vigilSlot=kept;}catch{}
+/** A slot's save, read like an expedition save. */
+function vigilPlan(key=vigilKey()){const doc=readStored(key);return doc?planContinue({v2:doc,v1:null}):{ok:false,code:'none',message:'No vigil is kept in this slot.'};}
 function storeProfile(){try{localStorage.setItem(PROFILE,JSON.stringify({name:$('player-name').value,character,sound:sound.enabled,autoAttack,healPick}));}catch{}}
 /** Title screen: one panel at a time on the right (modes, expedition, join, dungeons, vigil, waiting camp). */
 const FRONT_PANELS=['home-panel','expedition-panel','join-panel','dungeon-panel','vigil-panel','room-panel'];
@@ -163,7 +169,7 @@ function maintainChest(){
 function isRun(w){return !!(w?.dungeon&&!w.surface);}
 function save(manual=false){if(world?.showcase||world?.arena||isRun(world)){if(manual)toast(world.dungeon?'Dungeon runs are not saved':world.arena?'Arena runs are not saved':world.homestead?'The homestead sandbox is not saved':'Showcase stays on this screen');return;}if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;
   // A Vigil writes only to its own slot; an expedition never touches it.
-  const vigil=world.mode==='vigil',key=vigil?SAVE_KEYS.vigil:SAVE_KEYS.expeditionV2;
+  const vigil=world.mode==='vigil',key=vigil?playingVigilKey:SAVE_KEYS.expeditionV2;
   try{localStorage.setItem(key,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));saveText=vigil?'Vigil kept on this browser':'Saved on this browser';if(manual)toast(vigil?'Vigil saved':'Expedition saved');dirty=true;}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
 function syncSaveOption(){const plan=continuePlan(),visible=!!(plan.ok||plan.recoverable);$('continue').hidden=!visible;$('saved-option').hidden=!visible;const badge=$('expedition-badge');if(badge)badge.hidden=!visible;$('solo').classList.toggle('primary',!visible);}
 function resetInput(){keys.clear();stick={x:0,z:0};hold={act:false,attack:false};pointer=null;const stickEl=$('stick');if(stickEl)stickEl.style.transform='';const player=world?.player(localId);if(player)world.input(localId,{x:0,z:0,act:false,attack:false});network?.input({x:0,z:0,act:false,attack:false});}
@@ -270,8 +276,9 @@ async function runMulti(op){
 function refresh(){dirty=true;ui();}
 function discardPanel(){inventoryPanel?.destroy();inventoryPanel=null;}
 function prepareWorld(resume=false,dungeon=null,vigil=null){
-  if(vigil==='resume'){const plan=vigilPlan();if(!plan.ok)throw new Error(plan.message);const resumed=World.fromSave(plan.save);if(plan.write==='v2')localStorage.setItem(SAVE_KEYS.vigil,JSON.stringify(plan.save));world=resumed;world.mode='vigil';world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This vigil is missing its keeper.');p.online=true;if(world.status!=='playing')world.status='playing';}
-  else if(vigil==='new'){if(readStored(SAVE_KEYS.vigil))throw new Error('A vigil is already kept on this browser. End it first to begin another.');world=new World(undefined,{mode:'vigil',land:vigilLand});world.addPlayer('host',$('player-name').value,character);}
+  if(vigil)playingVigilKey=vigilKey();
+  if(vigil==='resume'){const plan=vigilPlan(playingVigilKey);if(!plan.ok)throw new Error(plan.message);const resumed=World.fromSave(plan.save);if(plan.write==='v2')localStorage.setItem(playingVigilKey,JSON.stringify(plan.save));world=resumed;world.mode='vigil';world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This vigil is missing its keeper.');p.online=true;if(world.status!=='playing')world.status='playing';}
+  else if(vigil==='new'){if(readStored(playingVigilKey))throw new Error('A vigil is already kept in this slot. End it first, or pick another slot.');world=new World(undefined,{mode:'vigil',land:vigilLand});world.addPlayer('host',$('player-name').value,character);}
   else if(dungeon){world=new World((Math.random()*0xffffffff)>>>0,{dungeon});world.addPlayer('host',$('player-name').value,character);}
   else if(resume){const plan=continuePlan();if(!plan.ok)throw new Error(plan.message);const resumed=World.fromSave(plan.save);if(plan.write==='v2')localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify(plan.save));world=resumed;world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This saved expedition is missing its host.');p.online=true;if(world.status!=='playing')world.status='playing';}
   else{world=new World();world.addPlayer('host',$('player-name').value,character);}
@@ -319,8 +326,31 @@ function showVigilPanel(open){
   showFrontPanel(open?'vigil-panel':'home-panel');vigilConfirm=0;
   if(open)paintVigilPanel();
 }
+/** One line about a kept vigil (title-screen hint and slot buttons). */
+function vigilSummary(doc){const w=doc.world||{},day=Math.floor((Math.max(0,(w.time||0)-(w.below||0)))/430)+1,dread=Math.floor(w.saga?.dread||1),age=AGES[ageFromDread(dread)];return `Day ${day} · dread ${dread}${age.numeral?` · ${age.name}`:''}`;}
+function pickVigilSlot(slot){
+  if(!(slot>=1&&slot<=VIGIL_SLOTS)||slot===vigilSlot)return;
+  vigilSlot=slot;try{localStorage.setItem('hollowstead.vigilSlot',String(slot));}catch{}
+  if(vigilConfirm){clearTimeout(vigilConfirm);vigilConfirm=0;}
+  paintVigilPanel();syncVigilHint();
+}
+/** The first slot with nothing in it, or 0. */
+function emptyVigilSlot(){for(let i=1;i<=VIGIL_SLOTS;i++)if(!readStored(vigilKey(i)))return i;return 0;}
+/** Copies the picked slot's save into the first empty slot and picks the copy, so a vigil can be tried out without risking the original. */
+function copyVigil(){
+  if(busy)return;const raw=(()=>{try{return localStorage.getItem(vigilKey());}catch{return null;}})(),to=emptyVigilSlot();if(!raw||!to)return;
+  try{localStorage.setItem(vigilKey(to),raw);}catch{showStatus('There is no room on this browser to copy the vigil.',true);return;}
+  const from=vigilSlot;pickVigilSlot(to);showStatus(`Slot ${from} copied into slot ${to}.`);
+}
+function paintVigilSlots(){
+  $('vigil-slots').innerHTML=Array.from({length:VIGIL_SLOTS},(_,i)=>{const slot=i+1,doc=readStored(vigilKey(slot)),w=doc?.world,land=w?.land&&LANDS[w.land]?LANDS[w.land].name:'';
+    const line=!doc?'Empty':doc.invalid?'Unreadable':`${vigilSummary(doc)}${land?` · ${land}`:''}`;
+    return `<button type="button" class="vigil-slot${doc?'':' vigil-slot--empty'}" data-slot="${slot}" aria-pressed="${slot===vigilSlot}"><b>Slot ${slot}</b><small>${escapeHtml(line)}</small></button>`;}).join('');
+}
 function paintVigilPanel(){
-  const doc=readStored(SAVE_KEYS.vigil),plan=doc?vigilPlan():null,kept=!!doc;
+  paintVigilSlots();
+  const doc=readStored(vigilKey()),plan=doc?vigilPlan():null,kept=!!doc;
+  const to=kept&&plan?.ok?emptyVigilSlot():0,copy=$('vigil-copy');copy.hidden=!to;if(to)copy.textContent=`Copy to slot ${to}`;
   const del=$('vigil-delete');del.hidden=!kept;del.classList.toggle('confirming',vigilConfirm>0);del.textContent=vigilConfirm>0?'Tap again to end it forever':'End this vigil…';
   $('vigil-solo').innerHTML=kept?'Continue the vigil <span>→</span>':'Begin the vigil <span>→</span>';
   $('vigil-host').innerHTML=kept?'Keep it with friends <span>↗</span>':'Begin with friends <span>↗</span>';
@@ -335,13 +365,13 @@ function paintVigilPanel(){
   $('vigil-save').innerHTML=`<b>${escapeHtml(host?.name||'Wanderer')}’s vigil</b>Kept on this browser${when?` · last ${escapeHtml(when)}`:''}${w.land&&LANDS[w.land]?` · ${escapeHtml(LANDS[w.land].name)}`:''}${w.dungeon?' · resting in a delve':''}<div class="vigil-stats"><span><b>${day}</b>DAY</span><span><b>${dread}</b>DREAD</span><span><b>${AGES[ageFromDread(dread)].numeral||'–'}</b>AGE</span><span><b>${host?.level||1}</b>LEVEL</span><span><b>${bosses}</b>BOSSES</span><span><b>${w.omensDone||0}</b>OMENS</span></div>`;
 }
 function deleteVigil(){
-  if(!readStored(SAVE_KEYS.vigil))return;
+  if(!readStored(vigilKey()))return;
   if(!vigilConfirm){vigilConfirm=setTimeout(()=>{vigilConfirm=0;paintVigilPanel();},4000);paintVigilPanel();return;}
   clearTimeout(vigilConfirm);vigilConfirm=0;
-  try{localStorage.removeItem(SAVE_KEYS.vigil);}catch{}
+  try{localStorage.removeItem(vigilKey());}catch{}
   showStatus('The vigil is over. Its fire is out.');paintVigilPanel();syncVigilHint();
 }
-function syncVigilHint(){const doc=readStored(SAVE_KEYS.vigil),hint=$('vigil-hint');if(!hint)return;if(!doc){hint.textContent='Endless save';return;}const w=doc.world||{},day=Math.floor((Math.max(0,(w.time||0)-(w.below||0)))/430)+1,dread=Math.floor(w.saga?.dread||1),age=AGES[ageFromDread(dread)];hint.textContent=`Day ${day} · dread ${dread}${age.numeral?` · ${age.name}`:''}`;}
+function syncVigilHint(){const hint=$('vigil-hint');if(!hint)return;let kept=0;for(let i=1;i<=VIGIL_SLOTS;i++)if(readStored(vigilKey(i)))kept++;const doc=readStored(vigilKey()),slot=kept>1||vigilSlot>1?`Slot ${vigilSlot} · `:'';hint.textContent=!doc?(slot?`${slot}empty`:'Endless save'):doc.invalid?`${slot}unreadable`:slot+vigilSummary(doc);}
 /** The Dread Age a saved vigil stands in (ages.mjs), read straight from its Dread. */
 function ageFromDread(dread){let age=0;for(let i=1;i<AGES.length;i++)if(dread>=AGES[i].at)age=i;return age;}
 function showShowcase(open){
@@ -1293,7 +1323,7 @@ function setupControls(){
   $('looks').onclick=e=>{const b=e.target.closest('[data-look]');if(!b)return;pickWanderer(baseOf(character),b.dataset.look);};
   $('mode-expedition').onclick=()=>{if(!busy){syncSaveOption();showFrontPanel('expedition-panel');}};$('expedition-back').onclick=()=>showFrontPanel('home-panel');
   $('mode-join').onclick=()=>{if(!busy){showFrontPanel('join-panel');$('room-input').focus();}};$('join-back').onclick=()=>showFrontPanel('home-panel');
-  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('homestead').onclick=()=>{if(!busy)startHomestead();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-lands').onclick=e=>{const b=e.target.closest('[data-land]');if(!b||busy)return;vigilLand=b.dataset.land;try{localStorage.setItem('hollowstead.vigilLand',vigilLand);}catch{}for(const el of $('vigil-lands').children)el.setAttribute('aria-pressed',String(el===b));};$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(SAVE_KEYS.vigil)?'resume':'new');};$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
+  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('homestead').onclick=()=>{if(!busy)startHomestead();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-lands').onclick=e=>{const b=e.target.closest('[data-land]');if(!b||busy)return;vigilLand=b.dataset.land;try{localStorage.setItem('hollowstead.vigilLand',vigilLand);}catch{}for(const el of $('vigil-lands').children)el.setAttribute('aria-pressed',String(el===b));};$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(vigilKey())?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(vigilKey())?'resume':'new');};$('vigil-slots').onclick=e=>{const b=e.target.closest('[data-slot]');if(b&&!busy)pickVigilSlot(Number(b.dataset.slot));};$('vigil-copy').onclick=copyVigil;$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;syncSoundButton();sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   // Pack, Build and Light answer on release over the same button (pointer events, so a held joystick does not swallow the tap).

@@ -92,6 +92,16 @@
 #front .vigil-land--yomi[aria-pressed="true"]{border-color:#eba7b8;background:#eba7b81a;box-shadow:inset 0 0 0 1px #eba7b855}
 #front .vigil-land--yomi b::after{content:' ⛩';font-family:system-ui,sans-serif}
 #front .vigil-delete{align-self:flex-start;min-height:32px;padding:4px 0}
+/* Vigil save slots: slot 1 is the original save, the others sit beside it. */
+#front .vigil-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0}
+#front .vigil-slot{min-width:0;text-align:left;padding:6px 10px;border:1px solid var(--border,#dac29a28);border-radius:12px;background:#ffffff08;color:inherit;font:inherit;cursor:pointer}
+#front .vigil-slot b{display:block;font:600 12px/1.2 Georgia,serif;letter-spacing:.2px}
+#front .vigil-slot small{display:block;margin-top:2px;font-size:10px;line-height:1.3;color:var(--muted,#b9ac99);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#front .vigil-slot--empty small{font-style:italic;opacity:.7}
+#front .vigil-slot[aria-pressed="true"]{border-color:#cdbdf5;background:#cdbdf514;box-shadow:inset 0 0 0 1px #cdbdf555}
+#front .vigil-tools{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center}
+#front .vigil-tools:not(:has(button:not([hidden]))){display:none}
+#front .vigil-copy{min-height:32px;padding:4px 0}
 #front .room-code{margin:0;padding:10px;border-radius:12px}
 #front #roster{margin:0}
 #front #room-note{margin:0}

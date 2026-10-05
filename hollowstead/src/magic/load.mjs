@@ -13,6 +13,7 @@ const SPECS = [
   'hollow-moon.mjs',
   'thornheart.mjs',
   'deepeye.mjs',
+  'katana.mjs',
 ];
 
 export async function loadMagicModules(){

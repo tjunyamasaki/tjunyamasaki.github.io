@@ -244,6 +244,10 @@ export const ENEMIES = {
   golem:{name:'Moonshard golem',hp:320,speed:1.05*SPEED_SCALE,damage:72,range:2.7,period:3,loot:{shard:2,stone:2}},
   // Dread Ages (ages.mjs): from the Age of the Hunt a Vigil's nights and roaming packs bring dreadhounds.
   dreadhound:{name:'Dreadhound',hp:40,speed:6.2,damage:16,range:4.6,period:1.7,loot:{bone:1}},
+  // The Shrine of Yomi (a Vigil land): paper-lantern ghosts that hop in packs and lash with a long tongue,
+  // and hopping corpses that leap at you arms first.
+  chochin:{name:'Chōchin-obake',hp:22,speed:4.4,damage:12,range:1.9,period:1.35,loot:{fiber:1}},
+  jiangshi:{name:'Jiangshi',hp:64,speed:2.9*SPEED_SCALE,damage:22,range:4.2,period:2.2,loot:{bone:1}},
   // The great bosses (bosses.mjs): Mother Briar on her throne, The Unblinking at the bottom of a delve.
   briarmother:{name:'Mother Briar',hp:2400,speed:1.55*SPEED_SCALE,damage:58,range:4.2,period:2.1,boss:true,loot:{ember:12}},
   unblinking:{name:'The Unblinking',hp:2200,speed:1.1*SPEED_SCALE,damage:62,range:6,period:2,boss:true,loot:{ember:14}},

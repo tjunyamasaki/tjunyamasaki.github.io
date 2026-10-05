@@ -23,7 +23,8 @@
     "ashscar": "#4d4340",
     "briarlair": "#4f5c3c",
     "ice": "#b4d3e2",
-    "lava": "#e8662a"
+    "lava": "#e8662a",
+    "yomi": "#7a7062"
   },
   "lighting": {
     "ambientNight": 0.2,
@@ -5530,6 +5531,307 @@
         }
       },
       "icon": "./sprites/sigil-icon.svg?v=dread1"
+    },
+    "chochin": {
+      "src": "./sprites/chochin.svg?v=yomi1",
+      "size": [
+        2.0,
+        3.0
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 7
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 6
+        }
+      }
+    },
+    "jiangshi": {
+      "src": "./sprites/jiangshi.svg?v=yomi1",
+      "size": [
+        2.5,
+        3.75
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 6
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 6
+        }
+      }
+    },
+    "yomi-tree": {
+      "src": "./sprites/sakura.svg?v=yomi1",
+      "size": [
+        4.92,
+        7.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "variants": [
+        "sakura",
+        "sakura",
+        "matsu"
+      ]
+    },
+    "sakura": {
+      "src": "./sprites/sakura.svg?v=yomi1",
+      "size": [
+        4.92,
+        7.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "matsu": {
+      "src": "./sprites/matsu.svg?v=yomi1",
+      "size": [
+        4.92,
+        7.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "yomi-rock": {
+      "src": "./sprites/yomi-rock.svg?v=yomi1",
+      "size": [
+        2.8,
+        4.2
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "variants": [
+        "yomi-rock",
+        "yomi-rock",
+        "yomi-rock-b"
+      ]
+    },
+    "yomi-rock-b": {
+      "src": "./sprites/yomi-rock-b.svg?v=yomi1",
+      "size": [
+        2.8,
+        4.2
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "toro": {
+      "src": "./sprites/toro.svg?v=yomi1",
+      "size": [
+        1.9,
+        2.85
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        }
+      }
+    },
+    "torii": {
+      "src": "./sprites/torii.svg?v=yomi1",
+      "size": [
+        3.4,
+        5.1
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "jizo": {
+      "src": "./sprites/jizo.svg?v=yomi1",
+      "size": [
+        1.5,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "grip-katana": {
+      "src": "./sprites/grip-katana.svg?v=yomi1",
+      "size": [
+        2.25,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.21875
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "held-katana": {
+      "src": "../../assets/magic/katana/item.svg?v=yomi1",
+      "size": [
+        1.4,
+        2.1
+      ],
+      "anchor": [
+        0.5,
+        0.14
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
     }
   },
   "motion": {

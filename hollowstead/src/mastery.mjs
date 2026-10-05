@@ -62,7 +62,7 @@ const NAME_TAILS = Object.freeze({
 });
 /** What each kind of foe is called in a weapon's title. */
 const FOES = Object.freeze({crawler: 'Briarlings', wraith: 'Wraiths', brute: 'Gravekeepers', bonewalker: 'Bonewalkers', bogling: 'Boglings',
-  golem: 'Golems', dreadhound: 'Dreadhounds', king: 'the Hollow King', briarmother: 'Mother Briar', unblinking: 'the Unblinking'});
+  golem: 'Golems', dreadhound: 'Dreadhounds', chochin: 'Lantern Ghosts', jiangshi: 'the Hopping Dead', king: 'the Hollow King', briarmother: 'Mother Briar', unblinking: 'the Unblinking'});
 
 /** Count an elder (or a boss) toward a weapon type's name; name it when the count is reached. */
 function creditElder(world, p, itemId, enemy){

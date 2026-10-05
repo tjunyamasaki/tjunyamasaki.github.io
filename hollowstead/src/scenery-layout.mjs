@@ -5,7 +5,7 @@
 
 import {NODES, RULES, STRUCTURES} from './content.mjs?v=harvest-18';
 import {isCache, regionAt, valueNoise} from './progression.mjs?v=harvest-18';
-import {TERRAIN, densityAt, generateNodes, terrainAt, worldShape} from './worldgen.mjs?v=harvest-18';
+import {TERRAIN, areaAt, densityAt, generateNodes, terrainAt, worldShape} from './worldgen.mjs?v=harvest-18';
 import {SCENERY_ATLAS} from './scenery-atlas.mjs?v=harvest-18';
 
 /** World units per chunk side. Each chunk is laid out (and on WebGL merged into one mesh) on its own. */
@@ -52,6 +52,12 @@ export const REGION_MIX = Object.freeze({
   crags: {rate:.46, dense:.1, kinds:[['pebbles', 3], ['pebbles-b', 2], ['crystals', 1.1], ['tuft-dead', .7]]},
   barrow: {rate:.5, dense:.15, kinds:[['tuft-dead', 3], ['bone-bits', 1.6], ['stones', 1]]},
 });
+/** Areas that decorate by their own mix instead of their ring's. The Shrine of Yomi (a land's area): a kept grove,
+ * ferns and clover under the cherries, red leaves for fallen petals. */
+export const AREA_MIX = Object.freeze({
+  yomi: {rate:.6, dense:.4, kinds:[['fern', 2], ['fern-small', 2], ['tuft', 2.4], ['clover', 1.4], ['leaves-red', 1.6], ['stones', .8], ['toadstool', .5]]},
+});
+const mixOf = region => REGION_MIX[region] || AREA_MIX[region] || REGION_MIX.meadow;
 /** Rare set pieces per chunk: [kind, regions, chance per try, tries]. */
 const LANDMARKS = Object.freeze([
   ['scarecrow', ['meadow'], .2, 1], ['fence-bit', ['meadow'], .4, 2], ['stump', ['woods'], .55, 3],
@@ -100,7 +106,8 @@ export function sceneryEnv(seed, {nodes = null, shape = null} = {}){
   return {
     seed, radius, ox, oz, terrain,
     density: (x, z) => densityAt(seed, x, z),
-    region: (x, z) => regionAt(x, z),
+    // Only the Shrine of Yomi decorates by its own mix; every other area keeps its ring's (as it always has).
+    region: base.areas?.some(a => a.id === 'yomi') ? (x, z) => areaAt(seed, x, z) === 'yomi' ? 'yomi' : regionAt(x, z) : (x, z) => regionAt(x, z),
     patch: (x, z) => valueNoise(x * .2 + ox, z * .2 + oz) * .6 + valueNoise(x * .46 - oz, z * .46 + ox) * .4,
     theme: (x, z) => valueNoise(x * .16 - oz * .7, z * .16 + ox * .3),
     drift: (x, z) => valueNoise(x * .05 - ox, z * .05 + oz) * 2.3 + valueNoise(x * .019 + oz, z * .019 - ox) * 1.7,
@@ -123,7 +130,7 @@ function pickWeighted(list, r){
 
 /** Probability that a common prop grows at a candidate: patches with open ground between them. */
 function growth(env, x, z, region){
-  const mix = REGION_MIX[region] || REGION_MIX.meadow;
+  const mix = mixOf(region);
   const d = env.density(x, z), patch = env.patch(x, z);
   // Denser land grows larger, fuller patches; open heath keeps small ones.
   const threshold = .575 - mix.dense * (d - .5) * .1;
@@ -169,7 +176,7 @@ export function layoutChunk(env, cx, cz){
     if(env.blocked(x, z))continue;
     const h4 = hash4(seed, gi, gj, 53);
     // Each patch leans to one kind (a drift of ferns, a ring of toadstools), the rest mixed in.
-    const kinds = (REGION_MIX[region] || REGION_MIX.meadow).kinds, h5 = hash4(seed, gi, gj, 59);
+    const kinds = mixOf(region).kinds, h5 = hash4(seed, gi, gj, 59);
     let kind = shore ? (h4 < .7 ? 'reeds-small' : 'sedge') : h5 < .5 ? kinds[Math.floor(env.theme(x, z) * 2.2 * kinds.length) % kinds.length][0] : pickWeighted(kinds, h4);
     if(kind === 'flower'){const drift = env.drift(x, z);kind = FLOWERS[Math.floor((drift % 1) * FLOWERS.length) % FLOWERS.length];}
     out.props.push(prop(kind, x, z, hash4(seed, gi, gj, 67)));

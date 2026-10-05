@@ -440,6 +440,8 @@ export function equippedLanternLit(player){
 // Presentation only: a theme may list `variants` for a sprite key. Each entity
 // keeps the same variant for its whole life because the pick hashes its id.
 export function spriteVariant(theme, key, entity){
+  // A node may wear an area's look (worldgen.mjs: a tree of the Shrine of Yomi is drawn as cherry or sacred pine).
+  if(entity?.look&&theme?.sprites?.[entity.look])key=entity.look;
   const variants=theme?.sprites?.[key]?.variants;
   if(!Array.isArray(variants)||!variants.length)return key;
   const seed=String(entity?.id??`${entity?.x},${entity?.z}`);let h=2166136261;

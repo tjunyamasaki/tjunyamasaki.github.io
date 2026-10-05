@@ -40,7 +40,7 @@ import {applyRegions, regionSpeed} from './regions.mjs?v=harvest-18';
 import {cartAction, cartLabel, cartSlots, cartSpeed, stepCarts} from './cart.mjs?v=harvest-18';
 import {harvestLoot, rhythmStep, rhythmStrike} from './rhythm.mjs?v=harvest-18';
 import {cacheOpened, cacheRate, charmOf, reviveRate, socketsAllowed, trinketEvent, trinketHaste, trinketSpeed, unlockCharm, CHARM} from './trinkets.mjs?v=harvest-18';
-import {generateNodes, walkableAt, landNear, zoneAt, iceAt} from './worldgen.mjs?v=harvest-18';
+import {generateNodes, walkableAt, landNear, zoneAt, iceAt, landOf, setLand} from './worldgen.mjs?v=harvest-18';
 import {HEARTH_MAX, ICE, areaBossFell, hearthCost, stepAreas, useLandmark} from './areas.mjs?v=harvest-18';
 import {DELVE, ascend, exitDelve, stepDelve, surfaceForNetwork} from './delve.mjs?v=harvest-18';
 import {bossLoot} from './bosses.mjs?v=harvest-18';
@@ -165,7 +165,7 @@ const MAGIC_AIM=Object.freeze({
   'kitsune-lantern':{reach:11,range:11},'plaguebeak':{reach:8.5,range:8.5},'gloomgrasp':{reach:8,range:8},
   'cinder-staff':{reach:11,speed:12*1.15,range:11},'widows-needle':{reach:9,speed:20*1.15,range:9},
   'spirit-fan':{reach:5.5,range:5.5},'barrow-rattle':{reach:10,range:10},'mourning-bell':{reach:5.2,range:5.2},
-  'pallbearer':{reach:3.1,range:3.1},'hollow-moon':{reach:9,range:9},'thornheart':{reach:9,range:9},'deepeye':{reach:10,range:10},
+  'pallbearer':{reach:3.1,range:3.1},'hollow-moon':{reach:9,range:9},'thornheart':{reach:9,range:9},'deepeye':{reach:10,range:10},'katana':{reach:3.6,range:3.6},
 });
 /**
  * Guests only draw creatures and shots, so the network copy rounds every number to centimetres and
@@ -192,11 +192,13 @@ export const EXPLORE_CELL=4, EXPLORE_SIZE=Math.ceil(RULES.radius*2/4);
 const MAP_CACHE=new Map();
 /** Deterministic map for a seed. Cached: guests rebuild the world from snapshots every frame. */
 export function makeMap(seed){
-  if(!MAP_CACHE.has(seed)){
+  // Keyed by the land too (worldgen.mjs setLand): a Vigil of the Shrine of Yomi grows a different hollow.
+  const key=`${seed}|${landOf(seed)||''}`;
+  if(!MAP_CACHE.has(key)){
     if(MAP_CACHE.size>4)MAP_CACHE.clear();
-    MAP_CACHE.set(seed, generateNodes(seed));
+    MAP_CACHE.set(key, generateNodes(seed));
   }
-  return MAP_CACHE.get(seed).map(node=>({...node}));
+  return MAP_CACHE.get(key).map(node=>({...node}));
 }
 export class World {
   constructor(seed=(Math.random()*0xffffffff)>>>0, options={}){
@@ -204,6 +206,8 @@ export class World {
     this.showcase=options?.showcase===true;this.radius=RULES.radius;this.arena=null;this.dungeon=null;this.hostile=[];
     // The Vigil (vigil.mjs): a long-haul save. `below`: seconds spent in delves, when the hollow's clock holds still.
     if(options?.mode==='vigil')this.mode='vigil';this.below=0;this.saga=null;
+    // The land (worldgen.mjs LANDS), a Vigil setting: registered with the seed before the hollow is built.
+    if(typeof options?.land==='string'&&options.land!=='hollow'){this.land=options.land;}setLand(seed,this.land||null);
     for(const key of ['frameObstacles','fieldBudget','obstacleCache','flowFields'])Object.defineProperty(this,key,{value:key==='flowFields'?new Map():null,writable:true,configurable:true,enumerable:false});
     const bare=this.showcase||options?.arena===true||options?.lab===true||!!options?.dungeon||options?.bare===true;
     this.nodes=bare?[]:makeMap(seed);
@@ -1608,7 +1612,7 @@ export class World {
     const obstacles=this.frameObstacles||this.obstacles();
     for(let i=0;i<4;i++)this.move(p,dx/l*amount/.2,dz/l*amount/.2,.05,obstacles);
   }
-  hurt(p,amount,source=null){if(this.showcase||this.arena?.god||p.down||p.ghost)return;
+  hurt(p,amount,source=null){if(this.showcase||this.arena?.god||p.down||p.ghost||p.vanish>this.time)return;
     if(p.iframes>0||p.dash>0){
       // Inside the telegraph, but mid-dodge: the blow passes through. Timed well, it pays back.
       if(!(this.time-(p.lastDodge??-9)<.35)){p.lastDodge=this.time;this.readyDash(p);if(p.dashRecharge.length){p.dashRecharge[p.dashRecharge.length-1]=Math.min(p.dashRecharge[p.dashRecharge.length-1],DASH.perfectCooldown);const refund=p.dashRecharge.pop();p.dashRecharge.unshift(refund);}this.syncDash(p);if(!this.arena)p.stamina=Math.min(100,p.stamina+DASH.perfectStamina);this.event('dodge',p.x,p.z,'Dodged!',{player:p.id});trinketEvent(this,p,'perfect',{source});}
@@ -1751,6 +1755,8 @@ export class World {
       else if(p.lantern)p.lantern=false;
       if(p.rest){if(this.showcase||phase==='night'||p.hunger<15)p.rest=false;else{p.hp=Math.min(maxHealth(p),p.hp+dt*3);p.courage=Math.min(100,p.courage+dt*4);continue;}}
       let input=this.inputs.get(p.id)||{x:0,z:0};if(this.time-input.at>.6)input={x:0,z:0};let x=input.x||0,z=input.z||0;
+      // Out of sight (Kagekiri's Hundred-Line Draw, magic/katana.mjs): the wanderer holds still until they step out.
+      if(p.vanish>this.time){x=0;z=0;p.goal=null;input={...input,attack:false,act:false};}
       if(p.goal){
         const goal=p.goal;
         const node=this.nodes.find(n=>n.id===goal.target);
@@ -1853,7 +1859,7 @@ export class World {
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
       projectiles:this.projectiles, allies:this.allies, zones:this.zones, beats:this.beats, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
-      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone, tiles:this.tiles, homestead:this.homestead, wilds:this.wilds, thorns:this.thorns,
+      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, land:this.land, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone, tiles:this.tiles, homestead:this.homestead, wilds:this.wilds, thorns:this.thorns,
       ...magicSnapshotFields(this),
     };
     // Where each random stream stands, so a reloaded save carries on rather than replaying the seed.
@@ -1865,8 +1871,8 @@ export class World {
     if(data&&typeof data==='object')settleStorage(data);
     if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
     // A dungeon floor is rebuilt from its seed (dungeon/layout.mjs), never from the hollow's map.
-    const world=new World(data.seed,data.dungeon?{bare:true}:{});
-    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','below','saga','surface','delves','lair','omens','omenT','omensDone','tiles','homestead','wilds','thorns'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    const world=new World(data.seed,{...(data.dungeon?{bare:true}:{}),land:data.land});
+    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','land','below','saga','surface','delves','lair','omens','omenT','omensDone','tiles','homestead','wilds','thorns'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     if(world.arena){world.nodes=[];}if(world.dungeon)world.nodes=dungeonNodes(world);if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||(!world.arena&&!world.dungeon))world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
     for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);sanitizeRefine(p);}

@@ -1,0 +1,402 @@
+{
+ "miko": {
+  "src": "./sprites/miko.svg?v=yomi1",
+  "size": [
+   2.25,
+   3.38
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 8,
+  "rows": 2,
+  "clips": {
+   "idle": {
+    "frames": [
+     0,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "fps": 2
+   },
+   "walk": {
+    "frames": [
+     2,
+     3,
+     4,
+     5
+    ],
+    "fps": 9
+   },
+   "attack": {
+    "frames": [
+     6,
+     7,
+     8
+    ],
+    "fps": 10
+   },
+   "gather": {
+    "frames": [
+     9,
+     10,
+     11,
+     10
+    ],
+    "fps": 7
+   },
+   "dash": {
+    "frames": [
+     12
+    ],
+    "fps": 1
+   },
+   "down": {
+    "frames": [
+     13
+    ],
+    "fps": 1
+   }
+  }
+ },
+ "daoshi": {
+  "src": "./sprites/daoshi.svg?v=yomi1",
+  "size": [
+   2.25,
+   3.38
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 8,
+  "rows": 2,
+  "clips": {
+   "idle": {
+    "frames": [
+     0,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "fps": 2
+   },
+   "walk": {
+    "frames": [
+     2,
+     3,
+     4,
+     5
+    ],
+    "fps": 9
+   },
+   "attack": {
+    "frames": [
+     6,
+     7,
+     8
+    ],
+    "fps": 10
+   },
+   "gather": {
+    "frames": [
+     9,
+     10,
+     11,
+     10
+    ],
+    "fps": 7
+   },
+   "dash": {
+    "frames": [
+     12
+    ],
+    "fps": 1
+   },
+   "down": {
+    "frames": [
+     13
+    ],
+    "fps": 1
+   }
+  }
+ },
+ "chochin": {
+  "src": "./sprites/chochin.svg?v=yomi1",
+  "size": [
+   2.0,
+   3.0
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 4,
+  "rows": 2,
+  "clips": {
+   "idle": {
+    "frames": [
+     7
+    ],
+    "fps": 1
+   },
+   "walk": {
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "fps": 9
+   },
+   "attack": {
+    "frames": [
+     4,
+     5,
+     6,
+     5
+    ],
+    "fps": 6
+   }
+  }
+ },
+ "jiangshi": {
+  "src": "./sprites/jiangshi.svg?v=yomi1",
+  "size": [
+   2.5,
+   3.75
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 4,
+  "rows": 2,
+  "clips": {
+   "idle": {
+    "frames": [
+     7
+    ],
+    "fps": 1
+   },
+   "walk": {
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "fps": 9
+   },
+   "attack": {
+    "frames": [
+     4,
+     5,
+     6,
+     5
+    ],
+    "fps": 6
+   }
+  }
+ },
+ "sakura": {
+  "src": "./sprites/sakura.svg?v=yomi1",
+  "size": [
+   4.92,
+   7.38
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 1,
+  "rows": 1,
+  "clips": {
+   "idle": {
+    "frames": [
+     0
+    ],
+    "fps": 1
+   }
+  }
+ },
+ "matsu": {
+  "src": "./sprites/matsu.svg?v=yomi1",
+  "size": [
+   4.92,
+   7.38
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 1,
+  "rows": 1,
+  "clips": {
+   "idle": {
+    "frames": [
+     0
+    ],
+    "fps": 1
+   }
+  }
+ },
+ "toro": {
+  "src": "./sprites/toro.svg?v=yomi1",
+  "size": [
+   1.9,
+   2.85
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 4,
+  "rows": 1,
+  "clips": {
+   "idle": {
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "fps": 5
+   }
+  }
+ },
+ "torii": {
+  "src": "./sprites/torii.svg?v=yomi1",
+  "size": [
+   3.4,
+   5.1
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 1,
+  "rows": 1,
+  "clips": {
+   "idle": {
+    "frames": [
+     0
+    ],
+    "fps": 1
+   }
+  }
+ },
+ "katana": {
+  "src": "./sprites/katana.svg?v=yomi1",
+  "size": [
+   1.1,
+   1.65
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 1,
+  "rows": 1,
+  "clips": {
+   "idle": {
+    "frames": [
+     0
+    ],
+    "fps": 1
+   }
+  },
+  "icon": "./sprites/katana-icon.svg?v=yomi1"
+ },
+ "guandao": {
+  "src": "./sprites/guandao.svg?v=yomi1",
+  "size": [
+   1.1,
+   1.65
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 1,
+  "rows": 1,
+  "clips": {
+   "idle": {
+    "frames": [
+     0
+    ],
+    "fps": 1
+   }
+  },
+  "icon": "./sprites/guandao-icon.svg?v=yomi1"
+ },
+ "yomi-rock": {
+  "src": "./sprites/yomi-rock.svg?v=yomi1",
+  "size": [
+   2.8,
+   4.2
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 1,
+  "rows": 1,
+  "clips": {
+   "idle": {
+    "frames": [
+     0
+    ],
+    "fps": 1
+   }
+  }
+ },
+ "yomi-rock-b": {
+  "src": "./sprites/yomi-rock-b.svg?v=yomi1",
+  "size": [
+   2.8,
+   4.2
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 1,
+  "rows": 1,
+  "clips": {
+   "idle": {
+    "frames": [
+     0
+    ],
+    "fps": 1
+   }
+  }
+ },
+ "jizo": {
+  "src": "./sprites/jizo.svg?v=yomi1",
+  "size": [
+   1.5,
+   2.25
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 1,
+  "rows": 1,
+  "clips": {
+   "idle": {
+    "frames": [
+     0
+    ],
+    "fps": 1
+   }
+  }
+ }
+}

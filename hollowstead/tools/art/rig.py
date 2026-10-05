@@ -9,13 +9,13 @@ Writes, per wanderer and per look (witch: no suffix, hood: -hood, mask: -mask, a
   <name>-arm<suffix>.svg  that look's front arm as two bones (2 x 1 cells): 0 upper arm (pivot:
                           shoulder), 1 forearm + hand (pivot: elbow), both hanging straight down
 and once:
-  grip-<tool>.svg  axe, pick, sword, broadsword, flamberge drawn upright, the grip on the sprite anchor
+  grip-<tool>.svg  axe, pick, sword, broadsword, flamberge, katana drawn upright, the grip on the sprite anchor
 and src/rig-data.mjs: per look, the shoulder in every body cell and the bone lengths, plus the arm
 and grip sprite frames, in world units (src/player-rig.mjs reads it, so art and motion agree).
 """
 import json, math, os
 import lib
-import actors, items, longnight, wanderers
+import actors, items, longnight, wanderers, yomi
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -150,6 +150,8 @@ TOOLS = {
     "sword": dict(fn=items.sword, undo=(256, 560, 38), grip=66, length=1.6, span=446),
     "broadsword": dict(fn=longnight.broadsword, undo=(256, 560, 0), grip=66, length=1.7, span=446),
     "flamberge": dict(fn=longnight.flamberge, undo=(256, 560, 0), grip=59, length=1.75, span=476),
+    # Kagekiri (src/magic/katana.mjs): the Yomi katana, drawn in tools/art/yomi.py.
+    "katana": dict(fn=lambda: yomi.katana(False), undo=(256, 470, 0), grip=117, length=1.75, span=524),
 }
 
 

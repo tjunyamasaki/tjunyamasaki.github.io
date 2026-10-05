@@ -58,9 +58,9 @@ def target(t):
 
 
 def registry():
-    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig, dread, homeward
+    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig, dread, homeward, yomi
     reg = {}
-    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig, dread, homeward):
+    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig, dread, homeward, yomi):
         for key, spec in getattr(mod, "SPRITES", getattr(mod, "NODES", {})).items():
             reg[key] = spec
     return reg
@@ -136,6 +136,10 @@ def main():
         import rig
         rig.rig_data()
         print("wrote src/rig-data.mjs")
+    if not a.only or "katana" in keys:
+        import yomi
+        yomi.write_katana(ROOT)
+        print("built assets/magic/katana")
     if not a.only or "magic" in keys:
         import magic
         for k, im in magic.build_magic(ROOT).items():

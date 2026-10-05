@@ -10,7 +10,7 @@ import {isMagicAlly} from './magic/registry.mjs?v=harvest-18';
 export const LAB = Object.freeze({
   counts: [1, 5, 10, 20, 40],
   formations: ['ahead', 'around', 'wall'],
-  foes: ['mix', 'crawler', 'bonewalker', 'wraith', 'bogling', 'brute', 'golem', 'king'],
+  foes: ['mix', 'crawler', 'bonewalker', 'wraith', 'bogling', 'brute', 'golem', 'chochin', 'jiangshi', 'king'],
   maxStrength: 30,
   window: 5,          // seconds the DPS meter averages over
   maxAlive: 120,

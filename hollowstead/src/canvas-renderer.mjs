@@ -20,7 +20,7 @@ import {hostileShots, telegraphOf} from './mobs.mjs?v=harvest-18';
 import {nightGlow} from './regions.mjs?v=harvest-18';
 import {beaconArt, beaconPhase, beaconStrength, dropSticker, lootBeacon, preloadDropArt} from './drop-art.mjs?v=harvest-18';
 import {markerPulse, paintMarker, targetMarker} from './target-marker.mjs?v=harvest-18';
-import {arenaProps, arenaTile, plazaProps} from './renderer.mjs?v=harvest-18';
+import {areaPropList, arenaProps, arenaTile, plazaProps, vanished} from './renderer.mjs?v=harvest-18';
 import {STRIKE_COLORS} from './renderer.mjs?v=harvest-18';
 import {glowStrength} from './lighting.mjs?v=harvest-18';
 import {paintDungeonCanvas} from './dungeon/canvas.mjs?v=harvest-18';
@@ -218,7 +218,7 @@ export class CanvasRenderer {
     paintHomesteadCanvas(this,c,world,frame,homestead);
     if(weapon&&(weapon.groundNormal.length||weapon.groundGlow.length))drawMagicCanvas(c,[...weapon.groundNormal,...weapon.groundGlow],(x,z,y)=>this.screenPoint(x,z,y));
     paintRopes(this,c,world,frame,this.theme,true);
-    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).filter(e=>!e.painted).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
+    const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).filter(e=>!e.painted).map(e=>({e:{...e,lift:.9},key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e:ALLIES[e.type]?.fly?{...e,lift:.9+Math.sin(this.clock*6+e.x)*.15}:e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(z=>z.kind!=='star').map(z=>({e:z,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online&&!vanished(e,world)).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme),...areaPropList(world,this.theme)];
     const drawn=entities.map(entry=>{
       if(entry.key==='gravecraft-skeleton'){
         const last=this.magicActors.get(entry.e.id)||{x:entry.e.x,z:entry.e.z};

@@ -12,7 +12,7 @@ import {beaconArt, beaconPhase, beaconStrength, dropSticker, lootBeacon, preload
 import {markerCanvas, markerPulse, targetMarker} from './target-marker.mjs?v=harvest-18';
 import {glowStrength} from './lighting.mjs?v=harvest-18';
 import {SceneryLayer} from './scenery.mjs?v=harvest-18';
-import {groundColors, walkableAt} from './worldgen.mjs?v=harvest-18';
+import {areaProps, groundColors, walkableAt} from './worldgen.mjs?v=harvest-18';
 import {nodeAwake} from './content.mjs?v=harvest-18';
 import {RopeLayer} from './cart-rope.mjs?v=harvest-18';
 import {DungeonLayer} from './dungeon/three.mjs?v=harvest-18';
@@ -22,6 +22,10 @@ import {HomesteadLayer, cropGlow, recentHit} from './homestead-render.mjs?v=harv
 import {cropEntities} from './homestead.mjs?v=harvest-18';
 /** The Heartfire plaza is kept flat (no standing props) so buildings and drops read on it; the arena keeps its runestones. */
 export function plazaProps(){return [];}
+/** An area's standing props (worldgen.mjs areaProps: the Shrine of Yomi's torii, lanterns and jizo); lanterns glow. */
+export function areaPropList(world,theme){if(!world?.land||world.arena||world.dungeon||world.showcase)return [];return areaProps(world.seed).filter(p=>theme.sprites[p.key]).map(p=>({e:{id:p.id,x:p.x,z:p.z,scale:p.scale,glow:p.light>0,light:p.light,tint:p.tint},key:p.key,kind:'prop'}));}
+/** A wanderer who has stepped out of sight (Kagekiri's Hundred-Line Draw, magic/katana.mjs) is not drawn at all. */
+export const vanished=(p,world)=>p.vanish>(world?.time??0);
 /** Runestones ringing the battle arena's wall (presentation only; nothing collides with them). */
 export function arenaProps(world,theme){if(!world?.arena||!theme.sprites['plaza-prop'])return [];const R=world.radius-.35,n=22;return [...Array(n)].map((_,i)=>{const a=i/n*Math.PI*2;return {e:{id:'arena-stone'+i,x:Math.cos(a)*R,z:Math.sin(a)*R},key:'plaza-prop',kind:'prop'};});}
 /** Arena floor colour at x,z: flagstone bands and spokes inside the wall, dark beyond it. */
@@ -427,7 +431,7 @@ export class Renderer {
     const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;this.paintField(frame);this.paintFlash(weapon);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
     this.paintPlaza(world,frame);if(world.dungeon)this.dungeonLayer?.update(world,frame,this.clock);this.scenery.update(world,frame,dt,this.focus);(this.homestead||=new HomesteadLayer(this)).update(world,frame,dt,homestead,this.clock,target?.id||null);this.combat.begin();
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).filter(e=>!e.painted).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme)];
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).filter(e=>!e.painted).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online&&!vanished(e,world)).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme),...areaPropList(world,this.theme)];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind,rig}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;

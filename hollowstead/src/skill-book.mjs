@@ -11,6 +11,7 @@ import {RITE, beginRite} from './magic/pallbearer.mjs?v=harvest-18';
 import {ECLIPSE, beginEclipse} from './magic/hollow-moon.mjs?v=harvest-18';
 import {heartbloom} from './magic/thornheart.mjs?v=harvest-18';
 import {ABYSS, openAbyss} from './magic/deepeye.mjs?v=harvest-18';
+import {DRAW, DRAW_TOTAL, hundredLine} from './magic/katana.mjs?v=harvest-18';
 import {gripAll} from './magic/gloomgrasp.mjs?v=harvest-18';
 import {finalChapter} from './grimoire.mjs?v=harvest-18';
 import {deathMark, deathReap} from './reaper.mjs?v=harvest-18';
@@ -291,6 +292,13 @@ export const SKILL_BOOK = Object.freeze({
     cast(k){
       k.beat(.05, {kind: 'call', fn: 'abyss', fx: 'abyss', dmg: k.dmg(14), fold: k.dmg(20)});
     }},
+
+  // Kagekiri (src/magic/katana.mjs): the katana's own hanging cuts, drawn ten at a time, then all snapped.
+  katana: {name: 'Hundred-Line Draw', cooldown: 13, reach: DRAW.radius, pose: DRAW_TOTAL+.1, lock: DRAW_TOTAL+.1,
+    blurb: 'You vanish. Long straight cuts flash across every foe around you, one after another; you step out where the last one ends, sheathe the blade, and every cut still hanging snaps shut at once.',
+    cast(k){
+      k.beat(0, {kind: 'call', fn: 'hundredline', cut: k.dmg(1.1), snap: k.dmg(2.6)});
+    }},
 });
 
 // ------------------------------------------------------------------ special beats
@@ -373,6 +381,8 @@ export const SKILL_CALLS = Object.freeze({
   eclipse(world, b, owner){return beginEclipse(world, owner, b);},
   /** Heartbloom: Thornmother's Heart lays its spokes and ring and blooms at every crossing (src/magic/thornheart.mjs). */
   heartbloom(world, b, owner){return heartbloom(world, owner, b);},
+  /** Hundred-Line Draw: Kagekiri's own module vanishes, cuts, steps out and sheathes (src/magic/katana.mjs). */
+  hundredline(world, b, owner){return hundredLine(world, owner, b);},
   /** Open the Abyss: the Eye of the Deep sweeps its beam round and folds the dark shut (src/magic/deepeye.mjs). */
   abyss(world, b, owner){return openAbyss(world, owner, b);},
   /** Abyssal Grip: the scepter's own hands rise under every foe near the mark (src/magic/gloomgrasp.mjs). */

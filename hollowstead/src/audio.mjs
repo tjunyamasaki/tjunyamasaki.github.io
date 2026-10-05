@@ -52,6 +52,14 @@ export class Sound {
     // Dungeons: the party goes down the stairs. A falling chime.
     if(type==='descend'){this.sweep(520,130,.9,'sine',.05);for(const [i,f] of [784,659,523,392].entries())this.sweep(f,f*.985,.5,'sine',.013,.08+i*.12);return;}
     if(type==='damage'&&ev?.crit){this.sweep(1500,2200,.08,'square',.01);this.sweep(320,110,.12,'triangle',.05);return;}
+    // Kagekiri (src/magic/katana.mjs): a bright shing on every draw, the sheath's click and the cuts snapping,
+    // a breath of wind as the wielder vanishes, a cut per line of the Hundred-Line Draw, a rising note on stepping out.
+    if(type==='katadraw'){const last=ev?.n===2;this.sweep(2600,5400,.07,'sawtooth',.007);this.sweep(1320,760,last?.28:.18,'sine',last?.016:.011);this.sweep(320,110,.1,'triangle',.03);return;}
+    if(type==='katasnap'){const n=Math.min(6,ev?.lines?.length||1),big=!!ev?.skill;this.sweep(3400,3320,.3,'sine',.022);this.sweep(5100,5040,.2,'sine',.009,.012);
+      for(let i=0;i<n;i++)this.sweep(2000-i*120,420,.09,'sawtooth',.009,.07+i*(big?.03:.045));this.sweep(170,48,big?.5:.3,'triangle',big?.08:.05,.06);return;}
+    if(type==='katavanish'){this.sweep(900,140,.4,'sine',.03);this.sweep(2600,300,.28,'sawtooth',.007);return;}
+    if(type==='kataline'){this.sweep(4400,1500,.06,'sawtooth',.006);this.sweep(1500+((ev?.n||0)%4)*90,900,.12,'sine',.007);return;}
+    if(type==='kataappear'){this.sweep(300,960,.26,'sine',.022);this.sweep(2200,2240,.2,'sine',.006,.08);return;}
     if(type==='foxfire'||type==='foxburst'){
       // A small haunted shrine chime; staggered partials echo the nine tails.
       const burst=type==='foxburst';

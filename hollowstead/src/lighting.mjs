@@ -11,6 +11,7 @@ import {ageLighting} from './ages.mjs?v=harvest-18';
 import {GRAVELIGHT_RADIUS_SCALE, regionDarkness} from './regions.mjs?v=harvest-18';
 import {DUNGEON, layoutOf} from './dungeon/run.mjs?v=harvest-18';
 import {variantOf} from './dungeon/variants.mjs?v=harvest-18';
+import {areaLights} from './worldgen.mjs?v=harvest-18';
 
 export const HEARTH_LEVEL_STEP = 1.5;
 export const PLAYER_LIGHT_RADIUS = RANGES.lanternLight;
@@ -144,6 +145,10 @@ export function collectLightSources(world){
   for(const player of world?.players||[]){
     const radius=playerLanternRadius(player);
     if(radius>0)sources.push({x:player.x||0, z:player.z||0, radius, kind:'player', id:player.id});
+  }
+  // An area's own lanterns (the Shrine of Yomi's stone lanterns, worldgen.mjs areaLights): fuelless, always lit.
+  if(world&&!world.arena&&!world.dungeon&&!world.showcase&&!world.homestead&&world.land){
+    for(const light of areaLights(world.seed))sources.push({x:light.x, z:light.z, radius:light.radius, kind:'shrine', id:'shrine'});
   }
   return sources;
 }

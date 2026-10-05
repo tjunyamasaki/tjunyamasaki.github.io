@@ -18,6 +18,8 @@ export const RIG_GEAR = Object.freeze({
   sword: {grip: 'grip-sword', swing: 'slash'},
   broadsword: {grip: 'grip-broadsword', swing: 'cleave'},
   flamberge: {grip: 'grip-flamberge', swing: 'sunder'},
+  // Kagekiri (magic/katana.mjs): every attack is an iai draw-cut.
+  katana: {grip: 'grip-katana', swing: 'iai'},
 });
 
 const F = RIG_DATA.frames;
@@ -33,9 +35,9 @@ const EASE = {
 // The resting carry: hand low and forward, blade up and a little ahead (a ready guard).
 const GUARD = {arm: .38, reach: .9, tool: -.42, lean: .02};
 const GATHER_PERIOD = .45;     // engine.mjs stepHarvest: one hit every .45 s of work
-const SWING_SECONDS = {slash: .5, cleave: .62, sunder: .66};
+const SWING_SECONDS = {slash: .5, cleave: .62, sunder: .66, iai: .58};
 const BLEND = .11;             // seconds to ease from one motion into the next
-const CONTACT = {slashA: .36, slashB: .37, cleave: .48, sunder: .44};   // when each cut lands (body squash)
+const CONTACT = {slashA: .36, slashB: .37, cleave: .48, sunder: .44, iai: .3};   // when each cut lands (body squash)
 
 // Key: time (0..1), arm, reach (share of the arm's length), tool, body lean (+ forward), body cell,
 // the easing into this key, and options: `back` the tool is swung behind the body (drawn under it),
@@ -91,6 +93,18 @@ const TRACKS = {
     K(.44, 1.05, 1, -2.05, .22, F.impact, 'out'),
     K(.64, .97, .98, -1.97, .2, F.impact, 'lin'),
     K(.86, .45, .9, -.3, .02, F.recover, 'io'),
+    K(1, GUARD.arm, GUARD.reach, GUARD.tool, GUARD.lean, F.idle[0], 'io'),
+  ],
+  // Katana, iai: crouch with the blade drawn back along the hip, a held breath, then one level draw that
+  // whips the blade out in a straight line ahead, held there (zanshin), a flick of the blade, and back to guard.
+  iai: [
+    K(0, GUARD.arm, GUARD.reach, GUARD.tool, GUARD.lean, F.ready),
+    K(.13, -.62, .74, 1.78, -.13, F.ready, 'out', B),
+    K(.22, -.66, .74, 1.82, -.15, F.ready, 'lin', B),
+    K(.27, .55, .86, -.25, .06, F.strike, 'in', {flat: true}),
+    K(.32, 1.52, 1, -1.6, .2, F.strike, 'snap', {flat: true}),
+    K(.56, 1.48, 1, -1.56, .18, F.strike, 'lin'),
+    K(.7, 1.0, .94, -2.65, .1, F.recover, 'out'),
     K(1, GUARD.arm, GUARD.reach, GUARD.tool, GUARD.lean, F.idle[0], 'io'),
   ],
   // Chopping (loops; t = 0 is the hit): a level swing at the trunk. Wrench the bit free, draw the axe

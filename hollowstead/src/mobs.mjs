@@ -98,6 +98,9 @@ export const ATTACKS = Object.freeze({
   charge: {shape: 'line', windup: .62, trigger: 5.6, min: 2.2, length: 5.6, width: 1.15, speed: 15*1.15, dmg: 1},
   // A dreadhound's leap (ages.mjs): a short, quick line that a well-timed dodge still beats.
   pounce: {shape: 'line', windup: .42, trigger: 4.6, min: 1.4, length: 4.4, width: 1, speed: 17*1.15, dmg: 1},
+  // The Shrine of Yomi: a lantern ghost's tongue reaches past its body; a jiangshi leaps, stiff-armed, then claws.
+  lash:   {shape: 'circle', windup: .4, trigger: 1.9, reach: 1.55, radius: .85, lunge: .2, dmg: 1},
+  hop:    {shape: 'line', windup: .58, trigger: 4.2, min: 1.5, length: 4.2, width: 1.2, speed: 13.5*1.15, dmg: 1.1},
   orb:    {shape: 'aim', windup: .55, trigger: 8.5, length: 2.6, width: .5, speed: 5.4*1.15, radius: .34, life: 3.4, dmg: 1},
   lob:    {shape: 'circle', windup: .3, trigger: 7.5, radius: 1.4, flight: .6, dmg: 1},
   slam:   {shape: 'cone', windup: .6, trigger: 2.6, radius: 3.1, arc: 110, push: 1.4, dmg: 1},
@@ -119,6 +122,8 @@ export const MOVES = Object.freeze({
   crawler:    {body: .52, accel: 16, flank: 55, attacks: ['bite']},
   bonewalker: {body: .5, accel: 10, flank: 30, retreat: .8, attacks: ['charge', 'swipe']},
   dreadhound: {body: .5, accel: 20, flank: 75, retreat: .5, attacks: ['pounce', 'bite']},
+  chochin:    {body: .5, accel: 14, flank: 60, attacks: ['lash']},
+  jiangshi:   {body: .58, accel: 8, flank: 20, retreat: .4, attacks: ['hop', 'swipe']},
   wraith:     {body: .45, accel: 6, fly: true, keep: 6, orbit: .8, attacks: ['orb']},
   bogling:    {body: .55, accel: 7, keep: 5, orbit: .4, attacks: ['lob']},
   brute:      {body: .8, accel: 4, flank: 10, attacks: ['slam']},

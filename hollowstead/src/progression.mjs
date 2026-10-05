@@ -15,6 +15,8 @@ export const REGIONS = Object.freeze({
   frostmere:{name:'Frostmere', tier:2, area:true},
   ashscar:{name:'The Ashen Scar', tier:2, area:true},
   briarlair:{name:'The Briar Throne', tier:2, area:true, boss:'briarmother'},
+  // Only in a hollow of that land (worldgen.mjs LANDS). `haunt`: a night wave that finds you here is of its own dead.
+  yomi:{name:'The Shrine of Yomi', tier:2, area:true, haunt:true},
 });
 /** Region ids that are seeded areas rather than rings. */
 export const AREA_IDS = Object.freeze(Object.keys(REGIONS).filter(id=>REGIONS[id].area));
@@ -52,6 +54,8 @@ export const NODE_POOLS = Object.freeze({
   frostmere:['rimecrystal','rimecrystal','rimecrystal','shardrock','rock','grass','tree'],
   ashscar:['embervent','embervent','embervent','rock','ore','bones','grave'],
   briarlair:['bush','bush','bush','tree','tree','grass','mushroom'],
+  // Its trees grow as cherry and sacred pine, its rocks as mossy garden stones (worldgen.mjs generateNodes).
+  yomi:['tree','tree','tree','tree','rock','grass','grass','mushroom'],
 });
 
 /** Creatures that live in a region by day and guard its caches. */
@@ -66,6 +70,8 @@ export const RESIDENTS = Object.freeze({
   ashscar:['bonewalker','brute','crawler','crawler'],
   // Mother Briar's brood: her lair crawls with briarlings.
   briarlair:['crawler','crawler','crawler'],
+  // The shrine's dead: paper-lantern ghosts in packs, and the hopping corpses.
+  yomi:['chochin','chochin','jiangshi'],
 });
 
 export const CACHE_LAYOUT = Object.freeze([
@@ -87,7 +93,7 @@ const ITEM_RARITY = Object.freeze({
   elixir:'uncommon', heartstone:'epic', stew:'uncommon', bandage:'common',
   sword:'uncommon', torch:'common', recurve:'uncommon', bonebow:'rare', broadsword:'rare', crookstaff:'rare',
   flamberge:'epic', skullstaff:'epic', tome:'legendary', bonemail:'rare', shardplate:'epic', everlantern:'legendary',
-  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic', 'kitsune-lantern':'epic', plaguebeak:'epic', gloomgrasp:'epic', pallbearer:'epic', 'hollow-moon':'legendary', thornheart:'legendary', deepeye:'legendary',
+  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic', 'kitsune-lantern':'epic', plaguebeak:'epic', gloomgrasp:'epic', pallbearer:'epic', 'hollow-moon':'legendary', thornheart:'legendary', deepeye:'legendary', katana:'legendary',
   fangs:'rare', wisplantern:'rare', crowtotem:'rare', soulchain:'epic', stormrod:'epic', jacklantern:'epic', censer:'epic',
   scythe:'legendary', starfall:'legendary', wighthorn:'legendary',
   // Trinkets (trinkets.mjs): six rare, four epic. Caches and elites drop them through the pools below.
@@ -115,7 +121,7 @@ const POOLS = Object.freeze({
   uncommon:['recurve','sword','elixir','elixir','torch','bandage','tinderpouch','crookedkey','soulstitch','book'],
   rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem','nightfang','emberheart','crowseye','harvestcharm','wispfeather','gravedust','gutteringcandle','gravechalk','redthread','book','book'],
   epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer','pallbearer','frostanklet','boneward','moonlocket','thornknot','hellspur','mournersveil','book','book'],
-  legendary:['tome','everlantern','scythe','starfall','wighthorn','hollow-moon','thirteenthbell','hollowmirror','book'],
+  legendary:['tome','everlantern','scythe','starfall','wighthorn','hollow-moon','katana','thirteenthbell','hollowmirror','book'],
 });
 export const LOOT_TABLES = Object.freeze({
   crate:{xp:12, rolls:[
@@ -151,6 +157,9 @@ export const LOOT_TABLES = Object.freeze({
   golem:{xp:52, rolls:[{chance:.34, entries:[['rare',1,3],['epic',1,1]]},{entries:[['ichor',[3,4],1]]},{chance:.1, entries:[['book',1,1]]}]},
   // Dread Ages (ages.mjs): fast pack hunters of the later Vigil.
   dreadhound:{xp:14, rolls:[{chance:.3, entries:[['bone',[1,2],2],['meat',[1,1],1]]},{chance:.08, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.4, entries:[['ichor',[1,1],1]]},{chance:.015, entries:[['book',1,1]]}]},
+  // The Shrine of Yomi: the lanterns burn on embers; the corpses are the ones that keep the shrine's blade.
+  chochin:{xp:5, rolls:[{chance:.3, entries:[['ember',[1,1],2],['fiber',[1,2],1]]},{chance:.03, entries:[['uncommon',1,1]]},{chance:.16, entries:[['ichor',[1,1],1]]},{chance:.006, entries:[['book',1,1]]}]},
+  jiangshi:{xp:18, rolls:[{chance:.35, entries:[['bone',[1,2],2],['ember',[1,2],1]]},{chance:.1, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.45, entries:[['ichor',[1,2],1]]},{chance:.02, entries:[['book',1,1]]},{chance:.006, entries:[['katana',1,1]]}]},
   // Omens (omens.mjs): rare, hard won, and worth it. Each is a little hoard.
   fallenstar:{xp:120, rolls:[
     {count:[3,4], entries:[['shard',[3,5],3],['ember',[3,4],2],['rime',[2,3],1],['emberglass',[2,3],1],['ore',[3,4],1]]},
@@ -473,4 +482,4 @@ export function pickWeighted(rng, roster){
 }
 /** Residents roam in packs: `pack` is how many briarlings (or bonewalkers) turn up together. */
 /** `hounds`: on a Vigil from the Age of the Hunt (ages.mjs), the share of packs that are dreadhounds. */
-export const ROAM = Object.freeze({interval:9, spawnMin:15, spawnMax:21, despawn:46, leash:14, aggro:10, cap:[0,6,10], chance:[0,.3,.55], pack:{crawler:[2,4], bonewalker:[1,2], dreadhound:[2,3]}, hounds:.3});
+export const ROAM = Object.freeze({interval:9, spawnMin:15, spawnMax:21, despawn:46, leash:14, aggro:10, cap:[0,6,10], chance:[0,.3,.55], pack:{crawler:[2,4], bonewalker:[1,2], dreadhound:[2,3], chochin:[2,4], jiangshi:[1,2]}, hounds:.3});

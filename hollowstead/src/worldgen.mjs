@@ -167,7 +167,30 @@ export const AREAS = Object.freeze({
   frostmere: Object.freeze({ring:[58, 100], radius:[16, 20], sheet:.58}),
   ashscar: Object.freeze({ring:[72, 106], radius:[17, 21], pools:[3, 5]}),
   briarlair: Object.freeze({radius:13.5, wall:3, gate:6, inset:20, approach:12}),
+  // Yomi (a land, LANDS.yomi): a haunted shrine grove of cherry and sacred pine. A straight torii path runs
+  // from its heart out toward home, lined with stone lanterns that burn all night.
+  yomi: Object.freeze({ring:[64, 104], radius:[17, 20], approach:13, path:2.4, clearing:7}),
 });
+/**
+ * Lands: what kind of hollow a Vigil is (a setting chosen when it begins, World options.land, kept as
+ * world.land). The hollow keeps every ordinary place; a land adds its own areas. Worldgen reads a seed's
+ * land from setLand (the World registers it before anything is built), so host and guests build the same
+ * hollow from the seed and the land.
+ */
+export const LANDS = Object.freeze({
+  hollow: Object.freeze({name:'The Hollow', blurb:'The woods as they have always been.'}),
+  yomi: Object.freeze({name:'The Shrine of Yomi', blurb:'Somewhere in the outer rings a shrine grove waits: cherry and sacred pine, a path of torii, lanterns that never go out, and the dead that walk there. Its ghosts and corpses come for you at night when you stand near it.'}),
+});
+const LAND_OF=new Map();
+/** The land of a seed (null: the plain hollow). */
+export function landOf(seed){return LAND_OF.get(seed>>>0)||null;}
+/** Register a seed's land. Changing it drops whatever was built for that seed. */
+export function setLand(seed, land){
+  const key=seed>>>0,want=land&&land!=='hollow'&&Object.hasOwn(LANDS,land)?land:null;
+  if((LAND_OF.get(key)||null)===want)return;
+  if(want)LAND_OF.set(key,want);else LAND_OF.delete(key);
+  SHAPES.delete(seed);SHAPES.delete(key);if(lastShape&&lastShape.seed>>>0===key)lastShape=null;GROUND.clear();
+}
 /** Disc membership with a soft, noisy edge (the throne keeps an exact one). */
 function inArea(a, x, z, pad=0){
   const dx=x-a.x, dz=z-a.z, d2=dx*dx+dz*dz, r=a.r+pad+(a.id==='briarlair'?a.wall:0);
@@ -226,6 +249,18 @@ function makeAreas(grid,detail,outlineR,lakes,O,seed){
       each(px,pz,pr+1.4,(k,cx,cz,dist)=>{const wob=(valueNoise(cx*.5+px,cz*.5-pz)-.5)*.9;if(grid[k]===G&&dist+wob<pr){grid[k]=W;detail[k]=(detail[k]&~DETAIL.trail)|DETAIL.lava;}});
     }
   }
+  // The Shrine of Yomi (only in that land): a grove in the outer rings, its torii path pointing home.
+  if(landOf(seed)==='yomi'){const A=AREAS.yomi;let x,z;
+    for(let t=0;t<160&&x===undefined;t++){const p=rng()*4,[dx,dz]=pseudoDir(p),r=A.ring[0]+rng()*(A.ring[1]-A.ring[0]);if(apart(p,t<100?.8:.5)){x=dx*r;z=dz*r;}}
+    if(x===undefined){const [dx,dz]=pseudoDir(out[0].p+2.6);x=dx*84;z=dz*84;}
+    const rad=A.radius[0]+rng()*(A.radius[1]-A.radius[0]),l=Math.sqrt(x*x+z*z)||1,gx=-x/l,gz=-z/l;
+    // The path runs from near the heart, out through the edge and on toward home.
+    const ax=x+gx*2,az=z+gz*2,bx=x+gx*(rad+A.approach),bz=z+gz*(rad+A.approach);
+    const shrine={id:'yomi',x,z,r:rad,p:pseudoAngle(x,z),gx,gz,path:[[bx,bz],[ax,az]]};out.push(shrine);
+    // Kept groves: no thicket, fence or water inside, nor ice.
+    each(x,z,rad+3,(k,cx,cz)=>{const code=grid[k];if((code===T||code===F||code===W)&&inArea(shrine,cx,cz,-1)){grid[k]=G;detail[k]&=~(DETAIL.ford|DETAIL.ice|DETAIL.lava);}});
+    capsule(grid,ax,az,bx,bz,A.path,G,[0,1,1,1,0]);capsule(grid,ax,az,bx,bz,1.2,0,[1,0,0,0,0],detail,DETAIL.trail);
+  }
   return out;
 }
 /** How an area leans the density and rockiness fields (built after the terrain settles). */
@@ -235,7 +270,12 @@ function areaFields(a,density,rock){
     const d=Math.sqrt((x-a.x)*(x-a.x)+(z-a.z)*(z-a.z)),k=j*LN+i,t=1-smooth(a.r-3,a.r+3,d);if(t<=0)continue;
     if(a.id==='frostmere'){density[k]=density[k]*(1-.65*t);rock[k]+=.08*t;}
     else if(a.id==='ashscar'){density[k]=density[k]*(1-.92*t);rock[k]+=.3*t;}
-    else if(a.id==='briarlair'&&d<a.r){density[k]=.5+(density[k]-.5)*.4;}}}
+    else if(a.id==='briarlair'&&d<a.r){density[k]=.5+(density[k]-.5)*.4;}
+    else if(a.id==='yomi'){
+      // A grove: thick enough for trees all round, a clearing at its heart and along the torii path.
+      const along=(x-a.x)*a.gx+(z-a.z)*a.gz,across=Math.abs((x-a.x)*a.gz-(z-a.z)*a.gx),lane=along>0?1-smooth(2.5,4.5,across):0;
+      const open=Math.max(1-smooth(AREAS.yomi.clearing-2,AREAS.yomi.clearing+1,d),lane);
+      density[k]=(density[k]+(.8-density[k])*.9*t)*(1-.9*open*t);rock[k]=rock[k]*(1-.4*t)+.02*t;}}}
 }
 
 const SHAPES=new Map();let lastShape=null;
@@ -367,9 +407,11 @@ function buildShape(seed){
     for(const c of clearings){const reach=c.r+4;for(let j=0;j<LN;j++){const z=-EXTENT+j*LATTICE;if(Math.abs(z-c.z)>reach)continue;for(let i=0;i<LN;i++){const x=-EXTENT+i*LATTICE;if(Math.abs(x-c.x)>reach)continue;const d=Math.sqrt((x-c.x)**2+(z-c.z)**2);density[j*LN+i]*=.12+.88*smooth(c.r,c.r+3.5,d);}}}}
   // ---- 6. trails, cache spots, border props
   const trails=makeTrails(grid,detail,blocked,density);
+  // An area's own way in (the Shrine of Yomi's torii path) is drawn like a trail.
+  for(const a of areas)if(a.path)trails.push(a.path.map(p=>[p[0],p[1]]));
   const water=chamfer(grid,[0,1,0,0,0],S.dist);
   const spots=makeSpots(grid,detail,blocked,water,density,fences,clearings,rng);
-  const shape={seed, radius:RULES.radius, extent:EXTENT, cell:CELL, size:N, lattice:LATTICE, latticeSize:LN,
+  const shape={seed, land:landOf(seed), radius:RULES.radius, extent:EXTENT, cell:CELL, size:N, lattice:LATTICE, latticeSize:LN,
     grid, detail, density, rock, blocked, features:null, lakes, clumps, fences, trails, clearings, spots, areas, arcs:arcs.map(a=>({p0:a.p0,p1:a.p1,kind:TERRAIN_NAMES[a.kind],depth:a.depth})), stats:null};
   const counts=[0,0,0,0,0];
   shape.features=makeFeatures(shape,rngFor((seed>>>0)^0xfea7),chamfer(grid,[1,0,0,0,0],S.dist),counts);
@@ -468,6 +510,35 @@ export function areaAt(seed, x, z){const s=lastShape!==null&&lastShape.seed===se
 export function zoneAt(seed, x, z){return areaAt(seed,x,z)||regionAt(x,z);}
 /** The areas of a hollow: [{id, x, z, r, ...}] (the throne also has its wall, gate direction gx/gz; the scar its lava pools). */
 export function areasOf(seed){return shapeFor(seed).areas;}
+/**
+ * Standing props of the areas (presentation, no collision): the Shrine of Yomi's torii along its path,
+ * stone lanterns in pairs beside it and round the clearing, and a few jizo. Cached on the shape.
+ * Each: {id, key, x, z, light?, tint?, scale?} with `key` a theme sprite.
+ */
+export function areaProps(seed){
+  const s=shapeFor(seed);if(s.props)return s.props;
+  const props=[],a=s.areas.find(entry=>entry.id==='yomi');
+  if(a){const A=AREAS.yomi,rng=rngFor((seed>>>0)^0x70a1),px=-a.gz,pz=a.gx;
+    const onLand=(x,z)=>{const k=cellOf(x,z);return k>=0&&s.grid[k]===G;};
+    const put=(key,x,z,extra={})=>{if(onLand(x,z))props.push({id:`yp${props.length}`,key,x:+x.toFixed(2),z:+z.toFixed(2),...extra});};
+    const lantern={light:2.6,tint:'#f4a64a',scale:1.25};
+    // A run of torii down the path (the farthest stands out past the grove, where the path begins).
+    for(const d of [a.r+A.approach-2.5,a.r+2.5,a.r-2,a.r-6])put('torii',a.x+a.gx*d,a.z+a.gz*d);
+    // Lanterns in pairs between the gates.
+    for(const d of [a.r+5,a.r+.2,a.r-4,a.r-8])for(const side of [-1,1])put('toro',a.x+a.gx*d+px*side*2.9,a.z+a.gz*d+pz*side*2.9,lantern);
+    // The clearing at its heart: a ring of lanterns, open toward the path.
+    const face=Math.atan2(a.gz,a.gx);
+    for(let i=0;i<5;i++){const t=face+Math.PI*(.42+i*.29),r=A.clearing-1.5;put('toro',a.x+Math.cos(t)*r,a.z+Math.sin(t)*r,lantern);}
+    // Jizo keep watch here and there among the trees.
+    for(let i=0,tries=0;i<5&&tries<60;tries++){const t=rng()*Math.PI*2,r=A.clearing+1+rng()*(a.r-A.clearing-2),x=a.x+Math.cos(t)*r,z=a.z+Math.sin(t)*r;
+      const along=(x-a.x)*a.gx+(z-a.z)*a.gz,across=Math.abs((x-a.x)*a.gz-(z-a.z)*a.gx);if(along>0&&across<4.5)continue;
+      if(!onLand(x,z)||props.some(p=>(p.x-x)**2+(p.z-z)**2<9))continue;put('jizo',x,z);i++;}
+  }
+  s.props=props;return props;
+}
+/** The areas' own night lights (the shrine's lanterns): [{x, z, radius}]. Light as a lantern does, all night. */
+export function areaLights(seed){return areaProps(seed).filter(p=>p.light>0).map(p=>({x:p.x,z:p.z,radius:p.light}));}
+
 /** True on ice (Frostmere): walkers slide. */
 export function iceAt(seed, x, z){const s=lastShape!==null&&lastShape.seed===seed?lastShape:shapeFor(seed);const k=cellOf(x,z);return k>=0&&(s.detail[k]&DETAIL.ice)!==0;}
 
@@ -509,9 +580,9 @@ export function landNear(seed, x, z, maxR=6){
 
 // ------------------------------------------------------------------ ground colours
 const SAND=[196,184,150],FOAM=[168,188,190],EARTH=[88,70,54],BRIAR=[84,40,46];
-const TONE_KEYS=['meadow','woods','graveyard','mire','crags','barrow','path','water','shore','thicket','void','frostmere','ashscar','briarlair','ice','lava'];
+const TONE_KEYS=['meadow','woods','graveyard','mire','crags','barrow','path','water','shore','thicket','void','frostmere','ashscar','briarlair','ice','lava','yomi'];
 const DEFAULT_TONES={meadow:'#7d735d',woods:'#565e55',graveyard:'#746977',mire:'#5c6a4e',crags:'#6c6679',barrow:'#655862',path:'#9c8968',water:'#3f5566',shore:'#6f7a6a',thicket:'#3c4a40',void:'#1f1d27',
-  frostmere:'#97a3ad',ashscar:'#4d4340',briarlair:'#4f5c3c',ice:'#b4d3e2',lava:'#e8662a'};
+  frostmere:'#97a3ad',ashscar:'#4d4340',briarlair:'#4f5c3c',ice:'#b4d3e2',lava:'#e8662a',yomi:'#7a7062'};
 const toRGB=h=>{const n=parseInt(String(h).replace('#',''),16);return Number.isFinite(n)?[n>>16&255,n>>8&255,n&255]:[128,128,128];};
 const REGION_TONES=new Map(),GROUND=new Map();
 /** Region colour on the lattice (seed independent, so built once per palette), blended across borders by bilerp. */
@@ -532,7 +603,7 @@ function regionTones(tones,key){
  */
 export const GROUND_RES = 1/CELL;
 export function groundColors(seed, palette={}){
-  const toneKey=TONE_KEYS.map(k=>palette[k]||'').join(','),key=seed+'|'+toneKey;
+  const toneKey=TONE_KEYS.map(k=>palette[k]||'').join(','),key=seed+'|'+(landOf(seed)||'')+'|'+toneKey;
   let out=GROUND.get(key);if(out)return out;
   const s=shapeFor(seed),{grid,detail}=s,tones={};for(const k of TONE_KEYS)tones[k]=toRGB(palette[k]||DEFAULT_TONES[k]);
   const region=regionTones(tones,toneKey),{path,water,shore,thicket}=tones,dark=tones.void,stone=[118,114,122],grass=[104,116,78];
@@ -630,7 +701,7 @@ function pickType(rng,region,patch){
 export function generateNodes(seed){
   const shape=shapeFor(seed),{grid,detail,blocked}=shape,rng=rngFor(seed),nodes=[],B=4,BN=Math.ceil(EXTENT*2/B)+1,buckets=new Array(BN*BN);
   // Nothing grows on Frostmere's ice, and the throne's floor is kept open for the fight.
-  const lair=shape.areas.find(a=>a.id==='briarlair'),arena=(x,z)=>!!lair&&(x-lair.x)*(x-lair.x)+(z-lair.z)*(z-lair.z)<(lair.r-2.5)*(lair.r-2.5);
+  const shrine=shape.areas.find(a=>a.id==='yomi'),lair=shape.areas.find(a=>a.id==='briarlair'),arena=(x,z)=>!!lair&&(x-lair.x)*(x-lair.x)+(z-lair.z)*(z-lair.z)<(lair.r-2.5)*(lair.r-2.5);
   const clear=(x,z)=>{const k=cellOf(x,z);return k<0||grid[k]!==G||(detail[k]&DETAIL.ice)||arena(x,z)?0:blocked[k]*DIST_UNIT;};
   const zone=(x,z)=>{for(const a of shape.areas)if(inArea(a,x,z))return a.id;return regionAt(x,z);};
   const onTrail=(x,z)=>{const k=cellOf(x,z);return k>=0&&(detail[k]&DETAIL.trail)!==0;};
@@ -638,7 +709,8 @@ export function generateNodes(seed){
   const add=(type,x,z)=>{const node={id:`n${nodes.length}`,type,x,z,hits:NODES[type].hits,ready:0};nodes.push(node);const b=bucketOf(x,z);(buckets[b]||(buckets[b]=[])).push(node);return node;};
   const solid=type=>NODES[type].radius>.3,caches=new Set(CACHE_LAYOUT.map(c=>c.type));
   const gapTo=(type,other)=>caches.has(other.type)||caches.has(type)?3:solid(type)&&solid(other.type)?2.3:NODES[type].night||NODES[other.type].night?.9:1.2;
-  const free=(type,x,z)=>{const bi=Math.floor((x+EXTENT)/B),bj=Math.floor((z+EXTENT)/B);for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const list=buckets[(bj+dj)*BN+bi+di];if(!list)continue;for(const n of list){const g=gapTo(type,n);if((n.x-x)**2+(n.z-z)**2<g*g)return false;}}return true;};
+  const props=areaProps(seed),propClear=(x,z)=>props.every(p=>(p.x-x)**2+(p.z-z)**2>=(p.key==='torii'?3.2:1.7)**2);
+  const free=(type,x,z)=>{if(!propClear(x,z))return false;const bi=Math.floor((x+EXTENT)/B),bj=Math.floor((z+EXTENT)/B);for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const list=buckets[(bj+dj)*BN+bi+di];if(!list)continue;for(const n of list){const g=gapTo(type,n);if((n.x-x)**2+(n.z-z)**2<g*g)return false;}}return true;};
   // The first clearing guarantees every basic material within a short walk.
   // Scaled out so the plaza around the Heartfire stays open.
   for(const [t,x,z] of [['tree',-4,-3],['tree',-7,1],['rock',4,-3],['grass',-2,3],['grass',3,3],['bush',5,2],['pumpkin',-4,5],['rock',7,-1],['tree',-6,-6],['grass',1,5],['mushroom',-7,5]])add(t,x*1.6,z*1.6);
@@ -667,6 +739,7 @@ export function generateNodes(seed){
     for(let tries=0;plots.length<want&&tries<400;tries++){
       const r=Math.sqrt(INNER_RING*INNER_RING+rng()*(OUTER_RING*OUTER_RING-INNER_RING*INNER_RING)),[dx,dz]=randomDir(rng),x=dx*r,z=dz*r;
       if(regionAt(x,z)!=='graveyard'||clear(x,z)<5||onTrail(x,z)||plots.some(p=>(p[0]-x)**2+(p[1]-z)**2<20*20))continue;
+      if(shrine&&inArea(shrine,x,z,8))continue;
       plots.push([x,z]);
       const [ux,uz]=randomDir(rng),vx=-uz,vz=ux,rows=2+Math.floor(rng()*2),cols=2+Math.floor(rng()*2);
       for(let a=0;a<rows;a++)for(let b=0;b<cols;b++){if(rng()<.15)continue;
@@ -691,6 +764,9 @@ export function generateNodes(seed){
     let have=0;for(const n of nodes)if(n.type===type)have++;
     for(let t=0;t<want*40&&have<want;t++){const [dx,dz]=randomDir(rng),r=Math.sqrt(rng())*a.r,x=a.x+dx*r,z=a.z+dz*r;if(!inArea(a,x,z,-1)||clear(x,z)<1.5||onTrail(x,z)||!free(type,x,z))continue;add(type,x,z);have++;}
   }
+  // The shrine's garden stones, set among its trees (rock nodes: the look comes below).
+  if(shrine){let have=0;for(const n of nodes)if(n.type==='rock'&&inArea(shrine,n.x,n.z))have++;
+    for(let t=0;t<400&&have<9;t++){const [dx,dz]=randomDir(rng),r=AREAS.yomi.clearing+Math.sqrt(rng())*(shrine.r-AREAS.yomi.clearing),x=shrine.x+dx*r,z=shrine.z+dz*r;if(!inArea(shrine,x,z,-1.5)||clear(x,z)<1.5||onTrail(x,z)||!free('rock',x,z))continue;add('rock',x,z);have++;}}
   // Night-only finds beside their hosts, where the region grows them.
   for(const [host,region] of hosts){
     const night=poolsFor(region).night.find(t=>NIGHT_HOSTS[t]===host.type);if(!night)continue;if(!night||rng()>(host.type==='tree'?.2:.45))continue;
@@ -717,6 +793,8 @@ export function generateNodes(seed){
       stair={x,z};
     }
     if(stair)add('delve',stair.x,stair.z);}
+  // The Shrine of Yomi grows its own: cherry and sacred pine for trees, mossy garden stones for rocks (same harvest).
+  if(shrine)for(const n of nodes){if((n.type==='tree'||n.type==='rock')&&inArea(shrine,n.x,n.z,1))n.look=n.type==='tree'?'yomi-tree':'yomi-rock';}
   return reachableOnly(shape,nodes);
 }
 

@@ -23,6 +23,8 @@ export const HELD_GEAR = Object.freeze({
   'kitsune-lantern': {motion: 'kitsune', handY: 1.12, handX: .59, sprite: 'kitsune-lantern'},
   plaguebeak: {motion: 'plague', handY: 1.08, handX: .55, sprite: 'plaguebeak'},
   gloomgrasp: {motion: 'grasp', handY: 1.1, handX: .55, sprite: 'gloomgrasp'},
+  // Kagekiri swings in the arm rig (player-rig.mjs RIG_GEAR); this pose stands in while the rig's sheets load.
+  katana: {motion: 'swing', sprite: 'held-katana'},
 });
 
 export const MAGIC_PALETTE = Object.freeze({

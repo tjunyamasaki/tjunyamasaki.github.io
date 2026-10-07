@@ -122,7 +122,7 @@ The arena keeps only health and level: no hunger, courage, weapon wear or loot. 
 - Active skills you learn go on the **skill bar** (1–4) at the bottom; the class's ultimate is on the ✦ button (Q). Skills spend the class's resource and recharge on their own timers.
 - **Tools** has the test switches: levels up and down (down refunds your points), spawn foes, clear them, call the next wave, fill the resource, **Invulnerable**, **Hold the waves** and **Free skills**.
 
-The first class is the **Kagekiri Ronin**, built on Kagekiri, the shrine blade of Yomi. Your attack is its iai draw: three draws make a set, every cut hangs in the air, and the third draw sheathes the blade and snaps every hanging cut shut on whatever stands in it. Where two of your cuts cross, the snap bursts there too (a **Crux**). Draws that land and snaps build **Ki**; skills spend it.
+The **Kagekiri Ronin** is built on Kagekiri, the shrine blade of Yomi. Your attack is its iai draw: three draws make a set, every cut hangs in the air, and the third draw sheathes the blade and snaps every hanging cut shut on whatever stands in it. Where two of your cuts cross, the snap bursts there too (a **Crux**). Draws that land and snaps build **Ki**; skills spend it.
 
 | Branch | What it does | Skills | Capstone |
 | --- | --- | --- | --- |
@@ -131,6 +131,26 @@ The first class is the **Kagekiri Ronin**, built on Kagekiri, the shrine blade o
 | **Sakura** · the Sheath | closes the lines | **Swift Sheath** (snap everything now, harder for the Ki you spend), **Falling Blossom** (six cuts close a ring round your mark: six corners, six Crux) | **Thousand Petals**: every closed cut looses a petal blade |
 
 The ultimate, **Hundred-Line Draw**, wakes at level 6. A typical turn: lay a Crossing Cut or a Falling Blossom where the swarm is coming, Shadow Lure everything onto the lines, then Swift Sheath to close them all at once.
+
+The **Green Dragon General** is built on the Green Dragon guandao. Your attack is its crescent sweep: cut again the same way, soon enough, and the reach grows three steps (3 to 6.3 units), harder each time; turn and it shortens. Foes at the very **tip** of a sweep take more. Sweeps that land and shots you cut out of the air build **Qi**.
+
+| Branch | What it does | Skills | Capstone |
+| --- | --- | --- | --- |
+| **Qinglong** · the Line | reach further, hold longer | **Dragon Lunge** (a charge that counts as a held cut: the line steps up), **Crescent Wave** (the edge flies down the line, longer and harder per step, and spends it) | **Coiled Dragon**: the wave keeps the line |
+| **Shan** · the Mountain | stand your ground | **Mountain Stance** (the line holds whichever way you turn), **Reaping Hook** (drag a wide arc of foes to the tip of your next sweep), **Whirling Crescent** (a full circle that steps the line up) | **Heart of the Mountain**: every sweep in stance echoes |
+| **Long** · the Dragon | the dragon in the blade | **Dragon's Roar** (stun a cone, drop its shots), **Dragon Pearl** (hangs at your mark until a sweep reaches it, then bursts) | **Ascending Dragon**: a full-reach wave wakes the dragon |
+
+Its ultimate is **Green Dragon Unbound**. A turn: hold the line to full reach, Reaping Hook the swarm onto your tip, sweep, then send the Crescent Wave.
+
+The **Hundred-Seal Daoshi** is built on the Hundred Seals. Your attack flicks a talisman that pastes a seal; the third seal on one foe ignites them all, and the fire runs down the link to every other foe you have sealed nearby. **Chain Fire**: a linked foe that held two seals or more catches fire itself, so one spark can run through a whole web. Seals that stick and foes the fire burns build **Ink**.
+
+| Branch | What it does | Skills | Capstone |
+| --- | --- | --- | --- |
+| **Fu** · the Paper | more talismans, sharper, a fourth seal | **Talisman Fan** (one talisman at each foe before you), **Talisman Storm** (every throw flicks two more) | **A Hundred Seals**: the fan throws twice |
+| **Huo** · the Fire | the web burns | **Release** (every seal you laid ignites at once), **Spirit Thread** (copy your most-sealed foe's seals onto every foe round it) | **Wildfire**: the fire pastes seals where it runs |
+| **Shen** · the Spirit | hold the swarm where the seals reach | **Warding Talisman** (a ward that throws for you), **Binding Circle** (root and seal a circle) | **Exorcism**: the weak burn twice as hard |
+
+Its ultimate is **Grand Seal**. A turn: Binding Circle the pack, Spirit Thread the seals across it, then let one talisman start the chain.
 
 ## Shared chests
 

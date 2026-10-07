@@ -250,3 +250,120 @@ test('a Class Vigil binds the class weapon, keeps other weapons in the pack, and
   q.x = 0; q.z = 0; q.dx = 1; q.dz = 0;
   assert.equal(saved.action('host', {type: 'classSkill', skill: 'kesagiri'}).ok, true, 'skills cast after a reload');
 });
+
+function classed(classId, level = 40){
+  const {world, p} = setup();
+  act(world, {type: 'classPick', classId});
+  if(level > 1) act(world, {type: 'classTest', op: 'level', n: level-1});
+  act(world, {type: 'classTest', op: 'toggle', key: 'hold'});
+  act(world, {type: 'classTest', op: 'toggle', key: 'god'});
+  world.arena.phase = 'cleared'; world.arena.timer = 0;
+  p.talents = Object.fromEntries(Object.entries(CLASSES[classId].nodes).map(([id, n]) => [id, n.max]));
+  p.x = 0; p.z = 0; p.dx = 1; p.dz = 0;
+  world.tick(.05);
+  return {world, p};
+}
+const castNow = (world, p, skill) => {p.classGcd = 0; return act(world, {type: 'classSkill', skill});};
+const typesDuring = (world, secs) => {const seen = new Set(); for(let t = 0; t < secs-1e-9; t += .05){world.tick(.05); for(const ev of world.events) seen.add(ev.type);} return seen;};
+
+test('Green Dragon General: the hook sets foes on the tip, the line grows, the wave spends it, the pearl bursts', () => {
+  const {world, p} = classed('general');
+  assert.equal(p.equipment.weapon.itemId, 'guandao');
+  assert.ok(p.gdMods.tipB > .25 && p.gdMods.reach > 0);
+  const near = foe(world, 1.5, .3), far = foe(world, 5.2, -.5);
+  p.ki = 100;
+  assert.equal(castNow(world, p, 'hook').ok, true);
+  typesDuring(world, .5);
+  const tip = 3+p.gdMods.reach-.6;
+  for(const e of [near, far]) assert.ok(Math.abs(Math.hypot(e.x, e.z)-tip) < .4, `dragged to the tip (${Math.hypot(e.x, e.z).toFixed(2)} vs ${tip.toFixed(2)})`);
+  // Three cuts the same way: the line climbs to full reach.
+  for(let i = 0; i < 3; i++){p.cooldown = 0; p.dx = 1; p.dz = 0; world.attack(p); typesDuring(world, .3);}
+  assert.equal(p.gdStage, 2);
+  assert.equal(castNow(world, p, 'lunge').ok, true);
+  typesDuring(world, .4);
+  assert.equal(p.gdStage, 3, 'the lunge counts as a held cut');
+  const before = far.hp;
+  p.ki = 100; p.x = 0; p.z = 0;
+  assert.equal(castNow(world, p, 'wave').ok, true);
+  typesDuring(world, .1);
+  assert.ok(far.hp < before, 'the wave cuts along the line');
+  assert.equal(p.gdStage, 3, 'Coiled Dragon keeps the line');
+  // The pearl waits at the mark until a crescent reaches it.
+  p.ki = 100;
+  const mark = foe(world, 4.5, 0);
+  assert.equal(castNow(world, p, 'pearl').ok, true);
+  assert.ok(p.general.pearl);
+  const seen = new Set();
+  for(let i = 0; i < 4 && p.general.pearl; i++){p.cooldown = 0; p.dx = 1; p.dz = 0; world.attack(p); for(const t of typesDuring(world, .3)) seen.add(t);}
+  assert.equal(p.general.pearl, null);
+  assert.ok(seen.has('genpearlburst'));
+  assert.ok(mark.hp < 5000);
+  // Whirl, roar, stance, the ultimate and its rush.
+  p.ki = 100; assert.equal(castNow(world, p, 'whirl').ok, true);
+  p.ki = 100; assert.equal(castNow(world, p, 'roar').ok, true);
+  p.ki = 100; assert.equal(castNow(world, p, 'stance').ok, true);
+  assert.ok(p.gdMods.stance === false, 'mods follow on the next tick');
+  world.tick(.05);
+  assert.equal(p.gdMods.stance, true);
+  p.ki = 100; p.classGcd = 0; assert.equal(act(world, {type: 'skill'}).ok, true);
+  assert.ok(p.gdDragon > world.time);
+  const after = typesDuring(world, 7);
+  assert.ok(after.has('fx'), 'the dragon rushes');
+  assert.ok(!(p.gdDragon > world.time));
+});
+
+test('Hundred-Seal Daoshi: fans and circles paste seals, threads copy them, and one spark runs the chain', () => {
+  const {world, p} = classed('daoshi');
+  assert.equal(p.equipment.weapon.itemId, 'ofuda');
+  assert.equal(p.sealMods.max, 4);
+  const foes = [foe(world, 4, -1.2), foe(world, 4.3, 0), foe(world, 4, 1.2), foe(world, 5.2, .6), foe(world, 5.2, -.6)];
+  p.ki = 100;
+  assert.equal(castNow(world, p, 'binding').ok, true);
+  const pins = () => (world.magicPins || []).filter(q => q.packId === 'ofuda' && !q.done);
+  assert.equal(pins().length, 5);
+  assert.ok(pins().every(q => q.n === 2), 'Deep Binding pastes two');
+  assert.ok(foes.every(e => e.magicRootRemaining > 1));
+  // Spirit Thread: the most-sealed foe's seals copied round it (one short of igniting).
+  pins()[1].n = 3;
+  p.ki = 100;
+  assert.equal(castNow(world, p, 'spread').ok, true);
+  assert.ok(pins().every(q => q.n === 3), 'all at three of four');
+  // One talisman: the first foe ignites, and the chain runs through every linked foe holding seals.
+  const seen = new Set();
+  for(let i = 0; i < 6 && pins().length; i++){p.cooldown = 0; world.attack(p); for(const t of typesDuring(world, .3)) seen.add(t);}
+  assert.ok(seen.has('sealburn'));
+  assert.ok(seen.has('daochain'), 'the fire jumped on its own');
+  assert.ok(foes.every(e => e.hp < 5000));
+  assert.ok(foes.some(e => e.dot?.kind === 'burn'), 'Embers');
+  // Fan, storm, ward, release and the ultimate.
+  p.ki = 100; assert.equal(castNow(world, p, 'fan').ok, true);
+  const darts = () => (world.magicDarts || []).filter(d => d.packId === 'ofuda').length;
+  assert.ok(darts() >= 7);
+  typesDuring(world, .5);
+  p.ki = 100; assert.equal(castNow(world, p, 'storm').ok, true);
+  p.cooldown = 0; const had = darts(); world.attack(p); assert.equal(darts()-had, 3, 'the storm adds two');
+  p.ki = 100; assert.equal(castNow(world, p, 'ward').ok, true);
+  const wardSeen = typesDuring(world, 2);
+  assert.ok(wardSeen.has('daowardthrow'));
+  act(world, {type: 'classTest', op: 'toggle', key: 'freeSkills'});
+  assert.equal(castNow(world, p, 'binding').ok, true);
+  assert.equal(castNow(world, p, 'kai').ok, true);
+  assert.equal(pins().length, 0, 'every seal released');
+  p.ki = 100; p.classGcd = 0; assert.equal(act(world, {type: 'skill'}).ok, true);
+  const ult = typesDuring(world, 1.5);
+  assert.ok(ult.has('sealburn'));
+  act(world, {type: 'classTest', op: 'clear'});
+  typesDuring(world, 12);
+  assert.equal(p.daoshi.ward, null);
+  assert.equal((world.magicPins || []).filter(q => q.packId === 'ofuda').length, 0);
+});
+
+test('a class can be changed on the test ground: the old weapon and tuning go, the new ones come', () => {
+  const {world, p} = classed('ronin');
+  assert.ok(p.kataMods);
+  assert.equal(act(world, {type: 'classPick', classId: 'daoshi'}).ok, true);
+  assert.equal(p.equipment.weapon.itemId, 'ofuda');
+  assert.equal(p.kataMods, null);
+  assert.deepEqual(p.talents, {});
+  assert.ok(![p.equipment.weapon, ...p.inventory.slots].some(s => s?.itemId === 'katana'), 'the katana went with the class');
+});

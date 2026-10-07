@@ -19,6 +19,8 @@ import {GUANDAO_FX} from './guandao.mjs?v=harvest-18';
 import {OFUDA_FX} from './ofuda.mjs?v=harvest-18';
 import {ODOKURO_FX} from './odokuro.mjs?v=harvest-18';
 import {RONIN_FX} from './ronin.mjs?v=harvest-18';
+import {GENERAL_FX} from './general.mjs?v=harvest-18';
+import {DAOSHI_FX} from './daoshi.mjs?v=harvest-18';
 import {HOLLOW_EVENTS, paintHollow} from './hollow.mjs?v=harvest-18';
 import {REFINE_EVENTS, paintWave} from './refine.mjs?v=harvest-18';
 import {magicItems} from '../magic/registry.mjs?v=harvest-18';
@@ -38,7 +40,9 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
  *                      behind the body); `keep` is handed back to its list painters as ctx.rig(ownerId).
  * Starfall predates this and is wired in by hand below.
  */
-export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAPER_FX, HORN_FX, MOON_FX, THORNHEART_FX, DEEPEYE_FX, KATANA_FX, GUANDAO_FX, OFUDA_FX, ODOKURO_FX, RONIN_FX];
+export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAPER_FX, HORN_FX, MOON_FX, THORNHEART_FX, DEEPEYE_FX, KATANA_FX, GUANDAO_FX, OFUDA_FX, ODOKURO_FX, RONIN_FX, GENERAL_FX, DAOSHI_FX];
+/** Classes (src/classes): `player(d, p, ctx)` paints what a class keeps on its wanderer (a pearl, a ward), by class id. */
+const CLASS_FX = new Map([RONIN_FX, GENERAL_FX, DAOSHI_FX].map(fx => [fx.id, fx]));
 const FOE_FX = WEAPON_FX.filter(fx => fx.foes);
 const FX_BY_ID = new Map(WEAPON_FX.map(fx => [fx.id, fx]));
 
@@ -120,6 +124,7 @@ export class WeaponFx {
     }
     for(const p of world.players || []){
       if(!p.online) continue;
+      if(p.classId) CLASS_FX.get(p.classId)?.player?.(d, p, ctx);
       const cast = p.skillCast, age = (frame?.time ?? world.time)-(cast?.at ?? -99);
       if(cast && age >= 0 && age < 1){
         const own = FX_BY_ID.get(cast.itemId)?.skillCast;

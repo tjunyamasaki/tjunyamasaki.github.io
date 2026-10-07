@@ -498,7 +498,7 @@ function paintClasses(force=false){
     const body=sheetEl.querySelector('.lab-body');if(body)body.scrollTop=scroll;
   }
   const sig=chosen?JSON.stringify([p.classId,p.classBar,p.talents]):'';
-  if(force||sig!==classBarSig){classBarSig=sig;$('class-bar').innerHTML=chosen?classBarMarkup(world,p):'';}
+  if(force||sig!==classBarSig){classBarSig=sig;$('class-bar').innerHTML=chosen?classBarMarkup(world,p):'';$('class-bar').style.setProperty('--class-color',classOf(p)?.resource?.color||'#ff8fb3');}
   const free=chosen?pointsFree(p):0;
   if(free>classPoints&&chosen&&p.level>1)toast(free>1?`${free} talent points to spend ✧`:'A talent point to spend ✧');
   classPoints=free;

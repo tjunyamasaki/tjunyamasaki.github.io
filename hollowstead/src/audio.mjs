@@ -69,6 +69,22 @@ export class Sound {
     if(type==='roninecho'||type==='roninreturned'){this.sweep(160,480,.4,'sine',.03);this.sweep(980,1960,.35,'triangle',.006,.05);return;}
     if(type==='roninreturn'){this.sweep(1800,4600,.12,'sawtooth',.006);this.sweep(1320,1980,.2,'sine',.012);return;}
     if(type==='roninpetals'){this.sweep(3600,2400,.18,'sine',.008);return;}
+    // The Green Dragon General (src/classes/general.mjs): a charge, a flying edge that rings higher per step, chains, a roar, the pearl.
+    if(type==='genlunge'){if(ev?.start)this.sweep(240,520,.18,'sawtooth',.012);else this.sweep(1800,900,.15,'sine',.012);return;}
+    if(type==='genwave'){const st=Math.max(0,Math.min(3,ev?.stage||0));this.sweep(900+st*260,300,.4,'sawtooth',.01);this.sweep(1600+st*300,1500+st*300,.3,'sine',.012);return;}
+    if(type==='genhook'){this.sweep(160,600,.28,'square',.01);this.sweep(1200,500,.2,'sawtooth',.006);return;}
+    if(type==='genroar'){this.sweep(120,60,.6,'sawtooth',.05);this.sweep(240,110,.5,'triangle',.04);return;}
+    if(type==='genstance'){this.sweep(110,50,.5,'triangle',.06);return;}
+    if(type==='genpearl'){this.sweep(880,1760,.25,'sine',.012);return;}
+    if(type==='genpearlburst'){this.sweep(200,70,.4,'triangle',.06);for(const [i,f] of [1318,1760,2637].entries())this.sweep(f,f,.35,'sine',.012,i*.04);return;}
+    // The Hundred-Seal Daoshi (src/classes/daoshi.mjs): paper fans, a bell for the circle, threads, the ward, fire jumping a link.
+    if(type==='daofan'){for(let i=0;i<3;i++)this.sweep(2400+i*300,1200,.08,'sawtooth',.005,i*.04);return;}
+    if(type==='daobind'){this.sweep(523,520,.6,'sine',.02);this.sweep(1046,1040,.5,'sine',.01,.03);return;}
+    if(type==='daothread'){this.sweep(700,1400,.3,'triangle',.012);return;}
+    if(type==='daoward'){this.sweep(330,660,.3,'sine',.02);this.sweep(1980,1970,.4,'sine',.006,.1);return;}
+    if(type==='daowardthrow'){this.sweep(2600,1600,.05,'sawtooth',.004);return;}
+    if(type==='daochain'){this.sweep(500+(ev?.depth||1)*160,200,.18,'sawtooth',.012);return;}
+    if(type==='daokai'||type==='daostorm'){this.sweep(300,900,.25,'triangle',.02);return;}
     if(type==='talent'){for(const [i,f] of [660,880,1320].entries())this.sweep(f,f,.3,'sine',.014,i*.07);return;}
     if(type==='kataappear'){this.sweep(300,960,.26,'sine',.022);this.sweep(2200,2240,.2,'sine',.006,.08);return;}
     // The Shrine of Yomi's weapons: the guandao's whistling crescent (longer as the line holds), its echo and the

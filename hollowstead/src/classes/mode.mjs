@@ -14,6 +14,8 @@ import {isMagicAlly} from '../magic/registry.mjs?v=harvest-18';
 import {MAX_LEVEL, maxHealth, pickWeighted, xpToNext} from '../progression.mjs?v=harvest-18';
 import {CLASSES, castSkill, classOf, coolSkills, learn, respec, slotSkill} from './registry.mjs?v=harvest-18';
 import './ronin.mjs?v=harvest-18';
+import './general.mjs?v=harvest-18';
+import './daoshi.mjs?v=harvest-18';
 
 export const CLASS_MODE = Object.freeze({
   countdown: 3,       // seconds between choosing (or a cleared wave) and the next wave

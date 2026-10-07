@@ -12,7 +12,7 @@ const P = hue(PACK), PAPER = '#f6e7a6', SCRIPT = '#b8343a';
 const rankOfOwner = p => p && typeof p === 'object' ? rankOf(p, PACK) : 1;
 
 /** One paper slip at (x, y, z), turned `spin` radians in the screen plane, `s` its size. */
-function slip(d, x, z, y, spin, s, alpha = 1, heat = 0){
+export function slip(d, x, z, y, spin, s, alpha = 1, heat = 0){
   const c = Math.cos(spin), si = Math.sin(spin), q = (u, v) => at(x, z, y, (u*c-v*si)*s, (u*si+v*c)*s);
   const body = [q(-.22, .5), q(.22, .5), q(.22, -.5), q(-.22, -.5)];
   d.path([...body, body[0]], 0, INK, .9*alpha, {fill: true});

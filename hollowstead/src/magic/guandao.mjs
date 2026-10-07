@@ -19,6 +19,17 @@ export const CRESCENT = Object.freeze({
 });
 export const DRAGON = Object.freeze({secs: 4.5, reach: 7.4, gain: 1.55, echoes: 2, rush: 12, width: 1.9});
 const TAU = Math.PI*2;
+/**
+ * Optional per-wielder tuning, `p.gdMods` (the Green Dragon General class sets it from its talents,
+ * src/classes/general.mjs; nothing else does, so the weapon is unchanged everywhere else). All optional:
+ * damage (x), reach (+ at every step), window (+ s), hold (+ degrees), echoAt (step that echoes, default 3),
+ * echoShare, echoAll (every sweep echoes), stance (the line holds whichever way you turn, and every sweep
+ * steps up), tipW/tipB (the outer tipW of the crescent hits tipB more), top (damage x at full reach).
+ */
+const NO_MODS = Object.freeze({});
+const modsOf = p => (p?.gdMods && typeof p.gdMods === 'object') ? p.gdMods : NO_MODS;
+/** Listeners told after every sweep a wielder makes ({sweep, hits, parried}). Host only. */
+export const GD_HOOKS = {sweep: []};
 
 export const magicPack = {
   id: PACK,
@@ -46,7 +57,7 @@ function hurt(world, e, amount, ownerId){
   e.lastHitBy = ownerId; if(e.home && !e.aggro) e.aggro = true;
 }
 /** True when (x, z) lies in the crescent of a sweep. */
-function inCrescent(s, x, z, pad = 0){
+export function inCrescent(s, x, z, pad = 0){
   const dx = x-s.ox, dz = z-s.oz, d = Math.hypot(dx, dz);
   if(d > s.r+pad || d < CRESCENT.inner) return false;
   return Math.abs(angleDelta(Math.atan2(dz, dx), s.ang)) <= s.arc*Math.PI/360+pad/Math.max(1, d);
@@ -54,7 +65,11 @@ function inCrescent(s, x, z, pad = 0){
 /** Cut whatever stands in the crescent now. Returns how many it struck. */
 function cut(world, s, share = 1){
   let n = 0;
-  for(const e of hostiles(world)) if(inCrescent(s, e.x, e.z, bodyOf(e)*.8)){hurt(world, e, s.dmg*share, s.ownerId); n++;}
+  for(const e of hostiles(world)) if(inCrescent(s, e.x, e.z, bodyOf(e)*.8)){
+    // The tip (a class's tuning): the outer edge of the crescent bites deeper.
+    const tip = s.tipB > 0 && Math.hypot(e.x-s.ox, e.z-s.oz) >= s.r-(s.tipW || 0)-bodyOf(e)*.4;
+    hurt(world, e, s.dmg*share*(tip ? 1+s.tipB : 1), s.ownerId); n++;
+  }
   return n;
 }
 /** The edge cuts enemy shots out of the air (not ground blasts or lobbed spores). */
@@ -75,25 +90,38 @@ export function use(world, player){
   const dx = length > 1e-6 ? player.dx/length : 0, dz = length > 1e-6 ? player.dz/length : 1;
   const power = ownerPower(world, player), ang = Math.atan2(dz, dx), now = world.time || 0;
   // Holding the line: the same way again, soon enough, and the haft runs out one more step.
-  const held = Number.isFinite(player.gdAng) && now-(player.gdAt ?? -99) < CRESCENT.window && Math.abs(angleDelta(ang, player.gdAng)) <= CRESCENT.hold*Math.PI/180;
+  const M = modsOf(player);
+  const held = Number.isFinite(player.gdAng) && now-(player.gdAt ?? -99) < CRESCENT.window+(M.window || 0) &&
+    (M.stance || Math.abs(angleDelta(ang, player.gdAng)) <= (CRESCENT.hold+(M.hold || 0))*Math.PI/180);
   const stage = held ? Math.min(3, (player.gdStage || 0)+1) : 0;
-  const dragon = player.gdDragon > now;
-  const r = dragon ? DRAGON.reach : CRESCENT.reach[stage], gain = dragon ? DRAGON.gain : CRESCENT.gain[stage];
-  const side = player.gdSide === 1 ? -1 : 1;
-  const sweep = {id: world.nextId('gd'), packId: PACK, ownerId: player.id, ox: round(player.x), oz: round(player.z), ang: round(ang), arc: CRESCENT.arc,
-    r, stage: dragon ? 4 : stage, side, age: 0, life: CRESCENT.life, delay: 0, dmg: round(CRESCENT.damage*gain*power)};
-  (world.magicSweeps ||= []).push(sweep);
-  cut(world, sweep);
-  const parried = parry(world, sweep);
-  // At full reach the edge echoes where it fell (twice while the dragon is awake).
-  const echoes = dragon ? DRAGON.echoes : stage >= 3 ? 1 : 0;
-  for(let k = 1; k <= echoes; k++) world.magicSweeps.push({...sweep, id: world.nextId('gd'), echo: k, delay: CRESCENT.echo*k, fired: false, side: -sweep.side*(k%2 ? 1 : -1)});
-  player.gdStage = stage; player.gdAng = round(ang); player.gdAt = round(now); player.gdSide = side;
+  const sweep = sweepAt(world, player, {ang, stage, power});
   world.wearEquipped(player, 'weapon', 1);
   player.dx = dx; player.dz = dz; player.rest = false;
   player.cooldown = CRESCENT.cooldown;
   player.action = 'attack'; player.actionUntil = now+.5;
-  world.event('gdcut', player.x, player.z, '', {player: player.id, itemId: PACK, stage: sweep.stage, angle: sweep.ang, r, parried});
+  return sweep;
+}
+
+/**
+ * One sweep of the blade at `ang` and line step `stage`, keeping the line (gdStage, gdAng, gdAt). The
+ * attack's own; the General's skills sweep through it too (`arc` 360 for a whirl, `share` of the damage).
+ */
+export function sweepAt(world, player, {ang, stage = 0, power = ownerPower(world, player), arc = CRESCENT.arc, share = 1, keepAngle = false} = {}){
+  const now = world.time || 0, M = modsOf(player), dragon = player.gdDragon > now;
+  const r = (dragon ? DRAGON.reach : CRESCENT.reach[stage])+(M.reach || 0), gain = dragon ? DRAGON.gain : CRESCENT.gain[stage];
+  const side = player.gdSide === 1 ? -1 : 1;
+  const sweep = {id: world.nextId('gd'), packId: PACK, ownerId: player.id, ox: round(player.x), oz: round(player.z), ang: round(ang), arc,
+    r: round(r), stage: dragon ? 4 : stage, side, age: 0, life: CRESCENT.life, delay: 0, dmg: round(CRESCENT.damage*gain*power*(M.damage || 1)*(stage >= 3 ? M.top || 1 : 1)*share),
+    ...(M.tipB > 0 ? {tipW: M.tipW || 1.2, tipB: M.tipB} : {})};
+  (world.magicSweeps ||= []).push(sweep);
+  const hits = cut(world, sweep);
+  const parried = parry(world, sweep);
+  // At full reach the edge echoes where it fell (twice while the dragon is awake).
+  const echoes = dragon ? DRAGON.echoes : M.echoAll || stage >= (M.echoAt || 3) ? 1 : 0;
+  for(let k = 1; k <= echoes; k++) world.magicSweeps.push({...sweep, id: world.nextId('gd'), echo: k, delay: CRESCENT.echo*k, fired: false, side: -sweep.side*(k%2 ? 1 : -1), share: M.echoShare || CRESCENT.echoShare});
+  player.gdStage = stage; if(!keepAngle) player.gdAng = round(ang); player.gdAt = round(now); player.gdSide = side;
+  world.event('gdcut', player.x, player.z, '', {player: player.id, itemId: PACK, stage: sweep.stage, angle: sweep.ang, r: sweep.r, parried, ...(arc !== CRESCENT.arc ? {arc} : {})});
+  for(const hook of GD_HOOKS.sweep) hook(world, player, {sweep, hits, parried});
   return sweep;
 }
 
@@ -107,7 +135,7 @@ export function step(world, dt){
     s.age += dt;
     if(s.delay > 0 && !s.fired && s.age >= s.delay){
       s.fired = true;
-      cut(world, s, CRESCENT.echoShare);
+      cut(world, s, s.share || CRESCENT.echoShare);
       parry(world, s);
       world.event('gdecho', s.ox, s.oz, '', {player: s.ownerId, itemId: PACK, angle: s.ang, r: s.r});
     }

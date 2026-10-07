@@ -251,6 +251,12 @@ export const ENEMIES = {
   // and hopping corpses that leap at you arms first.
   chochin:{name:'Chōchin-obake',hp:22,speed:4.4,damage:12,range:1.9,period:1.35,loot:{fiber:1}},
   jiangshi:{name:'Jiangshi',hp:64,speed:2.9*SPEED_SCALE,damage:22,range:4.2,period:2.2,loot:{bone:1}},
+  // Its yokai (yokai.mjs): umbrellas that skip at you, a woman whose neck crosses the ground, the snow woman's
+  // frost, and a fallen priest who seals you in with talismans and rings up the dead.
+  kasa:{name:'Kasa-obake',hp:30,speed:4.8,damage:13,range:6.2,period:1.75,loot:{fiber:1}},
+  rokurokubi:{name:'Rokurokubi',hp:46,speed:2.6*SPEED_SCALE,damage:20,range:11,period:2.9,loot:{bone:1}},
+  yukionna:{name:'Yuki-onna',hp:42,speed:2.3*SPEED_SCALE,damage:17,range:10,period:3.3,loot:{rime:1}},
+  daoshi:{name:'Fallen daoshi',hp:78,speed:2.4*SPEED_SCALE,damage:21,range:10,period:3.1,loot:{ember:1}},
   // The great bosses (bosses.mjs): Mother Briar on her throne, The Unblinking at the bottom of a delve.
   briarmother:{name:'Mother Briar',hp:2400,speed:1.55*SPEED_SCALE,damage:58,range:4.2,period:2.1,boss:true,loot:{ember:12}},
   unblinking:{name:'The Unblinking',hp:2200,speed:1.1*SPEED_SCALE,damage:62,range:6,period:2,boss:true,loot:{ember:14}},

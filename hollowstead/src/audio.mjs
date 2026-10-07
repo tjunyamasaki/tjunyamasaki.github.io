@@ -88,9 +88,15 @@ export class Sound {
       if(st==='star'){this.sweep(120,30,.6,'sine',.09);this.sweep(900,200,.3,'triangle',.02);return;}
       if(st==='gaze'){this.sweep(1400,500,.1,'sawtooth',.01);return;}
       if(st==='void'||st==='tendril'){this.sweep(90,40,.35,'sine',.05);return;}
+      // The Shrine of Yomi's yokai: rain splashes, the neck whips, frost cracks, talismans flare.
+      if(st==='rain'){this.sweep(700,240,.12,'sine',.03);this.sweep(2200,1400,.05,'triangle',.006);return;}
+      if(st==='neck'){this.sweep(220,520,.14,'sawtooth',.02);return;}
+      if(st==='frost'){this.sweep(2600,1800,.16,'triangle',.012);this.sweep(1300,900,.1,'sine',.01,.03);return;}
+      if(st==='ofuda'){this.sweep(500,180,.2,'square',.018);return;}
       this.sweep(260,70,.18,'square',.02);this.sweep(1200,500,.06,'square',.005,.02);return;}
     // The great bosses: a roar when they rise or change, a rumble before their big patterns.
     if(type==='bossrise'||type==='bossphase'){this.sweep(70,40,1.4,'sawtooth',.06);this.sweep(140,60,1.2,'square',.02,.05);this.sweep(320,90,.9,'sine',.03,.1);return;}
+    if(type==='bell'){for(const [i,f] of [392,587].entries())this.sweep(f,f*.995,1.1,'sine',.03,i*.02);this.sweep(1568,1560,.6,'triangle',.008);return;}
     if(type==='bossroar'){this.sweep(110,50,.7,'sawtooth',.035);return;}
     // Omens, moons and the vigil.
     if(type==='omen'){for(const [i,f] of [659,880,1319].entries())this.sweep(f,f*1.01,.7,'sine',.014,i*.12);return;}

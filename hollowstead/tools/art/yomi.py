@@ -16,7 +16,9 @@ writes themes/yomi/sprites/, themes/yomi/sprites.json and themes/yomi/preview.ht
   miko, daoshi        wanderers, 8 x 2 like ember: 0-1 idle, 2-5 walk, 6-8 attack, 9-11 gather,
                       12 dash, 13 down, 14-15 idle. They take the witch's pose parameters (feet, ab/af,
                       lean, by, hem, hat, eyes, mouth, fx, noarm), so rig.py can adopt them later.
-  chochin, jiangshi   creatures, 4 x 2 like crawler: 0-3 walk, 4-6 attack (wind-up, strike, recover), 7 idle
+  chochin, jiangshi,  creatures, 4 x 2 like crawler: 0-3 walk, 4-6 attack (wind-up, strike, recover), 7 idle
+  kasa, rokurokubi,   (the yokai: src/yokai.mjs; daoshi is the exorcist fallen, ash robes and a bell,
+  yukionna, daoshi    drawn by daoshi(fallen=True); the friendly wanderer is `daoshi-wanderer`)
   sakura, matsu       trees, 1 x 1, the tree's world size (the shrine's `yomi-tree` look)
   yomi-rock(-b)       garden stones and a roped sacred boulder (the shrine's `yomi-rock` look)
   toro, torii, jizo   stone lantern (4 x 1 looping flame), shrine gate, jizo statue (the shrine's props)
@@ -28,7 +30,7 @@ sys.path.insert(0, HERE)
 import lib
 from lib import *
 from actors import seg, bar, SKIN, SKIN_D
-from wanderers import after
+from wanderers import after, glow_eyes
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 OUT = os.path.join(ROOT, "themes", "yomi")
@@ -50,6 +52,14 @@ CORPSE = "#a7bfa6"; CORPSE_D = "#7a9580"; CORPSE_L = "#d2e2cc"
 ROBE = "#36426c"; ROBE_D = "#242c4e"; ROBE_L = "#5a6a9e"
 TONGUE = "#e0727c"; TONGUE_D = "#b04a5c"; MAW = "#4a1a28"
 HITO = "#9fe0e8"; HITO_L = "#e6fbff"                          # hitodama (ghost fire)
+ASH = "#5e576e"; ASH_D = "#403a52"; ASH_L = "#857d98"         # a fallen priest's grave-grey robes
+GHOUL_EYE = "#c8ff8a"                                          # the lit eyes of the risen (jiangshi, the fallen daoshi)
+BRONZE = "#b98a3e"; BRONZE_D = "#87602a"; BRONZE_L = "#e2bd72"
+KASA = "#4d6aa0"; KASA_D = "#334a78"; KASA_L = "#7c96c8"      # oiled umbrella paper
+PLUM = "#7a4a6a"; PLUM_D = "#553248"; PLUM_L = "#a46e8e"      # the rokurokubi's kimono
+PALE = "#f4dcc8"; PALE_D = "#d8b49c"
+SNOW = "#eef4f8"; SNOW_D = "#b8cad8"; SNOW_L = "#ffffff"      # the snow woman
+ICEB = "#8fb8d8"; ICEB_D = "#5f88ac"; FROSTSK = "#e6eef4"; FROSTSK_D = "#b8c8d6"
 
 
 def at_scale(s, draw):
@@ -290,7 +300,11 @@ def gourd(x, y, rot):
 
 
 def daoshi(P):
+    """The Taoist exorcist. `fallen=True` is the Shrine's hostile priest: ash robes, a corpse's skin, lit eyes, a bell."""
     d = []; b = ""
+    fallen = P.get("fallen", False)
+    R, R_D, R_L, R_DD = (ASH, ASH_D, ASH_L, "#2a2636") if fallen else (JADE, JADE_D, JADE_L, "#285447")
+    sk, sk_d = (CORPSE, CORPSE_D) if fallen else (SKIN, SKIN_D)
     by = P.get("by", 0); lean = P.get("lean", 0); sway = P.get("hem", 0); hs = P.get("hat", 0)
     feet = P.get("feet", [(-26, 0), (26, 0)])
     hip = (256, 640 + by)
@@ -303,26 +317,28 @@ def daoshi(P):
     body = ""
     sh_b = (210, 484 + by); sh_f = (302, 484 + by)
     ab = P.get("ab", (-12, -8))
-    a_b, _ = wide_sleeve(d, sh_b, ab[0], ab[1], JADE_D, "#285447", SKIN_D, cuff=54, drop=20)
+    a_b, _ = wide_sleeve(d, sh_b, ab[0], ab[1], R_D, R_DD, sk_d, cuff=54, drop=20)
     body += a_b
     robe = f"M212 {464 + by} L300 {464 + by} Q328 {540 + by} {340 + sway} {680 + by} Q256 {694 + by} {172 + sway} {680 + by} Q186 {540 + by} 212 {464 + by} Z"
-    slit = line(f"M{300 + sway * .7} {600 + by} L{306 + sway} {684 + by}", 6, JADE_D)
-    hem = fill_ns(f"M150 {664 + by} L360 {664 + by} L360 {700 + by} L150 {700 + by} Z", JADE_D)
-    body += shaded(d, robe, JADE, JADE_D, 14, -4, hem + slit + brush((214, 500 + by), (200, 580 + by), (196, 650 + by), 8, JADE_L))
+    slit = line(f"M{300 + sway * .7} {600 + by} L{306 + sway} {684 + by}", 6, R_D)
+    hem = fill_ns(f"M150 {664 + by} L360 {664 + by} L360 {700 + by} L150 {700 + by} Z", R_D)
+    body += shaded(d, robe, R, R_D, 14, -4, hem + slit + brush((214, 500 + by), (200, 580 + by), (196, 650 + by), 8, R_L))
     body += line(f"M{176 + sway} {664 + by} Q256 {678 + by} {336 + sway} {664 + by}", 6, GOLD)
     # diagonal placket with knot buttons, mandarin collar
     body += stroke(f"M250 {470 + by} Q262 {500 + by} 300 {506 + by} Q314 {560 + by} {312 + sway * .6} {664 + by}", 6, GOLD)
     for (x, yy) in ((268, 492), (292, 506), (306, 540)):
         body += rrect(x - 11, yy - 5 + by, 22, 10, 4, GOLD, 5)
-    body += rrect(226, 452 + by, 60, 22, 8, JADE_D, 6) + line(f"M232 {470 + by} L280 {470 + by}", 4, GOLD)
+    body += rrect(226, 452 + by, 60, 22, 8, R_D, 6) + line(f"M232 {470 + by} L280 {470 + by}", 4, GOLD)
     # sash with hanging ends
     body += rrect(200, 566 + by, 112, 20, 7, VERM, 6)
     body += fill(f"M214 {578 + by} L234 {578 + by} L{230 + sway * .5} {636 + by} L{214 + sway * .5} {640 + by} Z", VERM_D, 6)
     body += tomoe(256, 576 + by, 15, GOLD)
-    body += gourd(178 + sway * .4, 640 + by, 10 - sway * .3)
+    body += gourd(178 + sway * .4, 640 + by, 10 - sway * .3) if not fallen else ofuda(184 + sway * .4, 640 + by, 8 - sway * .3, .9)
     # head: tidy hair under a wide douli
     hc = (256, 392 + by)
-    head = face(hc, P)
+    head = face(hc, {**P, "eyes": "none"} if fallen else P, blush=not fallen, skin=sk, skin_d=sk_d)
+    if fallen:
+        head += glow_eyes(hc[0] + 2, hc[1] + 14, P.get("eyes", "open"), GHOUL_EYE, 34)
     y = hc[1]
     hair = (f"M158 {y + 30} Q156 {y - 60} 256 {y - 70} Q356 {y - 60} 354 {y + 30} L336 {y + 30} Q332 {y - 10} 306 {y - 26} "
             f"Q290 {y - 4} 262 {y - 20} Q236 {y - 2} 212 {y - 24} Q184 {y - 6} 178 {y + 30} Z")
@@ -331,11 +347,13 @@ def daoshi(P):
     head += douli(256, y - 52, hs, d)
     body += head
     af = P.get("af", (14, 8))
-    a_f, hf = wide_sleeve(d, sh_f, af[0], af[1], JADE, JADE_D, SKIN, cuff=54, drop=20)
+    a_f, hf = wide_sleeve(d, sh_f, af[0], af[1], R, R_D, sk, cuff=54, drop=20)
     if not P.get("noarm"):
         body += a_f
     fx = P.get("fx", "")
-    body += magic_fx(fx, hf, JADE_L, JADE_L)
+    if fallen and not P.get("noarm"):
+        body += bell(hf[0] + 4, hf[1] + 26, P.get("ring", 0))
+    body += magic_fx(fx, hf, R_L, OFUDA if fallen else R_L)
     if lean:
         body = f'<g transform="rotate({lean} 256 {640 + by})">{body}</g>'
     b += body
@@ -588,6 +606,197 @@ JIANGSHI = creature_frames(jiangshi,
     dict(ph=0))
 
 
+# ================================================================ the fallen daoshi's bell
+def bell(x, y, ring=0.0):
+    """A bronze hand bell on a short cord; `ring` (0..1) swings it and draws the sound."""
+    rot = 26 * ring
+    g = stroke("M0 -40 L0 -14", 7, VERM)
+    g += fill("M-26 30 Q-30 -10 0 -16 Q30 -10 26 30 Q0 38 -26 30 Z", BRONZE, 7)
+    g += fill_ns("M6 -12 Q28 -6 24 28 Q16 32 10 30 Q16 4 6 -12 Z", BRONZE_D, .8)
+    g += brush((-16, 22), (-20, 4), (-8, -8), 6, BRONZE_L)
+    g += ell(0, 32, 9, 7, BRONZE_D, 5)
+    out = G(g, x, y, rot)
+    if ring:
+        for k in range(3):
+            r = 46 + k * 22
+            out += line(f"M{f(x + r * .5)} {f(y - r * .6)} Q{f(x + r * .9)} {f(y)} {f(x + r * .5)} {f(y + r * .6)}", 6, OFUDA, ' opacity=".8"')
+    return out
+
+
+# ================================================================ creature: the one-legged umbrella (kasa-obake)
+def kasa(P):
+    """A closed paper umbrella on one hairy leg and a geta, one big eye, a long tongue. `open` (0..1) spreads
+    the canopy for the leap; `lift` raises it off the ground; `crouch` bends the leg."""
+    d = []; b = ""
+    lift = P.get("lift", 0); op = P.get("open", 0); lean = P.get("lean", 0); ph = P.get("ph", 0)
+    crouch = P.get("crouch", 0); tongue = P.get("tongue", 0); eye = P.get("eye", "open")
+    cx = 256
+    fy = 728 - lift
+    knee = (cx + 10 + crouch * .6, fy - 92 + crouch)
+    hip = (cx, fy - 170 + crouch * 1.6)
+    out = ""
+    # the geta and the leg (the umbrella's handle grown a foot)
+    out += rrect(cx - 54, fy - 6, 112, 18, 6, WD, 7) + rrect(cx - 40, fy + 10, 18, 16, 3, WD_D, 5) + rrect(cx + 22, fy + 10, 18, 16, 3, WD_D, 5)
+    out += stroke(f"M{f(cx - 20)} {f(fy - 4)} Q{cx} {f(fy - 20)} {f(cx + 22)} {f(fy - 4)}", 6, VERM)
+    leg = limb(hip, knee, (cx + 4, fy - 14), 30, 40)
+    out += fill(leg, SKIN_D, 8)
+    for k in range(5):
+        t = .2 + k * .14; px = hip[0] + (cx + 4 - hip[0]) * t + 18; py = hip[1] + (fy - 14 - hip[1]) * t
+        out += line(f"M{f(px)} {f(py)} l12 6", 4, LACQ)
+    out += fill(f"M{cx - 30} {f(fy - 22)} Q{cx + 4} {f(fy - 40)} {cx + 40} {f(fy - 22)} Q{cx + 46} {f(fy - 4)} {cx + 4} {f(fy - 2)} Q{cx - 34} {f(fy - 4)} {cx - 30} {f(fy - 22)} Z", SKIN_D, 7)
+    # canopy: a folded cone that spreads into a dome
+    top = hip[1] - 380 + op * 110
+    brim_y = hip[1] + 10 - op * 30
+    half = 92 + op * 150
+    tip = (cx + 6 + 10 * math.sin(2 * math.pi * ph), top)
+    canopy = (f"M{f(tip[0])} {f(tip[1])} Q{f(cx + half * .5)} {f(top + 90 - op * 40)} {f(cx + half)} {f(brim_y)} "
+              f"Q{f(cx + half * .5)} {f(brim_y + 22 + op * 10)} {cx} {f(brim_y + 16)} Q{f(cx - half * .5)} {f(brim_y + 22 + op * 10)} {f(cx - half)} {f(brim_y)} "
+              f"Q{f(cx - half * .5)} {f(top + 90 - op * 40)} {f(tip[0])} {f(tip[1])} Z")
+    folds = "".join(line(f"M{f(tip[0])} {f(tip[1] + 14)} Q{f(cx + k * half * .45)} {f((top + brim_y) / 2)} {f(cx + k * half * .9)} {f(brim_y + 6)}", 5, KASA_D) for k in (-.66, -.22, .22, .66))
+    band = line(f"M{f(cx - half * .78)} {f(brim_y - 30)} Q{cx} {f(brim_y - 10)} {f(cx + half * .78)} {f(brim_y - 30)}", 14, VERM)
+    patch = fill(f"M{f(cx + half * .3)} {f(top + (brim_y - top) * .3)} l40 10 l-6 44 l-40 -8 Z", PAPER_D, 4)
+    hl = brush((cx - half * .6, brim_y - 20), (cx - half * .42, (top + brim_y) / 2), (tip[0] - 16, tip[1] + 40), 10, KASA_L)
+    out += shaded(d, canopy, KASA, KASA_D, 16, -6, folds + band + patch + hl)
+    out += f'<circle cx="{f(tip[0])}" cy="{f(tip[1] - 8)}" r="14" fill="{LACQ}" stroke-width="{sw(6)}"/>'
+    # the one eye and the mouth with its tongue
+    ex, ey = cx - 4, top + (brim_y - top) * .48
+    if eye == "squint":
+        out += fill(f"M{ex - 40} {f(ey + 4)} Q{ex} {f(ey - 24)} {ex + 40} {f(ey + 4)} Q{ex} {f(ey + 18)} {ex - 40} {f(ey + 4)} Z", "#ffffff", 7)
+        out += ell(ex + 10, ey, 13, 10, O, 0)
+    else:
+        r = 44 if eye == "wide" else 38
+        out += ell(ex, ey, r, r * 1.1, "#ffffff", 8)
+        pr = 13 if eye == "wide" else 17
+        out += ell(ex + 12, ey + 4, pr, pr * 1.2, O, 0) + f'<circle cx="{f(ex + 6)}" cy="{f(ey - 6)}" r="5" fill="#ffffff" stroke="none"/>'
+    my = ey + 74
+    out += fill(f"M{ex - 34} {f(my)} Q{ex} {f(my + 30 + tongue * 20)} {ex + 34} {f(my)} Q{ex} {f(my + 10)} {ex - 34} {f(my)} Z", MAW, 6)
+    t0 = (ex + 4, my + 14); t1 = (ex + 60 + tongue * 110, my + 100 - tongue * 60 + 10 * math.sin(2 * math.pi * ph)); c = (ex + 40, my + 70)
+    out += fill(limb(t0, c, t1, 28, 18), TONGUE, 6)
+    out += f'<circle cx="{f(t1[0])}" cy="{f(t1[1])}" r="10" fill="{TONGUE}" stroke-width="{sw(5)}"/>'
+    if op > .5:
+        for k in range(5):
+            a = math.radians(-160 + k * 35)
+            out += brush((cx + math.cos(a) * half * .9, brim_y + 40 + math.sin(a) * 30), (cx + math.cos(a) * half * 1.05, brim_y + 70), (cx + math.cos(a) * half * 1.1, brim_y + 110), 8, HITO_L, .7)
+    if lean:
+        out = f'<g transform="rotate({lean} {cx} {fy})">{out}</g>'
+    return d, b + out
+
+
+# ================================================================ the long-haired ladies: rokurokubi and yuki-onna
+def lady(P, pal):
+    """A woman in a kimono with long black hair. `neck` (dx, dy) puts the head that far from the neck's
+    root, drawn as a long pale neck when it is far; `mist` trails the hem off into nothing (no feet);
+    `breath` (0..1) blows frost from the mouth."""
+    d = []; b = ""
+    by = P.get("by", 0); lean = P.get("lean", 0); sway = P.get("hem", 0)
+    root = (256, 452 + by)
+    nx, ny = P.get("neck", (0, -60))
+    hc = (root[0] + nx, root[1] + ny)
+    out = ""
+    # hair down her back, behind everything
+    # (a stretched neck carries the head away: its hair then hangs shorter, in a loose tail)
+    hl_ = 150 if math.hypot(nx, ny) > 170 else 250
+    hair_back = (f"M{hc[0] - 96} {hc[1] - 10} Q{hc[0] - 120} {hc[1] + hl_ * .56} {hc[0] - 70 - sway} {hc[1] + hl_} "
+                 f"Q{hc[0]} {hc[1] + hl_ + 20} {hc[0] + 70 - sway} {hc[1] + hl_ - 10} Q{hc[0] + 110} {hc[1] + hl_ * .48} {hc[0] + 96} {hc[1] - 10} Z")
+    out += fill(hair_back, HAIR, 8)
+    if not pal.get("mist"):
+        for i, x in enumerate((236, 276)):
+            fy = 724 - (P.get("step", 0) if i else 0)
+            out += rrect(x - 26, fy - 4, 52, 16, 5, WD, 6) + rrect(x - 18, fy - 22, 36, 22, 10, PAPER, 6)
+    # the back sleeve
+    ab = P.get("ab", (-12, -8))
+    a_b, _ = wide_sleeve(d, (214, 484 + by), ab[0], ab[1], pal["robe_d"], pal["robe_dd"], pal["skin_d"], cuff=56, drop=26)
+    out += a_b
+    # kimono: straight, with a crossed collar and an obi
+    if pal.get("mist"):
+        hem = 700 + by
+        robe = (f"M212 {464 + by} L300 {464 + by} Q326 {560 + by} {334 + sway} {hem} "
+                + " ".join(f"Q{f(320 - k * 22 + sway)} {f(hem + 26 + (k % 2) * 18)} {f(312 - (k + 1) * 22 + sway)} {f(hem + (k % 2) * 10)}" for k in range(6))
+                + f" Q188 {560 + by} 212 {464 + by} Z")
+    else:
+        robe = f"M212 {464 + by} L300 {464 + by} Q324 {560 + by} {324 + sway} {712 + by} Q256 {722 + by} {188 + sway} {712 + by} Q190 {560 + by} 212 {464 + by} Z"
+    pattern = "".join(blossom(x, y + by, 12, pal["robe_l"], pal["robe_d"]) for x, y in ((236, 640), (290, 600), (270, 680), (222, 560)))
+    out += shaded(d, robe, pal["robe"], pal["robe_d"], 14, -4, pattern + brush((216, 500 + by), (204, 590 + by), (204, 670 + by), 8, pal["robe_l"]))
+    out += stroke(f"M226 {468 + by} L262 {520 + by} L296 {468 + by}", 8, pal["collar"])
+    out += rrect(204, 540 + by, 104, 34, 8, pal["obi"], 7) + line(f"M210 {556 + by} L302 {556 + by}", 4, pal["obi_d"])
+    if pal.get("mist"):
+        for k in range(4):
+            out += fill_ns(blob(196 + k * 40 + sway, 726 + by + (k % 2) * 12, 34, 14, 7, .2, 11 + k), SNOW_L, .55)
+    # the neck: short and hidden by the collar, or a long pale rope
+    far = math.hypot(nx, ny) > 90
+    if far:
+        c = P.get("bend", (root[0] - 60, (root[1] + hc[1]) / 2))
+        out += fill(limb(root, c, (hc[0], hc[1] + 70), 34, 30), pal["skin"], 8)
+        out += line(f"M{root[0] + 8} {root[1] - 10} Q{f(c[0] + 10)} {f(c[1])} {f(hc[0] + 8)} {f(hc[1] + 60)}", 5, pal["skin_d"])
+    else:
+        out += rrect(root[0] - 18, hc[1] + 60, 36, root[1] - hc[1] - 50, 14, pal["skin"], 7)
+    # head: face, a straight fringe, side locks
+    head = face(hc, P, blush=pal.get("blush", False), skin=pal["skin"], skin_d=pal["skin_d"])
+    y = hc[1]
+    head += fill(f"M{hc[0] - 100} {y + 6} Q{hc[0] - 104} {y - 96} {hc[0]} {y - 98} Q{hc[0] + 104} {y - 96} {hc[0] + 100} {y + 6} "
+                 f"L{hc[0] + 84} {y + 6} L{hc[0] + 80} {y - 18} L{hc[0] - 80} {y - 18} L{hc[0] - 84} {y + 6} Z", HAIR, 7)
+    head += fill(f"M{hc[0] - 100} {y} Q{hc[0] - 108} {y + 70} {hc[0] - 96} {y + 110} L{hc[0] - 76} {y + 104} L{hc[0] - 80} {y + 4} Z "
+                 f"M{hc[0] + 100} {y} Q{hc[0] + 108} {y + 70} {hc[0] + 96} {y + 110} L{hc[0] + 76} {y + 104} L{hc[0] + 80} {y + 4} Z", HAIR, 6)
+    head += brush((hc[0] - 70, y - 60), (hc[0] - 30, y - 84), (hc[0] + 20, y - 86), 8, HAIR_L)
+    if pal.get("comb"):
+        head += rrect(hc[0] + 30, y - 100, 60, 18, 8, pal["comb"], 6, (-12, hc[0] + 60, y - 92))
+    if P.get("breath"):
+        k = P["breath"]
+        for i in range(4):
+            yy = y + 60 + i * 14 - 20
+            head += brush((hc[0] + 20, y + 62), (hc[0] + 120 + i * 30, yy), (hc[0] + 180 + i * 50 * k, yy + (i - 1.5) * 30), 16 - i * 2, SNOW_L, .75)
+        head += sparkle(hc[0] + 210, y + 40, 1.8, "#ffffff") + sparkle(hc[0] + 170, y + 110, 1.2, pal["robe_l"])
+    out += head
+    # the front sleeve
+    af = P.get("af", (14, 8))
+    a_f, hf = wide_sleeve(d, (298, 484 + by), af[0], af[1], pal["robe"], pal["robe_d"], pal["skin"], cuff=56, drop=26)
+    out += a_f
+    if lean:
+        out = f'<g transform="rotate({lean} 256 {700 + by})">{out}</g>'
+    return d, b + out
+
+
+ROKURO = dict(robe=PLUM, robe_d=PLUM_D, robe_l=PLUM_L, robe_dd="#3e2234", collar=PAPER, obi=GOLD, obi_d=GOLD_D, skin=PALE, skin_d=PALE_D, comb=VERM)
+YUKI = dict(robe=SNOW, robe_d=SNOW_D, robe_l=SNOW_L, robe_dd="#9cb0c0", collar=ICEB, obi=ICEB, obi_d=ICEB_D, skin=FROSTSK, skin_d=FROSTSK_D, mist=True)
+
+
+def rokurokubi(P):
+    return lady(P, ROKURO)
+
+
+def yukionna(P):
+    return lady(P, YUKI)
+
+
+KASA_FRAMES = creature_frames(kasa,
+    [dict(ph=0, crouch=30, lift=0), dict(ph=.25, lift=46, crouch=0), dict(ph=.5, lift=76, crouch=-6, tongue=.2), dict(ph=.75, lift=24, crouch=10)],
+    [dict(ph=0, crouch=58, lean=-8, eye="squint"), dict(ph=.3, lift=70, open=1, lean=14, eye="wide", tongue=1), dict(ph=.6, crouch=36, open=.4, lean=4, tongue=.4)],
+    dict(ph=.1, crouch=8))
+ROKURO_FRAMES = creature_frames(rokurokubi,
+    [dict(neck=(-10, -150), hem=-6, step=0, eyes="closed", mouth="smile"), dict(neck=(6, -168), by=-6, hem=0, step=10, eyes="closed", mouth="smile"),
+     dict(neck=(20, -152), hem=6, step=0, eyes="closed", mouth="smile"), dict(neck=(4, -166), by=-6, hem=0, step=10, eyes="closed", mouth="smile")],
+    [dict(neck=(-60, -250), bend=(320, 300), eyes="focus", mouth="o", af=(40, 30), lean=-4),
+     dict(neck=(210, -120), bend=(200, 300), eyes="focus", mouth="shout", af=(70, 80), lean=6),
+     dict(neck=(80, -190), bend=(180, 330), eyes="open", mouth="o", lean=2)],
+    dict(neck=(0, -60), eyes="closed", mouth="smile"))
+YUKI_FRAMES = creature_frames(yukionna,
+    [dict(by=0, hem=-8, eyes="closed", mouth="smile"), dict(by=-14, hem=0, eyes="closed", mouth="smile"),
+     dict(by=-20, hem=8, eyes="closed", mouth="smile"), dict(by=-8, hem=0, eyes="closed", mouth="smile")],
+    [dict(by=-10, af=(-70, -110), ab=(-40, -70), eyes="closed", mouth="o", lean=-6),
+     dict(by=-16, af=(96, 110), eyes="focus", mouth="o", breath=1, lean=8),
+     dict(by=-12, af=(60, 70), eyes="open", mouth="o", breath=.4, lean=3)],
+    dict(by=-6, eyes="closed", mouth="smile"))
+DAOSHI_FRAMES = creature_frames(daoshi,
+    [dict(fallen=True, feet=[(-34, 0), (30, 0)], ab=(22, 12), af=(-18, -10), hem=-8, hat=-4, eyes="focus"),
+     dict(fallen=True, feet=[(-6, 0), (6, 26)], ab=(6, 2), af=(-2, 4), by=-10, hat=2, eyes="focus"),
+     dict(fallen=True, feet=[(30, 0), (-34, 0)], ab=(-22, -12), af=(24, 16), hem=8, hat=4, eyes="focus"),
+     dict(fallen=True, feet=[(6, 26), (-6, 0)], ab=(-6, -2), af=(6, 10), by=-10, hat=-2, eyes="focus")],
+    [dict(fallen=True, af=(-70, -110), ab=(10, 10), lean=-6, eyes="focus", mouth="shout", fx="glow", ring=.6),
+     dict(fallen=True, af=(96, 110), ab=(-30, -40), lean=8, eyes="focus", mouth="shout", fx="spark", feet=[(-40, 0), (34, 0)], hem=10, ring=1),
+     dict(fallen=True, af=(60, 70), ab=(-20, -24), lean=4, eyes="focus", mouth="o", feet=[(-36, 0), (30, 0)], ring=.3)],
+    dict(fallen=True, eyes="focus"))
+
+
 # ================================================================ trees
 def sakura():
     """An old cherry: a gnarled dark trunk under clouds of blossom, petals drifting down."""
@@ -837,9 +1046,13 @@ STILL = {"idle": {"frames": [0], "fps": 1}}
 
 ALL = {
     "miko": dict(frames=wanderer_frames(miko, miko_down), cols=8, rows=2, target=(40, 40, 472, 736), size=[2.25, 3.38], clips=WANDERER_CLIPS),
-    "daoshi": dict(frames=wanderer_frames(daoshi, daoshi_down), cols=8, rows=2, target=(40, 40, 472, 736), size=[2.25, 3.38], clips=WANDERER_CLIPS),
+    "daoshi-wanderer": dict(frames=wanderer_frames(daoshi, daoshi_down), cols=8, rows=2, target=(40, 40, 472, 736), size=[2.25, 3.38], clips=WANDERER_CLIPS),
     "chochin": dict(frames=CHOCHIN, cols=4, rows=2, target=(70, 150, 460, 740), size=[2.0, 3.0], clips=CREATURE_CLIPS),
     "jiangshi": dict(frames=JIANGSHI, cols=4, rows=2, target=(40, 90, 490, 740), size=[2.5, 3.75], clips=CREATURE_CLIPS),
+    "kasa": dict(frames=KASA_FRAMES, cols=4, rows=2, target=(60, 110, 452, 740), size=[2.0, 3.0], clips=CREATURE_CLIPS),
+    "rokurokubi": dict(frames=ROKURO_FRAMES, cols=4, rows=2, target=(20, 40, 500, 740), size=[2.7, 4.05], clips=CREATURE_CLIPS),
+    "yukionna": dict(frames=YUKI_FRAMES, cols=4, rows=2, target=(40, 70, 480, 740), size=[2.4, 3.6], clips=CREATURE_CLIPS),
+    "daoshi": dict(frames=DAOSHI_FRAMES, cols=4, rows=2, target=(40, 60, 480, 740), size=[2.4, 3.6], clips=CREATURE_CLIPS),
     "sakura": dict(frames=[sakura], cols=1, rows=1, target=(12, 24, 500, 736), size=[4.92, 7.38], clips=STILL),
     "matsu": dict(frames=[matsu], cols=1, rows=1, target=(40, 40, 480, 736), size=[4.92, 7.38], clips=STILL),
     "toro": dict(frames=[(lambda k: (lambda: toro(k / 4)))(k) for k in range(4)], cols=4, rows=1, target=(130, 150, 382, 744), size=[1.9, 2.85],
@@ -853,7 +1066,7 @@ ALL = {
 }
 # What the game uses (tools/art/build.py builds these into themes/harvest/sprites like every other sprite;
 # theme.json holds their entries). The wanderers and the guandao stay preview-only for now.
-GAME = ("chochin", "jiangshi", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo")
+GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo")
 SPRITES = {k: {kk: v for kk, v in ALL[k].items() if kk in ("frames", "cols", "rows", "target")} for k in GAME}
 
 
@@ -931,7 +1144,7 @@ for (const k of Object.keys(MANIFEST)) {
 // stage: a little shrine path at night's edge
 const stage = document.getElementById('stage'), sx = stage.getContext('2d');
 const walkers = [
-  { k: 'miko', x: 380, v: 70, min: 300, max: 760 }, { k: 'daoshi', x: 640, v: -60, min: 420, max: 900 },
+  { k: 'miko', x: 380, v: 70, min: 300, max: 760 }, { k: 'daoshi-wanderer', x: 640, v: -60, min: 420, max: 900 },
   { k: 'chochin', x: 980, v: -55, min: 820, max: 1130 }, { k: 'jiangshi', x: 90, v: 40, min: 40, max: 300 },
 ];
 function loop(ms) {
@@ -956,7 +1169,8 @@ requestAnimationFrame(loop);
 </script></body></html>
 """
 
-NAMES = {"miko": "Shrine maiden (wanderer)", "daoshi": "Taoist exorcist (wanderer)", "chochin": "Chochin-obake, lantern ghost (mob)",
+NAMES = {"miko": "Shrine maiden (wanderer)", "daoshi-wanderer": "Taoist exorcist (wanderer)", "daoshi": "Fallen daoshi (mob)",
+         "kasa": "Kasa-obake, umbrella ghost (mob)", "rokurokubi": "Rokurokubi, long neck (mob)", "yukionna": "Yuki-onna, snow woman (mob)", "chochin": "Chochin-obake, lantern ghost (mob)",
          "jiangshi": "Jiangshi, hopping corpse (mob)", "sakura": "Old cherry (tree)", "matsu": "Sacred pine (tree)",
          "toro": "Stone lantern (decoration)", "torii": "Torii gate (decoration)", "katana": "Kagekiri, katana (weapon)", "guandao": "Dragon guandao (weapon)",
          "yomi-rock": "Garden stones (rock node)", "yomi-rock-b": "Sacred boulder (rock node)", "jizo": "Jizo statue (decoration)"}

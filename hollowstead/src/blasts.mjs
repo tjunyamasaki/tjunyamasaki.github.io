@@ -8,14 +8,16 @@
  *   shape   'circle' (radius) | 'ring' (radius, inner: the safe middle) | 'line' (from x,z along angle: length, width)
  *   all     it hurts creatures too (vents, falling stars); otherwise only wanderers, their allies and the camp
  *   style   what it looks like (src/fx/hollow.mjs), and the sound
+ *   chill   seconds a wanderer it catches walks slower (yokai.mjs CHILL: a snow woman's frost)
  */
-export function addBlast(world, {style = 'vent', shape = 'circle', x, z, radius = 1.5, inner = 0, angle = 0, length = 4, width = 1, fuse = 1, damage = 10, all = false, push = 0, owner = null, delay = 0, heavy = false, loot = null} = {}){
+export function addBlast(world, {style = 'vent', shape = 'circle', x, z, radius = 1.5, inner = 0, angle = 0, length = 4, width = 1, fuse = 1, damage = 10, all = false, push = 0, owner = null, delay = 0, heavy = false, loot = null, chill = 0} = {}){
   if(!Number.isFinite(x) || !Number.isFinite(z)) return null;
   const list = world.hostile ||= [];
   if(list.length > 260) return null;
   const blast = {id: world.nextId('h'), kind: 'blast', style, shape, x: +x.toFixed(2), z: +z.toFixed(2), r: radius, inner, ang: +angle.toFixed(3), len: length, w: width,
     fuse: fuse+delay, flight: fuse, wait: delay, dmg: damage, all: !!all, push, owner, heavy: !!heavy || fuse >= .9};
   if(loot) blast.loot = loot;
+  if(chill > 0) blast.chill = chill;
   list.push(blast);
   return blast;
 }

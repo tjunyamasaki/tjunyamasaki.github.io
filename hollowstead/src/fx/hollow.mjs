@@ -18,6 +18,11 @@ const STYLE = Object.freeze({
   gaze:    {main: '#b45cff', core: '#fff4ff', glow: '#8a3dff', dark: '#120624'},
   tendril: {main: '#5a2a66', core: '#ff9ccf', glow: '#b45cff', dark: '#140a1c'},
   void:    {main: '#7c3cff', core: '#e6d0ff', glow: '#5a1fe0', dark: '#0c0618'},
+  // The Shrine of Yomi's yokai (yokai.mjs): a kasa's rain, a rokurokubi's neck, a snow woman's frost, a daoshi's talismans.
+  rain:    {main: '#6fa8c8', core: '#e6f6ff', glow: '#8fd0f0', dark: '#22324a'},
+  neck:    {main: '#f2dcc4', core: '#fff6ea', glow: '#e0727c', dark: '#3a2030'},
+  frost:   {main: '#a8dcf0', core: '#ffffff', glow: '#bfe8ff', dark: '#1c2c3c'},
+  ofuda:   {main: '#f0cf5a', core: '#fff3c0', glow: '#ff8a5c', dark: '#3a1a14'},
 });
 const S = style => STYLE[style] || STYLE.vent;
 
@@ -64,6 +69,30 @@ function paintPending(d, s, lead, clock){
     if(k > .6) d.path([a, b], s.w*.6*k, c.glow, .25, {glow: true, soft: true});
     return;
   }
+  if(s.style === 'neck'){
+    // A pale line where the neck will cross, the head's shadow sliding out to its end.
+    const ca = Math.cos(s.ang), sa = Math.sin(s.ang), reach = s.len*easeOut(k);
+    d.path([[s.x, .08, s.z], [s.x+ca*reach, .08, s.z+sa*reach]], s.w*.45, c.dark, .25+.25*k, {soft: true});
+    d.path([[s.x, .1, s.z], [s.x+ca*s.len, .1, s.z+sa*s.len]], .05, c.glow, .5*k, {glow: true});
+    d.stain(s.x+ca*reach, s.z+sa*reach, .7, c.dark, .45*k);
+    return;
+  }
+  if(s.style === 'rain' && s.shape !== 'line'){
+    // A dark wet patch where the umbrella will land, rain streaking down onto it.
+    d.stain(s.x, s.z, s.r*(.5+.5*k), c.dark, .35+.25*k);
+    d.ring(s.x, s.z, s.r, .05, c.glow, .5*k, {glow: true});
+    for(let i = 0; i < 5; i++){const a = rnd(seed, i)*TAU, r = s.r*.8*rnd(seed, i+7), x = s.x+Math.cos(a)*r, z = s.z+Math.sin(a)*r, y = 1.6*((clock*2.4+rnd(seed, i+3))%1);
+      d.path([[x, y+.5, z], [x, y, z]], .04, c.core, .7*k, {glow: true});}
+    return;
+  }
+  if(s.style === 'ofuda' && s.shape !== 'line'){
+    // A talisman pinned to the ground, its glow spreading as the charm wakes.
+    d.pool(s.x, s.z, s.r*(.6+.4*k), c.glow, .3*k);
+    d.path([[s.x, .06, s.z-.32], [s.x, .9*Math.min(1, k*3), s.z-.32]], .26, INK, .9); d.path([[s.x, .06, s.z-.32], [s.x, .9*Math.min(1, k*3), s.z-.32]], .2, c.main, 1);
+    d.ring(s.x, s.z, s.r, .05, c.glow, .7*k, {glow: true});
+    d.light(s.x, s.z, 1+k);
+    return;
+  }
   if(s.shape === 'line'){
     // Roots or thorns pushing up along the line, their tips breaking the soil.
     for(const [i, [x, z]] of along(s).entries()){
@@ -77,7 +106,7 @@ function paintPending(d, s, lead, clock){
     if(s.shape !== 'ring') for(let i = 0; i < 4; i++){const a = clock*2+i/4*TAU, r = s.r*.6; d.orb(s.x+Math.cos(a)*r, s.z+Math.sin(a)*r, .2, .1*k, c.core, .8*k, {glow: true});}
     return;
   }
-  if(s.style === 'snare' || s.style === 'thorn'){
+  if(s.style === 'snare' || s.style === 'thorn' || s.style === 'frost' || s.style === 'ofuda' || s.style === 'rain'){
     const n = s.shape === 'ring' ? 18 : 7, r0 = s.shape === 'ring' ? (s.inner+s.r)/2 : s.r*.6;
     for(let i = 0; i < n; i++){
       const a = i/n*TAU+rnd(seed, i)*.3, x = s.x+Math.cos(a)*r0, z = s.z+Math.sin(a)*r0, h = .1+.4*k;
@@ -91,6 +120,14 @@ function paintBurst(d, ev, age, seed){
   const c = S(ev.style), life = BURST_LIFE(ev), t = clamp01(age/life), f = fade(t, 1.3);
   if(ev.shape === 'line'){
     const ca = Math.cos(ev.angle || 0), sa = Math.sin(ev.angle || 0), len = ev.length || 4;
+    if(ev.style === 'neck'){
+      // The neck itself, flung across the ground and gone: ink, pale skin, and the head at its end.
+      const out = easeOut(Math.min(1, t*3)), a = [ev.x, .9, ev.z], b = [ev.x+ca*len*out, .7, ev.z+sa*len*out];
+      d.path([a, b], .5, INK, .9*f); d.path([a, b], .36, c.main, f); d.path([a, b], .08, c.core, .8*f);
+      d.orb(b[0], b[2], .8, .5, INK, .9*f); d.orb(b[0], b[2], .8, .42, c.main, f); d.orb(b[0]-.1, b[2], .95, .18, '#2a2030', f);
+      d.stain(ev.x+ca*len/2, ev.z+sa*len/2, len*.25, c.dark, .15*f);
+      return;
+    }
     if(ev.style === 'gaze'){
       const a = [ev.x, .55, ev.z], b = [ev.x+ca*len, .55, ev.z+sa*len];
       d.path([a, b], (ev.width || 1)*.55*f, c.main, .9*f); d.path([a, b], (ev.width || 1)*.25*f, c.core, f);
@@ -127,6 +164,14 @@ function paintBurst(d, ev, age, seed){
     d.stain(ev.x, ev.z, r, '#2a1a14', .45*f);
     d.sparks(ev.x, ev.z, .6, 10, t, c.core, f, seed, {speed: 3, up: 7, gravity: 9});
     d.light(ev.x, ev.z, r*2*f);
+    return;
+  }
+  if(ev.style === 'rain'){
+    // The umbrella comes down: a splash ring and droplets.
+    d.ring(ev.x, ev.z, r*(.3+.9*easeOut(t)), .1, c.main, .9*f, {glow: true});
+    d.ring(ev.x, ev.z, r*(.1+.6*easeOut(t)), .06, c.core, .7*f, {glow: true});
+    d.sparks(ev.x, ev.z, .2, 12, t, c.core, f, seed, {speed: 4, up: 3.5, gravity: 14});
+    d.stain(ev.x, ev.z, r, c.dark, .35*f);
     return;
   }
   if(ev.shape === 'ring' && inner > 0){
@@ -173,6 +218,9 @@ export const HOLLOW_EVENTS = {
     d.sparks(ev.x, ev.z, 1.2, 26, t, '#ffe7a8', fade(t), seed, {up: 9, speed: 5});
     d.light(ev.x, ev.z, 9*fade(t));
   }},
+  // The Shrine of Yomi's yokai (yokai.mjs): a daoshi's bell rings out over the dead it rouses.
+  bell: {life: () => 1.2, paint(d, ev, age){const t = age/1.2; for(let i = 0; i < 3; i++){const k = Math.min(1, Math.max(0, t*1.6-i*.18)); if(k > 0) d.ring(ev.x, ev.z, .8+(ev.radius || 8)*easeOut(k), .1, i ? '#f0cf5a' : '#fff3c0', .75*fade(k), {glow: true});} d.light(ev.x, ev.z, 3*fade(t));}},
+  seal: {life: () => 1.8, paint(d, ev, age){const t = age/1.8; d.sigil(ev.x, ev.z, (ev.radius || 2.6)*.62, '#f0cf5a', .5*fade(t), {spin: t*2, sides: 3});}},
   mimic: {life: () => .8, kick: () => ({shake: .35}), paint(d, ev, age){const t = age/.8; d.ring(ev.x, ev.z, 1+2*t, .14, '#f2c14e', fade(t), {glow: true});}},
   brew: {life: () => 1.4, paint(d, ev, age, seed){const t = age/1.4, c = ev.kind === 'hex' ? '#9a5cff' : ev.kind === 'fury' ? '#ff7a5c' : ev.kind === 'swift' ? '#8fd3ff' : '#8fd3a0'; d.motes(ev.x, ev.z, 14, t, 1.2, c, fade(t), seed, {rise: 2.2, size: .12}); d.ring(ev.x, ev.z, .8+t, .08, c, fade(t), {glow: true});}},
   gilded: {life: () => 1, paint(d, ev, age, seed){const t = age/1; d.sparks(ev.x, ev.z, .8, 12, t, '#ffe08a', fade(t), seed, {up: 4});}},
@@ -231,6 +279,12 @@ export function paintHollow(d, world, lead, clock){
       }
       d.bloom(o.x, o.z, 1.3, 1.6*open, '#8a3dff', .5);
     }
+  }
+  // A wanderer a snow woman's frost caught (yokai.mjs CHILL): rime breath and pale motes until they warm.
+  for(const p of world.players || []){
+    if(!(p.chill > (world.time || 0)) || !d.near(p.x, p.z, 4)) continue;
+    d.ring(p.x, p.z, .7, .05, STYLE.frost.glow, .5, {glow: true});
+    d.motes(p.x, p.z, 4, (clock*.8+p.x*.1)%1, .6, STYLE.frost.core, .8, Number(String(p.id).slice(1)) || 7, {rise: 1.4, size: .07});
   }
   // Hushing stones (hush.mjs): a soft hum of light, and a faint line where their song ends.
   for(const b of world.buildings || []){

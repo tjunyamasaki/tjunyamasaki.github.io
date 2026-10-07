@@ -71,8 +71,21 @@ export const RESIDENTS = Object.freeze({
   // Mother Briar's brood: her lair crawls with briarlings.
   briarlair:['crawler','crawler','crawler'],
   // The shrine's dead: paper-lantern ghosts in packs, and the hopping corpses.
-  yomi:['chochin','chochin','jiangshi'],
+  yomi:['chochin','chochin','jiangshi','kasa','kasa','rokurokubi','yukionna','daoshi'],
 });
+/**
+ * A haunted area's own night (REGIONS[id].haunt, night.mjs): who rises after a wanderer standing there, by weight,
+ * and from what threat each first comes ([type, weight, from]).
+ */
+export const HAUNTS = Object.freeze({
+  yomi:[['chochin',4],['jiangshi',2.5],['kasa',3],['rokurokubi',1.5,3],['yukionna',1.4,4],['daoshi',.8,6]],
+});
+/** The weighted roster a haunted area sends at this threat (or its residents when it has none). */
+export function hauntRoster(zone, threat=1){
+  const list=HAUNTS[zone];
+  if(!list)return (RESIDENTS[zone]||[]).map(type=>[type,1]);
+  return list.filter(([,, from=0])=>threat>=from).map(([type,weight])=>[type,weight]);
+}
 
 export const CACHE_LAYOUT = Object.freeze([
   {type:'crate', count:40, min:9, max:120},
@@ -160,6 +173,11 @@ export const LOOT_TABLES = Object.freeze({
   // The Shrine of Yomi: the lanterns burn on embers; the corpses are the ones that keep the shrine's blade.
   chochin:{xp:5, rolls:[{chance:.3, entries:[['ember',[1,1],2],['fiber',[1,2],1]]},{chance:.03, entries:[['uncommon',1,1]]},{chance:.16, entries:[['ichor',[1,1],1]]},{chance:.006, entries:[['book',1,1]]}]},
   jiangshi:{xp:18, rolls:[{chance:.35, entries:[['bone',[1,2],2],['ember',[1,2],1]]},{chance:.1, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.45, entries:[['ichor',[1,2],1]]},{chance:.02, entries:[['book',1,1]]},{chance:.006, entries:[['katana',1,1]]}]},
+  // Its yokai (yokai.mjs): oiled paper and bamboo from the umbrellas, rime from the snow woman, the priest's embers and talismans.
+  kasa:{xp:7, rolls:[{chance:.35, entries:[['fiber',[1,2],2],['wood',[1,2],1]]},{chance:.04, entries:[['uncommon',1,1]]},{chance:.2, entries:[['ichor',[1,1],1]]},{chance:.008, entries:[['book',1,1]]}]},
+  rokurokubi:{xp:15, rolls:[{chance:.35, entries:[['bone',[1,2],2],['fiber',[1,2],1]]},{chance:.1, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.42, entries:[['ichor',[1,2],1]]},{chance:.018, entries:[['book',1,1]]}]},
+  yukionna:{xp:16, rolls:[{chance:.45, entries:[['rime',[1,2],2],['shard',[1,1],1]]},{chance:.1, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.42, entries:[['ichor',[1,2],1]]},{chance:.02, entries:[['book',1,1]]}]},
+  daoshi:{xp:26, rolls:[{chance:.5, entries:[['ember',[1,3],2],['bone',[1,2],1],['elixir',[1,1],.4]]},{chance:.16, entries:[['rare',1,3],['epic',1,1]]},{chance:.55, entries:[['ichor',[1,3],1]]},{chance:.035, entries:[['book',1,1]]}]},
   // Omens (omens.mjs): rare, hard won, and worth it. Each is a little hoard.
   fallenstar:{xp:120, rolls:[
     {count:[3,4], entries:[['shard',[3,5],3],['ember',[3,4],2],['rime',[2,3],1],['emberglass',[2,3],1],['ore',[3,4],1]]},
@@ -480,6 +498,6 @@ export function pickWeighted(rng, roster){
   for(const [id,w] of roster){r-=w;if(r<=0)return id;}
   return roster[0][0];
 }
-/** Residents roam in packs: `pack` is how many briarlings (or bonewalkers) turn up together. */
+/** Residents roam in packs: `pack` is how many briarlings (or bonewalkers) turn up together. `escort`: who walks with a lone leader. */
 /** `hounds`: on a Vigil from the Age of the Hunt (ages.mjs), the share of packs that are dreadhounds. */
-export const ROAM = Object.freeze({interval:9, spawnMin:15, spawnMax:21, despawn:46, leash:14, aggro:10, cap:[0,6,10], chance:[0,.3,.55], pack:{crawler:[2,4], bonewalker:[1,2], dreadhound:[2,3], chochin:[2,4], jiangshi:[1,2]}, hounds:.3});
+export const ROAM = Object.freeze({interval:9, spawnMin:15, spawnMax:21, despawn:46, leash:14, aggro:10, cap:[0,6,10], chance:[0,.3,.55], pack:{crawler:[2,4], bonewalker:[1,2], dreadhound:[2,3], chochin:[2,4], jiangshi:[1,2], kasa:[2,3], rokurokubi:[1,1], yukionna:[1,1], daoshi:[1,1]}, escort:{daoshi:['jiangshi',[1,2]], yukionna:['chochin',[1,2]]}, hounds:.3});

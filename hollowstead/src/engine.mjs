@@ -23,6 +23,7 @@ import {
 import {stepSkills, useSkill} from './skills.mjs?v=harvest-18';
 import {ascendWeapon, creditKill, mendWeapon, syncMastery, warnWear} from './mastery.mjs?v=harvest-18';
 import {packRule, stepAges, thornNodes, thornSpeed} from './ages.mjs?v=harvest-18';
+import {chillSpeed} from './yokai.mjs?v=harvest-18';
 import {refineDodge, refineHit as refinedHit, refineHurt, refineKill, refineSwing, refineWeapon, refinedStyle, sanitizeRefine, shotEnd, shotHit, shotMods, shotSteer, splitBefore, splitMagic, splitMarks, stepRefine} from './refine.mjs?v=harvest-18';
 import {shelfAction, shelfCount, spillShelf, storeBooks} from './bookshelf.mjs?v=harvest-18';
 import {HEARTH_MEND, stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
@@ -172,7 +173,7 @@ const MAGIC_AIM=Object.freeze({
  * Guests only draw creatures and shots, so the network copy rounds every number to centimetres and
  * drops per-charge bookkeeping. Fifty creatures fit in a fraction of the bytes.
  */
-const HOST_ONLY=new Set(['hitIds','cooldown','slam','slowed','power','flank','stuck','back','detour','leash','roamer','aggro','home','vx','vz','level','pat','room','hunt','chalk','oneBlow','tinder']);
+const HOST_ONLY=new Set(['hitIds','cooldown','slam','slowed','power','flank','stuck','back','detour','leash','roamer','aggro','home','vx','vz','level','pat','room','hunt','chalk','oneBlow','tinder','hop','rouse','raiser']);
 const WINDUP_ONLY=new Set(['atk','wt','ang','tx','tz']);
 function compactForNetwork(entity){
   const out={},busy=entity.windup>0||entity.act>0;
@@ -1521,7 +1522,7 @@ export class World {
   landNear(x,z,maxR=6){if(this.dungeon){const floor=layoutOf(this);return floor?dungeonLandNear(floor,x,z,maxR):null;}if(this.arena||this.showcase){const r=Math.hypot(x,z),R=this.radius-1.05;return r<R?{x,z}:r>0?{x:x*R/r,z:z*R/r}:{x:0,z:0};}return landNear(this.seed,x,z,maxR);}
   /** Walk speed multiplier from region hazards, a pulled cart and the worn trinket. */
   // Fleet (refine.mjs): refined body armour.
-  speedFactor(p){return (buffed(p,'swift')?BUFF.swift:1)*(1+armourStat(p,'fleet'))*(this.arena?1:this.dungeon?trinketSpeed(this,p):regionSpeed(this,p)*cartSpeed(this,p)*trinketSpeed(this,p)*brewSpeed(p)*thornSpeed(this,p));}
+  speedFactor(p){return (buffed(p,'swift')?BUFF.swift:1)*(1+armourStat(p,'fleet'))*chillSpeed(this,p)*(this.arena?1:this.dungeon?trinketSpeed(this,p):regionSpeed(this,p)*cartSpeed(this,p)*trinketSpeed(this,p)*brewSpeed(p)*thornSpeed(this,p));}
   /**
    * Solid things a walker cannot enter. Returns the few camp structures as a plain array and hangs
    * the many standing trees and rocks on `.grid`, a 4-unit spatial hash cached until a node is felled,
@@ -1684,6 +1685,8 @@ export class World {
         const type=hounds&&this.spawnRng()<ROAM.hounds?'dreadhound':pool[Math.floor(this.spawnRng()*pool.length)],[lo,hi]=ROAM.pack[type]||[1,1],n=lo+Math.floor(this.spawnRng()*(hi-lo+1))+(ROAM.pack[type]?rule.extra:0);
         const elders=n>1?Math.min(rule.elders,n-1):0;
         for(let k=0;k<n;k++){const b=this.spawnRng()*Math.PI*2,s=k?.8+this.spawnRng()*1.2:0;this.spawnEnemy(type,x+Math.cos(b)*s,z+Math.sin(b)*s,{home:true,roamer:true,tier:tier-1,leash:ROAM.leash,elite:k<elders?true:undefined});}
+        // A lone leader brings company (ROAM.escort): a fallen daoshi walks with his dead.
+        const escort=ROAM.escort?.[type];if(escort){const [kind,[elo,ehi]]=escort,m=elo+Math.floor(this.spawnRng()*(ehi-elo+1));for(let k=0;k<m;k++){const b=this.spawnRng()*Math.PI*2,s=1.4+this.spawnRng()*1.2;this.spawnEnemy(kind,x+Math.cos(b)*s,z+Math.sin(b)*s,{home:true,roamer:true,tier:tier-1,leash:ROAM.leash});}}
         break;
       }
     }

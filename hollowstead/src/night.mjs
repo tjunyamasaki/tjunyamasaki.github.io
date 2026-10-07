@@ -18,7 +18,7 @@ import {isVigil, threatOf} from './vigil.mjs?v=harvest-18';
 import {ageOf} from './ages.mjs?v=harvest-18';
 import {hushedAt} from './hush.mjs?v=harvest-18';
 import {STARRAIN, stepMoon} from './moons.mjs?v=harvest-18';
-import {NIGHT_CAP, REGIONS, RESIDENTS, nightRoster, pickWeighted, regionAt, waveSize} from './progression.mjs?v=harvest-18';
+import {NIGHT_CAP, REGIONS, RESIDENTS, hauntRoster, nightRoster, pickWeighted, regionAt, waveSize} from './progression.mjs?v=harvest-18';
 import {phaseProgress, remainingNightWaveOffsets} from './contracts.mjs?v=harvest-18';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -275,8 +275,8 @@ export function spawnWave(world){
   // Hunting a party, there is at least one pack for each wanderer.
   const packs=Math.min(3,1+Math.floor(count/8)),groups=hunts?Math.max(anchors.length,packs):packs,heading=[...Array(groups)].map(()=>world.rng()*Math.PI*2);
   // A haunted area (REGIONS[zone].haunt: the Shrine of Yomi) sends its own dead after a wanderer standing in it.
-  const haunts=anchors.map(a=>{const zone=hunts?world.regionOf(a.x,a.z):null;return zone&&REGIONS[zone]?.haunt?RESIDENTS[zone]:null;});
-  for(let i=0;i<count;i++){const g=i%groups,anchor=anchors[g%anchors.length],local=haunts[g%anchors.length];const a=heading[g]+(world.rng()-.5)*.7,r=16+world.rng()*6;const type=i===0&&threat>=3&&day%2===1?'brute':local&&world.rng()<.6?local[Math.floor(world.rng()*local.length)]:pickWeighted(world.rng, roster);const lim=RULES.radius-4;const x=clamp(anchor.x+Math.cos(a)*r,-lim,lim),z=clamp(anchor.z+Math.sin(a)*r,-lim,lim);const at=onLand(world,x,z,anchor);const e=world.spawnEnemy(type,at.x,at.z);if(e&&hunts)e.raid=true;}
+  const haunts=anchors.map(a=>{const zone=hunts?world.regionOf(a.x,a.z):null;return zone&&REGIONS[zone]?.haunt?hauntRoster(zone,threat):null;});
+  for(let i=0;i<count;i++){const g=i%groups,anchor=anchors[g%anchors.length],local=haunts[g%anchors.length];const a=heading[g]+(world.rng()-.5)*.7,r=16+world.rng()*6;const type=i===0&&threat>=3&&day%2===1?'brute':local?.length&&world.rng()<.6?pickWeighted(world.rng,local):pickWeighted(world.rng, roster);const lim=RULES.radius-4;const x=clamp(anchor.x+Math.cos(a)*r,-lim,lim),z=clamp(anchor.z+Math.sin(a)*r,-lim,lim);const at=onLand(world,x,z,anchor);const e=world.spawnEnemy(type,at.x,at.z);if(e&&hunts)e.raid=true;}
   if(blood&&world.bossNight!==day&&!world.enemies.some(e=>e.type==='king')){
     const visit=kingVisits(world, day),anchor=anchors[0];world.bossNight=day;world.bossSpawned=true;world.bossSlain=false;const at=onLand(world,anchor.x,anchor.z-19,anchor);const king=world.spawnEnemy('king',at.x,at.z);if(king&&hunts)king.raid=true;
     world.event('announce',0,0,hunts?(visit<=1?'Blood moon. The Hollow King has caught your scent.':`Blood moon. The Hollow King hunts you again, stronger. Night ${day}.`):visit<=1?'Blood moon. The Hollow King has found your fire.':`Blood moon. The Hollow King returns, stronger. Night ${day}.`,{moon});

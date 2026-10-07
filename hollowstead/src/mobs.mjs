@@ -29,6 +29,7 @@ import {slideMove, steer} from './pathing.mjs?v=harvest-18';
 import {addBlast} from './blasts.mjs?v=harvest-18';
 import {GILDED, starLoot} from './moons.mjs?v=harvest-18';
 import {BOSS_ATTACKS, BOSS_MOVES, bossRelease, bossTick} from './bosses.mjs?v=harvest-18';
+import {YOKAI_ATTACKS, YOKAI_MOVES, rouseSpeed, yokaiRelease, yokaiTick} from './yokai.mjs?v=harvest-18';
 export {addBlast};
 
 /** Creatures chew through camp structures at half their bite, so a lone explorer's fire survives an early night. */
@@ -110,6 +111,8 @@ export const ATTACKS = Object.freeze({
   kingSummon: {shape: 'ring', windup: .9, trigger: 14, radius: 2.4, summon: 5, dmg: 0},
   // Mother Briar and The Unblinking (bosses.mjs).
   ...BOSS_ATTACKS,
+  // The Shrine of Yomi's yokai (yokai.mjs): a kasa's skip, a rokurokubi's neck, a snow woman's frost, a daoshi's seal and bell.
+  ...YOKAI_ATTACKS,
 });
 
 /**
@@ -129,6 +132,7 @@ export const MOVES = Object.freeze({
   brute:      {body: .8, accel: 4, flank: 10, attacks: ['slam']},
   golem:      {body: 1, accel: 3, attacks: ['quake']},
   king:       {body: 1.5, accel: 3, attacks: ['kingSlam', 'kingNova', 'kingSummon'], rotate: true},
+  ...YOKAI_MOVES,
   ...BOSS_MOVES,
 });
 const DEFAULT_MOVE = {body: .5, accel: 8, attacks: ['bite']};
@@ -337,6 +341,7 @@ function detonate(world, s, people, guards){
   for(const p of people) if(inBlast(s, p.x, p.z, .3)){
     world.hurt(p, s.dmg, null);
     if(s.push && !(p.iframes > 0)) world.shove(p, p.x-s.x, p.z-s.z, s.push);
+    if(s.chill && !(p.iframes > 0)) p.chill = +(world.time+s.chill).toFixed(2);
   }
   for(const a of guards) if(inBlast(s, a.x, a.z, .35)) a.hp -= s.dmg*(ALLIES[a.type]?.guard ?? 1);
   if(s.all){for(const e of world.enemies) if(e.hp > 0 && !isMagicAlly(e) && e.id !== s.owner && !ENEMIES[e.type]?.boss && inBlast(s, e.x, e.z, bodyOf(e)*.6)){e.hp -= s.dmg*1.5; world.event('damage', e.x, e.z, String(Math.round(s.dmg*1.5)));}}
@@ -405,6 +410,7 @@ function release(world, e, target){
     bossRelease(world, e, id, target, amount);
     e.atk = ''; return;
   }
+  if(YOKAI_ATTACKS[id]){yokaiRelease(world, e, id, target, amount); e.atk = ''; e.back = (moveOf(e.type).retreat || 0)*e.cooldown; return;}
   if(id === 'bite' || id === 'swipe'){
     const d = Math.max(.01, Math.hypot(e.tx-e.x, e.tz-e.z));
     world.move(e, (e.tx-e.x)/d*spec.lunge/.05, (e.tz-e.z)/d*spec.lunge/.05, .05, world.frameObstacles);
@@ -556,6 +562,9 @@ export function stepMobs(world, dt, obstacles){
       continue;
     }
 
+    // A kasa mid-skip glides from landing to landing (yokai.mjs).
+    if(yokaiTick(world, e, dt)) continue;
+
     // An active charge carries the creature along its line, hurting whoever it runs through.
     if(e.act > 0){
       const spec = ATTACKS[e.atk] || ATTACKS.charge, step = Math.min(e.act, dt);
@@ -690,7 +699,7 @@ export function stepMobs(world, dt, obstacles){
       if(od < gap && od > 1e-3){const w = (gap-od)/gap; pushX += ox/od*w*2; pushZ += oz/od*w*2;}
     }
 
-    const top = (e.gilded ? GILDED.speed : def.speed)*(e.slowed > 0 ? .35 : 1)*(e.minion ? 1.1 : 1);
+    const top = (e.gilded ? GILDED.speed : def.speed)*(e.slowed > 0 ? .35 : 1)*(e.minion ? 1.1 : 1)*rouseSpeed(world, e);
     const wantVX = dirX*top+pushX*3, wantVZ = dirZ*top+pushZ*3;
     const k = Math.min(1, move.accel*dt/Math.max(.5, top));
     e.vx = (e.vx || 0)+(wantVX-(e.vx || 0))*Math.min(1, k*2);

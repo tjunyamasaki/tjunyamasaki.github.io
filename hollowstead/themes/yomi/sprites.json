@@ -63,8 +63,8 @@
    }
   }
  },
- "daoshi": {
-  "src": "./sprites/daoshi.svg?v=yomi1",
+ "daoshi-wanderer": {
+  "src": "./sprites/daoshi-wanderer.svg?v=yomi1",
   "size": [
    2.25,
    3.38
@@ -171,6 +171,162 @@
   "size": [
    2.5,
    3.75
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 4,
+  "rows": 2,
+  "clips": {
+   "idle": {
+    "frames": [
+     7
+    ],
+    "fps": 1
+   },
+   "walk": {
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "fps": 9
+   },
+   "attack": {
+    "frames": [
+     4,
+     5,
+     6,
+     5
+    ],
+    "fps": 6
+   }
+  }
+ },
+ "kasa": {
+  "src": "./sprites/kasa.svg?v=yomi1",
+  "size": [
+   2.0,
+   3.0
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 4,
+  "rows": 2,
+  "clips": {
+   "idle": {
+    "frames": [
+     7
+    ],
+    "fps": 1
+   },
+   "walk": {
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "fps": 9
+   },
+   "attack": {
+    "frames": [
+     4,
+     5,
+     6,
+     5
+    ],
+    "fps": 6
+   }
+  }
+ },
+ "rokurokubi": {
+  "src": "./sprites/rokurokubi.svg?v=yomi1",
+  "size": [
+   2.7,
+   4.05
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 4,
+  "rows": 2,
+  "clips": {
+   "idle": {
+    "frames": [
+     7
+    ],
+    "fps": 1
+   },
+   "walk": {
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "fps": 9
+   },
+   "attack": {
+    "frames": [
+     4,
+     5,
+     6,
+     5
+    ],
+    "fps": 6
+   }
+  }
+ },
+ "yukionna": {
+  "src": "./sprites/yukionna.svg?v=yomi1",
+  "size": [
+   2.4,
+   3.6
+  ],
+  "anchor": [
+   0.5,
+   0.04
+  ],
+  "columns": 4,
+  "rows": 2,
+  "clips": {
+   "idle": {
+    "frames": [
+     7
+    ],
+    "fps": 1
+   },
+   "walk": {
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "fps": 9
+   },
+   "attack": {
+    "frames": [
+     4,
+     5,
+     6,
+     5
+    ],
+    "fps": 6
+   }
+  }
+ },
+ "daoshi": {
+  "src": "./sprites/daoshi.svg?v=yomi1",
+  "size": [
+   2.4,
+   3.6
   ],
   "anchor": [
    0.5,

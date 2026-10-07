@@ -24,6 +24,7 @@ import {stepSkills, useSkill} from './skills.mjs?v=harvest-18';
 import {ascendWeapon, creditKill, mendWeapon, syncMastery, warnWear} from './mastery.mjs?v=harvest-18';
 import {packRule, stepAges, thornNodes, thornSpeed} from './ages.mjs?v=harvest-18';
 import {refineDodge, refineHit as refinedHit, refineHurt, refineKill, refineSwing, refineWeapon, refinedStyle, sanitizeRefine, shotEnd, shotHit, shotMods, shotSteer, splitBefore, splitMagic, splitMarks, stepRefine} from './refine.mjs?v=harvest-18';
+import {shelfAction, shelfCount, spillShelf, storeBooks} from './bookshelf.mjs?v=harvest-18';
 import {HEARTH_MEND, stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
 import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
@@ -237,7 +238,7 @@ export class World {
     const store=type==='chest'
       ? createChest(id)
       : createContainer(containerId('chest', id), type==='cart'?cartSlots(1):0);
-    return {id,type,x,z,hp:STRUCTURES[type].hp,maxHp:STRUCTURES[type].hp,fuel:type==='hearth'?150:type==='fire'?100:0,level:1,rotation:0,open:false,charges:3,growth:0,planted:false,store,cooldown:0,...(type==='cart'?{towedBy:null,frame:0,face:-1,snag:0}:{})};
+    return {id,type,x,z,hp:STRUCTURES[type].hp,maxHp:STRUCTURES[type].hp,fuel:type==='hearth'?150:type==='fire'?100:0,level:1,rotation:0,open:false,charges:3,growth:0,planted:false,store,cooldown:0,...(type==='cart'?{towedBy:null,frame:0,face:-1,snag:0}:{}),...(type==='bookshelf'?{books:{}}:{})};
   }
   addPlayer(id,name='Wanderer',character='ember'){
     if(typeof id!=='string'||id.length>64)return null;
@@ -698,7 +699,7 @@ export class World {
     if(this.status!=='playing')return {ok:false,code:'unavailable'};
     if(p.down||p.ghost){if(cmd.type==='interact'&&p.charm>0){p.charm--;this.revivePlayer(p);this.event('heal',p.x,p.z,'Last charm');return {ok:true,code:'ok'};}return {ok:false,code:'unavailable'};}
     if(Object.hasOwn(INTENTS,cmd.type))return inventoryIntent(this,p,cmd);
-    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill','refine','ascendWeapon','tile'].includes(cmd.type))return {ok:false,code:'cooldown'};
+    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill','refine','ascendWeapon','tile','shelf'].includes(cmd.type))return {ok:false,code:'cooldown'};
     switch(cmd.type){
       case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){const gx=clamp(cmd.x,-this.radius+1,this.radius-1),gz=clamp(cmd.z,-this.radius+1,this.radius-1),land=this.walkable(gx,gz)?null:this.landNear(gx,gz,6);p.goal={x:land?land.x:gx,z:land?land.z:gz,target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
       case 'craft':return this.performCraft(p, cmd.recipe, cmd.stationId);
@@ -723,6 +724,7 @@ export class World {
       case 'attack':this.attack(p);break;
       case 'skill':return useSkill(this, p);
       case 'refine':return refineWeapon(this, p, cmd);
+      case 'shelf':return this.dungeon||this.arena?{ok:false,code:'unavailable'}:shelfAction(this, p, cmd);
       case 'ascendWeapon':return ascendWeapon(this, p, cmd);
       case 'dash':return this.dodge(p);
       case 'hotbar':return this.selectHotbar(p, cmd.slot);
@@ -784,7 +786,7 @@ export class World {
     if(revive)return {kind:'revive',entity:revive,label:'Revive teammate'};
     return candidates.sort((a,b)=>distance(p,a.entity)-distance(p,b.entity)||(a.entity.id<b.entity.id?-1:1))[0]||null;
   }
-  buildingLabel(b){return ({hearth:'Feed heartfire',fire:'Feed fire',bench:'Workbench',chest:'Open supplies',wall:'Repair wall',gate:b.open?'Close gate':'Open gate',trap:b.charges<3?'Rearm trap':'Briar trap',farm:b.planted?(b.growth>=100?'Harvest pumpkins':'Growing…'):'Plant seed',pot:'Cook a feast',lantern:'Soul lantern',bed:'Rest',ward:'Warding totem',hushstone:'Hushing stone',cart:b.type==='cart'?cartLabel(b):''})[b.type];}
+  buildingLabel(b){return ({hearth:'Feed heartfire',fire:'Feed fire',bench:'Workbench',chest:'Open supplies',wall:'Repair wall',gate:b.open?'Close gate':'Open gate',trap:b.charges<3?'Rearm trap':'Briar trap',farm:b.planted?(b.growth>=100?'Harvest pumpkins':'Growing…'):'Plant seed',pot:'Cook a feast',lantern:'Soul lantern',bed:'Rest',ward:'Warding totem',hushstone:'Hushing stone',bookshelf:`Bookshelf · ${shelfCount(b)} ${shelfCount(b)===1?'book':'books'}`,cart:b.type==='cart'?cartLabel(b):''})[b.type];}
   interact(p,target){
     const explicit=typeof target==='string'?target:null;
     const t=this.target(p, explicit);if(!t)return {ok:false,code:'rejected'};
@@ -853,7 +855,8 @@ export class World {
     if(actionId==='awaken')return this.performUpgrade(p, targetId);
     if(actionId==='home')return this.makeHome(p, building);
     if(actionId==='mend'){if(p.cooldown>.05)return {ok:false,code:'cooldown'};return mendWeapon(this, p, building);}
-    if(actionId==='cook'||actionId==='craft'||actionId==='build'||actionId==='open'||actionId==='refine')return {ok:true,code:'ok'};
+    if(actionId==='shelve')return storeBooks(this, p, building);
+    if(actionId==='cook'||actionId==='craft'||actionId==='build'||actionId==='open'||actionId==='refine'||actionId==='browse')return {ok:true,code:'ok'};
     return this.interact(p, targetId);
   }
   /** A Vigil's Heartfire on the grid may be taken down and rebuilt elsewhere (vigil.mjs keeps its awakening). */
@@ -910,6 +913,7 @@ export class World {
     if(building.grid||building.foot)this.gridRev=(this.gridRev||0)+1;
     this.dropContainer(building.store, building.x, building.z);
     if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);
+    spillShelf(this, building);
     this.buildings=this.buildings.filter(entry=>entry!==building);
     p.cooldown=.5;
   }
@@ -1824,7 +1828,7 @@ export class World {
     this.enemies=this.enemies.filter(e=>e.hp>0);
     // A Vigil never ends with its fire: the embers catch again, weaker (vigil.mjs). The raiders are sated and leave.
     if(isVigil(this)&&!this.dungeon){const hearth=this.buildings.find(b=>b.type==='hearth'&&b.hp<=0);if(hearth){rekindle(this,hearth);this.enemies=this.enemies.filter(e=>e.home||isMagicAlly(e));this.hostile=[];}}
-    for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth'&&!this.showcase)this.status='defeat';}
+    for(const building of this.buildings.filter(b=>b.hp<=0)){this.dropContainer(building.store, building.x, building.z);spillShelf(this, building);if(building.overflow)this.dropContainer(building.overflow, building.x, building.z);this.event('break',building.x,building.z,`${STRUCTURES[building.type].name} destroyed`);if(building.type==='hearth'&&!this.showcase)this.status='defeat';}
     this.buildings=this.buildings.filter(b=>b.hp>0);this.drops=this.drops.filter(d=>d.stack?.quantity>0&&(d.flight||d.until>this.time));
     const active=this.players.filter(p=>p.online);if(active.length&&active.every(p=>(p.down||p.ghost)&&!p.charm)){this.wipe+=dt;
       // On a Vigil the dark only takes the night: everyone wakes by the fire (vigil.mjs).

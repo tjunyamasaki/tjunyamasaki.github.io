@@ -19,6 +19,7 @@
 import {ITEMS, RECIPES, RULES, STRUCTURES, NODES} from './content.mjs?v=harvest-18';
 import {stationLabel} from './interactions.mjs?v=harvest-18';
 import {hushReason} from './hush.mjs?v=harvest-18';
+import {shelfCount, spillShelf} from './bookshelf.mjs?v=harvest-18';
 import {hearthReason, kindleHearth, bankHearth} from './vigil.mjs?v=harvest-18';
 
 export const CELL = 1.5;
@@ -69,6 +70,7 @@ export const ROOM_MAX = 120;
 export const OBJECTS = Object.freeze({
   bench: {w: 1, h: 1, art: 1.54},
   chest: {w: 1, h: 1, art: 1.05},
+  bookshelf: {w: 1, h: 1, art: 1.1},
   fire: {w: 1, h: 1, art: 1.62},
   pot: {w: 1, h: 1, art: 1.56},
   lantern: {w: 1, h: 1, art: 1.02},
@@ -343,6 +345,7 @@ export function cellReason(world, p, toolId, i, j, {stationId = null} = {}){
       if(object.fixed || (object.type === 'hearth' && !hearthMoves(world))) return 'That stays';
       if(world.chestSessions?.has(object.id)) return 'Someone has it open';
       if(tool.pieces && [object.store, object.overflow].some(c => c?.slots?.some(Boolean))) return 'Empty it first';
+      if(tool.pieces && shelfCount(object)) return 'Empty it first';
       return '';
     }
     if(tool.pieces && !barrier && tile?.crop) return 'Harvest the crop first';
@@ -443,6 +446,7 @@ function applyCell(world, p, toolId, i, j, rotation){
       got = refund(world, p, recipeCost(gone.type), gone);
       world.dropContainer?.(gone.store, gone.x, gone.z);
       if(gone.overflow) world.dropContainer?.(gone.overflow, gone.x, gone.z);
+      spillShelf(world, gone);
       world.buildings = world.buildings.filter(b => b !== gone);world.gridRev = (world.gridRev || 0) + 1;
     }else if(tile?.crop){
       if(!ripe(tile) && !free(world)) world.give(p, CROPS[tile.crop].seed, 1);

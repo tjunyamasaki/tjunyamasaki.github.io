@@ -38,8 +38,11 @@ import {createUpdateChecker} from './updates.mjs?v=harvest-18';
 import {skillBlock, skillFor} from './skills.mjs?v=harvest-18';
 import {labClear, labDps, labEquip, labLevel, labRank, labResetStats, labSpawn, labStrength, labToggle} from './lab.mjs?v=harvest-18';
 import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/lab.mjs?v=harvest-18';
-import {REFINE_CURRENCY, bookLines, carriedBooks, carriedGear, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
+import {REFINE_CURRENCY, bookLines, carriedBooks, carriedGear, modText, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
 import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
+import {shelfMarkup} from './ui/bookshelf.mjs?v=harvest-18';
+import {shelfCount, shelfRows} from './bookshelf.mjs?v=harvest-18';
+import {isBook} from './refine-mods.mjs?v=harvest-18';
 import {createHurtFx} from './hurt-fx.mjs?v=harvest-18';
 import {CHARM} from './trinkets.mjs?v=harvest-18';
 import {dungeonStatus, layoutOf} from './dungeon/run.mjs?v=harvest-18';
@@ -78,6 +81,8 @@ let catalogPending='',catalogPick='';
 // The workbench's Refine panel (src/ui/refine.mjs): which bench, which weapon type or armour, the slot being
 // rolled, the modifier book picked to write (null: slots roll with ichor), and an ascension under way.
 let refining={stationId:null,itemId:null,pending:-1,fresh:-1,book:null,ascending:false};
+/** The bookshelf panel (src/ui/bookshelf.mjs): which shelf, and the button waiting on the host. */
+let shelving={shelfId:null,pending:''};
 let inventoryPanel=null,selection=null,qtyMode='all',chosenQty=1,pendingOp=null,actionPending=false;
 let liveActions=[],holdKind=null,holdTarget=null,holdSource=null,dismantleStarted=0,ringFrame=0,captured=null;
 const checkForUpdate=createUpdateChecker({canReload:()=>mode==='front'&&!busy&&!network&&!document.hidden});
@@ -531,7 +536,7 @@ function contextFacts(p){
   const base={kind:target.kind,id:entity.id,type:entity.type,wood:world.available(p,'wood'),stone:world.available(p,'stone'),seeds:world.available(p,'seed')};
   if(target.kind==='building'){
     const lock=world.chestSessions.get(entity.id);
-    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{})};
+    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{}),...(entity.type==='bookshelf'?{shelved:shelfCount(entity),packBooks:p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0)}:{})};
   }
   if(target.kind==='crop')return {...base,i:entity.i,j:entity.j,crop:entity.crop,seeds:entity.crop?[]:carriedSeeds(world,p).map(id=>({crop:id,name:CROPS[id].name}))};
   if(target.kind==='node'){const node=NODES[entity.type];return {...base,required:!!node?.required,toolReady:!(node?.tool)||world.hasTool(p,node.tool),toolLabel:node?.tool?label(node.tool).toLowerCase():''};}
@@ -555,6 +560,14 @@ function closeSheet(){
 function openFieldBuild(){catalog={source:'field',stationId:null,stationType:null,tab:'build'};category='all';catalogPick='';openSheet('catalog');}
 function openStationCatalog(panel){catalog={source:'station',stationId:panel.stationId,stationType:panel.stationType,tab:panel.tab};category='all';catalogPick='';openSheet('catalog');}
 function openRefine(stationId){const p=me();refining={stationId,itemId:p?.equipment?.weapon?.itemId||carriedGear(p)[0]||null,pending:-1,fresh:-1,book:null,ascending:false};openSheet('refine');}
+function openShelf(shelfId){shelving={shelfId,pending:''};openSheet('shelf');}
+/** Bookshelf panel buttons: shelve the pack's books, or take some down (count 0: all of that book). */
+async function shelfSend(op,bookId=null,count=0){
+  if(shelving.pending||!shelving.shelfId)return;
+  shelving.pending=op==='store'?'store':bookId;dirty=true;renderSheet();
+  const result=await send({type:'shelf',op,shelfId:shelving.shelfId,...(bookId?{bookId}:{}),...(count>0?{count}:{})});
+  shelving.pending='';if(!result?.ok&&result?.code&&!['rejected','inventoryFull'].includes(result.code))toast(commandError(result));dirty=true;renderSheet();
+}
 /** Ascension (src/mastery.mjs): one more ✦ for the weapon type on the Refine panel. */
 async function ascendSelected(){
   const p=me();if(!p||refining.ascending||refining.pending>=0||!refining.itemId)return;
@@ -578,7 +591,7 @@ async function runAction(action){
   if(action.id==='place'){await confirmPlace();return;}
   if(action.id==='rotate'){grid?.rotate();dirty=true;return;}
   if(action.id==='open'){await openChest(action.targetId);return;}
-  if(action.panel){const result=await send(action.command);if(result?.ok){if(action.panel.sheet==='refine')openRefine(action.panel.stationId);else openStationCatalog(action.panel);}return;}
+  if(action.panel){const result=await send(action.command);if(result?.ok){if(action.panel.sheet==='refine')openRefine(action.panel.stationId);else if(action.panel.sheet==='shelf')openShelf(action.panel.stationId);else openStationCatalog(action.panel);}return;}
   if(action.command)await send(action.command);
 }
 async function confirmPlace(){
@@ -595,7 +608,7 @@ async function confirmPlace(){
  * Tapping a camp object. Within reach you stay put: a chest opens, a workbench or cauldron opens its list.
  * Out of reach you walk up to it (stopping beside it, not into it) and it opens when you arrive.
  */
-const TAP_OPENS=Object.freeze({chest:'open',cart:'open',bench:'craft',pot:'cook'});
+const TAP_OPENS=Object.freeze({chest:'open',cart:'open',bench:'craft',pot:'cook',bookshelf:'browse'});
 let tapOpen=null;
 function buildingUnder(point){
   let best=null,bd=Infinity;
@@ -960,11 +973,16 @@ function renderSheet(){
     if(!gear.includes(refining.itemId))refining.itemId=gear[0]||null;
     setTabs(refineTabs(gear.map(itemId=>({itemId,name:weaponName(p,itemId),count:refinesOf(p,itemId).length,max:refineSlots(p,itemId),named:namedView(p,itemId).named})),refining.itemId));
     const canPay=cost=>world.canPay(p,cost);
-    const view=refining.itemId?refineView(p,refining.itemId,{have:world.available(p,REFINE_CURRENCY),canPay,books:carriedBooks(world,p),armed:refining.book}):null;
+    const view=refining.itemId?refineView(p,refining.itemId,{have:world.available(p,REFINE_CURRENCY),canPay,books:carriedBooks(world,p,world.buildings.find(b=>b.id===refining.stationId&&b.hp>0)),armed:refining.book}):null;
     if(refining.book&&view?.armed!==refining.book)refining.book=null;
     // Ascension is a weapon's: armour has none.
     const ascend=view&&view.kind!=='armour'?ascendView(p,view.itemId,{have:{sigil:world.available(p,'sigil'),ichor:world.available(p,REFINE_CURRENCY)},canPay}):null;
     replaceContent(refineMarkup(view,{icons:{weapon:view?icon(view.itemId):'',ichor:icon(REFINE_CURRENCY),sigil:icon('sigil')},bookIcon:icon,pending:refining.pending,fresh:refining.fresh,ascend,ascending:refining.ascending}));
+  }else if(sheet==='shelf'){
+    title='Bookshelf';kicker='MODIFIER BOOKS · NO SLOTS, NO LIMIT';setTabs('');
+    const shelf=world.buildings.find(b=>b.id===shelving.shelfId&&b.hp>0);
+    const packBooks=p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0);
+    replaceContent(shelfMarkup({rows:shelf?shelfRows(shelf):[],packBooks,bookIcon:icon,text:row=>modText(row.mod,row.tier,''),pending:shelving.pending}));
   }else if(sheet==='inventory'||sheet==='chest'){
     const cart=sheet==='chest'&&chestBuilding()?.type==='cart';
     title=sheet==='chest'?(cart?'Hand cart':'Chest'):'Inventory';
@@ -1269,6 +1287,7 @@ function ui(){
     if(world?.arena?.lab)paintLab();
     if(sheet==='catalog'&&catalog.source==='station'){const station=world.buildings.find(b=>b.id===catalog.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(sheet==='refine'){const station=world.buildings.find(b=>b.id===refining.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
+    if(sheet==='shelf'){const shelf=world.buildings.find(b=>b.id===shelving.shelfId&&b.hp>0);if(!shelf||distance(p,shelf)>=RULES.reach){closeSheet();toast('Bookshelf out of reach');}}
     if(maintenance&&maintenanceTarget&&!world.buildings.some(b=>b.id===maintenanceTarget&&b.hp>0))maintenanceTarget=null;
     if(maintenanceCell&&!tileAt(world,maintenanceCell.i,maintenanceCell.j))maintenanceCell=null;
     paintCluster(currentMode(),p);drawMap($('minimap'));
@@ -1436,6 +1455,8 @@ function setupControls(){
     if(button.dataset.refineSlot!=null){void refineSlot(Number(button.dataset.refineSlot));return;}
     if(button.dataset.refineBook!=null){if(refining.pending<0){refining.book=refining.book===button.dataset.refineBook?null:button.dataset.refineBook;dirty=true;renderSheet();}return;}
     if(button.dataset.ascend!=null){void ascendSelected();return;}
+    if(button.dataset.shelfStore!=null){void shelfSend('store');return;}
+    if(button.dataset.shelfTake!=null){void shelfSend('take',button.dataset.shelfTake,Number(button.dataset.count)||0);return;}
     if(button.dataset.pick){catalogPick=button.dataset.pick;dirty=true;renderSheet();return;}
     if(button.dataset.recipe){
       if(catalogPending)return;

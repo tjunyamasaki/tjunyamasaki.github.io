@@ -39,6 +39,8 @@ const SPECS = Object.freeze({
   pull: {icon: '⇢', label: 'Pull', activation: 'tap'},
   upgrade: {icon: '⇧', label: 'Upgrade', activation: 'tap'},
   refine: {icon: '◈', label: 'Refine', activation: 'tap'},
+  browse: {icon: '▤', label: 'Books', activation: 'tap'},
+  shelve: {icon: '⇥', label: 'Shelve books', activation: 'tap'},
   descend: {icon: '⇩', label: 'Descend', activation: 'hold'},
   sip: {icon: '♨', label: 'Sip', activation: 'hold'},
   cut: {icon: '✂', label: 'Cut', activation: 'hold'},
@@ -363,6 +365,21 @@ export function describeContext(facts) {
       targetId: id,
       command: buildingCommand('cook', id),
       panel: {tab: 'craft', stationType: 'pot', stationId: id},
+    }));
+  } else if (facts.type === 'bookshelf') {
+    // Bookshelf (src/bookshelf.mjs): browse what is shelved, or put every book in the pack on it.
+    list.push(make('browse', {
+      targetId: id,
+      label: facts.shelved ? `Books · ${facts.shelved}` : 'Books',
+      command: buildingCommand('browse', id),
+      panel: {sheet: 'shelf', stationId: id},
+    }));
+    list.push(make('shelve', {
+      targetId: id,
+      label: facts.packBooks ? `Shelve ${facts.packBooks}` : 'Shelve books',
+      enabled: facts.packBooks > 0,
+      disabledReason: 'You carry no modifier books',
+      command: buildingCommand('shelve', id),
     }));
   } else if (facts.type === 'chest') {
     list.push(make('open', {

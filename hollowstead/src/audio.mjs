@@ -77,6 +77,9 @@ export class Sound {
     // The Eye of the Deep: a rising hum as the gaze locks, a zap when it leaps, a swell and a fold for the abyss.
     if(type==='gaze'){this.sweep(220,440,.3,'sine',.018);return;}
     if(type==='gazejump'){this.sweep(1800,300,.12,'sawtooth',.012);return;}
+    // The eye opens wider: a step up in pitch per stage; a stared-at foe bursts with a low wet thump.
+    if(type==='gazestage'){const k=Math.max(1,ev?.stage|0);this.sweep(330*k,660*k,.25,'sine',.02+.01*k);if(k>=2)this.sweep(110,220,.5,'sawtooth',.012);return;}
+    if(type==='gazerupture'){this.sweep(160,40,.35,'sine',.06);this.sweep(900,200,.18,'sawtooth',.012);return;}
     if(type==='abyss'){this.sweep(60,180,1.4,'sawtooth',.03);this.sweep(440,880,1.5,'sine',.01);return;}
     if(type==='abyssfold'){this.sweep(140,30,.8,'sine',.1);this.sweep(600,80,.4,'sawtooth',.02);return;}
     // Blasts on the ground (blasts.mjs): vents hiss and burst, stars whistle down, roots crack, the gaze sears.

@@ -21,6 +21,7 @@ import {equipmentSlotFor, inCraftRange} from './contracts.mjs?v=harvest-18';
 import {DASH, NAMED, RARITIES, REFINE, armourStat, maxHealth, namedOf, powerOf, rarityOf, refineSlots, refineStat, weaponStyle} from './progression.mjs?v=harvest-18';
 import {isMagicAlly, magicItems} from './magic/registry.mjs?v=harvest-18';
 import {bookOf, isBook} from './refine-mods.mjs?v=harvest-18';
+import {shelfBooks, shelvesNear, takeShelfBook} from './bookshelf.mjs?v=harvest-18';
 
 export const REFINE_CURRENCY = 'ichor';
 const MELEE_STYLES = new Set(['melee', 'combo', 'lash', 'reap', 'nova']);
@@ -143,12 +144,17 @@ export function carriedGear(p){
   for(const stack of p?.inventory?.slots || []) add(stack);
   return ids;
 }
-/** Modifier books at hand (the pack and the chests a workbench can reach): [{id, count}]. */
-export function carriedBooks(world, p){
-  const counts = new Map();
-  const scan = container => {for(const stack of container?.slots || []) if(stack && isBook(stack.itemId)) counts.set(stack.itemId, (counts.get(stack.itemId) || 0)+stack.quantity);};
+/**
+ * Modifier books at hand: the pack, the chests a workbench can reach, and every bookshelf within
+ * SHELF.reach of the workbench `bench` (bookshelf.mjs), so a shelved book is written without taking it down.
+ * [{id, count}]
+ */
+export function carriedBooks(world, p, bench = null){
+  const counts = new Map(), add = (id, n) => counts.set(id, (counts.get(id) || 0)+n);
+  const scan = container => {for(const stack of container?.slots || []) if(stack && isBook(stack.itemId)) add(stack.itemId, stack.quantity);};
   scan(p?.inventory);
   for(const store of world?.stores?.(p) || []) scan(store);
+  if(bench) for(const shelf of shelvesNear(world, bench.x, bench.z)) for(const [id, n] of Object.entries(shelfBooks(shelf))) add(id, n);
   return [...counts.entries()].map(([id, count]) => ({id, count}));
 }
 
@@ -242,7 +248,8 @@ export function refineWeapon(world, p, cmd){
     if(!book) return reject('', 'invalidCommand');
     if(!modAllowed(book.mod, itemId, book.tier, null)) return reject(`${book.name} does not fit the ${label(itemId)}`);
     if(list.some((entry, index) => index !== slot && entry?.mod === book.mod)) return reject(`${REFINE.mods[book.mod].name} is already on it`);
-    if(!world.pay(p, {[cmd.bookId]: 1})) return reject(`Carry the ${book.name}`);
+    // From the pack or a nearby chest first, else straight off a bookshelf by the workbench.
+    if(!world.pay(p, {[cmd.bookId]: 1}) && !takeShelfBook(world, bench.x, bench.z, cmd.bookId)) return reject(`Carry the ${book.name}, or shelve it near the workbench`);
     rolled = {mod: book.mod, tier: book.tier};
   }else{
     const reroll = slot < list.length, cost = refineCost(itemId, slot, reroll);

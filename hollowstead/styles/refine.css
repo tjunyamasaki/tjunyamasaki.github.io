@@ -83,3 +83,11 @@
 .refine-slots.is-writing .refine-slot:not(.is-target){opacity:.55}
 .refine-slot.is-target{box-shadow:0 0 0 1px var(--tone),0 0 12px color-mix(in srgb,var(--tone) 35%,transparent)}
 .world-label.strike-refine{font-size:12px;letter-spacing:.8px;color:#e6c6ff}
+/* Bookshelf panel (src/ui/bookshelf.mjs): the refine book rows with Take buttons beside them. */
+.shelf-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:6px}
+.shelf-head p{margin:0;font-size:12px;color:#e1d2bb;flex:1 1 220px}
+.shelf .refine-books{border-top:0;padding-top:0;margin-top:6px}
+.shelf .refine-books ul{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.shelf-row{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.shelf-take{display:flex;flex-direction:column;gap:4px}
+.shelf-take button{min-width:58px;min-height:30px;padding:4px 8px;font-size:12px}

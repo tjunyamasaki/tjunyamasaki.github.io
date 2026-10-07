@@ -287,10 +287,10 @@ export const SKILL_BOOK = Object.freeze({
       k.beat(.1, {kind: 'call', fn: 'heartbloom', fx: 'heartbloom', power: round(k.strength), vine: k.dmg(1), bloom: k.dmg(2.6), heart: k.dmg(6)});
     }},
 
-  deepeye: {name: 'Open the Abyss', cooldown: 15, reach: ABYSS.radius, pose: 1.7,
-    blurb: 'The eye swells and its beam sweeps a full circle round you, burning everything it crosses; then the dark it opened folds shut on whatever stands close, stunning it.',
+  deepeye: {name: 'Open the Abyss', cooldown: 14, reach: ABYSS.radius, pose: 1.7,
+    blurb: 'The eye swells and its beam sweeps a full circle round you, burning and transfixing everything it crosses; the dark it opened folds shut on whatever stands close, stunning it, and the eye is left wide open: your next gaze starts Unblinking.',
     cast(k){
-      k.beat(.05, {kind: 'call', fn: 'abyss', fx: 'abyss', dmg: k.dmg(14), fold: k.dmg(20)});
+      k.beat(.05, {kind: 'call', fn: 'abyss', fx: 'abyss', dmg: k.dmg(16), fold: k.dmg(24)});
     }},
 
   // Kagekiri (src/magic/katana.mjs): the katana's own hanging cuts, drawn ten at a time, then all snapped.

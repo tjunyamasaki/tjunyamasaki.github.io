@@ -7,7 +7,7 @@ export const TRANSACTION_PROTOCOL=1;
 const outcome=code=>({ok:code==='ok',code});
 // Gameplay ping and automatic eat are not world actions. Legacy inventory
 // packets stay excluded: their replacements require revisions.
-const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','skill','dash','lantern','repair','dismantle','upgrade','hotbar','arenaPick','cart','strike','refine','ascendWeapon','tile']);
+const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','skill','dash','lantern','repair','dismantle','upgrade','hotbar','arenaPick','cart','strike','refine','ascendWeapon','tile','shelf']);
 function validWorldAction(cmd){
   if(typeof cmd.type!=='string')return false;
   if(['move','build'].includes(cmd.type)&&(!Number.isFinite(cmd.x)||!Number.isFinite(cmd.z)))return false;
@@ -17,6 +17,7 @@ function validWorldAction(cmd){
   if(cmd.type==='tile'&&(typeof cmd.tool!=='string'||!Array.isArray(cmd.cells)||cmd.cells.length>64))return false;
   if(cmd.type==='hotbar'&&!(Number.isInteger(cmd.slot)&&cmd.slot>=0&&cmd.slot<HOTBAR_SLOTS))return false;
   if(cmd.type==='refine'&&(typeof cmd.stationId!=='string'||typeof cmd.itemId!=='string'||!Number.isInteger(cmd.slot)||(cmd.bookId!=null&&typeof cmd.bookId!=='string')))return false;
+  if(cmd.type==='shelf'&&(typeof cmd.shelfId!=='string'||!['store','take'].includes(cmd.op)||(cmd.bookId!=null&&typeof cmd.bookId!=='string')||(cmd.count!=null&&!Number.isSafeInteger(cmd.count))))return false;
   if(cmd.type==='ascendWeapon'&&(typeof cmd.stationId!=='string'||typeof cmd.itemId!=='string'))return false;
   if(cmd.type==='arenaPick'&&(!Number.isInteger(cmd.choice)||(cmd.replace!=null&&!(Number.isInteger(cmd.replace)&&cmd.replace>=0&&cmd.replace<HOTBAR_SLOTS))))return false;
   return true;

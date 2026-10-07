@@ -127,10 +127,10 @@ export const CATALOG_CONTEXT_FIELDS = Object.freeze(['source', 'stationId', 'tab
 export const FIRE_STATION_TYPES = Object.freeze(['hearth', 'fire']);
 
 export const FIELD_BUILD_RECIPES = Object.freeze(['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed', 'cart']);
-export const WORKBENCH_BUILD_RECIPES = Object.freeze([...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone']);
+export const WORKBENCH_BUILD_RECIPES = Object.freeze([...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone', 'bookshelf']);
 /** Building on the grid (homestead.mjs gridWorld: the Vigil and the Homestead): walls, floors and soil a cell at a time. */
 export const GRID_FIELD_BUILD_RECIPES = Object.freeze(['hearth', 'fire', 'bench', 'chest', 'bed', 'trap', 'cart', 'glimmer', 'till', 'plank', 'roughplank', 'fieldstone', 'fence', 'wall', 'gate']);
-export const GRID_WORKBENCH_BUILD_RECIPES = Object.freeze([...GRID_FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone', 'boards', 'flagstone', 'cobble', 'slabs', 'stonewall', 'timberwall', 'masonwall']);
+export const GRID_WORKBENCH_BUILD_RECIPES = Object.freeze([...GRID_FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone', 'bookshelf', 'boards', 'flagstone', 'cobble', 'slabs', 'stonewall', 'timberwall', 'masonwall']);
 export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack', 'warpscroll']);
 export const FIRE_COOK_RECIPES = Object.freeze(['roast', 'roastMeat', 'roastCaps', 'loaf']);
 export const CAULDRON_COOK_RECIPES = Object.freeze(['stew', 'elixir', 'greaterelixir', 'moonbroth', 'tonic', 'tea', 'gloomstew', 'gourdsoup']);
@@ -157,6 +157,7 @@ export const CONTEXT_ACTIONS = Object.freeze({
   bench: Object.freeze(['craft', 'build', 'refine', 'repair']),
   pot: Object.freeze(['cook', 'repair']),
   chest: Object.freeze(['open', 'repair']),
+  bookshelf: Object.freeze(['browse', 'shelve', 'repair']),
   cart: Object.freeze(['pull', 'open', 'upgrade', 'repair']),
   wall: Object.freeze(['repair']),
   fence: Object.freeze(['repair']),

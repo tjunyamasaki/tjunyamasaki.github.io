@@ -13,6 +13,9 @@ import {heartbloom} from './magic/thornheart.mjs?v=harvest-18';
 import {ABYSS, openAbyss} from './magic/deepeye.mjs?v=harvest-18';
 import {DRAW, DRAW_TOTAL, hundredLine} from './magic/katana.mjs?v=harvest-18';
 import {gripAll} from './magic/gloomgrasp.mjs?v=harvest-18';
+import {DRAGON, dragonRush, wakeDragon} from './magic/guandao.mjs?v=harvest-18';
+import {grandSeal, sealFire} from './magic/ofuda.mjs?v=harvest-18';
+import {avalanche} from './magic/odokuro.mjs?v=harvest-18';
 import {finalChapter} from './grimoire.mjs?v=harvest-18';
 import {deathMark, deathReap} from './reaper.mjs?v=harvest-18';
 import {wildHunt} from './wightcaller.mjs?v=harvest-18';
@@ -299,6 +302,23 @@ export const SKILL_BOOK = Object.freeze({
     cast(k){
       k.beat(0, {kind: 'call', fn: 'hundredline', cut: k.dmg(1.1), snap: k.dmg(2.6)});
     }},
+
+  // ------------------------------------------------------------------ the Shrine of Yomi
+  guandao: {name: 'Green Dragon Unbound', cooldown: 14, reach: 7, pose: .6,
+    blurb: 'The dragon wakes in the blade: for a few seconds every sweep runs out at its longest and echoes twice. When it leaves, it rushes along your last cut through everything in its way.',
+    cast(k){
+      k.beat(0, {kind: 'call', fn: 'dragonwake', fx: 'dragonwake', secs: DRAGON.secs});
+      k.beat(DRAGON.secs, {kind: 'call', fn: 'dragonrush', fx: 'dragonrush', dmg: k.dmg(5.5)});
+    }},
+  ofuda: {name: 'Grand Seal', cooldown: 13, reach: 9, pose: .9,
+    blurb: 'Talismans fly to every foe around you, two seals each; then every seal you have laid ignites at once, nearest first.',
+    cast(k){
+      k.beat(.1, {kind: 'call', fn: 'grandseal', fx: 'grandseal', n: 2, power: round(k.strength)});
+      k.beat(1, {kind: 'call', fn: 'sealfire', fx: 'sealfire'});
+    }},
+  odokuro: {name: 'Bone Avalanche', cooldown: 15, reach: 7.5, pose: .9,
+    blurb: 'The hand grows huge, scoops up every foe in a wide arc before you into a ball of bones and sends it rolling: it gathers up whatever it rolls over and bursts at the end.',
+    cast(k){k.beat(.15, {kind: 'call', fn: 'avalanche', fx: 'avalanche', dmg: k.dmg(4.5)});}},
 });
 
 // ------------------------------------------------------------------ special beats
@@ -383,6 +403,14 @@ export const SKILL_CALLS = Object.freeze({
   heartbloom(world, b, owner){return heartbloom(world, owner, b);},
   /** Hundred-Line Draw: Kagekiri's own module vanishes, cuts, steps out and sheathes (src/magic/katana.mjs). */
   hundredline(world, b, owner){return hundredLine(world, owner, b);},
+  /** Green Dragon Unbound: the guandao's dragon wakes, then rushes along the last cut (src/magic/guandao.mjs). */
+  dragonwake(world, b, owner){return wakeDragon(world, owner, b.secs);},
+  dragonrush(world, b, owner){return dragonRush(world, owner, b.dmg);},
+  /** Grand Seal: the Hundred Seals paste seals on everything near, then ignite them all (src/magic/ofuda.mjs). */
+  grandseal(world, b, owner){return grandSeal(world, owner, b.n || 2, ownerPower(world, owner)*(b.power || 1));},
+  sealfire(world, b, owner){return sealFire(world, owner);},
+  /** Bone Avalanche: the Gashadokuro's Hand scoops a ball of foes and rolls it (src/magic/odokuro.mjs). */
+  avalanche(world, b, owner){return avalanche(world, owner, b.dmg);},
   /** Open the Abyss: the Eye of the Deep sweeps its beam round and folds the dark shut (src/magic/deepeye.mjs). */
   abyss(world, b, owner){return openAbyss(world, owner, b);},
   /** Abyssal Grip: the scepter's own hands rise under every foe near the mark (src/magic/gloomgrasp.mjs). */

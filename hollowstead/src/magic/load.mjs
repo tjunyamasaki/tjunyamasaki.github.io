@@ -14,6 +14,9 @@ const SPECS = [
   'thornheart.mjs',
   'deepeye.mjs',
   'katana.mjs',
+  'guandao.mjs',
+  'ofuda.mjs',
+  'odokuro.mjs',
 ];
 
 export async function loadMagicModules(){

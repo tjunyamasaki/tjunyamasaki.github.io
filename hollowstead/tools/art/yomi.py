@@ -1167,6 +1167,64 @@ def guandao():
     return d, G(b, 256, 440)
 
 
+def ofuda_sheaf():
+    """The Hundred Seals: a fan of yellow talismans bound at the foot with red cord and a jade bead."""
+    d = []; b = ""
+    for k, rot in enumerate((-30, -15, 0, 15, 30)):
+        slipb = rrect(-46, -330, 92, 330, 6, OFUDA if k % 2 == 0 else "#f6e3a0", 8)
+        slipb += line("M0 -290 Q22 -262 -6 -232 Q24 -200 -10 -168 M-20 -130 L20 -138 M0 -110 L0 -60", 9, SCRIPT)
+        slipb += brush((-30, -300), (-34, -170), (-30, -40), 7, "#fff6c8", .8)
+        b += G(slipb, 256, 700, rot)
+    b += stroke("M206 690 Q256 716 306 690", 12, VERM) + stroke("M256 700 Q240 740 224 760 M256 700 Q270 742 290 758", 9, VERM)
+    b += gem(256, 702, 18, JADE, JADE_D, JADE_L)
+    b += sparkle(380, 420, 1.6, "#fff6c8") + sparkle(140, 470, 1.1, "#fff6c8")
+    return d, b
+
+
+def odokuro_hand():
+    """The Gashadokuro's Hand: a huge bone hand, fingers half curled, green ghost-fire in the knuckles."""
+    d = []; b = ""
+    BN = "#e8dcc0"; BN_D = "#b9a986"; FIRE = "#c8ff8a"
+    # wrist and the stub of the radius
+    b += fill(limb((256, 744), (250, 690), (250, 620), 48, 56), BN, 8) + line("M236 700 L264 690", 5, BN_D)
+    palm = "M170 620 Q160 520 190 460 L330 452 Q356 520 344 620 Q260 650 170 620 Z"
+    b += shaded(d, palm, BN, BN_D, 12, -6, line("M210 480 L216 600 M256 470 L258 610 M300 470 L298 600", 6, BN_D))
+    # the fingers as one silhouette (outline pass, then fill), so neighbours do not ink over each other
+    segs, knuckles = [], []
+    for i, (x, a0, L) in enumerate(((190, -100, 96), (236, -92, 110), (282, -84, 106), (326, -72, 90))):
+        px, py, a = x, 462, a0
+        for j, l in enumerate((L, L * .8, L * .62)):
+            a += 24 + i * 2
+            nx, ny = px + math.cos(math.radians(a)) * l, py + math.sin(math.radians(a)) * l
+            segs.append(limb((px, py), ((px + nx) / 2, (py + ny) / 2), (nx, ny), 50 - j * 8, 44 - j * 8))
+            knuckles.append((nx, ny, 9 - j * 2))
+            px, py = nx, ny
+    b += union(segs, BN)
+    b += "".join(f'<circle cx="{f(x)}" cy="{f(y)}" r="{f(r)}" fill="{BN_D}" stroke="none"/>' for x, y, r in knuckles)
+    for x in (190, 236, 282, 326):
+        b += f'<circle cx="{x}" cy="462" r="13" fill="{FIRE}" stroke="none" opacity=".95"/>'
+    b += fill(limb((176, 600), (104, 560), (112, 474), 50, 40), BN, 7) + f'<circle cx="112" cy="474" r="22" fill="{BN}" stroke-width="{sw(6)}"/>'
+    b += f'<circle cx="256" cy="540" r="70" fill="{FIRE}" opacity=".18" stroke="none"/>'
+    b += sparkle(370, 430, 1.4, FIRE) + sparkle(150, 410, 1.0, FIRE)
+    return d, b
+
+
+def write_magic_item(root, key):
+    """A magic weapon's item and inventory icon (src/magic/<key>.mjs): assets/magic/<key>/item.svg and icon.svg."""
+    out = os.path.join(root, "assets", "magic", key)
+    os.makedirs(out, exist_ok=True)
+    spec = ALL[key]
+    item = lib.build_sheet(spec["frames"], 1, 1, spec["target"], line=lib.line_for(spec.get("line_world", spec["size"][0])))
+    icon = lib.build_sheet([spec["diag"]], 1, 1, (36, 36, 476, 476), cell=(512, 512), out_scale=.375, align="center",
+                           center_on_first=False, line=lib.line_for(lib.ICON_WU, big=False))
+    open(os.path.join(out, "item.svg"), "w", newline="\n").write(item)
+    open(os.path.join(out, "icon.svg"), "w", newline="\n").write(icon)
+
+
+# The Shrine of Yomi's magic weapons whose item art is drawn here (tools/art/build.py --only <key>).
+MAGIC_ITEMS = ("katana", "guandao", "ofuda", "odokuro")
+
+
 # ================================================================ shrine stones and a jizo (the Yomi area's rocks and props)
 def river_stone(d, x, base, rx, ry, col, dark, moss=True, seed=1):
     st = blob(x, base - ry, rx, ry, 9, .07, seed, flat=base - 2)
@@ -1251,6 +1309,8 @@ ALL = {
     "torii": dict(frames=[torii], cols=1, rows=1, target=(24, 160, 488, 744), size=[3.4, 5.1], clips=STILL),
     "katana": dict(frames=[katana], cols=1, rows=1, target=(130, 30, 382, 740), size=[1.1, 1.65], line_world=1.334, clips=STILL, diag=diagonal(katana)),
     "guandao": dict(frames=[guandao], cols=1, rows=1, target=(60, 20, 452, 744), size=[1.1, 1.65], line_world=1.334, clips=STILL, diag=diagonal(guandao)),
+    "ofuda": dict(frames=[ofuda_sheaf], cols=1, rows=1, target=(60, 120, 452, 744), size=[1.1, 1.65], line_world=1.334, clips=STILL, diag=diagonal(ofuda_sheaf, 20)),
+    "odokuro": dict(frames=[odokuro_hand], cols=1, rows=1, target=(40, 120, 472, 744), size=[1.3, 1.95], line_world=1.4, clips=STILL, diag=diagonal(odokuro_hand, 15)),
     "yomi-rock": dict(frames=[yomi_rock], cols=1, rows=1, target=(40, 420, 476, 746), size=[2.8, 4.2], clips=STILL),
     "yomi-rock-b": dict(frames=[yomi_rock_b], cols=1, rows=1, target=(56, 360, 456, 746), size=[2.8, 4.2], clips=STILL),
     "jizo": dict(frames=[jizo], cols=1, rows=1, target=(150, 300, 362, 744), size=[1.5, 2.25], clips=STILL),
@@ -1270,14 +1330,7 @@ SPRITES = {k: {kk: v for kk, v in ALL[k].items() if kk in ("frames", "cols", "ro
 
 def write_katana(root):
     """Kagekiri's item and inventory icon for the magic pack (src/magic/katana.mjs): assets/magic/katana/."""
-    out = os.path.join(root, "assets", "magic", "katana")
-    os.makedirs(out, exist_ok=True)
-    spec = ALL["katana"]
-    item = lib.build_sheet(spec["frames"], 1, 1, spec["target"], line=lib.line_for(spec["line_world"]))
-    icon = lib.build_sheet([spec["diag"]], 1, 1, (36, 36, 476, 476), cell=(512, 512), out_scale=.375, align="center",
-                           center_on_first=False, line=lib.line_for(lib.ICON_WU, big=False))
-    open(os.path.join(out, "item.svg"), "w", newline="\n").write(item)
-    open(os.path.join(out, "icon.svg"), "w", newline="\n").write(icon)
+    write_magic_item(root, "katana")
 
 
 def build(key, spec, out_dir):
@@ -1370,7 +1423,7 @@ requestAnimationFrame(loop);
 NAMES = {"miko": "Shrine maiden (wanderer)", "daoshi-wanderer": "Taoist exorcist (wanderer)", "daoshi": "Fallen daoshi (mob)",
          "kasa": "Kasa-obake, umbrella ghost (mob)", "rokurokubi": "Rokurokubi, long neck (mob)", "yukionna": "Yuki-onna, snow woman (mob)", "chochin": "Chochin-obake, lantern ghost (mob)",
          "jiangshi": "Jiangshi, hopping corpse (mob)", "sakura": "Old cherry (tree)", "matsu": "Sacred pine (tree)",
-         "toro": "Stone lantern (decoration)", "torii": "Torii gate (decoration)", "katana": "Kagekiri, katana (weapon)", "guandao": "Dragon guandao (weapon)",
+         "toro": "Stone lantern (decoration)", "torii": "Torii gate (decoration)", "katana": "Kagekiri, katana (weapon)", "guandao": "Dragon guandao (weapon)", "ofuda": "The Hundred Seals (weapon)", "odokuro": "Gashadokuro\u2019s Hand (weapon)",
          "yomi-rock": "Garden stones (rock node)", "yomi-rock-b": "Sacred boulder (rock node)", "jizo": "Jizo statue (decoration)",
          "bamboo": "Bamboo clump (tree, the Bamboo Thicket)", "bamboo-b": "Bamboo clump, lesser (tree)", "yanagi": "Weeping willow (tree, the Spider-lily Marsh)",
          "obonlantern": "Obon lantern (omen)", "foxwedding": "Fox wedding (omen)"}

@@ -121,7 +121,7 @@ const ITEM_RARITY = Object.freeze({
   elixir:'uncommon', heartstone:'epic', stew:'uncommon', bandage:'common',
   sword:'uncommon', torch:'common', recurve:'uncommon', bonebow:'rare', broadsword:'rare', crookstaff:'rare',
   flamberge:'epic', skullstaff:'epic', tome:'legendary', bonemail:'rare', shardplate:'epic', everlantern:'legendary',
-  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic', 'kitsune-lantern':'epic', plaguebeak:'epic', gloomgrasp:'epic', pallbearer:'epic', 'hollow-moon':'legendary', thornheart:'legendary', deepeye:'legendary', katana:'legendary',
+  'cinder-staff':'rare', 'barrow-rattle':'rare', 'widows-needle':'rare', 'spirit-fan':'epic', 'mourning-bell':'epic', 'kitsune-lantern':'epic', plaguebeak:'epic', gloomgrasp:'epic', pallbearer:'epic', 'hollow-moon':'legendary', thornheart:'legendary', deepeye:'legendary', katana:'legendary', guandao:'epic', ofuda:'epic', odokuro:'legendary',
   fangs:'rare', wisplantern:'rare', crowtotem:'rare', soulchain:'epic', stormrod:'epic', jacklantern:'epic', censer:'epic',
   scythe:'legendary', starfall:'legendary', wighthorn:'legendary',
   // Trinkets (trinkets.mjs): six rare, four epic. Caches and elites drop them through the pools below.
@@ -148,7 +148,7 @@ export const rarityRank = itemId=>RARITIES.indexOf(rarityOf(itemId));
 const POOLS = Object.freeze({
   uncommon:['recurve','sword','elixir','elixir','torch','bandage','tinderpouch','crookedkey','soulstitch','book'],
   rare:['bonebow','broadsword','crookstaff','bonemail','cinder-staff','barrow-rattle','widows-needle','fangs','wisplantern','crowtotem','nightfang','emberheart','crowseye','harvestcharm','wispfeather','gravedust','gutteringcandle','gravechalk','redthread','book','book'],
-  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','soulchain','stormrod','jacklantern','censer','pallbearer','frostanklet','boneward','moonlocket','thornknot','hellspur','mournersveil','book','book'],
+  epic:['flamberge','skullstaff','shardplate','heartstone','spirit-fan','mourning-bell','guandao','ofuda','soulchain','stormrod','jacklantern','censer','pallbearer','frostanklet','boneward','moonlocket','thornknot','hellspur','mournersveil','book','book'],
   legendary:['tome','everlantern','scythe','starfall','wighthorn','hollow-moon','katana','thirteenthbell','hollowmirror','book'],
 });
 export const LOOT_TABLES = Object.freeze({
@@ -192,7 +192,7 @@ export const LOOT_TABLES = Object.freeze({
   kasa:{xp:7, rolls:[{chance:.35, entries:[['fiber',[1,2],2],['wood',[1,2],1]]},{chance:.04, entries:[['uncommon',1,1]]},{chance:.2, entries:[['ichor',[1,1],1]]},{chance:.008, entries:[['book',1,1]]}]},
   rokurokubi:{xp:15, rolls:[{chance:.35, entries:[['bone',[1,2],2],['fiber',[1,2],1]]},{chance:.1, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.42, entries:[['ichor',[1,2],1]]},{chance:.018, entries:[['book',1,1]]}]},
   yukionna:{xp:16, rolls:[{chance:.45, entries:[['rime',[1,2],2],['shard',[1,1],1]]},{chance:.1, entries:[['uncommon',1,3],['rare',1,1]]},{chance:.42, entries:[['ichor',[1,2],1]]},{chance:.02, entries:[['book',1,1]]}]},
-  daoshi:{xp:26, rolls:[{chance:.5, entries:[['ember',[1,3],2],['bone',[1,2],1],['elixir',[1,1],.4]]},{chance:.16, entries:[['rare',1,3],['epic',1,1]]},{chance:.55, entries:[['ichor',[1,3],1]]},{chance:.035, entries:[['book',1,1]]}]},
+  daoshi:{xp:26, rolls:[{chance:.5, entries:[['ember',[1,3],2],['bone',[1,2],1],['elixir',[1,1],.4]]},{chance:.16, entries:[['rare',1,3],['epic',1,1]]},{chance:.55, entries:[['ichor',[1,3],1]]},{chance:.035, entries:[['book',1,1]]},{chance:.008, entries:[['ofuda',1,1]]}]},
   // Omens (omens.mjs): rare, hard won, and worth it. Each is a little hoard.
   fallenstar:{xp:120, rolls:[
     {count:[3,4], entries:[['shard',[3,5],3],['ember',[3,4],2],['rime',[2,3],1],['emberglass',[2,3],1],['ore',[3,4],1]]},

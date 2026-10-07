@@ -25,6 +25,9 @@ export const HELD_GEAR = Object.freeze({
   gloomgrasp: {motion: 'grasp', handY: 1.1, handX: .55, sprite: 'gloomgrasp'},
   // Kagekiri swings in the arm rig (player-rig.mjs RIG_GEAR); this pose stands in while the rig's sheets load.
   katana: {motion: 'swing', sprite: 'held-katana'},
+  // The Shrine of Yomi: the guandao thrust out in its crescents, the talismans flicked like a needle.
+  guandao: {motion: 'thrust', handY: 1.0, sprite: 'guandao'},
+  ofuda: {motion: 'needle', sprite: 'ofuda'},
 });
 
 export const MAGIC_PALETTE = Object.freeze({
@@ -83,7 +86,7 @@ export function swingAngle(t){
 }
 
 /** Weapons not drawn in the hand: their src/fx rig draws them (WEAPON_FX `rig`). */
-export const UNHELD = new Set(['kitsune-lantern', 'pallbearer', 'scythe', 'hollow-moon', 'thornheart', 'deepeye']);
+export const UNHELD = new Set(['kitsune-lantern', 'pallbearer', 'scythe', 'hollow-moon', 'thornheart', 'deepeye', 'odokuro']);
 
 export function heldWeaponPose(player, time, theme={}){
   const tool = player.action === 'gather' && TOOL_GEAR[player.gatherTool] ? player.gatherTool : null;

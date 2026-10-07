@@ -68,6 +68,9 @@ export const HUES = Object.freeze({
   thornheart: H('#ffe1d6', '#d8473f', '#ff7a5c', '#2a1218', '#8fd36a'),
   deepeye: H('#fff4ff', '#b45cff', '#8a3dff', '#120624', '#ff5c8a'),
   katana: H('#ffffff', '#ffe1ea', '#ff8fb3', '#2e1430', '#9fd8ff'),
+  guandao: H('#effff6', '#4fd09a', '#2fa776', '#0f2a20', '#ffd27a'),
+  ofuda: H('#fffbe0', '#f0cf5a', '#ff7a3a', '#3a1a14', '#e0465a'),
+  odokuro: H('#fffbf0', '#e8dcc0', '#c8ff8a', '#241c2c', '#ff6a5a'),
 });
 /**
  * The kitsune's colours: one is rolled each time the Nine-Tail Lantern is equipped (FOX_LOOKS in

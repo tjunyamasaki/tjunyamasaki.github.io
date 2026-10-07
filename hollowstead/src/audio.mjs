@@ -60,6 +60,16 @@ export class Sound {
     if(type==='katavanish'){this.sweep(900,140,.4,'sine',.03);this.sweep(2600,300,.28,'sawtooth',.007);return;}
     if(type==='kataline'){this.sweep(4400,1500,.06,'sawtooth',.006);this.sweep(1500+((ev?.n||0)%4)*90,900,.12,'sine',.007);return;}
     if(type==='kataappear'){this.sweep(300,960,.26,'sine',.022);this.sweep(2200,2240,.2,'sine',.006,.08);return;}
+    // The Shrine of Yomi's weapons: the guandao's whistling crescent (longer as the line holds), its echo and the
+    // dragon; the talismans' flick and burn; the bone hand's grab, crash and avalanche.
+    if(type==='gdcut'){const s=ev?.stage||0;this.sweep(520+s*90,180,.16+s*.03,'sawtooth',.012);this.sweep(1800+s*200,900,.1,'sine',.008);return;}
+    if(type==='gdecho'){this.sweep(1400,700,.14,'sine',.008);return;}
+    if(type==='ofudathrow'){this.sweep(1600,2400,.06,'triangle',.006);return;}
+    if(type==='sealstick'){this.sweep(900,700,.05,'square',.006);return;}
+    if(type==='sealburn'){this.sweep(220,90,.35,'sawtooth',.025);this.sweep(1200,400,.25,'triangle',.012,.02);return;}
+    if(type==='odkgrab'){this.sweep(140,260,.18,'square',.02);return;}
+    if(type==='odkcrash'||type==='odkslap'){this.sweep(110,40,.3,'triangle',.05);this.sweep(1500,500,.08,'square',.01);return;}
+    if(type==='odkburst'){this.sweep(80,30,.6,'triangle',.07);this.sweep(900,200,.3,'square',.015,.05);return;}
     if(type==='foxfire'||type==='foxburst'){
       // A small haunted shrine chime; staggered partials echo the nine tails.
       const burst=type==='foxburst';

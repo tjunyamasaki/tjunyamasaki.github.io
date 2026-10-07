@@ -136,10 +136,11 @@ def main():
         import rig
         rig.rig_data()
         print("wrote src/rig-data.mjs")
-    if not a.only or "katana" in keys:
-        import yomi
-        yomi.write_katana(ROOT)
-        print("built assets/magic/katana")
+    import yomi
+    for key in yomi.MAGIC_ITEMS:
+        if not a.only or key in keys:
+            yomi.write_magic_item(ROOT, key)
+            print("built assets/magic/" + key)
     if not a.only or "magic" in keys:
         import magic
         for k, im in magic.build_magic(ROOT).items():

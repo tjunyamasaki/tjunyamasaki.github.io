@@ -15,6 +15,9 @@ import {MOON_FX} from './hollow-moon.mjs?v=harvest-18';
 import {THORNHEART_FX} from './thornheart.mjs?v=harvest-18';
 import {DEEPEYE_FX} from './deepeye.mjs?v=harvest-18';
 import {KATANA_FX} from './katana.mjs?v=harvest-18';
+import {GUANDAO_FX} from './guandao.mjs?v=harvest-18';
+import {OFUDA_FX} from './ofuda.mjs?v=harvest-18';
+import {ODOKURO_FX} from './odokuro.mjs?v=harvest-18';
 import {HOLLOW_EVENTS, paintHollow} from './hollow.mjs?v=harvest-18';
 import {REFINE_EVENTS, paintWave} from './refine.mjs?v=harvest-18';
 import {magicItems} from '../magic/registry.mjs?v=harvest-18';
@@ -34,7 +37,7 @@ import {rankOf} from '../progression.mjs?v=harvest-18';
  *                      behind the body); `keep` is handed back to its list painters as ctx.rig(ownerId).
  * Starfall predates this and is wired in by hand below.
  */
-export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAPER_FX, HORN_FX, MOON_FX, THORNHEART_FX, DEEPEYE_FX, KATANA_FX];
+export const WEAPON_FX = [KITSUNE_FX, PALLBEARER_FX, GLOOM_FX, GRIMOIRE_FX, REAPER_FX, HORN_FX, MOON_FX, THORNHEART_FX, DEEPEYE_FX, KATANA_FX, GUANDAO_FX, OFUDA_FX, ODOKURO_FX];
 const FOE_FX = WEAPON_FX.filter(fx => fx.foes);
 const FX_BY_ID = new Map(WEAPON_FX.map(fx => [fx.id, fx]));
 

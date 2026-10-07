@@ -33,7 +33,7 @@ export const SHOTS = Object.freeze({
   wisplantern: ['wisp', 'wisps'], crowtotem: ['crow', 'crows'], stormrod: ['leap', 'leaps'], starfall: ['star', 'stars'],
   jacklantern: ['sentry', 'sentries'],
   'cinder-staff': ['firebolt', 'firebolts'], plaguebeak: ['vial', 'vials'], 'kitsune-lantern': ['foxfire', 'foxfires'],
-  'widows-needle': ['needle', 'needles'],
+  'widows-needle': ['needle', 'needles'], ofuda: ['talisman', 'talismans'],
 });
 // The widow's needle keeps its own shot clock, so a faster swing would change nothing.
 const NO_SWIFT = new Set(['widows-needle']);

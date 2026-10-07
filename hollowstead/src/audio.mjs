@@ -110,6 +110,8 @@ export class Sound {
     if(type==='obon'){this.sweep(660,670,.8,'sine',.02);this.sweep(990,1000,.6,'sine',.012,.15);return;}
     if(type==='snuff'){this.sweep(500,120,.3,'sine',.03);return;}
     if(type==='foxblessing'){for(const [i,f] of [784,988,1175,1568].entries())this.sweep(f,f,.4,'triangle',.03,i*.1);return;}
+    if(type==='offering'){for(const [i,f] of [523,659,784].entries())this.sweep(f,f,.7,'sine',.025,i*.14);this.sweep(1568,1560,.9,'triangle',.006,.3);return;}
+    if(type==='fudaburn'){this.sweep(1800,900,.08,'sawtooth',.004);return;}
     if(type==='foxcurse'){this.sweep(300,80,.5,'sawtooth',.03);return;}
     if(type==='bell'){for(const [i,f] of [392,587].entries())this.sweep(f,f*.995,1.1,'sine',.03,i*.02);this.sweep(1568,1560,.6,'triangle',.008);return;}
     if(type==='bossroar'){this.sweep(110,50,.7,'sawtooth',.035);return;}

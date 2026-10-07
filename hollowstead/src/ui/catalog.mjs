@@ -5,8 +5,8 @@
 import {RECIPES} from '../content.mjs?v=harvest-18';
 import {contextRecipeIds} from '../interactions.mjs?v=harvest-18';
 
-const BUILD_CAMP = new Set(['hearth', 'fire', 'bench', 'chest', 'bookshelf', 'lantern', 'bed', 'cart', 'glimmer']);
-const BUILD_DEFENSE = new Set(['wall', 'gate', 'trap', 'ward', 'hushstone', 'fence', 'stonewall', 'timberwall', 'masonwall']);
+const BUILD_CAMP = new Set(['hearth', 'fire', 'bench', 'chest', 'bookshelf', 'lantern', 'toro', 'hokora', 'bed', 'cart', 'glimmer']);
+const BUILD_DEFENSE = new Set(['wall', 'gate', 'trap', 'ward', 'fudaward', 'hushstone', 'fence', 'stonewall', 'timberwall', 'masonwall']);
 const BUILD_FOOD = new Set(['farm', 'pot', 'till']);
 const BUILD_FLOOR = new Set(['plank', 'roughplank', 'boards', 'fieldstone', 'flagstone', 'cobble', 'slabs']);
 
@@ -15,8 +15,8 @@ function escape(value) {
 }
 
 /** `grid`: the world builds on the grid (homestead.mjs gridWorld): walls, floors and soil join the list. */
-export function catalogModel({source = 'field', stationType = null, tab = 'build', grid = false} = {}) {
-  const recipeIds = contextRecipeIds({source, stationType, tab, grid});
+export function catalogModel({source = 'field', stationType = null, tab = 'build', grid = false, land} = {}) {
+  const recipeIds = contextRecipeIds({source, stationType, tab, grid, land});
   const cooking = source === 'station' && (stationType === 'fire' || stationType === 'hearth' || stationType === 'pot');
   const bench = source === 'station' && stationType === 'bench';
   let title = 'Build';

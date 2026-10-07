@@ -43,8 +43,16 @@ export function stationRule(recipeId){
   };
 }
 
-/** `grid`: the world builds on the grid (homestead.mjs gridWorld), so walls, floors and soil replace the free-placed ones. */
-export function contextRecipeIds({source, stationType, tab, grid=false}){
+/**
+ * `grid`: the world builds on the grid (homestead.mjs gridWorld), so walls, floors and soil replace the free-placed ones.
+ * `land`: the world's land (World.land); recipes bound to another land (RECIPES land, shrinecamp.mjs) drop out.
+ * Left undefined, nothing is filtered.
+ */
+export function contextRecipeIds({source, stationType, tab, grid=false, land}){
+  const ids=contextRecipeList({source, stationType, tab, grid});
+  return land===undefined?ids:ids.filter(id=>!RECIPES[id]?.land||RECIPES[id].land===land);
+}
+function contextRecipeList({source, stationType, tab, grid}){
   if(grid&&source==='field'&&tab==='build')return [...GRID_FIELD_BUILD_RECIPES];
   if(grid&&source==='station'&&stationType==='bench'&&tab==='build')return [...GRID_WORKBENCH_BUILD_RECIPES];
   if(source==='field'&&tab==='build')return [...FIELD_BUILD_RECIPES];

@@ -1331,6 +1331,92 @@ def write_magic_item(root, key):
 MAGIC_ITEMS = ("katana", "guandao", "ofuda", "odokuro")
 
 
+# ================================================================ camp pieces and decoration of the Shrine of Yomi (yomi.mjs)
+def hokora():
+    """An offering shrine (hokora): a little wooden house on a stone plinth, a red bib, offerings at its door."""
+    d = []; b = ""
+    b += shaded(d, "M130 744 L142 676 L370 676 L382 744 Z", RK, RK_D, -10, -6, brush((150, 730), (150, 700), (170, 684), 6, RK_L))
+    b += shaded(d, "M176 676 L176 520 L336 520 L336 676 Z", WD, WD_D, -12, 0, brush((188, 660), (186, 600), (190, 534), 7, WD_L))
+    b += rrect(214, 560, 84, 116, 6, LACQ_D, 7)                      # the open door, dark within
+    b += ell(256, 612, 22, 28, GOLD, 6) + f'<circle cx="252" cy="604" r="6" fill="{GOLD_L}" stroke="none"/>'   # a mirror inside
+    roof = "M120 534 Q180 530 210 492 L240 452 L272 452 L302 492 Q332 530 392 534 Q400 516 404 500 Q356 500 322 468 L290 428 L222 428 L190 468 Q156 500 108 500 Q112 516 120 534 Z"
+    b += shaded(d, roof, VERM, VERM_D, -10, -8, brush((150, 512), (196, 488), (232, 444), 8, VERM_L))
+    b += rope((186, 540), (256, 566), (326, 540), 18) + shide(232, 556, .7) + shide(282, 556, .7)
+    # offerings: a little cup of sake, a rice ball, an orange
+    b += rrect(150, 690, 34, 26, 6, PAPER, 6) + ell(214, 706, 18, 14, PAPER_L, 6) + ell(306, 704, 18, 16, ORG, 6) + ell(350, 706, 14, 12, ORG_L, 5)
+    b += fill(blob(140, 742, 26, 8, 6, .2, 3), MOSS, 5) + fill(blob(370, 740, 22, 7, 6, .2, 4), MOSS_D, 5)
+    return d, b
+
+
+def fudaward():
+    """A paper ward: two bamboo posts, a sacred rope between them hung with talismans and streamers."""
+    d = []; b = ""
+    for x in (120, 392):
+        b += fill(f"M{x - 18} 744 L{x - 14} 380 L{x + 14} 380 L{x + 18} 744 Z", BAMB, 7)
+        for y in (480, 600):
+            b += line(f"M{x - 16} {y} Q{x} {y + 8} {x + 16} {y}", 6, BAMB_N)
+        b += f'<ellipse cx="{x}" cy="380" rx="14" ry="6" fill="{BAMB_D}" stroke-width="{sw(6)}"/>'
+    b += rope((110, 420), (256, 500), (402, 420), 24)
+    for i, x in enumerate((168, 214, 256, 298, 344)):
+        y = 470 + 26 * math.sin(math.pi * (x - 110) / 292)
+        b += ofuda(x, y + 40, (-1) ** i * 6, .9, glow=(i == 2)) if i % 2 == 0 else shide(x, y, .85)
+    b += fill(blob(256, 742, 160, 10, 9, .2, 6), MOSS_D, 5)
+    return d, b
+
+
+def gorinto():
+    """A five-ring stone stupa (gorinto): cube, sphere, pyramid, half-moon and jewel, mossy, with a lean."""
+    d = []; b = ""
+    b += shaded(d, "M174 744 L180 640 L332 640 L338 744 Z", RK, RK_D, -10, -6, brush((192, 730), (192, 690), (198, 652), 6, RK_L))       # earth
+    b += shaded(d, blob(256, 584, 70, 60, 14, .02, 2), RK, RK_D, -10, -6, brush((206, 600), (204, 570), (222, 544), 6, RK_L))   # water
+    b += shaded(d, "M166 538 Q256 512 346 538 L304 476 L208 476 Z", RK, RK_D, -10, -6)                                        # fire
+    b += shaded(d, "M208 476 Q256 424 304 476 Z", RK, RK_D, -8, -4)                                                          # wind
+    b += shaded(d, "M256 380 Q290 410 280 440 Q256 452 232 440 Q222 410 256 380 Z", RK, RK_D, -6, -2)                        # void
+    b += line("M236 690 L236 712 M256 686 L256 716 M276 690 L276 712", 6, RK_D)
+    b += fill(blob(220, 642, 30, 8, 6, .2, 5), MOSS, 5) + fill(blob(300, 538, 18, 7, 6, .2, 6), MOSS, 5)
+    return d, b
+
+
+def ema():
+    """A rack of ema: wooden votive plaques hung on a little roofed frame, each with a painted wish."""
+    d = []; b = ""
+    for x in (110, 402):
+        b += rrect(x - 12, 430, 24, 314, 6, WD, 7)
+    b += rrect(90, 470, 332, 18, 6, WD_D, 6) + rrect(90, 570, 332, 18, 6, WD_D, 6)
+    b += shaded(d, "M70 440 L130 400 L382 400 L442 440 Z", VERM, VERM_D, -8, -6)
+    cols = (VERM, JADE, GOLD, SAK, ROBE_L)
+    for row, y in enumerate((490, 590)):
+        for i in range(5):
+            x = 140 + i * 58 + row * 14
+            plaque = f"M{x - 22} {y + 10} L{x - 22} {y + 52} L{x + 22} {y + 52} L{x + 22} {y + 10} L{x} {y - 4} Z"
+            b += fill(plaque, WD_L if (i + row) % 2 else "#d8b07a", 6)
+            b += line(f"M{x - 10} {y + 26} Q{x} {y + 18} {x + 10} {y + 28}", 6, cols[(i + row * 2) % 5])
+            b += line(f"M{x} {y} L{x} {y - 10}", 4, VERM)
+    return d, b
+
+
+def bonsho():
+    """A temple bell (bonsho) hanging in a little wooden frame, its striking log on ropes beside it."""
+    d = []; b = ""
+    for x in (124, 388):
+        b += rrect(x - 16, 300, 32, 444, 6, WD, 7)
+    roof = "M70 312 Q160 306 200 270 L224 246 L288 246 L312 270 Q352 306 442 312 Q446 296 450 284 Q380 284 340 254 L304 222 L208 222 L172 254 Q132 284 62 284 Q66 296 70 312 Z"
+    b += shaded(d, roof, LACQ, LACQ_D, -8, -6, brush((110, 292), (160, 276), (204, 240), 6, LACQ_L))
+    b += rrect(110, 318, 292, 20, 6, WD_D, 6)
+    bell_ = "M196 360 Q192 340 256 336 Q320 340 316 360 L326 560 Q256 580 186 560 Z"
+    b += shaded(d, bell_, BRONZE, BRONZE_D, 14, -4, brush((210, 380), (204, 460), (206, 540), 8, BRONZE_L))
+    for y in (400, 470):
+        b += line(f"M196 {y} Q256 {y + 8} 316 {y}", 6, BRONZE_D)
+    for i in range(3):
+        for j in range(2):
+            b += f'<circle cx="{222 + i * 34}" cy="{f(372 + j * 18)}" r="6" fill="{BRONZE_D}" stroke="none"/>'
+    b += ell(256, 560, 70, 14, BRONZE_D, 6)
+    b += line("M140 400 L150 470 M180 400 L170 470", 5, STRAW_D)
+    b += rrect(120, 466, 80, 26, 12, WD_L, 6)
+    b += fill(blob(256, 742, 180, 10, 9, .2, 7), MOSS_D, 5)
+    return d, b
+
+
 # ================================================================ shrine stones and a jizo (the Yomi area's rocks and props)
 def river_stone(d, x, base, rx, ry, col, dark, moss=True, seed=1):
     st = blob(x, base - ry, rx, ry, 9, .07, seed, flat=base - 2)
@@ -1413,7 +1499,7 @@ ALL = {
     "sakura": dict(frames=[sakura], cols=1, rows=1, target=(12, 24, 500, 736), size=[4.92, 7.38], clips=STILL),
     "matsu": dict(frames=[matsu], cols=1, rows=1, target=(40, 40, 480, 736), size=[4.92, 7.38], clips=STILL),
     "toro": dict(frames=[(lambda k: (lambda: toro(k / 4)))(k) for k in range(4)], cols=4, rows=1, target=(130, 150, 382, 744), size=[1.9, 2.85],
-                 clips={"idle": {"frames": [0, 1, 2, 3], "fps": 5}}),
+                 clips={"idle": {"frames": [0, 1, 2, 3], "fps": 5}}, icon=True),
     "torii": dict(frames=[torii], cols=1, rows=1, target=(24, 160, 488, 744), size=[3.4, 5.1], clips=STILL),
     "katana": dict(frames=[katana], cols=1, rows=1, target=(130, 30, 382, 740), size=[1.1, 1.65], line_world=1.334, clips=STILL, diag=diagonal(katana)),
     "guandao": dict(frames=[guandao], cols=1, rows=1, target=(60, 20, 452, 744), size=[1.1, 1.65], line_world=1.334, clips=STILL, diag=diagonal(guandao)),
@@ -1422,6 +1508,11 @@ ALL = {
     "yomi-rock": dict(frames=[yomi_rock], cols=1, rows=1, target=(40, 420, 476, 746), size=[2.8, 4.2], clips=STILL),
     "yomi-rock-b": dict(frames=[yomi_rock_b], cols=1, rows=1, target=(56, 360, 456, 746), size=[2.8, 4.2], clips=STILL),
     "jizo": dict(frames=[jizo], cols=1, rows=1, target=(150, 300, 362, 744), size=[1.5, 2.25], clips=STILL),
+    "hokora": dict(frames=[hokora], cols=1, rows=1, target=(100, 380, 412, 744), size=[2.1, 3.15], clips=STILL, icon=True),
+    "fudaward": dict(frames=[fudaward], cols=1, rows=1, target=(60, 340, 452, 744), size=[2.6, 3.9], clips=STILL, icon=True),
+    "gorinto": dict(frames=[gorinto], cols=1, rows=1, target=(150, 330, 362, 744), size=[1.5, 2.25], clips=STILL),
+    "ema": dict(frames=[ema], cols=1, rows=1, target=(60, 360, 452, 744), size=[2.4, 3.6], clips=STILL),
+    "bonsho": dict(frames=[bonsho], cols=1, rows=1, target=(50, 210, 462, 744), size=[2.8, 4.2], clips=STILL),
     "bamboo": dict(frames=[bamboo(1)], cols=1, rows=1, target=(40, 24, 472, 744), size=[3.6, 5.4], clips=STILL),
     "bamboo-b": dict(frames=[bamboo(2)], cols=1, rows=1, target=(60, 60, 452, 744), size=[3.2, 4.8], clips=STILL),
     "yanagi": dict(frames=[yanagi], cols=1, rows=1, target=(12, 40, 500, 736), size=[4.92, 7.38], clips=STILL),
@@ -1432,8 +1523,8 @@ ALL = {
 }
 # What the game uses (tools/art/build.py builds these into themes/harvest/sprites like every other sprite;
 # theme.json holds their entries). The wanderers and the guandao stay preview-only for now.
-GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "gashadokuro", "gashamound", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo", "bamboo", "bamboo-b", "yanagi", "obonlantern", "foxwedding")
-SPRITES = {k: {kk: v for kk, v in ALL[k].items() if kk in ("frames", "cols", "rows", "target")} for k in GAME}
+GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "gashadokuro", "gashamound", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo", "bamboo", "bamboo-b", "yanagi", "obonlantern", "foxwedding", "hokora", "fudaward", "gorinto", "ema", "bonsho")
+SPRITES = {k: {kk: v for kk, v in ALL[k].items() if kk in ("frames", "cols", "rows", "target", "icon")} for k in GAME}
 
 
 def write_katana(root):
@@ -1534,7 +1625,8 @@ NAMES = {"miko": "Shrine maiden (wanderer)", "daoshi-wanderer": "Taoist exorcist
          "toro": "Stone lantern (decoration)", "torii": "Torii gate (decoration)", "katana": "Kagekiri, katana (weapon)", "guandao": "Dragon guandao (weapon)", "ofuda": "The Hundred Seals (weapon)", "odokuro": "Gashadokuro\u2019s Hand (weapon)",
          "yomi-rock": "Garden stones (rock node)", "yomi-rock-b": "Sacred boulder (rock node)", "jizo": "Jizo statue (decoration)",
          "bamboo": "Bamboo clump (tree, the Bamboo Thicket)", "bamboo-b": "Bamboo clump, lesser (tree)", "yanagi": "Weeping willow (tree, the Spider-lily Marsh)",
-         "obonlantern": "Obon lantern (omen)", "foxwedding": "Fox wedding (omen)"}
+         "obonlantern": "Obon lantern (omen)", "foxwedding": "Fox wedding (omen)",
+         "hokora": "Offering shrine (camp)", "fudaward": "Paper ward (camp)", "gorinto": "Five-ring stupa (decoration)", "ema": "Ema rack (decoration)", "bonsho": "Temple bell (decoration)"}
 
 
 def write_preview(out_dir, manifest):

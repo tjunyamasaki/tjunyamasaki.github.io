@@ -165,6 +165,8 @@ export const STRUCTURES = {
   cart:{name:'Hand cart',hp:220,radius:.55},
   // Keeps modifier books (bookshelf.mjs): no slots, no stack limit; a workbench nearby writes straight from it.
   bookshelf:{name:'Bookshelf',hp:180,radius:.6},
+  // The Shrine of Yomi's camp pieces (shrinecamp.mjs; RECIPES land:'yomi', built only in that land).
+  toro:{name:'Stone lantern',hp:260,radius:.4,light:7.5,fuelless:true},hokora:{name:'Wayside shrine',hp:220,radius:.55},fudaward:{name:'Paper ward',hp:150,radius:.5},
   // A standing stone whose runes glow after dark. One stands in the middle of every Vigil, where the Heartfire used to be.
   // `fuelless`: its light never needs wood (like the soul lantern).
   glimmer:{name:'Glimmerstone',hp:300,radius:.45,light:5,fuelless:true},
@@ -199,6 +201,9 @@ export const RECIPES = {
   elixir:{kind:'cook',cost:{spore:2,berry:2},station:'pot',desc:'Restore 60 health and 20 courage.'},
   greaterelixir:{kind:'cook',cost:{moonpetal:1,bloodapple:1,spore:2},station:'pot',desc:'Restore 120 health and 40 courage. Brewed from a rare moonpetal.'},
   ward:{kind:'build',cost:{stone:5,ore:2,ember:4},station:'bench',desc:'A soul-powered defense. Damages nearby enemies.'},
+  toro:{kind:'build',cost:{stone:8,ember:2},station:'bench',land:'yomi',desc:'A stone lantern of the Shrine of Yomi. A wide, steady light that never needs wood, wider than a soul lantern.'},
+  hokora:{kind:'build',cost:{wood:6,stone:4,ember:4},station:'bench',land:'yomi',desc:'A wayside shrine. Leave 2 soul embers once a day and the kami favour everyone within 8 paces: courage holds in the dark, and wounds slowly mend.'},
+  fudaward:{kind:'build',cost:{wood:4,fiber:6,ember:2},station:'bench',land:'yomi',desc:'Paper talismans on a rope. The restless dead (lantern and umbrella ghosts, long necks, the snow woman, jiangshi, wraiths) cannot come within 5 paces; its paper burns while it holds them back.'},
   bookshelf:{kind:'build',cost:{wood:8,fiber:3},station:'bench',desc:'Keeps every modifier book you shelve, as many as you like. A workbench within 12 paces writes from it directly: no need to take a book down first.'},
   hushstone:{kind:'build',cost:{stone:8,ore:2,ember:3},station:'bench',desc:'No creature rises or comes hunting within 18 paces, so you can build in peace. Raids and moons still come. Two at most.'},
   roast:{kind:'cook',cost:{pumpkin:1},station:'fire',desc:'Cook a pumpkin into a restorative supper.'},

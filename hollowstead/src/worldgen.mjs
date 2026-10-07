@@ -545,7 +545,8 @@ export function zoneAt(seed, x, z){return areaAt(seed,x,z)||regionAt(x,z);}
 export function areasOf(seed){return shapeFor(seed).areas;}
 /**
  * Standing props of the areas (presentation, no collision): the Shrine of Yomi's torii along its path,
- * stone lanterns in pairs beside it and round the clearing, and a few jizo. Cached on the shape.
+ * stone lanterns in pairs beside it and round the clearing, a few jizo, a temple bell and a rack of ema
+ * plaques; the Spider-lily Marsh's graveyard of gorinto stupas. Cached on the shape.
  * Each: {id, key, x, z, light?, tint?, scale?} with `key` a theme sprite.
  */
 export function areaProps(seed){
@@ -566,6 +567,17 @@ export function areaProps(seed){
     for(let i=0,tries=0;i<5&&tries<60;tries++){const t=rng()*Math.PI*2,r=A.clearing+1+rng()*(a.r-A.clearing-2),x=a.x+Math.cos(t)*r,z=a.z+Math.sin(t)*r;
       const along=(x-a.x)*a.gx+(z-a.z)*a.gz,across=Math.abs((x-a.x)*a.gz-(z-a.z)*a.gx);if(along>0&&across<4.5)continue;
       if(!onLand(x,z)||props.some(p=>(p.x-x)**2+(p.z-z)**2<9))continue;put('jizo',x,z);i++;}
+    // A temple bell and a rack of prayer plaques stand inside the ring of lanterns, either side of the shrine.
+    put('bonsho',a.x+Math.cos(face+Math.PI*.68)*(A.clearing-4),a.z+Math.sin(face+Math.PI*.68)*(A.clearing-4),{scale:1.05});
+    put('ema',a.x+Math.cos(face+Math.PI*1.32)*(A.clearing-4),a.z+Math.sin(face+Math.PI*1.32)*(A.clearing-4));
+  }
+  // The Spider-lily Marsh keeps its dead: an old graveyard of stone stupas in an arc on one bank, clear of the black river.
+  const marsh=s.areas.find(entry=>entry.id==='higan');
+  if(marsh){const rng=rngFor((seed>>>0)^0x6a71),dry=(x,z)=>{const k=cellOf(x,z);return k>=0&&s.grid[k]===G&&!(s.detail[k]&DETAIL.black);};
+    const start=rng()*Math.PI*2;
+    for(let i=0,tries=0;i<7&&tries<40;tries++){const t=start+tries*.19,r=marsh.r*(.7+.12*Math.sin(tries*2.3)),x=marsh.x+Math.cos(t)*r,z=marsh.z+Math.sin(t)*r;
+      if(!dry(x,z)||!dry(x+.8,z)||!dry(x-.8,z)||props.some(p=>(p.x-x)**2+(p.z-z)**2<3.2))continue;
+      props.push({id:`yp${props.length}`,key:'gorinto',x:+x.toFixed(2),z:+z.toFixed(2),scale:+(1.1+rng()*.3).toFixed(2)});i++;}
   }
   s.props=props;return props;
 }

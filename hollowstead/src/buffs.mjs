@@ -11,8 +11,10 @@ export const BUFFS = Object.freeze({
   haunted: Object.freeze({name: 'Ghostly vigor', text: '+30 max health', secs: 300, color: '#e9fdff'}),
   // A fox wedding's blessing (omens.mjs, the Shrine of Yomi): not a dish.
   foxwed: Object.freeze({name: 'Fox’s blessing', text: 'Blows 15% harder, 15% less harm', secs: 420, color: '#ffc98a'}),
+  // An offering at a wayside shrine (shrinecamp.mjs, the Shrine of Yomi): not a dish.
+  kami: Object.freeze({name: 'Kami’s favour', text: 'Courage holds in the dark, wounds slowly mend', secs: 300, color: '#ffe7b0'}),
 });
-export const BUFF = Object.freeze({fury: 1.25, swift: 1.15, swiftBreath: 1.5, warded: .8, haunted: 30, fed: .5, foxwed: 1.15, foxward: .85});
+export const BUFF = Object.freeze({fury: 1.25, swift: 1.15, swiftBreath: 1.5, warded: .8, haunted: 30, fed: .5, foxwed: 1.15, foxward: .85, kami: 1});
 
 export const buffed = (p, id) => !!p?.buffs?.[id];
 

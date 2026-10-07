@@ -27,6 +27,7 @@ import {chillSpeed} from './yokai.mjs?v=harvest-18';
 import {wadeSpeed} from './yomi.mjs?v=harvest-18';
 import {refineDodge, refineHit as refinedHit, refineHurt, refineKill, refineSwing, refineWeapon, refinedStyle, sanitizeRefine, shotEnd, shotHit, shotMods, shotSteer, splitBefore, splitMagic, splitMarks, stepRefine} from './refine.mjs?v=harvest-18';
 import {shelfAction, shelfCount, spillShelf, storeBooks} from './bookshelf.mjs?v=harvest-18';
+import {landReason, offerAt, shrineLabel, stepShrineCamp} from './shrinecamp.mjs?v=harvest-18';
 import {HEARTH_MEND, stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
 import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
@@ -491,6 +492,7 @@ export class World {
   recipeReason(p,key,stationId,placing=false){
     const recipe=RECIPES[key];
     if(!recipe)return 'Unknown recipe';
+    if(recipe.land&&landReason(this,key))return landReason(this,key);
     if(recipe.station){
       const station=this.stationBuilding(p, key, stationId,placing);
       if(station==='fuel')return 'The fire needs wood';
@@ -789,7 +791,7 @@ export class World {
     if(revive)return {kind:'revive',entity:revive,label:'Revive teammate'};
     return candidates.sort((a,b)=>distance(p,a.entity)-distance(p,b.entity)||(a.entity.id<b.entity.id?-1:1))[0]||null;
   }
-  buildingLabel(b){return ({hearth:'Feed heartfire',fire:'Feed fire',bench:'Workbench',chest:'Open supplies',wall:'Repair wall',gate:b.open?'Close gate':'Open gate',trap:b.charges<3?'Rearm trap':'Briar trap',farm:b.planted?(b.growth>=100?'Harvest pumpkins':'Growing…'):'Plant seed',pot:'Cook a feast',lantern:'Soul lantern',bed:'Rest',ward:'Warding totem',hushstone:'Hushing stone',bookshelf:`Bookshelf · ${shelfCount(b)} ${shelfCount(b)===1?'book':'books'}`,cart:b.type==='cart'?cartLabel(b):''})[b.type];}
+  buildingLabel(b){return ({hearth:'Feed heartfire',fire:'Feed fire',bench:'Workbench',chest:'Open supplies',wall:'Repair wall',gate:b.open?'Close gate':'Open gate',trap:b.charges<3?'Rearm trap':'Briar trap',farm:b.planted?(b.growth>=100?'Harvest pumpkins':'Growing…'):'Plant seed',pot:'Cook a feast',lantern:'Soul lantern',bed:'Rest',ward:'Warding totem',hushstone:'Hushing stone',bookshelf:`Bookshelf · ${shelfCount(b)} ${shelfCount(b)===1?'book':'books'}`,toro:shrineLabel(this,b),hokora:shrineLabel(this,b),fudaward:shrineLabel(this,b),cart:b.type==='cart'?cartLabel(b):''})[b.type];}
   interact(p,target){
     const explicit=typeof target==='string'?target:null;
     const t=this.target(p, explicit);if(!t)return {ok:false,code:'rejected'};
@@ -859,6 +861,7 @@ export class World {
     if(actionId==='home')return this.makeHome(p, building);
     if(actionId==='mend'){if(p.cooldown>.05)return {ok:false,code:'cooldown'};return mendWeapon(this, p, building);}
     if(actionId==='shelve')return storeBooks(this, p, building);
+    if(actionId==='offer'){if(p.cooldown>.05)return {ok:false,code:'cooldown'};return offerAt(this, p, building);}
     if(actionId==='cook'||actionId==='craft'||actionId==='build'||actionId==='open'||actionId==='refine'||actionId==='browse')return {ok:true,code:'ok'};
     return this.interact(p, targetId);
   }
@@ -1740,7 +1743,7 @@ export class World {
     // A bag taken off any other way (dismantled, spilled) still leaves the pack its right size.
     for(const p of this.players)this.fitPack(p);
     stepSaga(this,dt);stepAges(this,dt,before,phase);stepNight(this,dt,before,phase);stepBlooms(this,before,phase);stepSleep(this);stepSunburn(this,dt,phase);
-    this.maintainGuards();this.roam(dt,phase);stepAreas(this,dt,phase);stepOmens(this,dt);
+    this.maintainGuards();this.roam(dt,phase);stepAreas(this,dt,phase);stepOmens(this,dt);stepShrineCamp(this,dt);
     // Nothing grows back through a floor, soil, a wall or a camp object (homestead.mjs builtAt): it waits until the cell is cleared.
     for(const n of this.nodes)if(n.ready&&n.ready<this.time){if(this.tiles&&builtAt(this,n.x,n.z,NODES[n.type].radius||0)){n.ready=this.time+20;continue;}n.ready=0;n.hits=NODES[n.type].hits;}
     }
@@ -1755,7 +1758,8 @@ export class World {
         else{this.dropContainer(p.inventory, p.x, p.z);p.inventory=createBackpack(p.id);this.event('announce',p.x,p.z,`${p.name} will return at dawn`);}}continue;}
       if(!this.showcase&&!this.arena&&!this.dungeon){
         p.hunger=Math.max(0,p.hunger-dt*(p.rest?RULES.hungerRest:RULES.hunger)*(buffed(p,'fed')?BUFF.fed:1));
-        const light=phase!=='night'||this.lit(p);p.courage=clamp(p.courage+dt*(light||buffed(p,'calm')?.6:-3),0,100);
+        const light=phase!=='night'||this.lit(p);p.courage=clamp(p.courage+dt*(light||buffed(p,'calm')||buffed(p,'kami')?.6:-3),0,100);
+        if(buffed(p,'kami')&&p.hp<p.maxHp)p.hp=Math.min(p.maxHp,p.hp+BUFF.kami*dt);
         if(p.hunger<=0)this.hurtQuiet(p,dt*1.2);if(!light&&p.courage<20)this.hurtQuiet(p,dt*(p.courage<=0?6:2));
         applyRegions(this,p,dt,phase);if(p.down||p.ghost)continue;
       }

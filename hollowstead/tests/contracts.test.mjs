@@ -138,7 +138,7 @@ test('shared schema names equipment, intents, recipes, and ranges', () => {
   assert.equal(legacyEquipmentPlan({spear: 8}).sockets.weapon.itemId, 'spear');
 
   assert.deepEqual(FIELD_BUILD_RECIPES, ['fire', 'bench', 'chest', 'wall', 'gate', 'trap', 'farm', 'bed', 'cart']);
-  assert.deepEqual(WORKBENCH_BUILD_RECIPES, [...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone', 'bookshelf']);
+  assert.deepEqual(WORKBENCH_BUILD_RECIPES, [...FIELD_BUILD_RECIPES, 'pot', 'lantern', 'ward', 'hushstone', 'bookshelf', 'toro', 'hokora', 'fudaward']);
   assert.deepEqual(WORKBENCH_CRAFT_RECIPES, ['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack', 'warpscroll']);
   assert.deepEqual(FIRE_COOK_RECIPES, ['roast', 'roastMeat', 'roastCaps', 'loaf']);
   assert.deepEqual(CAULDRON_COOK_RECIPES, ['stew', 'elixir', 'greaterelixir', 'moonbroth', 'tonic', 'tea', 'gloomstew', 'gourdsoup']);

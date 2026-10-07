@@ -373,3 +373,105 @@ test('the Gashadokuro fights in three phases, sinks and bursts up, and always dr
   assert.ok(w.drops.some(d => d.stack?.itemId === 'odokuro'), 'the Gashadokuro’s Hand');
   assert.ok(['sigil', 'ember', 'heartstone'].every(id => w.drops.some(d => d.stack?.itemId === id)), 'and a hoard');
 });
+
+// ------------------------------------------------------------------ the camp pieces and the decoration
+import {OFFER, WARD, landReason, offerWait} from '../src/shrinecamp.mjs?v=harvest-18';
+import {contextRecipeIds} from '../src/interactions.mjs?v=harvest-18';
+import {catalogModel} from '../src/ui/catalog.mjs?v=harvest-18';
+import {describeContext} from '../src/ui/actions.mjs?v=harvest-18';
+import {OBJECTS, cellReason} from '../src/homestead.mjs?v=harvest-18';
+import {structureLightRadius} from '../src/lighting.mjs?v=harvest-18';
+import * as gen from '../src/worldgen.mjs?v=harvest-18';
+import {RECIPES, STRUCTURES, CLOCKS as CAMP_CLOCKS} from '../src/content.mjs';
+
+const PIECES = ['toro', 'hokora', 'fudaward'];
+function shrineCamp(){
+  const w = new World(SEED, {land: 'yomi'}); const p = w.addPlayer('host', 'Jun'); w.start();
+  w.ambient = false; w.enemies = []; w.nodes = [];
+  return {w, p};
+}
+const put = (w, type, x, z) => {const b = w.structure(type, x, z); w.buildings.push(b); return b;};
+
+test("the Shrine of Yomi's camp pieces are built at the workbench, and only in that land", () => {
+  for(const id of PIECES){
+    assert.equal(RECIPES[id].kind, 'build'); assert.equal(RECIPES[id].station, 'bench'); assert.equal(RECIPES[id].land, 'yomi');
+    assert.ok(STRUCTURES[id].hp > 0 && OBJECTS[id], id+' stands on the grid too');
+    assert.ok(THEME.sprites[id]?.src && THEME.sprites[id].icon, id+' has art and an icon');
+    assert.ok(NODE_ACTIONS[id]?.includes('repair'));
+    for(const grid of [false, true]){
+      assert.ok(contextRecipeIds({source: 'station', stationType: 'bench', tab: 'build', grid, land: 'yomi'}).includes(id), `${id} at a Yomi workbench (grid ${grid})`);
+      assert.ok(!contextRecipeIds({source: 'station', stationType: 'bench', tab: 'build', grid, land: null}).includes(id), `${id} not at a plain workbench`);
+    }
+    assert.ok(!contextRecipeIds({source: 'field', tab: 'build', land: 'yomi'}).includes(id), 'never from the field menu');
+    assert.ok(catalogModel({source: 'station', stationType: 'bench', tab: 'build', grid: true, land: 'yomi'}).recipeIds.includes(id));
+  }
+  const plain = new World(31), yomi = new World(SEED, {land: 'yomi'});
+  for(const id of PIECES){assert.match(landReason(plain, id), /Shrine of Yomi/); assert.equal(landReason(yomi, id), '');}
+  // A plain hollow refuses them however they are asked for.
+  const p = plain.addPlayer('host'); plain.start(); plain.give(p, 'stone', 20); plain.give(p, 'ember', 10); plain.give(p, 'wood', 20); plain.give(p, 'fiber', 20);
+  const bench = put(plain, 'bench', p.x-1.5, p.z);
+  assert.match(plain.recipeReason(p, 'toro', bench.id, true), /Shrine of Yomi/);
+  assert.equal(plain.recipeReason(p, 'lantern', bench.id, true), '', 'the rest of the workbench is untouched');
+  const vigil = new World(31, {mode: 'vigil'}), q = vigil.addPlayer('host'); vigil.start();
+  assert.match(cellReason(vigil, q, 'obj:hokora', 2, 2), /Shrine of Yomi/);
+});
+
+test('a stone lantern lights a wider yard than a soul lantern, and never needs wood', () => {
+  const {w} = shrineCamp();
+  const toro = put(w, 'toro', 3, 0), soul = w.structure('lantern', 0, 0);
+  assert.equal(toro.fuel, 0);
+  assert.ok(structureLightRadius(toro) > structureLightRadius(soul));
+});
+
+test('an offering at a wayside shrine wins the kami’s favour for everyone near, once a day', () => {
+  const {w, p} = shrineCamp();
+  const friend = w.addPlayer('guest', 'Mio'), far = w.addPlayer('far', 'Ren');
+  const shrine = put(w, 'hokora', p.x+1, p.z);
+  friend.x = p.x+4; friend.z = p.z; far.x = p.x+OFFER.near+6; far.z = p.z;
+  const facts = {kind: 'building', id: shrine.id, type: 'hokora', hp: 1, maxHp: 1, embers: 0, offered: false};
+  assert.equal(describeContext(facts).find(a => a.id === 'offer')?.enabled, false, 'no embers, no offering');
+  assert.equal(w.performBuildingAction(p, shrine.id, 'offer').ok, false);
+  w.give(p, 'ember', 3);
+  assert.equal(describeContext({...facts, embers: 3}).find(a => a.id === 'offer')?.enabled, true);
+  assert.equal(w.performBuildingAction(p, shrine.id, 'offer').ok, true);
+  assert.equal(w.available(p, 'ember'), 1, 'two embers given');
+  assert.ok(p.buffs?.kami && friend.buffs?.kami, 'the favour falls on everyone near');
+  assert.ok(!far.buffs?.kami, 'not on someone far off');
+  assert.ok(offerWait(w, shrine) > 0);
+  w.give(p, 'ember', 3); p.cooldown = 0;
+  assert.equal(w.performBuildingAction(p, shrine.id, 'offer').ok, false, 'once a day');
+  // The favour: courage holds in the dark, and wounds mend.
+  w.time = CAMP_CLOCKS.standard.day+CAMP_CLOCKS.standard.dusk+5;
+  p.courage = 50; p.hp = 40; p.x = 60; p.z = 60; friend.online = far.online = false;
+  run(w, 2);
+  assert.ok(p.courage >= 50, 'courage holds without light');
+  assert.ok(p.hp > 40.9, 'wounds mend');
+  w.time += CAMP_CLOCKS.standard.cycle; p.x = shrine.x-1; p.z = shrine.z; p.cooldown = 0;
+  assert.equal(w.performBuildingAction(p, shrine.id, 'offer').ok, true, 'a day later it takes another');
+});
+
+test('a paper ward keeps the restless dead out, burning as it holds them; others walk past', () => {
+  const {w, p} = shrineCamp();
+  p.x = 30; p.z = 30;
+  const ward = put(w, 'fudaward', 8, 8);
+  const kasa = foe(w, 'kasa', 9.5, 8), jiangshi = foe(w, 'jiangshi', 8, 6), brute = foe(w, 'brute', 6.5, 8);
+  for(const e of [kasa, jiangshi, brute]){e.aggro = false; e.speed = 0;}
+  const hp = ward.hp;
+  run(w, 1.2, () => {for(const e of [kasa, jiangshi, brute]) e.cooldown = 9;});
+  for(const e of [kasa, jiangshi]) assert.ok(Math.hypot(e.x-ward.x, e.z-ward.z) >= WARD.near-.3, `${e.type} is shoved out to the edge`);
+  assert.ok(Math.hypot(brute.x-ward.x, brute.z-ward.z) < WARD.near-1, 'a brute is not a ghost');
+  assert.ok(ward.hp < hp, 'its paper burns while it holds them');
+  assert.ok(WARD.kinds.every(k => ENEMIES[k]), 'every warded kind exists');
+});
+
+test('the shrine has a temple bell and prayer plaques; the marsh a graveyard of stupas on dry ground', () => {
+  gen.setLand(SEED, 'yomi');
+  const props = gen.areaProps(SEED), keys = new Set(props.map(q => q.key));
+  for(const key of ['bonsho', 'ema', 'gorinto']){assert.ok(keys.has(key), key); assert.ok(THEME.sprites[key]?.src, key+' has art');}
+  const marsh = gen.areasOf(SEED).find(a => a.id === 'higan');
+  for(const q of props.filter(x => x.key === 'gorinto')){
+    assert.ok(!gen.blackAt(SEED, q.x, q.z), 'never in the black river');
+    assert.ok(Math.hypot(q.x-marsh.x, q.z-marsh.z) < marsh.r, 'in the marsh');
+  }
+  assert.ok(!gen.areaProps(31).some(q => q.key === 'gorinto'), 'a plain hollow has none');
+});

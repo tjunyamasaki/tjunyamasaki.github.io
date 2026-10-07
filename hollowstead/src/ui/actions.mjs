@@ -41,6 +41,7 @@ const SPECS = Object.freeze({
   refine: {icon: '◈', label: 'Refine', activation: 'tap'},
   browse: {icon: '▤', label: 'Books', activation: 'tap'},
   shelve: {icon: '⇥', label: 'Shelve books', activation: 'tap'},
+  offer: {icon: '⛩', label: 'Offer', activation: 'tap'},
   descend: {icon: '⇩', label: 'Descend', activation: 'hold'},
   sip: {icon: '♨', label: 'Sip', activation: 'hold'},
   cut: {icon: '✂', label: 'Cut', activation: 'hold'},
@@ -382,6 +383,15 @@ export function describeContext(facts) {
       enabled: facts.packBooks > 0,
       disabledReason: 'You carry no modifier books',
       command: buildingCommand('shelve', id),
+    }));
+  } else if (facts.type === 'hokora') {
+    // Wayside shrine (src/shrinecamp.mjs): an offering of soul embers, once a day, for the kami's favour.
+    list.push(make('offer', {
+      targetId: id,
+      label: facts.offered ? 'Offered today' : 'Offer 2 embers',
+      enabled: !facts.offered && facts.embers >= 2,
+      disabledReason: facts.offered ? 'The kami have had their offering today' : 'Needs 2 soul embers',
+      command: buildingCommand('offer', id),
     }));
   } else if (facts.type === 'chest') {
     list.push(make('open', {

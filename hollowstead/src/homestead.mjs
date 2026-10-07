@@ -20,6 +20,7 @@ import {ITEMS, RECIPES, RULES, STRUCTURES, NODES} from './content.mjs?v=harvest-
 import {stationLabel} from './interactions.mjs?v=harvest-18';
 import {hushReason} from './hush.mjs?v=harvest-18';
 import {shelfCount, spillShelf} from './bookshelf.mjs?v=harvest-18';
+import {landReason} from './shrinecamp.mjs?v=harvest-18';
 import {hearthReason, kindleHearth, bankHearth} from './vigil.mjs?v=harvest-18';
 
 export const CELL = 1.5;
@@ -71,6 +72,10 @@ export const OBJECTS = Object.freeze({
   bench: {w: 1, h: 1, art: 1.54},
   chest: {w: 1, h: 1, art: 1.05},
   bookshelf: {w: 1, h: 1, art: 1.1},
+  // The Shrine of Yomi's (shrinecamp.mjs): the paper ward's rope spans two cells.
+  toro: {w: 1, h: 1, art: .94},
+  hokora: {w: 1, h: 1, art: 1.28},
+  fudaward: {w: 2, h: 1, art: 1.95},
   fire: {w: 1, h: 1, art: 1.62},
   pot: {w: 1, h: 1, art: 1.56},
   lantern: {w: 1, h: 1, art: 1.02},
@@ -313,6 +318,7 @@ export function cellReason(world, p, toolId, i, j, {stationId = null} = {}){
     if(world.players.some(q => q.online && !q.ghost && Math.abs(q.x - fx) < w * CELL / 2 + .2 && Math.abs(q.z - fz) < h * CELL / 2 + .2)) return 'A wanderer is standing here';
     const why = blockedByThings(world, fx, fz, Math.min(w, h) * CELL * .45);if(why) return why;
     if(tool.type === 'hushstone' && hushReason(world)) return hushReason(world);
+    if(landReason(world, tool.type)) return landReason(world, tool.type);
     if(tool.type === 'hearth' && hearthReason(world)) return hearthReason(world);
     if(world.buildings.length >= BUILDING_LIMIT) return 'The camp has reached its structure limit';
   }else if(object && ['barrier', 'plant', 'harvest'].includes(tool.kind) || object && tool.ground === 'soil'){

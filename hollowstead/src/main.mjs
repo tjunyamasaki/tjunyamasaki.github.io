@@ -42,6 +42,7 @@ import {REFINE_CURRENCY, bookLines, carriedBooks, carriedGear, modText, refineLi
 import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
 import {shelfMarkup} from './ui/bookshelf.mjs?v=harvest-18';
 import {shelfCount, shelfRows} from './bookshelf.mjs?v=harvest-18';
+import {offerWait} from './shrinecamp.mjs?v=harvest-18';
 import {isBook} from './refine-mods.mjs?v=harvest-18';
 import {createHurtFx} from './hurt-fx.mjs?v=harvest-18';
 import {CHARM} from './trinkets.mjs?v=harvest-18';
@@ -536,7 +537,7 @@ function contextFacts(p){
   const base={kind:target.kind,id:entity.id,type:entity.type,wood:world.available(p,'wood'),stone:world.available(p,'stone'),seeds:world.available(p,'seed')};
   if(target.kind==='building'){
     const lock=world.chestSessions.get(entity.id);
-    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{}),...(entity.type==='bookshelf'?{shelved:shelfCount(entity),packBooks:p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0)}:{})};
+    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{}),...(entity.type==='hokora'?{offered:offerWait(world,entity)>0,embers:world.available(p,'ember')}:{}),...(entity.type==='bookshelf'?{shelved:shelfCount(entity),packBooks:p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0)}:{})};
   }
   if(target.kind==='crop')return {...base,i:entity.i,j:entity.j,crop:entity.crop,seeds:entity.crop?[]:carriedSeeds(world,p).map(id=>({crop:id,name:CROPS[id].name}))};
   if(target.kind==='node'){const node=NODES[entity.type];return {...base,required:!!node?.required,toolReady:!(node?.tool)||world.hasTool(p,node.tool),toolLabel:node?.tool?label(node.tool).toLowerCase():''};}
@@ -954,7 +955,7 @@ function renderSheet(){
     drawMap($('full-map'),true);
   }else if(!p)return;
   else if(sheet==='catalog'){
-    const onGrid=gridWorld(world),free=!!world.homestead?.free,model=catalogModel({...catalog,grid:onGrid});
+    const onGrid=gridWorld(world),free=!!world.homestead?.free,model=catalogModel({...catalog,grid:onGrid,land:world.land||null});
     title=model.title;kicker=model.kicker;
     const tab=catalog.source==='field'||catalog.tab==='build'?'build':'craft';
     const ids=model.recipeIds.filter(id=>inCategory(id,category,tab));

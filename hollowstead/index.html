@@ -138,6 +138,7 @@
         <div id="heal-picker" class="heal-picker" role="group" aria-label="Healing items" hidden></div>
         <button type="button" id="skill" class="round skill-round is-off" tabindex="-1" aria-label="Skill">✦<small>Skill</small></button>
         <button type="button" id="attack" class="round attack" aria-label="Attack, hold to repeat">⚔<small>Attack</small></button>
+        <div id="class-bar" class="class-bar" role="group" aria-label="Class skills" hidden></div>
         <div class="stamina-track" aria-hidden="true"><i id="stamina-bar"></i></div>
       </div>
     </div>
@@ -145,7 +146,7 @@
     <aside id="class-panel" hidden aria-label="Class tools"><div id="class-strip" class="lab-strip class-strip" role="toolbar" aria-label="Class tools"></div><section id="class-sheet" class="class-sheet" hidden></section></aside>
     <aside id="lab-panel" hidden aria-label="Weapon lab"><div id="lab-strip" class="lab-strip" role="toolbar" aria-label="Weapon lab tools"></div><div id="lab-meter" class="lab-meter" aria-live="off"></div><section id="lab-sheet" class="lab-sheet" hidden></section></aside>
     <nav class="hotbar" aria-label="Game actions">
-      <div id="weapon-bar" class="weapon-bar" role="group" aria-label="Weapons"><button type="button" class="weapon-slot" data-slot="0" aria-label="Weapon slot 1"></button><button type="button" class="weapon-slot" data-slot="1" aria-label="Weapon slot 2"></button><button type="button" class="weapon-slot" data-slot="2" aria-label="Weapon slot 3"></button></div><div id="class-bar" class="class-bar" role="group" aria-label="Class skills" hidden></div>
+      <div id="weapon-bar" class="weapon-bar" role="group" aria-label="Weapons"><button type="button" class="weapon-slot" data-slot="0" aria-label="Weapon slot 1"></button><button type="button" class="weapon-slot" data-slot="1" aria-label="Weapon slot 2"></button><button type="button" class="weapon-slot" data-slot="2" aria-label="Weapon slot 3"></button></div>
     </nav>
     <section id="arena-pick" hidden role="dialog" aria-modal="true" aria-labelledby="arena-pick-title"><button type="button" id="arena-menu" class="text-button arena-menu">Menu</button><div class="pick-card-wrap"><p class="eyebrow" id="arena-pick-kicker">THE ARENA</p><h2 id="arena-pick-title">Choose a weapon</h2><div id="arena-offers" class="arena-offers"></div><div id="arena-replace" class="arena-replace" hidden></div></div></section>
     <section id="class-pick" hidden role="dialog" aria-modal="true" aria-labelledby="class-pick-title"><button type="button" id="class-menu" class="text-button arena-menu">Menu</button><div class="class-pick-wrap"><p class="eyebrow" id="class-pick-kicker">CLASSES · A TEST GROUND</p><h2 id="class-pick-title">Choose your path</h2><p class="class-pick-lede">A class keeps one weapon for good and grows through a talent tree: every level is a point to spend.</p><div id="class-offers" class="class-offers"></div></div></section>

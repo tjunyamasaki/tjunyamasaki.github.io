@@ -24,12 +24,12 @@ export function classBarMarkup(world, p){
   const def = classOf(p);
   if(!def) return '';
   const slots = barView(world, p).map(v => v.id
-    ? `<button type="button" class="class-slot" data-class-skill="${escape(v.id)}" title="${escape(v.skill.name)} (${v.slot+1}) · ${escape(v.skill.text)}" aria-label="${escape(v.skill.name)}, key ${v.slot+1}">`
+    ? `<button type="button" class="class-slot" data-slot="${v.slot}" data-class-skill="${escape(v.id)}" title="${escape(v.skill.name)} (${v.slot+1}) · ${escape(v.skill.text)}" aria-label="${escape(v.skill.name)}, key ${v.slot+1}">`
       + `<span class="class-glyph" aria-hidden="true">${escape(v.skill.glyph)}</span><small>${escape(v.skill.name)}</small><kbd>${v.slot+1}</kbd>`
       + (v.skill.cost ? `<i class="class-cost">${v.skill.spendAll ? `${v.skill.cost}+` : v.skill.cost}</i>` : '') + `<i class="class-rank">${'•'.repeat(v.rank)}</i></button>`
-    : `<button type="button" class="class-slot empty" data-class-panel="talents" aria-label="Empty skill slot ${v.slot+1}: open the talents"><span class="class-glyph" aria-hidden="true">+</span><small>Learn</small><kbd>${v.slot+1}</kbd></button>`).join('');
+    : `<button type="button" class="class-slot empty" data-slot="${v.slot}" data-class-panel="talents" aria-label="Empty skill slot ${v.slot+1}: open the talents"><span class="class-glyph" aria-hidden="true">+</span><small>Learn</small><kbd>${v.slot+1}</kbd></button>`).join('');
   return `<div class="class-resource" role="progressbar" aria-label="${escape(def.resource.name)}" aria-valuemin="0" aria-valuemax="${def.resource.max}"><span>${escape(def.resource.name.toUpperCase())}</span><i><em id="class-ki-bar"></em></i><b id="class-ki-value">0</b></div>`
-    + `<div class="class-slots">${slots}</div>`;
+    + slots;
 }
 /** Per-frame state of the bar and the ultimate, for main.mjs to paint without rebuilding markup. */
 export function classBarState(world, p){
@@ -44,9 +44,12 @@ export function classBarState(world, p){
 }
 
 /** Tools strip under the vitals: the tree (with unspent points), the test switches. */
-export function classStripMarkup(p, {open = '', tools = true} = {}){
+/** Skill-button layouts round Attack (styles/classes.css): picked on the strip, kept per browser. */
+export const CLASS_LAYOUTS = Object.freeze({arc: 'Arc', block: 'Block', tower: 'Tower'});
+export function classStripMarkup(p, {open = '', tools = true, layout = 'arc'} = {}){
   const free = classOf(p) ? pointsFree(p) : 0;
   return `<button type="button" data-class-panel="talents" aria-pressed="${open === 'talents'}" class="${free ? 'has-points' : ''}" title="Talents (T)">✧<small>Talents</small>${free ? `<i class="class-points">${free}</i>` : ''}</button>`
+    + `<button type="button" data-class-layout="next" title="Skill buttons: ${escape(CLASS_LAYOUTS[layout] || '')} (tap for the next layout)">▦<small>${escape(CLASS_LAYOUTS[layout] || 'Layout')}</small></button>`
     + (tools ? `<button type="button" data-class-panel="tools" aria-pressed="${open === 'tools'}" title="Test tools">⚙<small>Tools</small></button>` : '');
 }
 

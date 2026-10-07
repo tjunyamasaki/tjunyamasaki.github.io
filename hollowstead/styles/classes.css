@@ -1,28 +1,52 @@
 /* Classes mode (src/classes, src/ui/classes.mjs): the class picker, the skill bar, the talent tree. */
 
-/* The class weapon is fixed: the weapon hotbar gives way to the skill bar. */
-body.classes #weapon-bar{display:none}
-.class-bar{display:flex;flex-direction:column;align-items:stretch;gap:4px;pointer-events:auto}
-.class-bar[hidden]{display:none}
-.class-slots{display:flex;gap:5px}
-.class-slot{position:relative;width:58px;min-width:58px;height:54px;min-height:54px;padding:4px 2px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #ff8fb355;border-radius:11px;background:radial-gradient(circle at 50% 30%,#4a2f45e6,#2a2230e6 72%);color:var(--cream);touch-action:none}
-.class-slot .class-glyph{font-size:21px;line-height:1;color:#ffe1ea;text-shadow:0 0 8px #ff8fb388}
-.class-slot small{font-size:8px;line-height:1.05;margin-top:3px;max-width:54px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.class-slot kbd{position:absolute;top:2px;left:4px;font:8px ui-monospace,monospace;color:var(--muted);display:block}
-.class-slot .class-cost{position:absolute;top:2px;right:4px;font:700 8px ui-monospace,monospace;font-style:normal;color:#ff8fb3}
-.class-slot .class-rank{position:absolute;bottom:-1px;right:4px;font-style:normal;font-size:9px;letter-spacing:-1px;color:#f2c14e}
-.class-slot.empty{border-style:dashed;border-color:#dac29a40;background:#211c2888;opacity:.75}
+/* The class weapon is fixed: no weapon hotbar. The class's skills join the action cluster round Attack
+   (#action-cluster, styles/hud.css: Attack in the corner, the ultimate on its left, Dodge above, Heal on the
+   diagonal), in one of three layouts (body[data-class-layout]): arc, block or tower. */
+body.classes .hotbar{display:none}
+#class-bar{position:absolute;right:0;bottom:0;width:0;height:0;--cs:62px;pointer-events:none}
+#class-bar[hidden]{display:none}
+#class-bar .class-slot{position:absolute;width:var(--cs);height:var(--cs);min-width:var(--cs);min-height:var(--cs);padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px solid #ff8fb366;border-radius:50%;background:radial-gradient(circle at 50% 36%,#4a2f45ee,#2a2230ee 72%);color:var(--cream);box-shadow:0 4px 14px #18132266;touch-action:none;pointer-events:auto}
+.class-slot .class-glyph{font-size:23px;line-height:1;color:#ffe1ea;text-shadow:0 0 8px #ff8fb388}
+.class-slot small{font:7.5px ui-monospace,monospace;letter-spacing:.2px;line-height:1;margin-top:3px;max-width:86%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.class-slot kbd{position:absolute;top:-3px;left:-3px;min-width:15px;height:15px;border-radius:8px;background:#211c28;border:1px solid #dac29a40;font:8px/13px ui-monospace,monospace;text-align:center;color:var(--muted);display:block}
+.class-slot .class-cost{position:absolute;top:-3px;right:-4px;min-width:16px;height:15px;padding:0 3px;border-radius:8px;background:#2a1626;border:1px solid #ff8fb355;font:700 8px/13px ui-monospace,monospace;font-style:normal;color:#ff8fb3}
+.class-slot .class-rank{position:absolute;bottom:3px;font-style:normal;font-size:8px;letter-spacing:-1px;color:#f2c14e}
+.class-slot.empty{border-style:dashed;border-color:#dac29a40;background:#211c28aa;opacity:.7}
 .class-slot.empty .class-glyph{color:var(--muted);text-shadow:none}
 /* Recharge: a dark sweep over the button; ready: a pink edge. */
 .class-slot::after{content:"";position:absolute;inset:0;border-radius:inherit;background:conic-gradient(#120d18cc calc(var(--cd,0) * 1turn),transparent 0);pointer-events:none}
-.class-slot.ready{border-color:#ff8fb3;box-shadow:0 0 0 1px #ff8fb344 inset,0 0 12px #ff8fb355}
-.class-slot.starved{opacity:.7}
+.class-slot.ready{border-color:#ff8fb3;box-shadow:0 0 0 1px #ff8fb344 inset,0 0 12px #ff8fb355,0 4px 14px #18132266}
+.class-slot.starved{opacity:.72}
 .class-slot.starved .class-cost{color:#d9857e}
 .class-slot.cooling .class-glyph,.class-slot.starved .class-glyph{color:#b9ac99;text-shadow:none}
-.class-resource{display:flex;align-items:center;gap:6px;padding:0 4px;font:8px ui-monospace,monospace;letter-spacing:.6px;color:#ff8fb3}
-.class-resource i{flex:1;height:6px;border-radius:4px;background:#1e1929cc;border:1px solid #ff8fb333;overflow:hidden}
+/* The class resource (Ki): a thin bar under Attack. */
+.class-resource{position:absolute;right:0;bottom:-11px;width:var(--atk);height:7px;display:flex;align-items:center;pointer-events:none}
+.class-resource span,.class-resource b{display:none}
+.class-resource i{flex:1;height:5px;border-radius:4px;background:#1e1929cc;border:1px solid #ff8fb344;overflow:hidden}
 .class-resource em{display:block;height:100%;width:0;background:linear-gradient(90deg,#d77898,#ffb6c8);box-shadow:0 0 8px #ff8fb388;transition:width .12s linear}
-.class-resource b{min-width:20px;text-align:right;font:700 10px Arial,Helvetica,sans-serif;color:var(--cream)}
+/* Arc: the skills fan out on an outer ring round Attack, from beside the ultimate up to above Dodge. */
+body[data-class-layout="arc"] #class-bar .class-slot{--r:calc(var(--atk) / 2 + var(--gap) + var(--skill) + var(--gap) + var(--cs) / 2 + 4px);right:calc(var(--atk) / 2 - cos(var(--a)) * var(--r) - var(--cs) / 2);bottom:calc(var(--atk) / 2 + sin(var(--a)) * var(--r) - var(--cs) / 2)}
+body[data-class-layout="arc"] #class-bar [data-slot="0"]{--a:176deg}
+body[data-class-layout="arc"] #class-bar [data-slot="1"]{--a:148deg}
+body[data-class-layout="arc"] #class-bar [data-slot="2"]{--a:120deg}
+body[data-class-layout="arc"] #class-bar [data-slot="3"]{--a:92deg}
+body.classes[data-class-layout="arc"] .context-row{bottom:calc(100% + var(--cs) + 22px)}
+/* Block: a 2x2 grid just left of the ultimate, 1 and 2 nearest the thumb. */
+body[data-class-layout="block"] #class-bar .class-slot{right:calc(var(--atk) + var(--gap) + var(--skill) + var(--gap) + var(--col) * (var(--cs) + var(--gap)));bottom:calc(var(--row) * (var(--cs) + var(--gap)))}
+body[data-class-layout="block"] #class-bar [data-slot="0"]{--col:0;--row:0}
+body[data-class-layout="block"] #class-bar [data-slot="1"]{--col:0;--row:1}
+body[data-class-layout="block"] #class-bar [data-slot="2"]{--col:1;--row:0}
+body[data-class-layout="block"] #class-bar [data-slot="3"]{--col:1;--row:1}
+/* Tower: a 2x2 grid stacked above Dodge and the ultimate. */
+body[data-class-layout="tower"] #class-bar .class-slot{right:calc(var(--col) * (var(--atk) / 2 + var(--gap) + var(--skill) / 2) + var(--atk) / 2 - var(--cs) / 2);bottom:calc(var(--atk) + var(--gap) + var(--dodge) + var(--gap) + var(--row) * (var(--cs) + var(--gap)))}
+body[data-class-layout="tower"] #class-bar [data-slot="0"]{--col:0;--row:0}
+body[data-class-layout="tower"] #class-bar [data-slot="1"]{--col:1;--row:0}
+body[data-class-layout="tower"] #class-bar [data-slot="2"]{--col:0;--row:1}
+body[data-class-layout="tower"] #class-bar [data-slot="3"]{--col:1;--row:1}
+body.classes[data-class-layout="tower"] .context-row{bottom:calc(100% + 2 * (var(--cs) + var(--gap)) + 12px)}
+@media(max-width:600px){#class-bar{--cs:54px}}
+@media(max-height:430px){#class-bar{--cs:52px}.class-slot small{display:none}}
 
 /* Tools strip (under the vitals) and its sheet, the weapon lab's look. */
 #class-panel{position:fixed;z-index:37;top:0;left:0;width:100%;height:100dvh;pointer-events:none;touch-action:manipulation}
@@ -106,12 +130,9 @@ body.classes #weapon-bar{display:none}
   #class-panel .lab-strip{top:calc(52px + env(safe-area-inset-top))}
   #class-panel .lab-strip button{height:40px;min-height:40px;width:48px;min-width:48px}
   .class-sheet{top:calc(98px + env(safe-area-inset-top));bottom:calc(8px + env(safe-area-inset-bottom))}
-  .class-slot{width:50px;min-width:50px;height:46px;min-height:46px}
-  .class-slot small{display:none}
 }
 @media(max-width:600px){
   .class-sheet,.class-sheet.tree-open{width:auto;right:max(10px,env(safe-area-inset-right));bottom:calc(210px + env(safe-area-inset-bottom))}
-  .class-slot{width:50px;min-width:50px}
   .talent small{font-size:7.5px}
 }
 

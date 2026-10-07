@@ -38,7 +38,7 @@ import {createUpdateChecker} from './updates.mjs?v=harvest-18';
 import {skillBlock, skillFor} from './skills.mjs?v=harvest-18';
 import {labClear, labDps, labEquip, labLevel, labRank, labResetStats, labSpawn, labStrength, labToggle} from './lab.mjs?v=harvest-18';
 import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/lab.mjs?v=harvest-18';
-import {classBarMarkup, classBarState, classPickMarkup, classStripMarkup, classToolsMarkup, talentTreeMarkup} from './ui/classes.mjs?v=harvest-18';
+import {CLASS_LAYOUTS, classBarMarkup, classBarState, classPickMarkup, classStripMarkup, classToolsMarkup, talentTreeMarkup} from './ui/classes.mjs?v=harvest-18';
 import {classOf, pointsFree} from './classes/registry.mjs?v=harvest-18';
 import {REFINE_CURRENCY, bookLines, carriedBooks, carriedGear, modText, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
 import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
@@ -75,6 +75,11 @@ let healPick='elixir',healHad=false,healPicker=false,autoAttack=true,pickPending
 let dungeonPick='';
 /** Weapon lab panel state (presentation only; the lab's rules live in lab.mjs). */
 /** Classes mode panels (presentation only; the rules live in classes/). */
+/** Where the class's skill buttons sit round Attack (ui/classes.mjs CLASS_LAYOUTS): kept per browser, or ?layout= in the address. */
+let classLayout='arc';
+try{const asked=new URLSearchParams(location.search).get('layout'),kept=localStorage.getItem('hollowstead.classLayout');classLayout=Object.hasOwn(CLASS_LAYOUTS,asked||'')?asked:Object.hasOwn(CLASS_LAYOUTS,kept||'')?kept:'arc';}catch{}
+document.body.dataset.classLayout=classLayout;
+function nextClassLayout(){const ids=Object.keys(CLASS_LAYOUTS);classLayout=ids[(ids.indexOf(classLayout)+1)%ids.length];document.body.dataset.classLayout=classLayout;try{localStorage.setItem('hollowstead.classLayout',classLayout);}catch{}toast(`Skill buttons: ${CLASS_LAYOUTS[classLayout]}`);paintClasses(true);}
 let classOpen='',classTalent='',classSheetCache='',classStripCache='',classBarSig='',classPickCache='',classPoints=0;
 let labOpen='',labRankPick=3,labFoe='mix',labCount=10,labFormation='ahead',labSheetCache='',labBarCache='',labMeterCache='';
 /** The arena is a swarm fight: start a little wider than the exploring camera. */
@@ -482,7 +487,7 @@ function paintClasses(force=false){
   const picking=!chosen&&!['victory','defeat'].includes(world.status)&&sheet!=='menu'&&sheet!=='guide';
   if(picking){if(force||!classPickCache){classPickCache=classPickMarkup(icon);$('class-offers').innerHTML=classPickCache;$('class-pick-kicker').textContent=world.arena?.classes?'CLASSES · A TEST GROUND':'THE CLASS VIGIL';}pick.hidden=false;}
   else if(!pick.hidden)pick.hidden=true;
-  const strip=chosen?classStripMarkup(p,{open:classOpen,tools:!!world.arena?.classes}):'';
+  const strip=chosen?classStripMarkup(p,{open:classOpen,tools:!!world.arena?.classes,layout:classLayout}):'';
   if(force||strip!==classStripCache){classStripCache=strip;$('class-strip').innerHTML=strip;}
   const sheetEl=$('class-sheet');
   const html=!chosen?'':classOpen==='talents'?talentTreeMarkup(p,{selected:classTalent}):classOpen==='tools'&&world.arena?.classes?classToolsMarkup(world,p):'';
@@ -1692,6 +1697,7 @@ async function init(){
     event.stopPropagation();sound?.unlock();
     const panel=event.target.closest('[data-class-panel]'),node=event.target.closest('[data-talent]'),learnIt=event.target.closest('[data-talent-learn]'),op=event.target.closest('[data-class-op]');
     if(panel){classPanel(panel.dataset.classPanel);return;}
+    if(event.target.closest('[data-class-layout]')){nextClassLayout();return;}
     if(learnIt){void send({type:'classTalent',op:'learn',node:learnIt.dataset.talentLearn}).then(()=>{dirty=true;paintClasses(true);});return;}
     if(node){classTalent=node.dataset.talent;paintClasses(true);return;}
     if(op)classCommand(op.dataset.classOp);

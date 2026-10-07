@@ -204,6 +204,7 @@ export const CONTEXT_ACTIONS = Object.freeze({
   wildghostgourd: Object.freeze(['gather']),
   thornpatch: Object.freeze(['cut']),
   dreadaltar: Object.freeze(['wake']),
+  gashamound: Object.freeze(['wake']),
   obonlantern: Object.freeze(['light']),
   foxwedding: Object.freeze(['bow']),
   drop: Object.freeze([]),

@@ -797,6 +797,112 @@ DAOSHI_FRAMES = creature_frames(daoshi,
     dict(fallen=True, eyes="focus"))
 
 
+# ================================================================ the Gashadokuro (bosses.mjs) and its mound
+BONE_Y = "#e8dcc0"; BONE_YD = "#b9a986"; BONE_YL = "#fff8e6"; GFIRE = "#c8ff8a"; EARTH = "#5a4a40"; EARTH_D = "#3e322c"
+
+
+def bone_hand(cx, cy, s, rot, grip=.3, mirror=1):
+    """A giant skeletal hand: a palm and four fingers as one silhouette, a thumb, green fire at the knuckles."""
+    def draw():
+        segs, joints = [], []
+        palm = blob(0, 0, 70, 56, 9, .08, 4)
+        for i in range(4):
+            px, py = -48 + i * 32, -40
+            a = -100 + i * 12
+            for j, l in enumerate((62, 50, 40)):
+                a += grip * 40
+                nx, ny = px + math.cos(math.radians(a)) * l, py + math.sin(math.radians(a)) * l
+                segs.append(limb((px, py), ((px + nx) / 2, (py + ny) / 2), (nx, ny), 26 - j * 4, 22 - j * 4))
+                joints.append((nx, ny))
+                px, py = nx, ny
+        segs.append(limb((-66, 10), (-110, -10), (-118, -60), 26, 20))
+        g = union(segs + [palm], BONE_Y)
+        g += line("M-40 -30 L-34 30 M-8 -34 L-4 34 M24 -32 L22 32", 5, BONE_YD)
+        g += "".join(f'<circle cx="{f(x)}" cy="{f(y)}" r="5" fill="{BONE_YD}" stroke="none"/>' for x, y in joints)
+        g += "".join(f'<circle cx="{-48 + i * 32}" cy="-40" r="7" fill="{GFIRE}" stroke="none"/>' for i in range(4))
+        return g
+    return f'<g transform="translate({f(cx)} {f(cy)}) rotate({f(rot)}) scale({mirror * s:.4f} {s:.4f})">{at_scale(s, draw)}</g>'
+
+
+def gashadokuro(P):
+    d = []; b = ""
+    lean = P.get("lean", 0); jaw = P.get("jaw", 0); rise = P.get("rise", 0)
+    lh = P.get("lh", (110, 690)); rh = P.get("rh", (410, 690)); lg = P.get("lg", .3); rg = P.get("rg", .3); fire = P.get("fire", .5)
+    sy = 430 - rise                      # shoulder line
+    sk = (256 + lean, 300 - rise)        # skull centre
+    out = ""
+    # the arms behind the body: shoulders to elbows to the hands
+    def arm(sh, hand, out_dir):
+        el = ((sh[0] + hand[0]) / 2 + out_dir * 70, (sh[1] + hand[1]) / 2 - 40)
+        return union([limb(sh, ((sh[0] + el[0]) / 2, (sh[1] + el[1]) / 2), el, 46, 38), limb(el, ((el[0] + hand[0]) / 2, (el[1] + hand[1]) / 2), hand, 38, 30)], BONE_Y) + \
+            f'<circle cx="{f(el[0])}" cy="{f(el[1])}" r="26" fill="{BONE_Y}" stroke-width="{sw(7)}"/>'
+    out += arm((256 - 110 + lean * .5, sy), lh, -1)
+    # spine and ribs
+    out += union([limb((256, 700), (256 + lean * .3, 560), (256 + lean * .6, sy - 10), 40, 34)], BONE_Y)
+    ribs = ""
+    for i in range(5):
+        y = sy + 30 + i * 46; w = 120 - i * 14
+        for sgn in (-1, 1):
+            ribs += line(f"M{f(256 + lean * .5)} {f(y)} Q{f(256 + lean * .5 + sgn * w)} {f(y - 30)} {f(256 + lean * .5 + sgn * w * .9)} {f(y + 40)}", 22, BONE_Y)
+    out += line("".join(f"M{f(256 + lean * .5)} {f(sy + 30 + i * 46)} Q{f(256 + lean * .5 + s * (120 - i * 14))} {f(sy + 30 + i * 46 - 30)} {f(256 + lean * .5 + s * (120 - i * 14) * .9)} {f(sy + 30 + i * 46 + 40)} " for i in range(5) for s in (-1, 1)), 34) + ribs
+    # the mound of earth and lesser bones it rises from
+    out += fill(f"M40 744 Q80 640 190 650 Q256 610 330 650 Q440 640 480 744 Z", EARTH, 8)
+    out += fill_ns("M70 744 Q120 690 200 690 Q256 670 320 690 Q400 690 450 744 Z", EARTH_D, .7)
+    for (x, y, r) in ((120, 700, 22), (380, 706, 20), (300, 690, 16), (190, 712, 14)):
+        out += ell(x, y, r, r * .8, BONE_Y, 6) + f'<circle cx="{x - r * .3}" cy="{y - 2}" r="{r * .22}" fill="{O}" stroke="none"/><circle cx="{x + r * .3}" cy="{y - 2}" r="{r * .22}" fill="{O}" stroke="none"/>'
+    # collarbones and the front arm
+    out += line(f"M{256 - 110 + lean * .5} {sy} Q{256 + lean * .5} {sy - 30} {256 + 110 + lean * .5} {sy}", 26, BONE_Y)
+    out += arm((256 + 110 + lean * .5, sy), rh, 1)
+    # the skull
+    sx, syk = sk
+    skull = f"M{sx - 108} {syk + 20} Q{sx - 120} {syk - 120} {sx} {syk - 128} Q{sx + 120} {syk - 120} {sx + 108} {syk + 20} Q{sx + 90} {syk + 70} {sx + 56} {syk + 76} L{sx - 56} {syk + 76} Q{sx - 90} {syk + 70} {sx - 108} {syk + 20} Z"
+    out += shaded(d, skull, BONE_Y, BONE_YD, 14, -8, brush((sx - 80, syk - 40), (sx - 60, syk - 100), (sx - 10, syk - 112), 12, BONE_YL))
+    out += line(f"M{sx + 30} {syk - 110} L{sx + 46} {syk - 70} L{sx + 34} {syk - 50}", 6, BONE_YD)
+    for sgn in (-1, 1):
+        ex = sx + sgn * 48
+        out += ell(ex, syk + 4, 34, 30, O, 0)
+        out += ell(ex, syk + 8, 14 + 8 * fire, 12 + 6 * fire, GFIRE, 0) + f'<ellipse cx="{ex}" cy="{syk + 8}" rx="{f(30 + 16 * fire)}" ry="{f(26 + 12 * fire)}" fill="{GFIRE}" opacity=".25" stroke="none"/>'
+    out += fill(f"M{sx - 12} {syk + 40} L{sx + 12} {syk + 40} L{sx} {syk + 62} Z", O, 0)
+    # the jaw, dropping open
+    jy = syk + 76 + jaw
+    out += fill(f"M{sx - 78} {jy - 6} Q{sx} {jy + 46} {sx + 78} {jy - 6} L{sx + 70} {jy + 30} Q{sx} {jy + 76} {sx - 70} {jy + 30} Z", BONE_Y, 8)
+    if jaw > 6:
+        out += fill(f"M{sx - 60} {syk + 74} L{sx + 60} {syk + 74} L{sx + 56} {jy} L{sx - 56} {jy} Z", MAW, 6)
+    for i in range(7):
+        x = sx - 54 + i * 18
+        out += rrect(x - 7, syk + 66, 14, 18, 3, BONE_YL, 4) + rrect(x - 7, jy - 6, 14, 16, 3, BONE_YL, 4)
+    # the hands, in front of everything
+    out += bone_hand(lh[0], lh[1], .85, P.get("lr", -10), lg, -1) + bone_hand(rh[0], rh[1], .85, P.get("rr", 10), rg, 1)
+    if lean:
+        out = f'<g transform="rotate({lean * .06} 256 744)">{out}</g>'
+    return d, b + out
+
+
+GASHA_FRAMES = creature_frames(gashadokuro,
+    [dict(lh=(90, 650), rh=(420, 700), lean=-10, fire=.4), dict(lh=(80, 690), rh=(400, 660), lean=0, rise=8, fire=.5),
+     dict(lh=(110, 700), rh=(440, 650), lean=10, fire=.4), dict(lh=(100, 660), rh=(420, 690), lean=0, rise=8, fire=.5)],
+    [dict(lh=(110, 690), rh=(420, 260), rr=-40, rg=.0, lean=-16, rise=20, jaw=30, fire=1), dict(lh=(110, 690), rh=(470, 690), rr=30, rg=.9, lean=20, jaw=10, fire=1),
+     dict(lh=(110, 690), rh=(440, 680), lean=8, jaw=40, fire=.8)],
+    dict(lh=(100, 690), rh=(420, 690), fire=.4))
+
+
+def gasha_mound():
+    """The Mound of the Starved: a hill of bones and skulls round a cracked stone, a bell hung on a dead branch."""
+    d = []; b = ""
+    b += fill("M40 744 Q90 600 200 590 Q256 540 320 590 Q430 600 472 744 Z", EARTH, 8)
+    b += fill_ns("M80 744 Q140 650 220 640 Q256 620 300 640 Q380 650 430 744 Z", EARTH_D, .7)
+    for (x, y, r) in ((150, 660, 26), (330, 650, 30), (250, 610, 34), (200, 700, 20), (380, 700, 22), (290, 690, 18), (120, 720, 16)):
+        b += ell(x, y, r, r * .82, BONE_Y, 7) + f'<circle cx="{f(x - r * .32)}" cy="{f(y - 2)}" r="{f(r * .24)}" fill="{O}" stroke="none"/><circle cx="{f(x + r * .32)}" cy="{f(y - 2)}" r="{f(r * .24)}" fill="{O}" stroke="none"/>'
+    for (x0, y0, x1, y1) in ((100, 690, 190, 640), (300, 720, 420, 670), (220, 660, 300, 620)):
+        b += stroke(f"M{x0} {y0} L{x1} {y1}", 18, BONE_Y)
+    # a dead branch with a bronze bell
+    b += stroke("M360 620 Q380 520 350 440 Q330 420 300 430", 16, BARK)
+    b += bell(310, 470, .2)
+    b += f'<circle cx="250" cy="600" r="80" fill="{GFIRE}" opacity=".12" stroke="none"/>'
+    b += f'<circle cx="238" cy="606" r="6" fill="{GFIRE}" stroke="none"/><circle cx="262" cy="606" r="6" fill="{GFIRE}" stroke="none"/>'
+    return d, b
+
+
 # ================================================================ trees
 def sakura():
     """An old cherry: a gnarled dark trunk under clouds of blossom, petals drifting down."""
@@ -1302,6 +1408,8 @@ ALL = {
     "rokurokubi": dict(frames=ROKURO_FRAMES, cols=4, rows=2, target=(20, 40, 500, 740), size=[2.7, 4.05], clips=CREATURE_CLIPS),
     "yukionna": dict(frames=YUKI_FRAMES, cols=4, rows=2, target=(40, 70, 480, 740), size=[2.4, 3.6], clips=CREATURE_CLIPS),
     "daoshi": dict(frames=DAOSHI_FRAMES, cols=4, rows=2, target=(40, 60, 480, 740), size=[2.4, 3.6], clips=CREATURE_CLIPS),
+    "gashadokuro": dict(frames=GASHA_FRAMES, cols=4, rows=2, target=(10, 20, 502, 744), size=[6.6, 9.9], clips=CREATURE_CLIPS),
+    "gashamound": dict(frames=[gasha_mound], cols=1, rows=1, target=(30, 260, 482, 744), size=[3.4, 5.1], clips=STILL),
     "sakura": dict(frames=[sakura], cols=1, rows=1, target=(12, 24, 500, 736), size=[4.92, 7.38], clips=STILL),
     "matsu": dict(frames=[matsu], cols=1, rows=1, target=(40, 40, 480, 736), size=[4.92, 7.38], clips=STILL),
     "toro": dict(frames=[(lambda k: (lambda: toro(k / 4)))(k) for k in range(4)], cols=4, rows=1, target=(130, 150, 382, 744), size=[1.9, 2.85],
@@ -1324,7 +1432,7 @@ ALL = {
 }
 # What the game uses (tools/art/build.py builds these into themes/harvest/sprites like every other sprite;
 # theme.json holds their entries). The wanderers and the guandao stay preview-only for now.
-GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo", "bamboo", "bamboo-b", "yanagi", "obonlantern", "foxwedding")
+GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "gashadokuro", "gashamound", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo", "bamboo", "bamboo-b", "yanagi", "obonlantern", "foxwedding")
 SPRITES = {k: {kk: v for kk, v in ALL[k].items() if kk in ("frames", "cols", "rows", "target")} for k in GAME}
 
 
@@ -1421,7 +1529,7 @@ requestAnimationFrame(loop);
 """
 
 NAMES = {"miko": "Shrine maiden (wanderer)", "daoshi-wanderer": "Taoist exorcist (wanderer)", "daoshi": "Fallen daoshi (mob)",
-         "kasa": "Kasa-obake, umbrella ghost (mob)", "rokurokubi": "Rokurokubi, long neck (mob)", "yukionna": "Yuki-onna, snow woman (mob)", "chochin": "Chochin-obake, lantern ghost (mob)",
+         "kasa": "Kasa-obake, umbrella ghost (mob)", "gashadokuro": "The Gashadokuro (boss)", "gashamound": "Mound of the Starved (landmark)", "rokurokubi": "Rokurokubi, long neck (mob)", "yukionna": "Yuki-onna, snow woman (mob)", "chochin": "Chochin-obake, lantern ghost (mob)",
          "jiangshi": "Jiangshi, hopping corpse (mob)", "sakura": "Old cherry (tree)", "matsu": "Sacred pine (tree)",
          "toro": "Stone lantern (decoration)", "torii": "Torii gate (decoration)", "katana": "Kagekiri, katana (weapon)", "guandao": "Dragon guandao (weapon)", "ofuda": "The Hundred Seals (weapon)", "odokuro": "Gashadokuro\u2019s Hand (weapon)",
          "yomi-rock": "Garden stones (rock node)", "yomi-rock-b": "Sacred boulder (rock node)", "jizo": "Jizo statue (decoration)",

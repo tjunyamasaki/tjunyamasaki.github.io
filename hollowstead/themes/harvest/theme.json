@@ -6126,6 +6126,66 @@
           "fps": 4
         }
       }
+    },
+    "gashadokuro": {
+      "src": "./sprites/gashadokuro.svg?v=yomi1",
+      "size": [
+        6.6,
+        9.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        },
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 5
+        },
+        "attack": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 5
+        }
+      }
+    },
+    "gashamound": {
+      "src": "./sprites/gashamound.svg?v=yomi1",
+      "size": [
+        3.4,
+        5.1
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
     }
   },
   "motion": {

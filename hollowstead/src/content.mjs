@@ -133,6 +133,8 @@ export const NODES = {
   embervent:{name:'Emberglass vent',hits:5,workSeconds:3.6,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{emberglass:2,ember:1},regrow:720,radius:.55},
   // Landmarks: never harvested. `landmark` names what holding the action does (World.useLandmark).
   briarthrone:{name:'The Briar Throne',hits:1,workSeconds:99,handRate:0,output:'floor',loot:{},regrow:0,radius:1.1,landmark:'throne'},
+  // A Yomi hollow's marsh (yomi.mjs): hold the action at night to wake the Gashadokuro (bosses.mjs).
+  gashamound:{name:'Mound of the Starved',hits:1,workSeconds:2,handRate:1,output:'floor',loot:{},regrow:0,radius:1.2,landmark:'gasha'},
   // Omens (omens.mjs): turn up somewhere for a while, never regrow.
   fallenstar:{name:'Fallen star',hits:1,workSeconds:2.2,handRate:1,output:'floor',loot:{},regrow:0,radius:.7,omen:true},
   soulrift:{name:'Soul rift',hits:1,workSeconds:99,handRate:0,output:'floor',loot:{},regrow:0,radius:0,omen:true},
@@ -263,6 +265,8 @@ export const ENEMIES = {
   // The great bosses (bosses.mjs): Mother Briar on her throne, The Unblinking at the bottom of a delve.
   briarmother:{name:'Mother Briar',hp:2400,speed:1.55*SPEED_SCALE,damage:58,range:4.2,period:2.1,boss:true,loot:{ember:12}},
   unblinking:{name:'The Unblinking',hp:2200,speed:1.1*SPEED_SCALE,damage:62,range:6,period:2,boss:true,loot:{ember:14}},
+  // A Yomi hollow's great boss (bosses.mjs): a giant skeleton of the starved dead, woken at the Mound of the Starved.
+  gashadokuro:{name:'The Gashadokuro',hp:2600,speed:1.2*SPEED_SCALE,damage:60,range:10,period:2.1,boss:true,loot:{bone:10}},
 };
 export const CHARACTERS = [
   {id:'ember',name:'Ember',detail:'The lost lantern keeper',color:'#f6a35d'},

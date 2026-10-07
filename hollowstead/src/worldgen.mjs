@@ -834,7 +834,12 @@ export function generateNodes(seed){
       if(shape.areas.some(a=>inArea(a,x,z,6))||clear(x,z)<(pass?2.4:3.2)||onTrail(x,z)||!free('delve',x,z))continue;
       stair={x,z};
     }
-    if(stair)add('delve',stair.x,stair.z);}
+    if(stair)add('delve',stair.x,stair.z);
+    // A Yomi hollow's marsh keeps the Mound of the Starved on its dry ground, where the Gashadokuro sleeps (yomi.mjs).
+    const marsh=shape.areas.find(entry=>entry.id==='higan');
+    if(marsh){let spot=null;
+      for(let t=0;t<400&&!spot;t++){const r=lrng()*marsh.r*.6,[dx,dz]=randomDir(lrng),x=marsh.x+dx*r,z=marsh.z+dz*r;if(!inArea(marsh,x,z,-3)||clear(x,z)<2.4||onTrail(x,z)||!free('gashamound',x,z))continue;spot={x,z};}
+      if(spot)add('gashamound',spot.x,spot.z);}}
   // The Shrine of Yomi grows its own: cherry and sacred pine for trees, mossy garden stones for rocks (same harvest).
   if(shrine)for(const n of nodes){if((n.type==='tree'||n.type==='rock')&&inArea(shrine,n.x,n.z,1))n.look=n.type==='tree'?'yomi-tree':'yomi-rock';}
   // Its other places grow their own: bamboo in the thicket, weeping willow by the black river, garden stones on the terrace.

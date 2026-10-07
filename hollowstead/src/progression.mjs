@@ -17,7 +17,8 @@ export const REGIONS = Object.freeze({
   briarlair:{name:'The Briar Throne', tier:2, area:true, boss:'briarmother'},
   // Only in a hollow of that land (worldgen.mjs LANDS). `haunt`: a night wave that finds you here is of its own dead.
   yomi:{name:'The Shrine of Yomi', tier:2, area:true, haunt:true},
-  // A Yomi hollow's other places (worldgen.mjs AREAS, yomi.mjs): its dead walk them at night too.
+  // A Yomi hollow's other places (worldgen.mjs AREAS, yomi.mjs): its dead walk them at night too. The marsh keeps the
+  // Mound of the Starved, where the Gashadokuro (bosses.mjs) sleeps.
   chikurin:{name:'The Bamboo Thicket', tier:2, area:true, haunt:true},
   higan:{name:'The Spider-lily Marsh', tier:2, area:true, haunt:true},
   onsen:{name:'The Hot-spring Terrace', tier:2, area:true, haunt:true},
@@ -251,6 +252,7 @@ export const LOOT_TABLES = Object.freeze({
   starshard:{xp:0, rolls:[{entries:[['rare',1,2],['epic',1,1]]},{chance:.06, entries:[['legendary',1,1]]}]},
   briarmother:{xp:700, rolls:[]},
   unblinking:{xp:820, rolls:[]},
+  gashadokuro:{xp:860, rolls:[]},
   king:{xp:320, rolls:[{entries:[['epic',1,1]]},{entries:[['legendary',1,1]]},{count:[2,2], entries:[['heartstone',[1,1],1],['elixir',[2,3],2]]},{entries:[['ichor',[10,14],1]]},{entries:[['sigil',[1,2],1]]},{entries:[['book',1,1]]}]},
 });
 

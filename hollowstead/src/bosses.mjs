@@ -7,6 +7,11 @@
 //   The Unblinking   (unblinking) waits on the last floor of a delve (delve.mjs). A beam that follows its
 //                    gaze, a gaze that sweeps the chamber, tendrils from below, wraiths; at the end it
 //                    collapses the dark around itself in rings you must dodge through.
+//   The Gashadokuro  (gashadokuro) a giant skeleton of the starved dead, only in a Yomi hollow: wake it at night at
+//                    the Mound of the Starved in the Spider-lily Marsh (yomi.mjs). Its palm slams down and drags
+//                    back; bony fingers burst up in a fan that closes on you; it rattles out a spiral of skulls.
+//                    From half health it inhales, hauling you in for a bite, and calls the shrine's dead; at the
+//                    end it sinks into the earth and bursts up where you stand.
 //
 // mobs.mjs moves them like any creature (MOVES below) and calls bossRelease() for their attacks and
 // bossTick() every tick. Every attack is telegraphed: the wind-up on the boss (ATTACKS shape) and then
@@ -34,6 +39,13 @@ export const BOSS_ATTACKS = Object.freeze({
   eyeGrasp:    {shape: 'ring', windup: .6, trigger: 16, radius: 1.8, dmg: .6},
   eyeSpawn:    {shape: 'ring', windup: 1, trigger: 18, radius: 3, summon: 3, dmg: 0},
   eyeCollapse: {shape: 'ring', windup: 1.2, trigger: 14, radius: 3, dmg: .8},
+  // The Gashadokuro
+  gashaPalm:    {shape: 'circle', windup: .95, trigger: 10, radius: 3.1, flight: .5, dmg: 1},
+  gashaFingers: {shape: 'ring', windup: .7, trigger: 15, radius: 2.4, dmg: .7},
+  gashaRattle:  {shape: 'ring', windup: .8, trigger: 14, radius: 2.6, shots: 26, speed: 3.6*SS, life: 4.4, dmg: .32},
+  gashaHunger:  {shape: 'ring', windup: 1.1, trigger: 11, radius: 7, pull: 2.6, dmg: 1.1},
+  gashaSink:    {shape: 'ring', windup: 1.2, trigger: 18, radius: 3, dmg: 1.2},
+  gashaCall:    {shape: 'ring', windup: 1, trigger: 18, radius: 3, summon: 4, dmg: 0},
 });
 
 /**
@@ -51,7 +63,14 @@ export const BOSS_MOVES = Object.freeze({
     phases: [['eyeBeam', 'eyeGrasp', 'eyeNova', 'eyeSweep'],
       ['eyeSweep', 'eyeBeam', 'eyeGrasp', 'eyeSpawn', 'eyeNova', 'eyeBeam'],
       ['eyeCollapse', 'eyeBeam', 'eyeSweep', 'eyeGrasp', 'eyeCollapse', 'eyeNova', 'eyeSpawn']]},
+  gashadokuro: {body: 2.1, accel: 2, rotate: true, attacks: ['gashaPalm', 'gashaFingers', 'gashaRattle'],
+    at: [1, .6, .3],
+    phases: [['gashaPalm', 'gashaFingers', 'gashaRattle', 'gashaPalm'],
+      ['gashaHunger', 'gashaPalm', 'gashaFingers', 'gashaCall', 'gashaRattle', 'gashaHunger'],
+      ['gashaSink', 'gashaHunger', 'gashaPalm', 'gashaFingers', 'gashaRattle', 'gashaSink', 'gashaCall']]},
 });
+/** The Gashadokuro's sinking: how long it stays under the earth before it bursts up. */
+export const GASHA = Object.freeze({sink: 1.15});
 
 const people = world => world.players.filter(p => p && p.online && !p.down && !p.ghost && p.hp > 0);
 function fire(world, e, kind, angle, speed, radius, damage, life){
@@ -92,7 +111,15 @@ export function bossTick(world, e, dt){
     }else if(e.type === 'unblinking'){
       world.event('announce', e.x, e.z, phase === 2 ? 'The Unblinking looks at all of you at once.' : 'The dark folds in around the eye.');
       summon(world, e, 'wraith', 3, 3.5);
+    }else if(e.type === 'gashadokuro'){
+      world.event('announce', e.x, e.z, phase === 2 ? 'The Gashadokuro’s jaw drops open. It is so hungry.' : 'The Gashadokuro sinks its hands into the earth. Keep moving.');
+      summon(world, e, phase === 2 ? 'jiangshi' : 'chochin', phase === 2 ? 3 : 4, 3.5);
     }
+  }
+  // Sunk under the earth: it bursts up where it was going (gashaSink).
+  if(e.sink && world.time >= e.sink.at){
+    e.x = e.sink.x; e.z = e.sink.z; e.sink = null; e.stunned = 0;
+    world.event('bossroar', e.x, e.z, '', {boss: e.type, kind: 'rise'});
   }
 }
 
@@ -166,6 +193,51 @@ export function bossRelease(world, e, id, target, amount){
       return true;
     }
     case 'eyeSpawn': summon(world, e, 'wraith', spec.summon, 3.5); return true;
+    case 'gashaPalm': {
+      // The palm comes down where the wind-up marked it, then drags back toward the skeleton along the ground.
+      addBlast(world, {style: 'bone', shape: 'circle', x: e.tx, z: e.tz, radius: spec.radius, fuse: .08, damage: Math.round(amount), owner: e.id, push: 1.2});
+      const len = Math.hypot(e.tx-e.x, e.tz-e.z);
+      if(len > 2) addBlast(world, {style: 'bone', shape: 'line', x: e.tx, z: e.tz, angle: Math.atan2(e.z-e.tz, e.x-e.tx), length: len-1.5, width: 2.4, fuse: .55, delay: .25, damage: Math.round(amount*.7), owner: e.id});
+      return true;
+    }
+    case 'gashaFingers': {
+      // Five bony fingers burst up in a fan aimed at you, then the hand closes where you stood.
+      const fingers = phase >= 2 ? 6 : 5;
+      for(const p of near.length ? near : [target]){
+        const base = Math.atan2(e.z-p.z, e.x-p.x);
+        for(let i = 0; i < fingers; i++){
+          const a = base+(i-(fingers-1)/2)*.42, L = 6;
+          addBlast(world, {style: 'bone', shape: 'line', x: p.x+Math.cos(a)*L, z: p.z+Math.sin(a)*L, angle: a+Math.PI, length: L-.6, width: .9, fuse: .8, delay: i*.05, damage: Math.round(amount), owner: e.id});
+        }
+        addBlast(world, {style: 'bone', shape: 'circle', x: p.x, z: p.z, radius: 1.7, fuse: .45, delay: 1, damage: Math.round(amount), owner: e.id, push: .8});
+      }
+      return true;
+    }
+    case 'gashaRattle': {
+      // Its teeth chatter out a spiral of skulls: three arms, each shot a little slower than the last.
+      const arms = phase >= 3 ? 4 : 3;
+      for(let i = 0; i < spec.shots; i++){const a = (i%arms)/arms*TAU+i*.21+e.ang; fire(world, e, 'shard', a, spec.speed*(1-.022*i), .36, Math.round(amount), spec.life);}
+      world.event('bossroar', e.x, e.z, '', {boss: e.type, kind: 'rattle'});
+      return true;
+    }
+    case 'gashaHunger': {
+      // It inhales: everyone near is hauled in, then the jaw snaps shut in front of it.
+      for(const p of foes) if(Math.hypot(p.x-e.x, p.z-e.z) < spec.radius+3 && !(p.iframes > 0)) world.shove(p, e.x-p.x, e.z-p.z, spec.pull);
+      addBlast(world, {style: 'bone', shape: 'circle', x: e.x, z: e.z, radius: 3.6, fuse: .65, delay: .2, damage: Math.round(amount), owner: e.id, push: 1.6, heavy: true});
+      world.event('bossroar', e.x, e.z, '', {boss: e.type, kind: 'hunger'});
+      return true;
+    }
+    case 'gashaSink': {
+      // Down into the earth, and up again under the nearest wanderer.
+      const p = (near.length ? near : [target]).reduce((a, b) => Math.hypot(a.x-e.x, a.z-e.z) <= Math.hypot(b.x-e.x, b.z-e.z) ? a : b);
+      const x = p.x+(p.vx || 0)*.4, z = p.z+(p.vz || 0)*.4;
+      addBlast(world, {style: 'bone', shape: 'circle', x, z, radius: 3.6, fuse: GASHA.sink, damage: Math.round(amount), owner: e.id, push: 1.8, heavy: true});
+      addBlast(world, {style: 'bone', shape: 'ring', x, z, radius: 7, inner: 4.6, fuse: .6, delay: GASHA.sink+.35, damage: Math.round(amount*.6), owner: e.id});
+      e.sink = {x: +x.toFixed(2), z: +z.toFixed(2), at: +(world.time+GASHA.sink).toFixed(2)}; e.stunned = GASHA.sink;
+      world.event('bossroar', e.x, e.z, '', {boss: e.type, kind: 'sink'});
+      return true;
+    }
+    case 'gashaCall': summon(world, e, phase >= 3 ? 'jiangshi' : 'chochin', spec.summon, 3.5); return true;
     case 'eyeCollapse': {
       // Rings close in from far out: dodge through each as it lands, or stand where the gaps fall.
       for(let i = 0; i < 4; i++){const r = 13-i*3; addBlast(world, {style: 'void', shape: 'ring', x: e.x, z: e.z, radius: r, inner: r-1.6, fuse: .9, delay: i*.42, damage: Math.round(amount), owner: e.id});}
@@ -178,12 +250,13 @@ export function bossRelease(world, e, id, target, amount){
 
 /**
  * What a boss leaves. The first time each falls it always drops its own weapon (Thornmother's Heart,
- * the Eye of the Deep); after that a third of the time. Always a legendary and an epic roll, heartstones,
+ * the Eye of the Deep, the Gashadokuro's Hand); after that a third of the time. Always a legendary and an epic roll, heartstones,
  * a hoard of Dread ichor, its area's finds and three Dread sigils (they ascend weapons, mastery.mjs).
  */
 export const BOSS_LOOT = Object.freeze({
   briarmother: {weapon: 'thornheart', again: .33, extra: [['emberglass', 6], ['rime', 6], ['ember', 10], ['sigil', 3]]},
   unblinking: {weapon: 'deepeye', again: .33, extra: [['shard', 8], ['ember', 12], ['sigil', 3]]},
+  gashadokuro: {weapon: 'odokuro', again: .33, extra: [['bone', 14], ['ember', 12], ['ichor', 10], ['sigil', 3]]},
 });
 export function bossLoot(world, e, times){
   const spec = BOSS_LOOT[e.type]; if(!spec) return;
@@ -193,7 +266,7 @@ export function bossLoot(world, e, times){
   rolls.push({itemId: 'heartstone', count: 1});
   for(const [itemId, count] of spec.extra) rolls.push({itemId, count});
   world.spillLoot(rolls, e.x, e.z, world.player(e.lastHitBy)?.name);
-  world.event('announce', e.x, e.z, e.type === 'briarmother' ? 'Mother Briar withers. Her heart rolls free of the thorns.' : 'The eye closes. The deep is quiet.');
+  world.event('announce', e.x, e.z, e.type === 'briarmother' ? 'Mother Briar withers. Her heart rolls free of the thorns.' : e.type === 'gashadokuro' ? 'The Gashadokuro falls apart into a hill of bones. One hand still twitches.' : 'The eye closes. The deep is quiet.');
 }
 
 export const isBoss = e => !!ENEMIES[e?.type]?.boss;

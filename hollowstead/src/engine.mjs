@@ -780,7 +780,7 @@ export class World {
     const inRange=entity=>distance(p,entity)<RULES.reach;
     const revive=this.players.find(q=>q.id!==p.id&&q.online&&q.down&&inRange(q));
     const candidates=[
-      ...this.nodes.filter(n=>!(n.ready>this.time)&&nodeAwake(n,this)&&inRange(n)&&(NODES[n.type].handRate||NODES[n.type].tool)).map(e=>({kind:'node',entity:e,label:e.type==='tree'?'Chop':['rock','ore','grave','shardrock','rimecrystal','embervent'].includes(e.type)?'Mine':isCache(e.type)||e.type==='fallenstar'||e.type==='mimic'?'Open':e.type==='witchcauldron'?'Sip':e.type==='thornpatch'?'Cut':e.type==='dreadaltar'?'Wake':e.type==='obonlantern'?'Light':e.type==='foxwedding'?'Bow':NODES[e.type].landmark==='delve'?'Descend':'Gather'})),
+      ...this.nodes.filter(n=>!(n.ready>this.time)&&nodeAwake(n,this)&&inRange(n)&&(NODES[n.type].handRate||NODES[n.type].tool)).map(e=>({kind:'node',entity:e,label:e.type==='tree'?'Chop':['rock','ore','grave','shardrock','rimecrystal','embervent'].includes(e.type)?'Mine':isCache(e.type)||e.type==='fallenstar'||e.type==='mimic'?'Open':e.type==='witchcauldron'?'Sip':e.type==='thornpatch'?'Cut':e.type==='dreadaltar'||e.type==='gashamound'?'Wake':e.type==='obonlantern'?'Light':e.type==='foxwedding'?'Bow':NODES[e.type].landmark==='delve'?'Descend':'Gather'})),
       ...this.buildings.filter(b=>b.hp>0&&inRange(b)&&!(b.grid&&b.type!=='gate')&&(typeof id==='string'||b.towedBy!==p.id)).map(e=>({kind:'building',entity:e,label:this.buildingLabel(e)})),
       ...cropTargets(this,p),
       ...(revive?[{kind:'revive',entity:revive,label:'Revive teammate'}]:[]),
@@ -1646,7 +1646,7 @@ export class World {
     const {scale,level,elite:chance,boss}=this.mobScale(options.tier||0);
     const elite=options.elite??(!this.showcase&&type!=='king'&&!options.minion&&this.spawnRng()<chance);
     // The great bosses come back stronger each time they fall (vigil.mjs saga).
-    const again=def.boss?1+.2*((sagaOf(this)[type==='briarmother'?'briar':'eye'])||0):1;
+    const again=def.boss?1+.2*((sagaOf(this)[type==='briarmother'?'briar':type==='gashadokuro'?'gasha':'eye'])||0):1;
     const hp=Math.round(def.hp*scale.hp*(1+(humans-1)*.35)*(elite?ELITE.hp:1)*(type==='king'?boss:again));
     const enemy={id:this.nextId('e'),type,x,z,hp,maxHp:hp,cooldown:.6+this.mobRng()*.9,windup:0,slam:0,tx:x,tz:z,slowed:0,power:+(scale.damage*(elite?ELITE.damage:1)).toFixed(3),level,elite:!!elite,
       vx:0,vz:0,atk:'',wt:0,ang:0,act:0,face:1,flank:+((this.mobRng()<.5?-1:1)*(.35+this.mobRng()*.65)).toFixed(3)};
@@ -1868,7 +1868,7 @@ export class World {
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
       projectiles:this.projectiles, allies:this.allies, zones:this.zones, beats:this.beats, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
-      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, land:this.land, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone, tiles:this.tiles, homestead:this.homestead, wilds:this.wilds, thorns:this.thorns,
+      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, land:this.land, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, gasha:this.gasha, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone, tiles:this.tiles, homestead:this.homestead, wilds:this.wilds, thorns:this.thorns,
       ...magicSnapshotFields(this),
     };
     // Where each random stream stands, so a reloaded save carries on rather than replaying the seed.
@@ -1881,7 +1881,7 @@ export class World {
     if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
     // A dungeon floor is rebuilt from its seed (dungeon/layout.mjs), never from the hollow's map.
     const world=new World(data.seed,{...(data.dungeon?{bare:true}:{}),land:data.land});
-    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','land','below','saga','surface','delves','lair','omens','omenT','omensDone','tiles','homestead','wilds','thorns'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','land','below','saga','surface','delves','lair','gasha','omens','omenT','omensDone','tiles','homestead','wilds','thorns'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     if(world.arena){world.nodes=[];}if(world.dungeon)world.nodes=dungeonNodes(world);if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||(!world.arena&&!world.dungeon))world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
     for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);sanitizeRefine(p);}

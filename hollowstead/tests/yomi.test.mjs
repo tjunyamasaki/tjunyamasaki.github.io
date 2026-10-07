@@ -319,3 +319,57 @@ test('a fox wedding blesses whoever keeps still beside it, and curses whoever st
     else{assert.ok(p.buffs?.foxwed > w.time, 'blessed'); assert.ok(BUFF.foxwed > 1 && BUFF.foxward < 1);}
   }
 });
+
+// ------------------------------------------------------------------ the Gashadokuro
+import {BOSS_ATTACKS, BOSS_LOOT, BOSS_MOVES, phaseOf as bossPhase} from '../src/bosses.mjs?v=harvest-18';
+import {MOUND, gashaOf, wakeMound} from '../src/yomi.mjs?v=harvest-18';
+import {magicItems} from '../src/magic/registry.mjs?v=harvest-18';
+import {rarityOf} from '../src/progression.mjs';
+import {CLOCKS} from '../src/content.mjs';
+
+test('the Mound of the Starved lies in every Yomi marsh, and wakes the Gashadokuro only at night', () => {
+  for(const seed of [1, 2, 402, 2024]){
+    setLand(seed, 'yomi');
+    const marsh = areasOf(seed).find(a => a.id === 'higan'), mound = generateNodes(seed).find(n => n.type === 'gashamound');
+    assert.ok(mound && Math.hypot(mound.x-marsh.x, mound.z-marsh.z) < marsh.r, `${seed}: a mound in the marsh`);
+  }
+  assert.ok(THEME.sprites.gashamound && THEME.sprites.gashadokuro, 'drawn');
+  assert.ok(NODES.gashamound.landmark === 'gasha' && NODE_ACTIONS.gashamound.includes('wake'));
+  const {w, p} = yomiWorld(), mound = w.nodes.find(n => n.type === 'gashamound');
+  p.x = mound.x+2; p.z = mound.z;
+  w.time = 20; wakeMound(w, mound, p);
+  assert.equal(gashaOf(w).state, 'asleep', 'by day nothing answers');
+  w.time = CLOCKS.vigil.day+CLOCKS.vigil.dusk+10; w.mode = 'vigil';
+  wakeMound(w, mound, p);
+  const G = gashaOf(w), boss = w.enemies.find(e => e.type === 'gashadokuro');
+  assert.equal(G.state, 'awake'); assert.ok(boss && boss.boss && G.boss === boss.id);
+  // Saved and sent to guests.
+  const back = World.restore(structuredClone(w.snapshot({purpose: 'save'})));
+  assert.equal(back.gasha.state, 'awake');
+});
+
+test('the Gashadokuro fights in three phases, sinks and bursts up, and always drops its hand the first time', () => {
+  assert.equal(BOSS_LOOT.gashadokuro.weapon, 'odokuro');
+  assert.ok(magicItems.odokuro && rarityOf('odokuro') === 'legendary');
+  for(const phase of BOSS_MOVES.gashadokuro.phases) for(const id of phase) assert.ok(BOSS_ATTACKS[id], id);
+  const {w, p} = yomiWorld();
+  w.ambient = false; w.time = 900;
+  const boss = w.spawnEnemy('gashadokuro', p.x+6, p.z, {elite: false});
+  boss.aggro = true; boss.home = {x: boss.x, z: boss.z}; boss.leash = 40; // as at its mound: dawn does not clear it
+  const styles = new Set(), immortal = () => {p.hp = p.maxHp = 1e6;};
+  // Phase by phase: watch what it lays on the ground.
+  for(const left of [1, .5, .2]){
+    boss.hp = boss.maxHp*left-1;
+    for(let t = 0; t < 14; t += T){immortal(); w.tick(T); for(const s of w.hostile || []) styles.add(s.kind === 'blast' ? `${s.style}:${s.shape}` : s.kind);}
+  }
+  assert.ok(bossPhase(boss) === 3);
+  assert.ok(styles.has('bone:circle') && styles.has('bone:line'), 'palm and fingers');
+  assert.ok(styles.has('shard'), 'a spiral of skulls');
+  assert.ok(styles.has('bone:ring'), 'it sank and burst up');
+  // First kill: its hand, every time the first time.
+  p.x = boss.x+30; p.z = boss.z; // out of reach, so nothing is picked up before we look
+  boss.hp = 0; boss.lastHitBy = p.id;
+  w.tick(T);
+  assert.ok(w.drops.some(d => d.stack?.itemId === 'odokuro'), 'the Gashadokuro’s Hand');
+  assert.ok(['sigil', 'ember', 'heartstone'].every(id => w.drops.some(d => d.stack?.itemId === id)), 'and a hoard');
+});

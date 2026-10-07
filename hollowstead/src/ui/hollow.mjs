@@ -8,9 +8,19 @@ import {OMENS} from '../omens.mjs?v=harvest-18';
 export function paintMapMarks(ctx, world, m){
   const {sx, sz, vis, known, full, clock} = m, k = full ? 1.15 : 1;
   for(const n of world.nodes){
-    if(n.type !== 'delve' && n.type !== 'briarthrone') continue;
+    if(n.type !== 'delve' && n.type !== 'briarthrone' && n.type !== 'gashamound') continue;
     if(!known(n) || !vis(n.x, n.z)) continue;
     const x = sx(n.x), y = sz(n.z);
+    if(n.type === 'gashamound'){
+      // The Mound of the Starved: a pale skull in a dark ring, green-eyed while the Gashadokuro walks.
+      const G = world.gasha || {}, awake = G.state === 'awake', slain = G.state === 'slain';
+      ctx.fillStyle = '#211c22'; ctx.beginPath(); ctx.arc(x, y, 7*k, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = awake ? '#c8ff8a' : slain ? '#6a6458' : '#d8cdb0'; ctx.lineWidth = awake ? 2.5 : 2; ctx.stroke();
+      ctx.fillStyle = slain ? '#8a8270' : '#e8dcc0'; ctx.beginPath(); ctx.arc(x, y-.5*k, 3.6*k, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = awake ? '#c8ff8a' : '#211c22'; ctx.fillRect(x-2*k, y-1.2*k, 1.4*k, 1.4*k); ctx.fillRect(x+.6*k, y-1.2*k, 1.4*k, 1.4*k);
+      if(full){ctx.font = '10px Georgia'; ctx.fillStyle = '#e8dcc0'; ctx.textAlign = 'center'; ctx.fillText(slain ? 'MOUND OF THE STARVED · STILL' : 'MOUND OF THE STARVED', x, y+20);}
+      continue;
+    }
     if(n.type === 'delve'){
       // A stair going down: a violet chevron in a dark ring.
       ctx.fillStyle = '#1d1726'; ctx.beginPath(); ctx.arc(x, y, 7*k, 0, Math.PI*2); ctx.fill();

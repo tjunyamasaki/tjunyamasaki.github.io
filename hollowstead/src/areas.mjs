@@ -13,7 +13,7 @@ import {REGIONS} from './progression.mjs?v=harvest-18';
 import {areasOf} from './worldgen.mjs?v=harvest-18';
 import {addBlast} from './blasts.mjs?v=harvest-18';
 import {tryDescend} from './delve.mjs?v=harvest-18';
-import {stepYomi} from './yomi.mjs?v=harvest-18';
+import {gashaFell, stepYomi, wakeMound} from './yomi.mjs?v=harvest-18';
 
 /** The Heartfire's levels: 1-3 as ever, then 4 and 5 for what only the areas give (and, last, a heartstone). */
 export const HEARTH_MAX = 5;
@@ -96,6 +96,7 @@ function stepLair(world, area, dt){
 
 /** A boss of the areas fell (called from World.tick). */
 export function areaBossFell(world, e){
+  if(e.type === 'gashadokuro'){gashaFell(world); return;}
   if(e.type !== 'briarmother') return;
   const L = lairOf(world);
   L.state = 'slain'; L.boss = null; L.until = hollowTime(world)+LAIR.respawn*scheduleOf(world).cycle;
@@ -106,4 +107,6 @@ export function useLandmark(world, node, p){
   if(!p) return;
   const kind = NODES[node.type]?.landmark;
   if(kind === 'delve') tryDescend(world, node, p);
+  // The Mound of the Starved (a Yomi hollow's marsh): wake the Gashadokuro at night (yomi.mjs).
+  if(kind === 'gasha') wakeMound(world, node, p);
 }

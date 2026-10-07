@@ -26,8 +26,12 @@ const STYLE = Object.freeze({
   ofuda:   {main: '#f0cf5a', core: '#fff3c0', glow: '#ff8a5c', dark: '#3a1a14'},
   // A hot spring's geyser on the terrace (yomi.mjs).
   steam:   {main: '#dbe8ec', core: '#ffffff', glow: '#bfe8f0', dark: '#3a4a50'},
+  // The Gashadokuro (bosses.mjs): bone bursting out of the earth, green ghost-fire.
+  bone:    {main: '#e8dcc0', core: '#ffffff', glow: '#c8ff8a', dark: '#2a2420'},
 });
 const S = style => STYLE[style] || STYLE.vent;
+/** A great boss's own colours (its rising, phases, roars and glow). */
+const bossStyle = boss => boss === 'unblinking' ? STYLE.void : boss === 'gashadokuro' ? STYLE.bone : STYLE.thorn;
 
 /** Along a line blast: points every `step` units. */
 function along(s, step = .9){
@@ -116,7 +120,7 @@ function paintPending(d, s, lead, clock){
     if(s.shape !== 'ring') for(let i = 0; i < 4; i++){const a = clock*2+i/4*TAU, r = s.r*.6; d.orb(s.x+Math.cos(a)*r, s.z+Math.sin(a)*r, .2, .1*k, c.core, .8*k, {glow: true});}
     return;
   }
-  if(s.style === 'snare' || s.style === 'thorn' || s.style === 'frost' || s.style === 'ofuda' || s.style === 'rain'){
+  if(s.style === 'snare' || s.style === 'thorn' || s.style === 'frost' || s.style === 'ofuda' || s.style === 'rain' || s.style === 'bone'){
     const n = s.shape === 'ring' ? 18 : 7, r0 = s.shape === 'ring' ? (s.inner+s.r)/2 : s.r*.6;
     for(let i = 0; i < n; i++){
       const a = i/n*TAU+rnd(seed, i)*.3, x = s.x+Math.cos(a)*r0, z = s.z+Math.sin(a)*r0, h = .1+.4*k;
@@ -217,17 +221,17 @@ const BURST_LIFE = ev => ev.style === 'star' ? .8 : ev.style === 'vent' || ev.st
 export const HOLLOW_EVENTS = {
   blast: {life: BURST_LIFE, kick: ev => ev.style === 'star' ? {shake: .3} : ev.inner > 0 ? {shake: .25} : null, paint: paintBurst},
   bossrise: {life: () => 2.2, kick: () => ({shake: .9, flash: .18, color: '#ffd0c0'}), paint(d, ev, age, seed){
-    const t = age/2.2, c = ev.boss === 'unblinking' ? STYLE.void : STYLE.thorn;
+    const t = age/2.2, c = bossStyle(ev.boss);
     d.stain(ev.x, ev.z, 6*easeOut(t*2), c.dark, .5*fade(t));
     for(let i = 0; i < 3; i++) d.ring(ev.x, ev.z, 2+i*2.4+easeOut(t)*6, .15, c.main, .8*fade(t), {glow: true});
     d.groundRays(ev.x, ev.z, 14, 1, 9*easeOut(t*1.5), .14, c.glow, .6*fade(t), seed);
     d.light(ev.x, ev.z, 8*fade(t));
   }},
   bossphase: {life: () => 1.4, kick: () => ({shake: .6, flash: .12, color: '#ffe0d0'}), paint(d, ev, age){
-    const t = age/1.4, c = ev.boss === 'unblinking' ? STYLE.void : STYLE.thorn;
+    const t = age/1.4, c = bossStyle(ev.boss);
     d.shock(ev.x, ev.z, 1+8*easeOut(t), .3, c.main, fade(t), c.core);
   }},
-  bossroar: {life: () => .6, paint(d, ev, age){const t = age/.6, c = ev.boss === 'unblinking' ? STYLE.gaze : STYLE.thorn; d.ring(ev.x, ev.z, 1.5+3*t, .1, c.glow, .6*fade(t), {glow: true});}},
+  bossroar: {life: () => .6, paint(d, ev, age){const t = age/.6, c = ev.boss === 'unblinking' ? STYLE.gaze : bossStyle(ev.boss); d.ring(ev.x, ev.z, 1.5+3*t, .1, c.glow, .6*fade(t), {glow: true});}},
   omen: {life: () => 3, paint(d, ev, age){const t = age/3, c = OMENS[ev.kind]?.color || '#ffd27a'; d.beam(ev.x, ev.z, 0, 18, 1.2*fade(t), c, .7*fade(t)); d.pool(ev.x, ev.z, 3, c, .5*fade(t));}},
   riftclose: {life: () => 1.2, kick: () => ({shake: .4}), paint(d, ev, age, seed){const t = age/1.2; d.shock(ev.x, ev.z, 3*(1-easeOut(t))+.2, .25, '#c49bff', fade(t), '#ffffff'); d.sparks(ev.x, ev.z, 1, 16, t, '#e6d0ff', fade(t), seed);}},
   omenfulfilled: {life: () => 2.6, kick: () => ({shake: .35, flash: .14, color: '#ffe7a8'}), paint(d, ev, age, seed){
@@ -344,8 +348,10 @@ export function paintHollow(d, world, lead, clock){
     // An Obon ghost wants the light: it trails a thin line toward the lanterns it hunts.
     if(e.snuff) d.motes(e.x, e.z, 2, (clock+e.x*.1)%1, .4, '#ffcf7a', .5, Number(String(e.id).slice(1)) || 5, {rise: .8, size: .06});
     if(e.champion){const beat = .5+.5*Math.sin(clock*3+e.x); d.pool(e.x, e.z, 2.2, '#e0465a', .22+.1*beat); d.ring(e.x, e.z, 1.8+.25*beat, .08, '#ff4a5e', .45, {glow: true}); d.light(e.x, e.z, 2.6);}
+    // The Gashadokuro under the earth: the ground churns where it sank and where it will burst up.
+    if(e.sink){for(const [x, z] of [[e.x, e.z], [e.sink.x, e.sink.z]]){d.stain(x, z, 2.6, STYLE.bone.dark, .5); d.debris(x, z, 6, (clock*1.5)%1, '#8f8572', 31, {speed: 2, up: 2.5, size: .1});}}
     if(ENEMIES[e.type]?.boss){
-      const c = e.type === 'unblinking' ? STYLE.void : STYLE.thorn, rage = (e.phase || 1)-1;
+      const c = bossStyle(e.type), rage = (e.phase || 1)-1;
       d.pool(e.x, e.z, 3+rage, c.glow, .22+.1*rage);
       d.light(e.x, e.z, 4+rage);
       if(rage) d.ring(e.x, e.z, 2.6+.2*Math.sin(clock*4), .08, c.main, .3*rage, {glow: true});

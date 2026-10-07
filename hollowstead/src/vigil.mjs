@@ -51,7 +51,7 @@ export const isVigil = world => world?.mode === 'vigil';
 export function sagaOf(world){
   if(!world) return {king: 0, briar: 0, eye: 0, peakLevel: 1, peakGear: 0, dread: 1, falls: 0, rekindled: 0};
   const s = world.saga && typeof world.saga === 'object' ? world.saga : (world.saga = {});
-  for(const key of ['king', 'briar', 'eye', 'falls', 'rekindled', 'peakGear']) if(!Number.isFinite(s[key])) s[key] = 0;
+  for(const key of ['king', 'briar', 'eye', 'gasha', 'falls', 'rekindled', 'peakGear']) if(!Number.isFinite(s[key])) s[key] = 0;
   if(!Number.isFinite(s.peakLevel)) s.peakLevel = 1;
   if(!Number.isFinite(s.dread)) s.dread = 1;
   return s;
@@ -70,7 +70,7 @@ export function gearRank(p){
 /** Dread from a saga record. */
 export function dreadFrom(s){
   const v = VIGIL;
-  const raw = 1 + v.level*Math.max(0, (s.peakLevel || 1) - 1) + v.gear*(s.peakGear || 0) + v.king*(s.king || 0) + v.boss*((s.briar || 0) + (s.eye || 0));
+  const raw = 1 + v.level*Math.max(0, (s.peakLevel || 1) - 1) + v.gear*(s.peakGear || 0) + v.king*(s.king || 0) + v.boss*((s.briar || 0) + (s.eye || 0) + (s.gasha || 0));
   return Math.min(v.max, Math.round(raw*10)/10);
 }
 
@@ -104,7 +104,7 @@ export function stepSaga(world, dt){
 
 /** A boss fell: the saga remembers. Returns how many times this kind has now fallen. */
 export function noteBossKill(world, type){
-  const s = sagaOf(world), key = type === 'king' ? 'king' : type === 'briarmother' ? 'briar' : type === 'unblinking' ? 'eye' : null;
+  const s = sagaOf(world), key = type === 'king' ? 'king' : type === 'briarmother' ? 'briar' : type === 'unblinking' ? 'eye' : type === 'gashadokuro' ? 'gasha' : null;
   if(!key) return 0;
   s[key] = (s[key] || 0) + 1;
   s.dread = dreadFrom(s);

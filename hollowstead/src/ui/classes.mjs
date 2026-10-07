@@ -44,10 +44,10 @@ export function classBarState(world, p){
 }
 
 /** Tools strip under the vitals: the tree (with unspent points), the test switches. */
-export function classStripMarkup(p, {open = ''} = {}){
+export function classStripMarkup(p, {open = '', tools = true} = {}){
   const free = classOf(p) ? pointsFree(p) : 0;
   return `<button type="button" data-class-panel="talents" aria-pressed="${open === 'talents'}" class="${free ? 'has-points' : ''}" title="Talents (T)">✧<small>Talents</small>${free ? `<i class="class-points">${free}</i>` : ''}</button>`
-    + `<button type="button" data-class-panel="tools" aria-pressed="${open === 'tools'}" title="Test tools">⚙<small>Tools</small></button>`;
+    + (tools ? `<button type="button" data-class-panel="tools" aria-pressed="${open === 'tools'}" title="Test tools">⚙<small>Tools</small></button>` : '');
 }
 
 /** The talent tree: three branches side by side, tiers top to bottom, and the selected talent's card. */

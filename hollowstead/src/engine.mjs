@@ -31,7 +31,7 @@ import {landReason, offerAt, shrineLabel, stepShrineCamp} from './shrinecamp.mjs
 import {HEARTH_MEND, stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
 import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
-import {classAction, setupClasses, stepClasses} from './classes/mode.mjs?v=harvest-18';
+import {classAction, setupClasses, stepClassPlayers, stepClasses} from './classes/mode.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
 import {stepMobs} from './mobs.mjs?v=harvest-18';
 import {applyTiles, builtAt, carriedSeeds, cropTargets, gridWorld, refund, roomOfBuilding, setupHomestead, stepTiles, wildSeeds} from './homestead.mjs?v=harvest-18';
@@ -226,6 +226,8 @@ export class World {
     if(options?.arena===true||options?.lab===true||options?.classes===true)setupArena(this);
     if(options?.lab===true)setupLab(this);
     if(options?.classes===true)setupClasses(this);
+    // Classed worlds (classes/mode.mjs): wanderers grow by class, not by weapon (the Classes test ground, a Class Vigil).
+    if(options?.classed===true)this.classed=true;
     if(options?.dungeon)setupDungeon(this, options.dungeon===true?{}:options.dungeon);
     if(options?.homestead===true)setupHomestead(this);
   }
@@ -654,6 +656,8 @@ export class World {
     return false;
   }
   equip(p,uid,socket,inventoryRevision,equipmentRevision){
+    // A classed wanderer's weapon is their class's (classes/mode.mjs): others stay in the pack.
+    if(this.classed&&p.classId&&equipmentSlotFor(p.inventory.slots.find(stack=>stack?.uid===uid)?.itemId)==='weapon'){this.tell(p,'Your class keeps its own weapon');return {ok:false,code:'incompatibleSocket'};}
     // Bags: swapping to a smaller one needs the room for it.
     const bag=p.inventory.slots.find(stack=>stack?.uid===uid);
     if(bag&&BAG_SLOTS[bag.itemId]&&!this.bagRoom(p,bag.itemId))return {ok:false,code:'inventoryFull'};
@@ -730,13 +734,13 @@ export class World {
       case 'interact':return this.interact(p, cmd.target)||{ok:false,code:'rejected'};
       case 'attack':this.attack(p);break;
       // The Classes mode (classes/mode.mjs): the skill button is the class's ultimate, and the class has commands of its own.
-      case 'skill':return this.arena?.classes?classAction(this, p, {type:'classSkill',skill:'ultimate'}):useSkill(this, p);
+      case 'skill':return this.classed?classAction(this, p, {type:'classSkill',skill:'ultimate'}):useSkill(this, p);
       case 'classPick':case 'classSkill':case 'classTalent':case 'classTest':return classAction(this, p, cmd);
       case 'refine':return refineWeapon(this, p, cmd);
       case 'shelf':return this.dungeon||this.arena?{ok:false,code:'unavailable'}:shelfAction(this, p, cmd);
       case 'ascendWeapon':return ascendWeapon(this, p, cmd);
       case 'dash':return this.dodge(p);
-      case 'hotbar':return this.selectHotbar(p, cmd.slot);
+      case 'hotbar':return this.classed?{ok:false,code:'unavailable'}:this.selectHotbar(p, cmd.slot);
       case 'arenaPick':return this.arena&&!this.arena.classes?arenaPick(this, p, cmd.choice, cmd.replace):{ok:false,code:'unavailable'};
       case 'cart':return this.arena?{ok:false,code:'unavailable'}:cartAction(this, p, cmd);
       case 'strike':return rhythmStrike(this, p, cmd);
@@ -1751,6 +1755,7 @@ export class World {
     // Nothing grows back through a floor, soil, a wall or a camp object (homestead.mjs builtAt): it waits until the cell is cleared.
     for(const n of this.nodes)if(n.ready&&n.ready<this.time){if(this.tiles&&builtAt(this,n.x,n.z,NODES[n.type].radius||0)){n.ready=this.time+20;continue;}n.ready=0;n.hits=NODES[n.type].hits;}
     }
+    if(this.classed)stepClassPlayers(this,dt);
     const obstacles=this.obstacles();
     for(const p of this.players){
       if(!p.online)continue;p.cooldown=Math.max(0,p.cooldown-dt);this.tickDash(p,dt);p.iframes=Math.max(0,(p.iframes||0)-dt);
@@ -1876,7 +1881,7 @@ export class World {
       idCounter:this.idCounter, eventId:this.eventId, wave:this.wave, nextSpawn:this.nextSpawn, kills:this.kills,
       bossSlain:this.bossSlain, bossSpawned:this.bossSpawned, endless:this.endless, stats:this.stats,
       projectiles:this.projectiles, allies:this.allies, zones:this.zones, beats:this.beats, bossNight:this.bossNight, guardsDay:this.guardsDay, best:this.best, roamTimer:this.roamTimer,
-      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, land:this.land, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, gasha:this.gasha, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone, tiles:this.tiles, homestead:this.homestead, wilds:this.wilds, thorns:this.thorns,
+      hostile:purpose==='network'?this.hostile.map(compactShot):this.hostile, arena:this.arena, dungeon:this.dungeon, radius:this.radius, night:this.night, mode:this.mode, land:this.land, below:this.below, saga:this.saga, surface:purpose==='save'?this.surface:surfaceForNetwork(this), delves:this.delves, lair:this.lair, gasha:this.gasha, omens:this.omens, omenT:this.omenT, omensDone:this.omensDone, tiles:this.tiles, homestead:this.homestead, wilds:this.wilds, thorns:this.thorns, classed:this.classed,
       ...magicSnapshotFields(this),
     };
     // Where each random stream stands, so a reloaded save carries on rather than replaying the seed.
@@ -1889,7 +1894,7 @@ export class World {
     if(!validateV2World(data).ok||data.clock!==CLOCK_V2)throw new Error('This save is not a Hollowstead expedition.');
     // A dungeon floor is rebuilt from its seed (dungeon/layout.mjs), never from the hollow's map.
     const world=new World(data.seed,{...(data.dungeon?{bare:true}:{}),land:data.land});
-    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','land','below','saga','surface','delves','lair','gasha','omens','omenT','omensDone','tiles','homestead','wilds','thorns'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
+    for(const key of ['time','status','players','buildings','enemies','drops','events','explored','idCounter','eventId','wave','nextSpawn','kills','bossSlain','bossSpawned','endless','stats','projectiles','allies','zones','beats','bossNight','guardsDay','best','roamTimer','hostile','arena','dungeon','radius','night','mode','land','below','saga','surface','delves','lair','gasha','omens','omenT','omensDone','tiles','homestead','wilds','thorns','classed'])if(data[key]!==undefined)world[key]=structuredClone(data[key]);
     if(world.arena){world.nodes=[];}if(world.dungeon)world.nodes=dungeonNodes(world);if(!Array.isArray(world.hostile))world.hostile=[];if(!(world.radius>0)||(!world.arena&&!world.dungeon))world.radius=RULES.radius;
     world.endless=true;if(world.status==='victory')world.status='playing';
     for(const p of world.players){p.level=p.level||1;p.xp=p.xp||0;p.bonusHp=p.bonusHp||0;p.maxHp=maxHealth(p);if(!Array.isArray(p.regions))p.regions=['meadow'];world.readyDash(p);world.syncHotbar(p);syncMastery(p);sanitizeRefine(p);}

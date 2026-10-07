@@ -1,9 +1,14 @@
-// Classes mode: the test ground for class-based progression (src/classes/registry.mjs). The arena's walled
-// clearing and its endless waves, but no weapon cards: you choose a class, its weapon is yours for good,
-// and every level is a talent point to spend in the class's tree. A few switches (levels, foes, waves,
-// invulnerability, free skills, respec) make it quick to try any build. Solo or hosted; never saved.
-// The World owns the fight; this module owns the mode's phases and its commands.
-import {itemDefinition} from '../inventory.mjs?v=harvest-18';
+// Classed worlds: wherever wanderers grow by class instead of by weapon (src/classes/registry.mjs). Two of
+// them so far, both flagged `world.classed`:
+//   - the Classes test ground (`world.arena.classes`): the arena's walled clearing and endless waves, no
+//     weapon cards, and a few switches (levels, foes, waves, invulnerability, free skills) to try any build;
+//     solo, never saved;
+//   - the Class Vigil (a Vigil with `classed`, vigil.mjs): the long save, played by class.
+// In both, a wanderer chooses a class; its weapon is bound to them (`p.classWeapon`, the stack's uid: always
+// in hand, never worn out, never swapped for another weapon) and every level is a talent point.
+// The World owns the fight; this module owns the class rules every tick, the test ground's waves, and the
+// class commands.
+import {itemDefinition, planEquip} from '../inventory.mjs?v=harvest-18';
 import {aliveCap, arenaRoster, spawnPack, waveBudget, waveChampions} from '../arena.mjs?v=harvest-18';
 import {isMagicAlly} from '../magic/registry.mjs?v=harvest-18';
 import {MAX_LEVEL, maxHealth, pickWeighted, xpToNext} from '../progression.mjs?v=harvest-18';
@@ -18,43 +23,89 @@ export const CLASS_MODE = Object.freeze({
   toggles: ['god', 'hold', 'freeSkills'],
 });
 
+/** The Classes test ground: an arena world, classed. */
 export function setupClasses(world){
+  world.classed = true;
   Object.assign(world.arena, {classes: true, phase: 'class', god: false, hold: false, freeSkills: false});
 }
-export const classesMode = world => !!world?.arena?.classes;
+export const classedWorld = world => !!world?.classed;
+export const testGround = world => !!world?.arena?.classes;
 const hostiles = world => world.enemies.filter(e => e.hp > 0 && !isMagicAlly(e));
 
-// ------------------------------------------------------------------ the class weapon
-function dropWeapon(p, uid){
-  if(p.equipment.weapon?.uid === uid){p.equipment.weapon = null; p.equipmentRevision++;}
-  else{const i = p.inventory.slots.findIndex(s => s?.uid === uid); if(i >= 0){p.inventory.slots[i] = null; p.inventory.revision++;}}
+// ------------------------------------------------------------------ the bound weapon
+function locateStack(p, uid){
+  if(!uid) return null;
+  if(p.equipment?.weapon?.uid === uid) return {where: 'worn', stack: p.equipment.weapon};
+  const i = (p.inventory?.slots || []).findIndex(s => s?.uid === uid);
+  return i >= 0 ? {where: 'pack', index: i, stack: p.inventory.slots[i]} : null;
 }
-/** The class's weapon, alone on the hotbar and in hand. */
-function armClass(world, p, itemId){
-  if(p.equipment?.weapon?.itemId === itemId) return true;
+/** Take the bound weapon away for good (the class is given up). */
+function unbind(world, p){
+  const at = locateStack(p, p.classWeapon);
+  if(at?.where === 'worn'){p.equipment.weapon = null; p.equipmentRevision++;}
+  else if(at){p.inventory.slots[at.index] = null; p.inventory.revision++;}
+  p.classWeapon = null;
   world.syncHotbar(p);
-  for(const uid of p.hotbar) if(uid) dropWeapon(p, uid);
-  if(p.equipment.weapon) dropWeapon(p, p.equipment.weapon.uid);
-  p.hotbar = p.hotbar.map(() => null);
-  const def = itemDefinition(itemId), stack = def && world.mintStack(itemId, 1, def.maxDurability);
-  const free = p.inventory.slots.indexOf(null);
-  if(!stack || free < 0) return false;
-  p.inventory.slots[free] = stack; p.inventory.revision++;
-  p.hotbar[0] = stack.uid;
-  world.selectHotbar(p, 0); world.syncHotbar(p); world.assertItems();
+}
+/**
+ * The class's weapon in hand, every tick: re-equipped if something else was taken up, minted again if it
+ * was lost, mended so it never breaks. Other weapons stay in the pack (to store, trade or salvage).
+ */
+export function bindWeapon(world, p, itemId){
+  const def = itemDefinition(itemId);
+  if(!def) return false;
+  let at = locateStack(p, p.classWeapon);
+  if(at && at.stack.itemId !== itemId){unbind(world, p); at = null;}
+  if(!at){
+    const stack = world.mintStack(itemId, 1, def.maxDurability);
+    if(!stack) return false;
+    const worn = p.equipment.weapon, free = p.inventory.slots.indexOf(null);
+    if(worn){
+      // Whatever was in hand goes to the pack, or to the ground when the pack is full.
+      if(free >= 0){p.inventory.slots[free] = worn; p.inventory.revision++;}
+      else world.placeDrop(worn, p.x, p.z);
+    }
+    p.equipment.weapon = stack; p.equipmentRevision++;
+    p.classWeapon = stack.uid;
+    world.syncHotbar(p); world.assertItems();
+    return true;
+  }
+  if(at.where === 'pack'){
+    const plan = planEquip({inventory: p.inventory, equipment: p.equipment, currentEquipmentRevision: p.equipmentRevision, uid: at.stack.uid, socket: 'weapon'});
+    if(!plan.ok) return false;
+    p.inventory.slots = plan.slots; p.inventory.revision = plan.inventoryRevision;
+    p.equipment = plan.equipment; p.equipmentRevision = plan.equipmentRevision;
+    world.syncHotbar(p); world.assertItems();
+  }
+  const held = p.equipment.weapon;
+  if(held) held.durability = def.maxDurability ?? held.durability;
   return true;
 }
 
+/** Take up a class: a fresh tree, its weapon bound. Choosing the class you have keeps everything. */
 export function chooseClass(world, p, classId){
-  const def = CLASSES[classId];
-  if(!def || !classesMode(world)) return {ok: false, code: 'rejected'};
-  if(p.classId !== classId){
-    Object.assign(p, {classId, talents: {}, classBar: [], classCd: {}, classGcd: 0, ki: 0, ronin: {}, kataMods: null});
-  }
-  if(!armClass(world, p, def.weapon)) return {ok: false, code: 'rejected'};
+  const def = Object.hasOwn(CLASSES, classId) ? CLASSES[classId] : null;
+  if(!def || !classedWorld(world)) return {ok: false, code: 'rejected'};
+  const old = classOf(p);
+  if(old && old.id !== classId){old.clear?.(world, p); unbind(world, p);}
+  if(p.classId !== classId) Object.assign(p, {classId, talents: {}, classBar: [], classCd: {}, classGcd: 0, ki: 0});
+  if(!bindWeapon(world, p, def.weapon)) return {ok: false, code: 'rejected'};
   def.sync?.(world, p);
   world.event('rankup', p.x, p.z, def.name, {player: p.id, itemId: def.weapon});
   return {ok: true, code: 'ok'};
+}
+
+/** Every tick in a classed world: each wanderer's bound weapon, class rules and recharges. */
+export function stepClassPlayers(world, dt){
+  if(!classedWorld(world)) return;
+  for(const p of world.players){
+    if(!p.online) continue;
+    const def = classOf(p);
+    if(!def) continue;
+    bindWeapon(world, p, def.weapon);
+    if(!p.down && !p.ghost) def.step?.(world, p, dt);
+    coolSkills(p, dt);
+  }
 }
 
 // ------------------------------------------------------------------ the waves
@@ -70,16 +121,7 @@ function nextWave(world, delay = CLASS_MODE.countdown){
 export function stepClasses(world, dt){
   const a = world.arena; if(!a?.classes) return;
   const people = world.players.filter(p => p.online);
-  for(const p of people){
-    p.hunger = 100; p.courage = 100;
-    const held = p.equipment?.weapon;
-    if(held) held.durability = itemDefinition(held.itemId)?.maxDurability ?? held.durability;
-    const def = classOf(p);
-    if(!def) continue;
-    if(p.equipment?.weapon?.itemId !== def.weapon) armClass(world, p, def.weapon);
-    if(!p.down && !p.ghost) def.step?.(world, p, dt);
-    coolSkills(p, dt);
-  }
+  for(const p of people){p.hunger = 100; p.courage = 100;}
   if(a.phase === 'class'){
     if(people.length && people.every(p => classOf(p))) nextWave(world);
     return;
@@ -161,10 +203,22 @@ function test(world, p, cmd){
   return {ok: false, code: 'unsupported'};
 }
 
-/** Every command of the mode, from World.action. */
+/** Why a wanderer cannot take up class `classId` now ('' when they can). */
+export function classPickReason(world, p, classId){
+  if(!Object.hasOwn(CLASSES, classId || '')) return 'No such class';
+  if(testGround(world) || !classOf(p)) return '';
+  return p.classId === classId ? '' : 'Your path is chosen';
+}
+
+/** Every class command, from World.action. */
 export function classAction(world, p, cmd){
-  if(!classesMode(world) || !p) return {ok: false, code: 'unavailable'};
-  if(cmd.type === 'classPick') return chooseClass(world, p, cmd.classId);
+  if(!classedWorld(world) || !p) return {ok: false, code: 'unavailable'};
+  // On the test ground any class at any time; elsewhere a wanderer chooses once (classPickReason says when else).
+  if(cmd.type === 'classPick'){
+    const why = classPickReason(world, p, cmd.classId);
+    if(why){world.tell(p, why); return {ok: false, code: 'rejected'};}
+    return chooseClass(world, p, cmd.classId);
+  }
   if(!classOf(p)) return {ok: false, code: 'unavailable'};
   if(cmd.type === 'classSkill') return castSkill(world, p, cmd.skill);
   if(cmd.type === 'classTalent'){
@@ -177,6 +231,6 @@ export function classAction(world, p, cmd){
     if(cmd.op === 'slot') return slotSkill(p, cmd.skill, cmd.slot);
     return {ok: false, code: 'unsupported'};
   }
-  if(cmd.type === 'classTest') return test(world, p, cmd);
+  if(cmd.type === 'classTest') return testGround(world) ? test(world, p, cmd) : {ok: false, code: 'unavailable'};
   return {ok: false, code: 'unsupported'};
 }

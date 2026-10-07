@@ -117,3 +117,4 @@ body.classes #weapon-bar{display:none}
 
 /* Title screen: the Classes card makes nine; Homestead gives up its double width so two rows still hold them all. */
 #front .mode-homestead{grid-column:auto}
+#classes-panel .menu-actions button small{display:block;font-size:11px;font-weight:400;opacity:.75;margin-top:2px}

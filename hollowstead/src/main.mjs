@@ -97,7 +97,9 @@ function readStored(key){try{const raw=localStorage.getItem(key);if(!raw)return 
 function continuePlan(){return planContinue({v2:readStored(SAVE_KEYS.expeditionV2),v1:readStored(SAVE_KEYS.expeditionV1)});}
 /** Vigil save slots. Slot 1 is the original key (SAVE_KEYS.vigil), so a vigil kept before slots existed stays where it was; the others sit beside it. Never shared with an expedition. */
 const VIGIL_SLOTS=3;
-function vigilKey(slot=vigilSlot){return slot>1?`${SAVE_KEYS.vigil}.slot${slot}`:SAVE_KEYS.vigil;}
+/** Which vigils the panel shows: 'weapons' (the Vigil) or 'classes' (the Class Vigil, its own slots; classes/mode.mjs). */
+let vigilKind='weapons';
+function vigilKey(slot=vigilSlot,kind=vigilKind){const base=kind==='classes'?`${SAVE_KEYS.vigil}.classes`:SAVE_KEYS.vigil;return slot>1?`${base}.slot${slot}`:base;}
 /** The slot picked on the Vigil panel (remembered), and the key the vigil being played writes to (fixed when it starts). */
 let vigilSlot=1,playingVigilKey=SAVE_KEYS.vigil;
 try{const kept=Number(localStorage.getItem('hollowstead.vigilSlot'));if(Number.isInteger(kept)&&kept>=1&&kept<=VIGIL_SLOTS)vigilSlot=kept;}catch{}
@@ -105,7 +107,7 @@ try{const kept=Number(localStorage.getItem('hollowstead.vigilSlot'));if(Number.i
 function vigilPlan(key=vigilKey()){const doc=readStored(key);return doc?planContinue({v2:doc,v1:null}):{ok:false,code:'none',message:'No vigil is kept in this slot.'};}
 function storeProfile(){try{localStorage.setItem(PROFILE,JSON.stringify({name:$('player-name').value,character,sound:sound.enabled,autoAttack,healPick}));}catch{}}
 /** Title screen: one panel at a time on the right (modes, expedition, join, dungeons, vigil, waiting camp). */
-const FRONT_PANELS=['home-panel','expedition-panel','join-panel','dungeon-panel','vigil-panel','room-panel'];
+const FRONT_PANELS=['home-panel','expedition-panel','join-panel','dungeon-panel','vigil-panel','classes-panel','room-panel'];
 function showFrontPanel(id){for(const name of FRONT_PANELS){const el=$(name);if(el)el.hidden=name!==id;}}
 function syncSoundButton(){const el=$('front-sound');if(!el)return;const on=!!sound?.enabled;el.classList.toggle('is-off',!on);el.setAttribute('aria-pressed',String(on));el.setAttribute('aria-label',on?'Sound on':'Sound off');el.title=on?'Sound on':'Sound off';}
 /** Mode cards show the theme's own art (hearth, moon, stairs, blade…). */
@@ -288,7 +290,7 @@ function discardPanel(){inventoryPanel?.destroy();inventoryPanel=null;}
 function prepareWorld(resume=false,dungeon=null,vigil=null){
   if(vigil)playingVigilKey=vigilKey();
   if(vigil==='resume'){const plan=vigilPlan(playingVigilKey);if(!plan.ok)throw new Error(plan.message);const resumed=World.fromSave(plan.save);if(plan.write==='v2')localStorage.setItem(playingVigilKey,JSON.stringify(plan.save));world=resumed;world.mode='vigil';world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This vigil is missing its keeper.');p.online=true;if(world.status!=='playing')world.status='playing';}
-  else if(vigil==='new'){if(readStored(playingVigilKey))throw new Error('A vigil is already kept in this slot. End it first, or pick another slot.');world=new World(undefined,{mode:'vigil',land:vigilLand});world.addPlayer('host',$('player-name').value,character);}
+  else if(vigil==='new'){if(readStored(playingVigilKey))throw new Error('A vigil is already kept in this slot. End it first, or pick another slot.');world=new World(undefined,{mode:'vigil',land:vigilLand,classed:vigilKind==='classes'});world.addPlayer('host',$('player-name').value,character);}
   else if(dungeon){world=new World((Math.random()*0xffffffff)>>>0,{dungeon});world.addPlayer('host',$('player-name').value,character);}
   else if(resume){const plan=continuePlan();if(!plan.ok)throw new Error(plan.message);const resumed=World.fromSave(plan.save);if(plan.write==='v2')localStorage.setItem(SAVE_KEYS.expeditionV2,JSON.stringify(plan.save));world=resumed;world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This saved expedition is missing its host.');p.online=true;if(world.status!=='playing')world.status='playing';}
   else{world=new World();world.addPlayer('host',$('player-name').value,character);}
@@ -304,8 +306,8 @@ function enterGame(){
   else if(mode==='solo'){connectionText='Expedition saved locally';saveText='Saved on this browser';showStatus('Expedition saved locally');}
   else{connectionText=connectionText||'Connected to camp';saveText=mode==='guest'?'Kept by the host':'Saved on this browser';}
   if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase&&!world?.homestead);announce(world?.homestead?'The homestead. Open Build (B) for soil, floors and walls; drag across the ground to lay a line. Free building and test tools are in the menu.':world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?.classes?'Classes · a test ground':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':world?.mode==='vigil'?(dayOf(world)===1&&world.time<5?(world.land==='yomi'?'The Vigil begins. Somewhere in the outer rings a shrine grove waits, and its dead do not rest.':'The Vigil begins. One fire, one save, as long as you can keep it.'):'The vigil goes on. The fire remembers you.'):dayOf(world)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
-  document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);document.body.classList.toggle('classes',!!world?.arena?.classes);document.body.classList.toggle('dungeon',!!world?.dungeon);document.body.classList.toggle('homestead',!!world?.homestead);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
-  showLab(!!world?.arena?.lab);showClasses(!!world?.arena?.classes);
+  document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);document.body.classList.toggle('classes',!!world?.classed);document.body.classList.toggle('dungeon',!!world?.dungeon);document.body.classList.toggle('homestead',!!world?.homestead);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
+  showLab(!!world?.arena?.lab);showClasses(!!world?.classed);
 }
 async function goHome(){
   leaveArena();
@@ -313,7 +315,7 @@ async function goHome(){
   void checkForUpdate();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
-function setBusy(value){busy=value;for(const id of ['mode-expedition','mode-join','host','join','solo','continue','showcase','homestead','arena','lab','classes','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
+function setBusy(value){busy=value;for(const id of ['mode-expedition','mode-join','host','join','solo','continue','showcase','homestead','arena','lab','classes','classes-test','classes-vigil','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
 function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status,wasDeep=!!world.dungeon;world=World.restore(data);dirty=true;if(!!world.dungeon!==wasDeep&&!$('room-panel').hidden)roomLabels();if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');showFrontPanel('room-panel');$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
 async function hostCamp(dungeon=null,vigil=null){
   if(busy)return;if(dungeon&&(typeof dungeon!=='object'||(typeof Event!=='undefined'&&dungeon instanceof Event)))dungeon=null;if(typeof vigil!=='string')vigil=null;setBusy(true);sound.unlock();storeProfile();showStatus(dungeon?'Opening the dungeon doors…':vigil?'Lighting the vigil fire…':'Opening the camp…');
@@ -332,8 +334,9 @@ let vigilConfirm=0;
 /** The land a new vigil begins in (worldgen.mjs LANDS): a setting picked on the Vigil panel, kept by the save as world.land. */
 let vigilLand='hollow';
 try{const kept=localStorage.getItem('hollowstead.vigilLand');if(kept&&Object.hasOwn(LANDS,kept))vigilLand=kept;}catch{}
-function showVigilPanel(open){
-  showFrontPanel(open?'vigil-panel':'home-panel');vigilConfirm=0;
+function showVigilPanel(open,kind=vigilKind){
+  if(open){vigilKind=kind==='classes'?'classes':'weapons';$('vigil-title').textContent=vigilKind==='classes'?'The Class Vigil':'The Vigil';$('vigil-lede').textContent=vigilKind==='classes'?'One endless save, played by class: every level a talent point.':'One endless save. The hollow grows with you.';}
+  showFrontPanel(open?'vigil-panel':vigilKind==='classes'?'classes-panel':'home-panel');vigilConfirm=0;
   if(open)paintVigilPanel();
 }
 /** One line about a kept vigil (title-screen hint and slot buttons). */
@@ -381,7 +384,7 @@ function deleteVigil(){
   try{localStorage.removeItem(vigilKey());}catch{}
   showStatus('The vigil is over. Its fire is out.');paintVigilPanel();syncVigilHint();
 }
-function syncVigilHint(){const hint=$('vigil-hint');if(!hint)return;let kept=0;for(let i=1;i<=VIGIL_SLOTS;i++)if(readStored(vigilKey(i)))kept++;const doc=readStored(vigilKey()),slot=kept>1||vigilSlot>1?`Slot ${vigilSlot} · `:'';hint.textContent=!doc?(slot?`${slot}empty`:'Endless save'):doc.invalid?`${slot}unreadable`:slot+vigilSummary(doc);}
+function syncVigilHint(){for(const [id,kind] of [['vigil-hint','weapons'],['class-vigil-hint','classes']]){const hint=$(id);if(!hint)continue;let kept=0;for(let i=1;i<=VIGIL_SLOTS;i++)if(readStored(vigilKey(i,kind)))kept++;const doc=readStored(vigilKey(vigilSlot,kind)),slot=kept>1||vigilSlot>1?`Slot ${vigilSlot} · `:'';hint.textContent=!doc?(slot?`${slot}empty`:'Endless save'):doc.invalid?`${slot}unreadable`:slot+vigilSummary(doc);}}
 /** The Dread Age a saved vigil stands in (ages.mjs), read straight from its Dread. */
 function ageFromDread(dread){let age=0;for(let i=1;i<AGES.length;i++)if(dread>=AGES[i].at)age=i;return age;}
 function showShowcase(open){
@@ -474,15 +477,15 @@ function showClasses(open){
 }
 /** The class picker, the tools strip, the open sheet and the skill bar; each rebuilt only when its markup changes. */
 function paintClasses(force=false){
-  const p=me();if(!p||!world?.arena?.classes||$('class-panel').hidden)return;
+  const p=me();if(!p||!world?.classed||$('class-panel').hidden)return;
   const chosen=!!classOf(p),pick=$('class-pick');
   const picking=!chosen&&!['victory','defeat'].includes(world.status)&&sheet!=='menu'&&sheet!=='guide';
-  if(picking){if(force||!classPickCache){classPickCache=classPickMarkup(icon);$('class-offers').innerHTML=classPickCache;}pick.hidden=false;}
+  if(picking){if(force||!classPickCache){classPickCache=classPickMarkup(icon);$('class-offers').innerHTML=classPickCache;$('class-pick-kicker').textContent=world.arena?.classes?'CLASSES · A TEST GROUND':'THE CLASS VIGIL';}pick.hidden=false;}
   else if(!pick.hidden)pick.hidden=true;
-  const strip=chosen?classStripMarkup(p,{open:classOpen}):'';
+  const strip=chosen?classStripMarkup(p,{open:classOpen,tools:!!world.arena?.classes}):'';
   if(force||strip!==classStripCache){classStripCache=strip;$('class-strip').innerHTML=strip;}
   const sheetEl=$('class-sheet');
-  const html=!chosen?'':classOpen==='talents'?talentTreeMarkup(p,{selected:classTalent}):classOpen==='tools'?classToolsMarkup(world,p):'';
+  const html=!chosen?'':classOpen==='talents'?talentTreeMarkup(p,{selected:classTalent}):classOpen==='tools'&&world.arena?.classes?classToolsMarkup(world,p):'';
   sheetEl.hidden=!html;sheetEl.classList.toggle('tree-open',classOpen==='talents');
   if(html&&(force||html!==classSheetCache)){
     const scroll=sheetEl.querySelector('.lab-body')?.scrollTop||0;classSheetCache=html;
@@ -498,7 +501,7 @@ function paintClasses(force=false){
 }
 /** Every frame: Ki, and each bar skill's recharge ring and readiness. */
 function paintClassBar(p){
-  if(!p||!world?.arena?.classes)return;
+  if(!p||!world?.classed)return;
   const st=classBarState(world,p);if(!st)return;
   const bar=$('class-ki-bar');if(bar)bar.style.width=`${clamp(st.ki/st.kiMax,0,1)*100}%`;
   const value=$('class-ki-value');if(value&&value.textContent!==String(st.ki))value.textContent=String(st.ki);
@@ -508,7 +511,7 @@ function paintClassBar(p){
   }
 }
 function classCommand(value){
-  const p=me();if(!p||!world?.arena?.classes)return;
+  const p=me();if(!p||!world?.classed)return;
   const [key,arg]=value.split(':');
   if(key==='respec')void send({type:'classTalent',op:'respec'}).then(()=>toast('Every point is yours again'));
   else if(key==='level')void send({type:'classTest',op:'level',n:Number(arg)||1});
@@ -1275,7 +1278,7 @@ function paintDodge(p){
 function paintSkill(p){
   const el=$('skill');if(!el||!p)return;
   // The Classes mode: the button is the class's ultimate, paid for in its resource (Ki).
-  if(world?.arena?.classes){
+  if(world?.classed){
     const st=classOf(p)?classBarState(world,p):null,u=st?.ultimate,locked=u?.block==='locked',sig=`class|${u?.name}|${locked}`;
     if(sig!==skillSig){skillSig=sig;el.innerHTML=`<span class="skill-glyph" aria-hidden="true">✦</span><small>${escapeHtml(locked?`Lv ${u.level}`:u?.name||'Skill')}</small>`;el.setAttribute('aria-label',u?`Ultimate: ${u.name}. ${u.text}`:'Skill');el.title=u?`${u.name} (Q) · ${u.cost} Ki · ${u.text}`:'';}
     el.style.setProperty('--cd',(u?.cd||0).toFixed(3));el.style.setProperty('--fuel',clamp(st?st.ki/st.kiMax:0,0,1).toFixed(3));
@@ -1360,7 +1363,7 @@ function ui(){
     }
     if(world?.showcase)paintShowcase();
     if(world?.arena?.lab)paintLab();
-    if(world?.arena?.classes)paintClasses();
+    if(world?.classed)paintClasses();
     if(sheet==='catalog'&&catalog.source==='station'){const station=world.buildings.find(b=>b.id===catalog.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(sheet==='refine'){const station=world.buildings.find(b=>b.id===refining.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(sheet==='shelf'){const shelf=world.buildings.find(b=>b.id===shelving.shelfId&&b.hp>0);if(!shelf||distance(p,shelf)>=RULES.reach){closeSheet();toast('Bookshelf out of reach');}}
@@ -1418,7 +1421,7 @@ function setupControls(){
   $('looks').onclick=e=>{const b=e.target.closest('[data-look]');if(!b)return;pickWanderer(baseOf(character),b.dataset.look);};
   $('mode-expedition').onclick=()=>{if(!busy){syncSaveOption();showFrontPanel('expedition-panel');}};$('expedition-back').onclick=()=>showFrontPanel('home-panel');
   $('mode-join').onclick=()=>{if(!busy){showFrontPanel('join-panel');$('room-input').focus();}};$('join-back').onclick=()=>showFrontPanel('home-panel');
-  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('homestead').onclick=()=>{if(!busy)startHomestead();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('classes').onclick=()=>{if(!busy)startClasses();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-lands').onclick=e=>{const b=e.target.closest('[data-land]');if(!b||busy)return;vigilLand=b.dataset.land;try{localStorage.setItem('hollowstead.vigilLand',vigilLand);}catch{}for(const el of $('vigil-lands').children)el.setAttribute('aria-pressed',String(el===b));};$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(vigilKey())?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(vigilKey())?'resume':'new');};$('vigil-slots').onclick=e=>{const b=e.target.closest('[data-slot]');if(b&&!busy)pickVigilSlot(Number(b.dataset.slot));};$('vigil-copy').onclick=copyVigil;$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
+  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('homestead').onclick=()=>{if(!busy)startHomestead();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('classes').onclick=()=>{if(!busy){showFrontPanel('classes-panel');syncVigilHint();}};$('classes-back').onclick=()=>showFrontPanel('home-panel');$('classes-test').onclick=()=>{if(!busy)startClasses();};$('classes-vigil').onclick=()=>{if(!busy)showVigilPanel(true,'classes');};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true,'weapons');};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-lands').onclick=e=>{const b=e.target.closest('[data-land]');if(!b||busy)return;vigilLand=b.dataset.land;try{localStorage.setItem('hollowstead.vigilLand',vigilLand);}catch{}for(const el of $('vigil-lands').children)el.setAttribute('aria-pressed',String(el===b));};$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(vigilKey())?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(vigilKey())?'resume':'new');};$('vigil-slots').onclick=e=>{const b=e.target.closest('[data-slot]');if(b&&!busy)pickVigilSlot(Number(b.dataset.slot));};$('vigil-copy').onclick=copyVigil;$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;syncSoundButton();sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   // Pack, Build and Light answer on release over the same button (pointer events, so a held joystick does not swallow the tap).
@@ -1585,7 +1588,7 @@ function setupControls(){
       return;
     }
     // Classes mode: 1-4 cast the bar's skills, T opens the talents; with the picker up, 1-4 choose a class.
-    if(world?.arena?.classes){
+    if(world?.classed){
       if(!$('class-pick').hidden){if(named?.startsWith('action-')){const card=document.querySelectorAll('#class-offers [data-class]')[Number(named.slice(7))-1];if(card)void send({type:'classPick',classId:card.dataset.class}).then(()=>{dirty=true;paintClasses(true);});}return;}
       if(classOf(actor)){
         if(key==='t'){classPanel('talents');return;}

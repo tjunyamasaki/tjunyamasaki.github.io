@@ -434,4 +434,6 @@ export const RONIN_CLASS = registerClass({
   nodes: NODES, skills: SKILLS, ultimate: ULTIMATE,
   busy: (world, p) => !!p.kataDraw || p.vanish > world.time || !!p.ronin?.step,
   sync, step,
+  /** Given up: the blade forgets the ronin's tuning. */
+  clear(world, p){p.ronin = {}; p.kataMods = null; p.ki = 0;},
 });

@@ -214,3 +214,39 @@ test('talent and skill commands only reach the class’s own talents', () => {
   assert.equal(pointsSpent(p), 0);
   assert.equal(pointsFree(p), 1);
 });
+
+test('a Class Vigil binds the class weapon, keeps other weapons in the pack, and saves its class', () => {
+  const world = new World(91, {mode: 'vigil', classed: true}), p = world.addPlayer('host', 'Jun');
+  world.start();
+  assert.equal(world.classed, true);
+  assert.equal(act(world, {type: 'classTest', op: 'level', n: 5}).ok, false, 'no test switches outside the test ground');
+  assert.equal(act(world, {type: 'classPick', classId: 'ronin'}).ok, true);
+  assert.equal(p.equipment.weapon.itemId, 'katana');
+  const bound = p.classWeapon;
+  assert.equal(act(world, {type: 'classPick', classId: 'ronin'}).ok, true, 'choosing your own class again is harmless');
+  assert.equal(p.classWeapon, bound);
+  // Another weapon found on the way stays in the pack.
+  world.give(p, 'sword', 1);
+  const sword = p.inventory.slots.find(s => s?.itemId === 'sword');
+  assert.ok(sword);
+  assert.equal(world.equip(p, sword.uid, 'weapon').ok, false);
+  assert.equal(act(world, {type: 'hotbar', slot: 1}).ok, false);
+  // Worn down or lost, the bound blade comes back whole.
+  p.equipment.weapon.durability = 1;
+  run(world, .1);
+  assert.ok(p.equipment.weapon.durability > 100);
+  p.equipment.weapon = null; p.equipmentRevision++;
+  run(world, .1);
+  assert.equal(p.equipment.weapon.itemId, 'katana');
+  assert.ok(p.inventory.slots.some(s => s?.uid === sword.uid), 'the sword is still in the pack');
+  p.talents = {kesagiri: 1}; p.classBar = ['kesagiri']; p.level = 3;
+  const saved = World.fromSave({world: world.snapshot({purpose: 'save'})});
+  const q = saved.player('host');
+  assert.equal(saved.classed, true);
+  assert.equal(q.classId, 'ronin');
+  assert.deepEqual(q.talents, {kesagiri: 1});
+  saved.start();
+  q.online = true;
+  q.x = 0; q.z = 0; q.dx = 1; q.dz = 0;
+  assert.equal(saved.action('host', {type: 'classSkill', skill: 'kesagiri'}).ok, true, 'skills cast after a reload');
+});

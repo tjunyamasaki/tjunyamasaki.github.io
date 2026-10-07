@@ -16,7 +16,7 @@ Pick a wanderer and a name on the left of the title screen, then a card on the r
 - **Dungeons** is a crawl through floors carved fresh every time, alone or with up to three friends. See [Dungeons](#dungeons).
 - **Arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
 - **Weapon lab** is the arena without rounds, for trying and balancing weapons. See [Weapon lab](#weapon-lab).
-- **Classes** is a test ground for a new way to grow: choose a class instead of collecting weapons, and spend a talent point every level. See [Classes](#classes).
+- **Classes** is a new way to grow: choose a class instead of collecting weapons, and spend a talent point every level. It opens **The Class Vigil** (a Vigil played by class, in its own save slots) and a **Test ground**. See [Classes](#classes).
 - **Showcase** is a sandbox clearing for placing anything in the game.
 - **The Vigil** builds and farms on the grid (soil, floors, walls and camp objects a cell at a time, from the Build menu, paid for in materials). **Homestead** (or `?homestead` in the address) is a calm sandbox for the same system: till soil, sow day and night crops, lay floors, run fences, palisades, stone walls and gates, close rooms with house walls and sleep through the night, cook blessing dishes, and test raids against your walls. Solo, free building by default, not saved. See `docs/HOMESTEAD.md`.
 
@@ -113,7 +113,10 @@ The arena keeps only health and level: no hunger, courage, weapon wear or loot. 
 
 ## Classes
 
-**Classes** on the title screen (or `?classes` in the address) is a test ground for class-based progression, MMO style. It is the arena's clearing and endless waves, but there are no weapon cards: you choose a **class**, its weapon is yours for good, and every level is a **talent point**. It is solo and never saved.
+**Classes** on the title screen grows a wanderer by class instead of by weapon, MMO style: you choose a **class**, its weapon is bound to you for good, and every level is a **talent point**.
+
+- **The Class Vigil** is a Vigil played by class, alone or with friends, in three save slots of its own (never mixed with the Vigil's). Choose your class when it begins. The class weapon never wears out and stays in your hand; other weapons you find stay in your pack, to store or salvage. Keys 1–4 cast your skills there (E still works the nearest action).
+- **Test ground** (or `?classes` in the address) is the arena's clearing and endless waves with test switches, to try any build. It is solo and never saved.
 
 - **Talents** (T) opens the class's tree: three branches, five rows each. A branch's next row opens for every three points you spend in it, and some talents need the one above them. Tap a talent to read it, then **Learn**. **Reset points** takes every point back.
 - Active skills you learn go on the **skill bar** (1–4) at the bottom; the class's ultimate is on the ✦ button (Q). Skills spend the class's resource and recharge on their own timers.

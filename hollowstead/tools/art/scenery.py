@@ -748,6 +748,10 @@ ATLAS = [
     ("ripple-0", lambda: ripple(0), "mid"), ("ripple-1", lambda: ripple(1), "mid"), ("ripple-2", lambda: ripple(2), "mid"),
 ]
 
+# The Shrine of Yomi's own decoration is drawn in yomi.py (its art set) in this same design space.
+from yomi import YOMI_SCENERY
+ATLAS += YOMI_SCENERY
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 ATLAS_JS = os.path.join(ROOT, "src", "scenery-atlas.mjs")
 

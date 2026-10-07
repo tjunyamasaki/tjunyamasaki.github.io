@@ -29,7 +29,7 @@ export const TERRAIN_NAMES = Object.freeze(['ground', 'water', 'thicket', 'fence
 export const PATCH = Object.freeze({heath:0, meadow:1, rocky:2, forest:3});
 export const PATCH_NAMES = Object.freeze(['heath', 'meadow', 'rocky', 'forest']);
 /** Presentation flags on walkable cells (shape.detail): a ford through water, a worn trail. */
-export const DETAIL = Object.freeze({ford:1, trail:2, ice:4, lava:8});
+export const DETAIL = Object.freeze({ford:1, trail:2, ice:4, lava:8, black:16, spring:32});
 
 /** The terrain grid: square cells of CELL units covering [-EXTENT, EXTENT) on both axes. */
 export const CELL = .5, EXTENT = RULES.radius+8, GRID_SIZE = Math.round(EXTENT*2/CELL);
@@ -170,7 +170,18 @@ export const AREAS = Object.freeze({
   // Yomi (a land, LANDS.yomi): a haunted shrine grove of cherry and sacred pine. A straight torii path runs
   // from its heart out toward home, lined with stone lanterns that burn all night.
   yomi: Object.freeze({ring:[64, 104], radius:[17, 20], approach:13, path:2.4, clearing:7}),
+  // The Shrine of Yomi's other places (only in that land; their rules live in yomi.mjs):
+  //   chikurin  a bamboo thicket, close-grown, where the dead stand unseen until you are on them
+  //   higan     a spider-lily marsh split by a black river you can wade, slowly
+  //   onsen     a hot-spring terrace: pools that mend whoever sits in them, geysers that shove
+  chikurin: Object.freeze({ring:[44, 96], radius:[14, 17]}),
+  higan: Object.freeze({ring:[56, 108], radius:[16, 19], river:2.1}),
+  onsen: Object.freeze({ring:[48, 104], radius:[13, 16], pools:[3, 4]}),
 });
+/** How the Shrine of Yomi's other places draw their trees and rocks (node `look`, a theme sprite). */
+const YOMI_LOOKS = Object.freeze({chikurin:{tree:'bamboo'}, higan:{tree:'yanagi', rock:'yomi-rock'}, onsen:{tree:'yomi-tree', rock:'yomi-rock'}});
+/** The Shrine of Yomi's areas beyond the shrine itself (yomi.mjs owns their rules). */
+export const YOMI_AREAS = Object.freeze(['chikurin', 'higan', 'onsen']);
 /**
  * Lands: what kind of hollow a Vigil is (a setting chosen when it begins, World options.land, kept as
  * world.land). The hollow keeps every ordinary place; a land adds its own areas. Worldgen reads a seed's
@@ -260,6 +271,24 @@ function makeAreas(grid,detail,outlineR,lakes,O,seed){
     // Kept groves: no thicket, fence or water inside, nor ice.
     each(x,z,rad+3,(k,cx,cz)=>{const code=grid[k];if((code===T||code===F||code===W)&&inArea(shrine,cx,cz,-1)){grid[k]=G;detail[k]&=~(DETAIL.ford|DETAIL.ice|DETAIL.lava);}});
     capsule(grid,ax,az,bx,bz,A.path,G,[0,1,1,1,0]);capsule(grid,ax,az,bx,bz,1.2,0,[1,0,0,0,0],detail,DETAIL.trail);
+    // Its other places, each well clear of every area already laid (by distance, not just by bearing).
+    const clearOf=(x,z,r)=>out.every(a=>Math.hypot(a.x-x,a.z-z)>a.r+(a.wall||0)+(a.id==='yomi'?AREAS.yomi.approach:0)+r+7);
+    const site=A=>{const r=A.radius[0]+rng()*(A.radius[1]-A.radius[0]);
+      for(let t=0;t<240;t++){const p=rng()*4,[dx,dz]=pseudoDir(p),d=A.ring[0]+rng()*(A.ring[1]-A.ring[0]),x=dx*d,z=dz*d;if(clearOf(x,z,r))return {x,z,r,p:pseudoAngle(x,z)};}
+      return null;};
+    const tidy=a=>each(a.x,a.z,a.r+3,(k,cx,cz)=>{const code=grid[k];if((code===T||code===F||code===W)&&inArea(a,cx,cz,-1)){grid[k]=G;detail[k]&=~(DETAIL.ford|DETAIL.ice|DETAIL.lava);}});
+    // The bamboo thicket: kept walkable; its stalks (tree nodes) grow close (areaFields).
+    {const at=site(AREAS.chikurin);if(at){const grove={id:'chikurin',...at};out.push(grove);tidy(grove);}}
+    // The spider-lily marsh: a black river runs straight through it, shallow enough to wade.
+    {const A=AREAS.higan,at=site(A);if(at){const ang=rng()*Math.PI,cx=Math.cos(ang),cz=Math.sin(ang),marsh={id:'higan',...at,rx:+cx.toFixed(4),rz:+cz.toFixed(4)};out.push(marsh);tidy(marsh);
+      each(at.x,at.z,at.r+3,(k,x,z)=>{if(grid[k]!==G||!inArea(marsh,x,z,1))return;const across=Math.abs((x-at.x)*cz-(z-at.z)*cx),wob=(valueNoise(x*.18+3,z*.18-7)-.5)*1.6;if(across+wob<A.river)detail[k]=(detail[k]&~DETAIL.trail)|DETAIL.black;});}}
+    // The hot-spring terrace: steaming pools you can sit in.
+    {const A=AREAS.onsen,at=site(A);if(at){const terrace={id:'onsen',...at,pools:[]};out.push(terrace);tidy(terrace);
+      const n=A.pools[0]+Math.floor(rng()*(A.pools[1]-A.pools[0]+1));
+      for(let t=0;t<80&&terrace.pools.length<n;t++){const [dx,dz]=randomDir(rng),off=(.15+rng()*.55)*at.r,px=at.x+dx*off,pz=at.z+dz*off,pr=1.6+rng()*1;
+        if(terrace.pools.some(q=>Math.hypot(q.x-px,q.z-pz)<q.r+pr+2.5))continue;
+        terrace.pools.push({x:+px.toFixed(2),z:+pz.toFixed(2),r:+pr.toFixed(2)});
+        each(px,pz,pr+1,(k,x,z,dist)=>{const wob=(valueNoise(x*.6+px,z*.6-pz)-.5)*.7;if(grid[k]===G&&dist+wob<pr)detail[k]=(detail[k]&~DETAIL.trail)|DETAIL.spring;});}}}
   }
   return out;
 }
@@ -275,7 +304,11 @@ function areaFields(a,density,rock){
       // A grove: thick enough for trees all round, a clearing at its heart and along the torii path.
       const along=(x-a.x)*a.gx+(z-a.z)*a.gz,across=Math.abs((x-a.x)*a.gz-(z-a.z)*a.gx),lane=along>0?1-smooth(2.5,4.5,across):0;
       const open=Math.max(1-smooth(AREAS.yomi.clearing-2,AREAS.yomi.clearing+1,d),lane);
-      density[k]=(density[k]+(.8-density[k])*.9*t)*(1-.9*open*t);rock[k]=rock[k]*(1-.4*t)+.02*t;}}}
+      density[k]=(density[k]+(.8-density[k])*.9*t)*(1-.9*open*t);rock[k]=rock[k]*(1-.4*t)+.02*t;}
+    // The bamboo thicket grows as thick as any forest; the marsh lies open and wet; the terrace is stony.
+    else if(a.id==='chikurin'){density[k]+=(.97-density[k])*.95*t;rock[k]*=1-.6*t;}
+    else if(a.id==='higan'){density[k]+=(.32-density[k])*.85*t;rock[k]*=1-.7*t;}
+    else if(a.id==='onsen'){density[k]+=(.3-density[k])*.8*t;rock[k]+=(.78-rock[k])*.7*t;}}}
 }
 
 const SHAPES=new Map();let lastShape=null;
@@ -541,6 +574,10 @@ export function areaLights(seed){return areaProps(seed).filter(p=>p.light>0).map
 
 /** True on ice (Frostmere): walkers slide. */
 export function iceAt(seed, x, z){const s=lastShape!==null&&lastShape.seed===seed?lastShape:shapeFor(seed);const k=cellOf(x,z);return k>=0&&(s.detail[k]&DETAIL.ice)!==0;}
+/** True in the Spider-lily Marsh's black river (yomi.mjs: wading is slow). */
+export function blackAt(seed, x, z){const s=lastShape!==null&&lastShape.seed===seed?lastShape:shapeFor(seed);const k=cellOf(x,z);return k>=0&&(s.detail[k]&DETAIL.black)!==0;}
+/** True in a hot spring on the terrace (yomi.mjs: it mends whoever sits in it). */
+export function springAt(seed, x, z){const s=lastShape!==null&&lastShape.seed===seed?lastShape:shapeFor(seed);const k=cellOf(x,z);return k>=0&&(s.detail[k]&DETAIL.spring)!==0;}
 
 /** Terrain kind code (TERRAIN) at a world position. */
 export function terrainAt(seed, x, z){const s=lastShape!==null&&lastShape.seed===seed?lastShape:shapeFor(seed);const i=(x+EXTENT)*INV|0,j=(z+EXTENT)*INV|0;return x+EXTENT>=0&&z+EXTENT>=0&&i<N&&j<N?s.grid[j*N+i]:V;}
@@ -580,9 +617,10 @@ export function landNear(seed, x, z, maxR=6){
 
 // ------------------------------------------------------------------ ground colours
 const SAND=[196,184,150],FOAM=[168,188,190],EARTH=[88,70,54],BRIAR=[84,40,46];
-const TONE_KEYS=['meadow','woods','graveyard','mire','crags','barrow','path','water','shore','thicket','void','frostmere','ashscar','briarlair','ice','lava','yomi'];
+const TONE_KEYS=['meadow','woods','graveyard','mire','crags','barrow','path','water','shore','thicket','void','frostmere','ashscar','briarlair','ice','lava','yomi','chikurin','higan','onsen','blackwater','spring'];
 const DEFAULT_TONES={meadow:'#7d735d',woods:'#565e55',graveyard:'#746977',mire:'#5c6a4e',crags:'#6c6679',barrow:'#655862',path:'#9c8968',water:'#3f5566',shore:'#6f7a6a',thicket:'#3c4a40',void:'#1f1d27',
-  frostmere:'#97a3ad',ashscar:'#4d4340',briarlair:'#4f5c3c',ice:'#b4d3e2',lava:'#e8662a',yomi:'#7a7062'};
+  frostmere:'#97a3ad',ashscar:'#4d4340',briarlair:'#4f5c3c',ice:'#b4d3e2',lava:'#e8662a',yomi:'#7a7062',
+  chikurin:'#5f6b4a',higan:'#5c4b4e',onsen:'#857e74',blackwater:'#1f1c26',spring:'#8cc4bc'};
 const toRGB=h=>{const n=parseInt(String(h).replace('#',''),16);return Number.isFinite(n)?[n>>16&255,n>>8&255,n&255]:[128,128,128];};
 const REGION_TONES=new Map(),GROUND=new Map();
 /** Region colour on the lattice (seed independent, so built once per palette), blended across borders by bilerp. */
@@ -617,7 +655,7 @@ export function groundColors(seed, palette={}){
     for(let j=0;j<LN;j++){const z=-EXTENT+j*LATTICE;if(Math.abs(z-a.z)>reach)continue;for(let i=0;i<LN;i++){const x=-EXTENT+i*LATTICE;if(Math.abs(x-a.x)>reach)continue;
       const d=Math.sqrt((x-a.x)*(x-a.x)+(z-a.z)*(z-a.z))+(a.id==='briarlair'?0:(valueNoise(x*.11+a.x*.01+31,z*.11-a.z*.01-17)-.5)*5),t=(a.id==='briarlair'?1-smooth(a.r-1,a.r+1.5,d):1-smooth(a.r-3,a.r+2,d))*.82;if(t<=0)continue;
       const k=j*LN+i;L0[k]+=(tone[0]-L0[k])*t;L1[k]+=(tone[1]-L1[k])*t;L2[k]+=(tone[2]-L2[k])*t;}}}
-  const iceTone=tones.ice,lavaTone=tones.lava,lair=s.areas.find(a=>a.id==='briarlair');
+  const iceTone=tones.ice,lavaTone=tones.lava,blackTone=tones.blackwater,springTone=tones.spring,lair=s.areas.find(a=>a.id==='briarlair');
   // How far each cell lies from water, from dry land and from ground (in grid thirds, see chamfer).
   const S=scratch();S.dist2||(S.dist2=new Uint16Array(N*N));S.dist3||(S.dist3=new Uint16Array(N*N));
   const toWater=chamfer(grid,[0,1,0,0,0],S.dist),fromShore=chamfer(grid,[1,0,1,1,1],S.dist2),toGround=chamfer(grid,[1,0,0,0,0],S.dist3);
@@ -637,6 +675,10 @@ export function groundColors(seed, palette={}){
         const worn=1-smooth(.5,1.15,trailLine[k]),dug=1-smooth(.2,.8,fenceLine[k]);if(worn>0)mix(.5*worn,path);if(detail[k]&DETAIL.ford)mix(.55,shore);if(dug>0)mix(.55*dug,EARTH);
         const wd=toWater[k]*DIST_UNIT;if(wd<2.6){mix(.6*(1-wd/2.6),shore);if(wd<.9)mix(.22,SAND);}
         // Frostmere's ice: pale, with long cracks of deeper blue.
+        // The marsh's black river: still and dark, a red glint where the lilies lean over it.
+        if(detail[k]&DETAIL.black){mix(.8,blackTone);mix(.12*smooth(.6,.9,valueNoise(x*.3+9,z*.3-4)),[120,40,52]);}
+        // Hot springs: milky blue-green, paler where the steam sits.
+        if(detail[k]&DETAIL.spring){mix(.78,springTone);mix(.3*smooth(.5,.9,valueNoise(x*.4-6,z*.4+2)),FOAM);}
         if(detail[k]&DETAIL.ice){mix(.66,iceTone);const crack=Math.abs(valueNoise(x*.21+7,z*.21-3)-.5),sheen=valueNoise(x*.08-2,z*.08+5);mix(.25*(1-smooth(.01,.045,crack)),water);mix(.18*smooth(.55,.85,sheen),FOAM);}
         r=c[0];g=c[1];b=c[2];land[k]=1;
       }else if(code===W&&(detail[k]&DETAIL.lava)){
@@ -657,7 +699,7 @@ export function groundColors(seed, palette={}){
     }}
   // Soften the stair-steps: where kinds of ground meet, a texel takes its neighbourhood's average.
   // Ice edges count as a change of ground too, so the mere's rim is softened like a shore.
-  const iceAt_=k=>(detail[k]&DETAIL.ice)?8:0,cls=k=>land[k]|iceAt_(k);
+  const iceAt_=k=>(detail[k]&(DETAIL.ice|DETAIL.black|DETAIL.spring))?8+(detail[k]&(DETAIL.black|DETAIL.spring)):0,cls=k=>land[k]|iceAt_(k);
   {const src=rgb.slice();for(let pass=0;pass<2;pass++){const from=pass?rgb.slice():src;for(let j=1;j<N-1;j++)for(let i=1;i<N-1;i++){const k=j*N+i,a=cls(k);if(cls(k-1)===a&&cls(k+1)===a&&cls(k-N)===a&&cls(k+N)===a)continue;if(pass&&!(iceAt_(k)||iceAt_(k-1)||iceAt_(k+1)||iceAt_(k-N)||iceAt_(k+N)))continue;
     for(let ch=0;ch<3;ch++){const o=k*3+ch;rgb[o]=(from[o]*4+from[o-3]*2+from[o+3]*2+from[o-N*3]*2+from[o+N*3]*2+from[o-N*3-3]+from[o-N*3+3]+from[o+N*3-3]+from[o+N*3+3])/16;}}}}
   out={seed,size:N,extent:EXTENT,res:GROUND_RES,rgb,land,hex:null};
@@ -702,7 +744,7 @@ export function generateNodes(seed){
   const shape=shapeFor(seed),{grid,detail,blocked}=shape,rng=rngFor(seed),nodes=[],B=4,BN=Math.ceil(EXTENT*2/B)+1,buckets=new Array(BN*BN);
   // Nothing grows on Frostmere's ice, and the throne's floor is kept open for the fight.
   const shrine=shape.areas.find(a=>a.id==='yomi'),lair=shape.areas.find(a=>a.id==='briarlair'),arena=(x,z)=>!!lair&&(x-lair.x)*(x-lair.x)+(z-lair.z)*(z-lair.z)<(lair.r-2.5)*(lair.r-2.5);
-  const clear=(x,z)=>{const k=cellOf(x,z);return k<0||grid[k]!==G||(detail[k]&DETAIL.ice)||arena(x,z)?0:blocked[k]*DIST_UNIT;};
+  const clear=(x,z)=>{const k=cellOf(x,z);return k<0||grid[k]!==G||(detail[k]&(DETAIL.ice|DETAIL.black|DETAIL.spring))||arena(x,z)?0:blocked[k]*DIST_UNIT;};
   const zone=(x,z)=>{for(const a of shape.areas)if(inArea(a,x,z))return a.id;return regionAt(x,z);};
   const onTrail=(x,z)=>{const k=cellOf(x,z);return k>=0&&(detail[k]&DETAIL.trail)!==0;};
   const bucketOf=(x,z)=>Math.floor((z+EXTENT)/B)*BN+Math.floor((x+EXTENT)/B);
@@ -751,7 +793,7 @@ export function generateNodes(seed){
   const S=1.6,M=Math.floor(EXTENT*2/S),hosts=[];
   for(let gj=0;gj<M;gj++)for(let gi=0;gi<M;gi++){
     const x=-EXTENT+(gi+rng())*S,z=-EXTENT+(gj+rng())*S,roll=rng(),r2=x*x+z*z;
-    if(r2<8.5*8.5)continue;const k=cellOf(x,z);if(k<0||grid[k]!==G||(detail[k]&DETAIL.ice))continue;
+    if(r2<8.5*8.5)continue;const k=cellOf(x,z);if(k<0||grid[k]!==G||(detail[k]&(DETAIL.ice|DETAIL.black|DETAIL.spring)))continue;
     const d=bilerp(shape.density,x,z),patch=patchOf(d,bilerp(shape.rock,x,z));
     const odds=patch===PATCH.forest?.12+.36*smooth(.62,1,d):PATCH_ODDS[patch];if(roll>=odds)continue;
     const region=zone(x,z),type=pickType(rng,region,patch);if(!type)continue;
@@ -795,6 +837,8 @@ export function generateNodes(seed){
     if(stair)add('delve',stair.x,stair.z);}
   // The Shrine of Yomi grows its own: cherry and sacred pine for trees, mossy garden stones for rocks (same harvest).
   if(shrine)for(const n of nodes){if((n.type==='tree'||n.type==='rock')&&inArea(shrine,n.x,n.z,1))n.look=n.type==='tree'?'yomi-tree':'yomi-rock';}
+  // Its other places grow their own: bamboo in the thicket, weeping willow by the black river, garden stones on the terrace.
+  for(const a of shape.areas){const look=YOMI_LOOKS[a.id];if(look)for(const n of nodes)if(look[n.type]&&inArea(a,n.x,n.z,1))n.look=look[n.type];}
   return reachableOnly(shape,nodes);
 }
 

@@ -137,3 +137,88 @@ test('a daoshi rings up the jiangshi already near him: they run faster and leap 
   for(const m of j) assert.ok(m.rouse > w.time, 'roused');
   assert.ok(!w.enemies.some(m => m.raiser === e.id), 'enough dead were near: none raised');
 });
+
+// ------------------------------------------------------------------ the regions
+import {areasOf, blackAt, springAt, setLand, generateNodes, YOMI_AREAS} from '../src/worldgen.mjs';
+import {REGIONS, NODE_POOLS} from '../src/progression.mjs';
+import {SPRING, VEIL, WADE, mobWade, stepYomi} from '../src/yomi.mjs?v=harvest-18';
+import {aimTarget} from '../src/arsenal.mjs?v=harvest-18';
+import {AREA_MIX, PROPS} from '../src/scenery-layout.mjs?v=harvest-18';
+import {SCENERY_ATLAS} from '../src/scenery-atlas.mjs?v=harvest-18';
+
+const SEED = 4242;
+function yomiWorld(){
+  const w = new World(SEED, {land: 'yomi'}); const p = w.addPlayer('host', 'Jun'); w.start();
+  w.enemies = []; w.hostile = [];
+  return {w, p, areas: areasOf(SEED)};
+}
+/** A walkable spot in an area, matching `test`. */
+function spotIn(w, a, test = () => true){
+  for(let r = 0; r < a.r; r += .5) for(let k = 0; k < 24; k++){const x = a.x+Math.cos(k/24*Math.PI*2)*r, z = a.z+Math.sin(k/24*Math.PI*2)*r; if(w.walkable(x, z) && w.regionOf(x, z) === a.id && test(x, z)) return {x, z};}
+  return null;
+}
+
+test('a Yomi hollow lays a bamboo thicket, a spider-lily marsh and a hot-spring terrace; a plain hollow does not', () => {
+  for(const seed of [1, 2, 3, 402, 777, 2024]){
+    setLand(seed, 'yomi');
+    const ids = areasOf(seed).map(a => a.id);
+    for(const id of YOMI_AREAS) assert.ok(ids.includes(id), `${seed} lacks ${id}`);
+    const all = areasOf(seed);
+    for(const a of all) for(const b of all) if(a !== b) assert.ok(Math.hypot(a.x-b.x, a.z-b.z) > a.r+b.r, `${a.id} overlaps ${b.id} (${seed})`);
+    setLand(seed, null);
+    assert.ok(!areasOf(seed).some(a => YOMI_AREAS.includes(a.id)), 'a plain hollow keeps its old places');
+  }
+  for(const id of YOMI_AREAS){
+    assert.ok(REGIONS[id]?.area && REGIONS[id].haunt, id);
+    assert.ok(NODE_POOLS[id]?.length && RESIDENTS[id]?.length && HAUNTS[id]?.length && AREA_MIX[id], id);
+    for(const [kind] of AREA_MIX[id].kinds) assert.ok(PROPS[kind] && SCENERY_ATLAS.cells[kind], `${id} decorates with ${kind}`);
+  }
+  setLand(SEED, 'yomi');
+  const nodes = generateNodes(SEED), looks = new Set(nodes.map(n => n.look));
+  for(const look of ['bamboo', 'yanagi']) assert.ok(looks.has(look) && THEME.sprites[look], look);
+  assert.ok(!nodes.some(n => blackAt(SEED, n.x, n.z) || springAt(SEED, n.x, n.z)), 'nothing grows in the river or the springs');
+});
+
+test('the bamboo hides the dead until you are on them, and nothing aims at what it cannot see', () => {
+  const {w, p, areas} = yomiWorld(), grove = areas.find(a => a.id === 'chikurin');
+  const at = spotIn(w, grove);
+  const e = w.spawnEnemy('kasa', at.x, at.z, {elite: false});
+  p.x = at.x+VEIL.near+3; p.z = at.z; p.dx = -1; p.dz = 0;
+  stepYomi(w, T);
+  assert.equal(e.veiled, true);
+  assert.equal(aimTarget(w, p, 20), null, 'a bow finds nothing to aim at');
+  p.x = at.x+VEIL.near-1;
+  stepYomi(w, T);
+  assert.ok(!e.veiled, 'close enough, it is seen');
+  assert.equal(aimTarget(w, p, 20), e);
+});
+
+test('the black river slows whoever wades it; the floating pass over', () => {
+  const {w, p, areas} = yomiWorld(), marsh = areas.find(a => a.id === 'higan');
+  const wet = spotIn(w, marsh, (x, z) => blackAt(SEED, x, z)), dry = spotIn(w, marsh, (x, z) => !blackAt(SEED, x, z));
+  assert.ok(wet && dry, 'the marsh has a river and banks');
+  p.x = dry.x; p.z = dry.z; const onBank = w.speedFactor(p);
+  p.x = wet.x; p.z = wet.z; const wading = w.speedFactor(p);
+  assert.ok(Math.abs(wading/onBank-WADE.speed) < 1e-6);
+  stepYomi(w, T);
+  const corpse = {type: 'jiangshi', x: wet.x, z: wet.z}, snow = {type: 'yukionna', x: wet.x, z: wet.z};
+  assert.equal(mobWade(w, corpse, false), WADE.speed);
+  assert.equal(mobWade(w, snow, false), 1, 'the snow woman floats over it');
+});
+
+test('a hot spring mends whoever sits in it and thaws frost; its geyser shoves on its own beat', () => {
+  const {w, p, areas} = yomiWorld(), terrace = areas.find(a => a.id === 'onsen');
+  const pool = terrace.pools[0];
+  assert.ok(springAt(SEED, pool.x, pool.z));
+  p.x = pool.x; p.z = pool.z; p.hp = 40; p.chill = w.time+5;
+  stepYomi(w, 1);
+  assert.ok(Math.abs(p.hp-(40+SPRING.heal)) < 1e-6, 'mended');
+  assert.ok(!(p.chill > w.time), 'thawed');
+  const e = w.spawnEnemy('kasa', pool.x+.3, pool.z, {elite: false}); e.hp = 10;
+  stepYomi(w, 1);
+  assert.ok(e.hp > 10, 'creatures mend in it too');
+  let steam = 0;
+  for(let t = 0; t < SPRING.geyser[1]*2+1; t += T){w.time += T; stepYomi(w, T); steam = Math.max(steam, blasts(w, 'steam').length);}
+  assert.ok(steam >= 1, 'a geyser went up');
+  assert.ok(blasts(w, 'steam').every(s => s.all && s.push > 0));
+});

@@ -24,6 +24,7 @@ import {stepSkills, useSkill} from './skills.mjs?v=harvest-18';
 import {ascendWeapon, creditKill, mendWeapon, syncMastery, warnWear} from './mastery.mjs?v=harvest-18';
 import {packRule, stepAges, thornNodes, thornSpeed} from './ages.mjs?v=harvest-18';
 import {chillSpeed} from './yokai.mjs?v=harvest-18';
+import {wadeSpeed} from './yomi.mjs?v=harvest-18';
 import {refineDodge, refineHit as refinedHit, refineHurt, refineKill, refineSwing, refineWeapon, refinedStyle, sanitizeRefine, shotEnd, shotHit, shotMods, shotSteer, splitBefore, splitMagic, splitMarks, stepRefine} from './refine.mjs?v=harvest-18';
 import {shelfAction, shelfCount, spillShelf, storeBooks} from './bookshelf.mjs?v=harvest-18';
 import {HEARTH_MEND, stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
@@ -1522,7 +1523,7 @@ export class World {
   landNear(x,z,maxR=6){if(this.dungeon){const floor=layoutOf(this);return floor?dungeonLandNear(floor,x,z,maxR):null;}if(this.arena||this.showcase){const r=Math.hypot(x,z),R=this.radius-1.05;return r<R?{x,z}:r>0?{x:x*R/r,z:z*R/r}:{x:0,z:0};}return landNear(this.seed,x,z,maxR);}
   /** Walk speed multiplier from region hazards, a pulled cart and the worn trinket. */
   // Fleet (refine.mjs): refined body armour.
-  speedFactor(p){return (buffed(p,'swift')?BUFF.swift:1)*(1+armourStat(p,'fleet'))*chillSpeed(this,p)*(this.arena?1:this.dungeon?trinketSpeed(this,p):regionSpeed(this,p)*cartSpeed(this,p)*trinketSpeed(this,p)*brewSpeed(p)*thornSpeed(this,p));}
+  speedFactor(p){return (buffed(p,'swift')?BUFF.swift:1)*(1+armourStat(p,'fleet'))*chillSpeed(this,p)*(this.arena?1:this.dungeon?trinketSpeed(this,p):regionSpeed(this,p)*cartSpeed(this,p)*trinketSpeed(this,p)*brewSpeed(p)*thornSpeed(this,p)*wadeSpeed(this,p));}
   /**
    * Solid things a walker cannot enter. Returns the few camp structures as a plain array and hangs
    * the many standing trees and rocks on `.grid`, a 4-unit spatial hash cached until a node is felled,

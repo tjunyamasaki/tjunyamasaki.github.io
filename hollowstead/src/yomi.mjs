@@ -1,0 +1,73 @@
+// The Shrine of Yomi's other places (worldgen.mjs AREAS: only in a hollow of that land), each with one rule
+// that changes how you move or fight there. areas.mjs calls stepYomi() every expedition tick; the World and
+// mobs.mjs read the speed factors.
+//
+//   chikurin  The Bamboo Thicket. The stalks hide what stands among them: a creature in the thicket is veiled
+//             (e.veiled, sent to guests) until a wanderer comes within VEIL.near of it. Veiled creatures are
+//             drawn as a faint stir in the bamboo, and aimed attacks (arsenal.mjs aimTarget) never lock on to
+//             them. The dead wait in there; you find them by walking into them.
+//   higan     The Spider-lily Marsh. A black river runs through it, shallow enough to wade: whoever wades it,
+//             wanderer or creature, moves at WADE.speed. Floating things (fliers, the snow woman, an umbrella
+//             mid-skip) pass over it. Fight on the bank, or lure them in.
+//   onsen     The Hot-spring Terrace. Sitting in a spring mends: a wanderer gains SPRING.heal health a second
+//             (and frost thaws at once); a creature mends SPRING.mob of its health a second. Each pool's geyser
+//             erupts on its own beat while anyone is near (telegraphed, it shoves everyone in it and scalds a
+//             little: creatures too). Hold the water, or knock them out of it.
+//
+// Pure simulation: import only content/progression/worldgen/blasts. Never engine.mjs, a renderer or the DOM.
+
+import {REGIONS} from './progression.mjs?v=harvest-18';
+import {areasOf, blackAt, springAt} from './worldgen.mjs?v=harvest-18';
+import {addBlast} from './blasts.mjs?v=harvest-18';
+
+export const VEIL = Object.freeze({near: 4.6});
+export const WADE = Object.freeze({speed: .6});
+export const SPRING = Object.freeze({heal: 5, mob: .035, geyser: [5.5, 7.5], fuse: 1.1, damage: 7, push: 2.4, near: 16});
+/** Who floats over the black river. */
+const FLOATS = new Set(['yukionna', 'wraith', 'chochin']);
+
+const outside = world => !!(world?.arena || world?.dungeon || world?.showcase);
+
+/** Walk-speed factor of a wanderer wading the black river (World.speedFactor). */
+export function wadeSpeed(world, p){
+  if(!p || outside(world) || !world?.seed) return 1;
+  return blackAt(world.seed, p.x, p.z) ? WADE.speed : 1;
+}
+/** Run-speed factor of a creature wading it (mobs.mjs). Floaters and a kasa mid-skip are spared. */
+export function mobWade(world, e, fly){
+  if(fly || FLOATS.has(e?.type) || e?.hop || outside(world) || !world?.seed || !world.yomiAreas) return 1;
+  return blackAt(world.seed, e.x, e.z) ? WADE.speed : 1;
+}
+/** True for a hostile the bamboo hides from wanderers (arsenal.mjs aimTarget skips it). */
+export const veiled = e => !!e?.veiled;
+
+/** Host, every expedition tick (areas.mjs stepAreas). */
+export function stepYomi(world, dt){
+  const areas = areasOf(world.seed), grove = areas.find(a => a.id === 'chikurin'), terrace = areas.find(a => a.id === 'onsen');
+  // Remember whether this hollow has the places at all, so the hot paths can skip it (not saved: derived).
+  world.yomiAreas = !!(grove || terrace || areas.some(a => a.id === 'higan'));
+  if(!world.yomiAreas) return;
+  const people = world.players.filter(p => p.online && !p.down && !p.ghost);
+  // The bamboo hides what stands in it.
+  for(const e of world.enemies){
+    if(!(e.hp > 0)) continue;
+    const hidden = !!grove && world.regionOf(e.x, e.z) === 'chikurin' && !people.some(p => Math.hypot(p.x-e.x, p.z-e.z) < VEIL.near);
+    if(hidden) e.veiled = true; else if(e.veiled) delete e.veiled;
+  }
+  if(!terrace) return;
+  // The springs mend whoever sits in them.
+  for(const p of people) if(springAt(world.seed, p.x, p.z)){
+    if(p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp+SPRING.heal*dt);
+    if(p.chill) p.chill = 0;
+  }
+  for(const e of world.enemies) if(e.hp > 0 && e.hp < e.maxHp && springAt(world.seed, e.x, e.z)) e.hp = Math.min(e.maxHp, e.hp+e.maxHp*SPRING.mob*dt);
+  // Each pool's geyser keeps its own beat (from the clock and its place, so nothing needs saving).
+  const {scale} = world.mobScale(REGIONS.onsen?.tier ?? 2);
+  terrace.pools.forEach((pool, i) => {
+    if(!people.some(p => Math.hypot(p.x-pool.x, p.z-pool.z) < SPRING.near)) return;
+    const [lo, hi] = SPRING.geyser, period = lo+(hi-lo)*((i*.618+pool.r)%1), phase = (pool.x*.37+pool.z*.13)%period;
+    const before = Math.floor((world.time-dt+phase)/period), now = Math.floor((world.time+phase)/period);
+    if(now === before) return;
+    addBlast(world, {style: 'steam', shape: 'circle', x: pool.x, z: pool.z, radius: pool.r+.7, fuse: SPRING.fuse, damage: Math.round(SPRING.damage*scale.damage), push: SPRING.push, all: true});
+  });
+}

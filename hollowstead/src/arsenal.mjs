@@ -23,6 +23,8 @@ export function aimTarget(w, p, range, from = p){
   const f = facing(p);
   let best = null, score = Infinity;
   for(const e of hostiles(w)){
+    // The Shrine of Yomi's bamboo hides what stands in it (yomi.mjs): nothing aims at what it cannot see.
+    if(e.veiled) continue;
     const d = dist(e, from); if(d > range) continue;
     const dot = d > .01 ? ((e.x-from.x)*f.x + (e.z-from.z)*f.z)/d : 1;
     const s = d * (dot > .2 ? 1 : 1.8);

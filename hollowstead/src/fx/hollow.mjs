@@ -23,6 +23,8 @@ const STYLE = Object.freeze({
   neck:    {main: '#f2dcc4', core: '#fff6ea', glow: '#e0727c', dark: '#3a2030'},
   frost:   {main: '#a8dcf0', core: '#ffffff', glow: '#bfe8ff', dark: '#1c2c3c'},
   ofuda:   {main: '#f0cf5a', core: '#fff3c0', glow: '#ff8a5c', dark: '#3a1a14'},
+  // A hot spring's geyser on the terrace (yomi.mjs).
+  steam:   {main: '#dbe8ec', core: '#ffffff', glow: '#bfe8f0', dark: '#3a4a50'},
 });
 const S = style => STYLE[style] || STYLE.vent;
 
@@ -49,6 +51,13 @@ function paintPending(d, s, lead, clock){
     d.bloom(x, z, y, 1.4, c.glow, .5);
     d.pool(s.x, s.z, s.r*(.4+.6*k), c.glow, .25*k);
     d.light(s.x, s.z, 1.5+2*k);
+    return;
+  }
+  if(s.style === 'steam'){
+    // The spring bubbles harder and wisps rise off it before the geyser goes.
+    d.ring(s.x, s.z, s.r*(.4+.6*k), .06, c.glow, .6*k, {glow: true});
+    for(let i = 0; i < 4; i++){const a = rnd(seed, i)*TAU+clock*.7, r = s.r*.5*rnd(seed, i+4); d.orb(s.x+Math.cos(a)*r, s.z+Math.sin(a)*r, .08, .12+.12*k, c.core, .6*k);}
+    d.motes(s.x, s.z, 6, (clock*.9)%1, s.r*.6, c.main, .55*k, seed, {rise: 2.6, size: .16});
     return;
   }
   if(s.style === 'vent'){
@@ -155,6 +164,15 @@ function paintBurst(d, ev, age, seed){
     d.light(ev.x, ev.z, r*2.2*f);
     return;
   }
+  if(ev.style === 'steam'){
+    // A white column of steam, and a shove of hot water.
+    const h = 4*bump(Math.min(1, t*1.2));
+    d.path([[ev.x, .1, ev.z], [ev.x, h, ev.z]], r*1.1*f, c.main, .7*f, {taper: .4, soft: true});
+    d.path([[ev.x, .1, ev.z], [ev.x, h*.75, ev.z]], r*.5*f, c.core, .85*f, {taper: .5});
+    d.ring(ev.x, ev.z, r*(.4+.9*easeOut(t)), .1, c.glow, .8*f, {glow: true});
+    d.sparks(ev.x, ev.z, .3, 10, t, c.core, f, seed, {speed: 3, up: 6, gravity: 10});
+    return;
+  }
   if(ev.style === 'vent'){
     // A column of fire and ash.
     const h = 3.2*bump(Math.min(1, t*1.4));
@@ -193,7 +211,7 @@ function paintBurst(d, ev, age, seed){
   d.pool(ev.x, ev.z, r, c.glow, .35*f);
 }
 const ez = ev => ev.z;
-const BURST_LIFE = ev => ev.style === 'star' ? .8 : ev.style === 'vent' ? .7 : ev.style === 'gaze' ? .3 : .55;
+const BURST_LIFE = ev => ev.style === 'star' ? .8 : ev.style === 'vent' || ev.style === 'steam' ? .7 : ev.style === 'gaze' ? .3 : .55;
 
 export const HOLLOW_EVENTS = {
   blast: {life: BURST_LIFE, kick: ev => ev.style === 'star' ? {shake: .3} : ev.inner > 0 ? {shake: .25} : null, paint: paintBurst},

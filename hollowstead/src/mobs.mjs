@@ -30,6 +30,7 @@ import {addBlast} from './blasts.mjs?v=harvest-18';
 import {GILDED, starLoot} from './moons.mjs?v=harvest-18';
 import {BOSS_ATTACKS, BOSS_MOVES, bossRelease, bossTick} from './bosses.mjs?v=harvest-18';
 import {YOKAI_ATTACKS, YOKAI_MOVES, rouseSpeed, yokaiRelease, yokaiTick} from './yokai.mjs?v=harvest-18';
+import {mobWade} from './yomi.mjs?v=harvest-18';
 export {addBlast};
 
 /** Creatures chew through camp structures at half their bite, so a lone explorer's fire survives an early night. */
@@ -699,7 +700,7 @@ export function stepMobs(world, dt, obstacles){
       if(od < gap && od > 1e-3){const w = (gap-od)/gap; pushX += ox/od*w*2; pushZ += oz/od*w*2;}
     }
 
-    const top = (e.gilded ? GILDED.speed : def.speed)*(e.slowed > 0 ? .35 : 1)*(e.minion ? 1.1 : 1)*rouseSpeed(world, e);
+    const top = (e.gilded ? GILDED.speed : def.speed)*(e.slowed > 0 ? .35 : 1)*(e.minion ? 1.1 : 1)*rouseSpeed(world, e)*mobWade(world, e, move.fly);
     const wantVX = dirX*top+pushX*3, wantVZ = dirZ*top+pushZ*3;
     const k = Math.min(1, move.accel*dt/Math.max(.5, top));
     e.vx = (e.vx || 0)+(wantVX-(e.vx || 0))*Math.min(1, k*2);

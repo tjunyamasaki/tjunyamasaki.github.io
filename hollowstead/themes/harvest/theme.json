@@ -4126,7 +4126,7 @@
       }
     },
     "scenery": {
-      "src": "./sprites/scenery.svg?v=scn1",
+      "src": "./sprites/scenery.svg?v=scn2",
       "size": [
         12.8,
         7.2
@@ -5813,6 +5813,74 @@
         "sakura",
         "matsu"
       ]
+    },
+    "bamboo": {
+      "src": "./sprites/bamboo.svg?v=yomi1",
+      "size": [
+        3.6,
+        5.4
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "variants": [
+        "bamboo",
+        "bamboo",
+        "bamboo-b"
+      ]
+    },
+    "bamboo-b": {
+      "src": "./sprites/bamboo-b.svg?v=yomi1",
+      "size": [
+        3.2,
+        4.8
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "yanagi": {
+      "src": "./sprites/yanagi.svg?v=yomi1",
+      "size": [
+        4.92,
+        7.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
     },
     "sakura": {
       "src": "./sprites/sakura.svg?v=yomi1",

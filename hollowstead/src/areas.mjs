@@ -1,4 +1,5 @@
-// Areas: Frostmere, the Ashen Scar and the Briar Throne (worldgen.mjs places them from the seed).
+// Areas: Frostmere, the Ashen Scar and the Briar Throne (worldgen.mjs places them from the seed); a Yomi
+// hollow's own places keep their rules in yomi.mjs.
 // Their rules live here; the World calls stepAreas() every expedition tick and useLandmark() when a
 // landmark node is used. Also the Heartfire's awakening ladder, which the areas' finds extend.
 // Pure simulation: import only content/progression/worldgen/mobs/delve. Never a renderer or the DOM.
@@ -12,6 +13,7 @@ import {REGIONS} from './progression.mjs?v=harvest-18';
 import {areasOf} from './worldgen.mjs?v=harvest-18';
 import {addBlast} from './blasts.mjs?v=harvest-18';
 import {tryDescend} from './delve.mjs?v=harvest-18';
+import {stepYomi} from './yomi.mjs?v=harvest-18';
 
 /** The Heartfire's levels: 1-3 as ever, then 4 and 5 for what only the areas give (and, last, a heartstone). */
 export const HEARTH_MAX = 5;
@@ -58,6 +60,8 @@ export function stepAreas(world, dt, phase){
     else p.ventT = 0;
   }
   if(lair) stepLair(world, lair, dt);
+  // The Shrine of Yomi's other places: the bamboo's veil, the black river, the hot springs (yomi.mjs).
+  stepYomi(world, dt);
 }
 
 function stepVents(world, p, dt){

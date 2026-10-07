@@ -41,6 +41,8 @@ export const PROPS = Object.freeze({
   'post-a':{big:true}, 'post-b':{big:true}, stake:{big:true}, rail:{big:true},
   'thicket-a':{big:true, sway:.03}, 'thicket-b':{big:true, sway:.03}, 'thicket-c':{big:true, sway:.03},
   'reeds-a':{big:true, sway:.1}, 'reeds-b':{big:true, sway:.1},
+  // the Shrine of Yomi's own places (yomi.mjs): spider lilies, bamboo shoots and litter, grave tablets
+  higanbana:{sway:.06}, takenoko:{}, sasa:{flat:true}, sotoba:{big:true},
 });
 export const FLOWERS = Object.freeze(['daisy', 'buttercup', 'bluebell', 'poppy', 'heather']);
 /** Which common props grow in which region, weighted. `flower` resolves to one colour per drift. */
@@ -56,6 +58,11 @@ export const REGION_MIX = Object.freeze({
  * ferns and clover under the cherries, red leaves for fallen petals. */
 export const AREA_MIX = Object.freeze({
   yomi: {rate:.6, dense:.4, kinds:[['fern', 2], ['fern-small', 2], ['tuft', 2.4], ['clover', 1.4], ['leaves-red', 1.6], ['stones', .8], ['toadstool', .5]]},
+  // The Bamboo Thicket: litter and shoots underfoot. The Spider-lily Marsh: red lilies in drifts, sedge, old grave
+  // tablets by the black river. The Hot-spring Terrace: pebbles and moss between the stones.
+  chikurin: {rate:.7, dense:.5, kinds:[['sasa', 4], ['takenoko', 1.6], ['fern-small', 1.8], ['tuft', 1]]},
+  higan: {rate:.8, dense:.2, kinds:[['higanbana', 5], ['sedge', 2], ['reeds-small', 1.2], ['tuft-dead', 1], ['sotoba', .45]]},
+  onsen: {rate:.55, dense:.1, kinds:[['pebbles', 3], ['pebbles-b', 2], ['stones', 1.6], ['clover', 1], ['fern-small', .8]]},
 });
 const mixOf = region => REGION_MIX[region] || AREA_MIX[region] || REGION_MIX.meadow;
 /** Rare set pieces per chunk: [kind, regions, chance per try, tries]. */
@@ -106,8 +113,8 @@ export function sceneryEnv(seed, {nodes = null, shape = null} = {}){
   return {
     seed, radius, ox, oz, terrain,
     density: (x, z) => densityAt(seed, x, z),
-    // Only the Shrine of Yomi decorates by its own mix; every other area keeps its ring's (as it always has).
-    region: base.areas?.some(a => a.id === 'yomi') ? (x, z) => areaAt(seed, x, z) === 'yomi' ? 'yomi' : regionAt(x, z) : (x, z) => regionAt(x, z),
+    // Only the Shrine of Yomi's places decorate by their own mix; every other area keeps its ring's (as it always has).
+    region: base.areas?.some(a => AREA_MIX[a.id]) ? (x, z) => {const a = areaAt(seed, x, z); return a && AREA_MIX[a] ? a : regionAt(x, z);} : (x, z) => regionAt(x, z),
     patch: (x, z) => valueNoise(x * .2 + ox, z * .2 + oz) * .6 + valueNoise(x * .46 - oz, z * .46 + ox) * .4,
     theme: (x, z) => valueNoise(x * .16 - oz * .7, z * .16 + ox * .3),
     drift: (x, z) => valueNoise(x * .05 - ox, z * .05 + oz) * 2.3 + valueNoise(x * .019 + oz, z * .019 - ox) * 1.7,

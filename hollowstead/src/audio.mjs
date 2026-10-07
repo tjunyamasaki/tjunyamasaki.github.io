@@ -93,6 +93,7 @@ export class Sound {
       if(st==='neck'){this.sweep(220,520,.14,'sawtooth',.02);return;}
       if(st==='frost'){this.sweep(2600,1800,.16,'triangle',.012);this.sweep(1300,900,.1,'sine',.01,.03);return;}
       if(st==='ofuda'){this.sweep(500,180,.2,'square',.018);return;}
+      if(st==='steam'){this.sweep(3000,1200,.4,'sawtooth',.005);this.sweep(140,60,.3,'sine',.04);return;}
       this.sweep(260,70,.18,'square',.02);this.sweep(1200,500,.06,'square',.005,.02);return;}
     // The great bosses: a roar when they rise or change, a rumble before their big patterns.
     if(type==='bossrise'||type==='bossphase'){this.sweep(70,40,1.4,'sawtooth',.06);this.sweep(140,60,1.2,'square',.02,.05);this.sweep(320,90,.9,'sine',.03,.1);return;}

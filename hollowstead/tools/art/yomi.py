@@ -877,6 +877,140 @@ def matsu():
     return d, b
 
 
+# ================================================================ the Bamboo Thicket and the Spider-lily Marsh (yomi.mjs)
+BAMB = "#7f9e56"; BAMB_D = "#5b7a3e"; BAMB_L = "#b2c97e"; BAMB_N = "#4b6634"
+WILLOW = "#7f9a5a"; WILLOW_D = "#5e7745"; WILLOW_L = "#a9c27c"
+LILY_R = "#c8363c"; LILY_RD = "#8e2430"; LILY_RL = "#f06a5c"
+
+
+def stalk(x0, y0, x1, y1, w, seed):
+    """One bamboo culm: a tapered green pole with ringed nodes and a highlight."""
+    out = fill(limb((x0, y0), ((x0 + x1) / 2 + 4, (y0 + y1) / 2), (x1, y1), w, w * .72), BAMB, 7)
+    n = int(abs(y0 - y1) / 70)
+    for i in range(1, n + 1):
+        t = i / (n + 1); x = x0 + (x1 - x0) * t; y = y0 + (y1 - y0) * t; ww = w * (1 - .28 * t) / 2 + 3
+        out += line(f"M{f(x - ww)} {f(y)} Q{f(x)} {f(y + 6)} {f(x + ww)} {f(y)}", 6, BAMB_N)
+    out += brush((x0 - w * .22, y0 - 20), ((x0 + x1) / 2 - w * .2, (y0 + y1) / 2), (x1 - w * .15, y1 + 30), 6, BAMB_L, .9)
+    return out
+
+
+def sasa_spray(x, y, rot, s=1.0, seed=1):
+    """A spray of bamboo leaves: a few broad lance-shaped blades fanning from one twig."""
+    r = random.Random(seed)
+    g = ""
+    for k in range(4):
+        a = -50 + k * 33 + r.uniform(-8, 8); L = 96 + r.uniform(-10, 20)
+        ca, sa = math.cos(math.radians(a)), math.sin(math.radians(a))
+        tip = (ca * L, sa * L)
+        g += fill(f"M0 0 Q{f(tip[0] * .45 - sa * 26)} {f(tip[1] * .45 + ca * 26)} {f(tip[0])} {f(tip[1])} Q{f(tip[0] * .45 + sa * 20)} {f(tip[1] * .45 - ca * 20)} 0 0 Z", BAMB_D if k % 2 else BAMB, 4)
+        g += line(f"M{f(tip[0] * .1)} {f(tip[1] * .1)} L{f(tip[0] * .8)} {f(tip[1] * .8)}", 3, BAMB_L)
+    return G(at_scale(s, lambda: g), x, y, rot, s)
+
+
+def bamboo(seed=1):
+    """A clump of bamboo: four to six culms of different heights, leaf sprays near the tops."""
+    def draw():
+        d = []; b = ""
+        r = random.Random(seed)
+        culms = sorted([(r.uniform(150, 360), r.uniform(70, 200), r.uniform(30, 44)) for _ in range(5 if seed == 1 else 4)], key=lambda c: c[2])
+        for x, top, w in culms:
+            lean = r.uniform(-30, 30)
+            b += stalk(x, 744, x + lean, top, w, seed)
+            for k in range(3):
+                yy = top + 40 + k * 90 + r.uniform(-10, 10)
+                b += sasa_spray(x + lean * (1 - (yy - top) / (744 - top)), yy, r.uniform(-30, 30) + (180 if k % 2 else 0), .9 + r.uniform(-.1, .2), seed * 10 + k)
+        b += fill(blob(256, 740, 130, 16, 9, .2, seed), BAMB_N, 6)
+        b += sasa_spray(180, 730, 160, .8, seed + 50) + sasa_spray(330, 730, 20, .8, seed + 60)
+        return d, b
+    return draw
+
+
+def yanagi():
+    """A weeping willow by the black river: a stooped dark trunk, long green strands hanging to the ground."""
+    d = []; b = ""
+    r = random.Random(5)
+
+    def strand(x, y0, y1, sway, col):
+        tip = (x + sway * 1.5, y1)
+        return fill(f"M{f(x - 13)} {f(y0)} Q{f(x + sway - 10)} {f((y0 + y1) / 2)} {f(tip[0])} {f(tip[1])} Q{f(x + sway + 12)} {f((y0 + y1) / 2)} {f(x + 13)} {f(y0)} Z", col, 5)
+    back = "".join(strand(100 + k * 40 + r.uniform(-8, 8), 400, 600 + r.uniform(0, 80), r.uniform(-14, 14), WILLOW_D) for k in range(9))
+    b += back
+    trunk = [limb((246, 744), (200, 620), (258, 470), 70, 40), limb((256, 480), (310, 420), (370, 380), 34, 14),
+             limb((250, 490), (190, 430), (140, 400), 30, 12), limb((252, 470), (256, 400), (250, 330), 30, 12)]
+    b += union(trunk, BARK)
+    b += brush((222, 720), (210, 640), (240, 520), 9, BARK_L)
+    for k in range(8):
+        x = 96 + k * 46 + r.uniform(-8, 8)
+        if 200 < x < 300:
+            continue
+        b += strand(x, 380 + r.uniform(-20, 20), 560 + r.uniform(0, 120), r.uniform(-16, 16), WILLOW)
+    # the crown last, so every strand seems to fall from under it
+    canopy = cloud(256, 370, 190, 90, 10, 17)
+    b += shaded(d, canopy, WILLOW, WILLOW_D, 16, -10, brush((120, 350), (200, 300), (300, 292), 10, WILLOW_L))
+    return d, b
+
+
+# ---------------------------------------------------------------- scenery decoration (packed by tools/art/scenery.py)
+# These share the scenery design space: U = 230 design units per world unit, upright props stand on (256, 740),
+# flat decals are centred on (256, 512). Quieter than nodes, few large shapes.
+def higanbana():
+    """Red spider lilies on bare stems: a ball of curled petals and long upswept stamens, no leaves."""
+    d = []; b = ""
+    r = random.Random(7)
+    for (x, h) in ((196, 160), (258, 200), (318, 150)):
+        b += stroke(f"M{x} 740 Q{x + r.uniform(-8, 8)} {740 - h * .5} {x + r.uniform(-6, 6)} {740 - h}", 9, "#5e7a3e")
+        cx, cy = x, 740 - h - 24
+        for k in range(5):
+            a = math.radians(-180 + k * 45 + r.uniform(-6, 6))
+            px, py = cx + math.cos(a) * 40, cy + math.sin(a) * 26
+            b += line(f"M{cx} {cy} Q{f(cx + math.cos(a) * 34)} {f(cy - 40)} {f(cx + math.cos(a) * 54)} {f(cy - 56)}", 4, LILY_RL)
+        petals = ""
+        for k in range(6):
+            a = math.radians(k * 60 + 15)
+            px, py = cx + math.cos(a) * 34, cy + math.sin(a) * 22
+            petals += fill(f"M{cx} {cy} Q{f(cx + math.cos(a) * 30 - 12)} {f(cy + math.sin(a) * 18 - 18)} {f(px)} {f(py)} Q{f(px + 12)} {f(py + 10)} {f(cx + math.cos(a) * 14)} {f(cy + math.sin(a) * 10 + 6)} Z", LILY_R if k % 2 else LILY_RL, 6)
+        b += petals + f'<circle cx="{cx}" cy="{cy}" r="12" fill="{LILY_RD}" stroke-width="{sw(5)}"/>'
+    return d, b
+
+
+def takenoko():
+    """A bamboo shoot pushing out of the leaf litter: brown husks to a pointed tip."""
+    d = []; b = ""
+    b += fill("M196 740 Q200 650 256 560 Q312 650 316 740 Z", "#8a6a4a", 7)
+    for k, y in enumerate((700, 650, 604)):
+        b += fill(f"M{208 + k * 14} 742 Q{230 + k * 10} {y} 256 {y - 40} Q{f(240 + k * 6)} {y + 20} {f(232 + k * 8)} 742 Z", "#6e5238" if k % 2 else "#a07e58", 5)
+    b += brush((230, 720), (236, 660), (250, 600), 6, "#c09a72", .8)
+    b += fill(blob(256, 742, 80, 10, 7, .2, 3), "#5a4632", 5)
+    return d, b
+
+
+def sasa_litter():
+    """Fallen bamboo leaves on the ground (flat decal)."""
+    d = []; b = ""
+    r = random.Random(4)
+    for k in range(7):
+        x = 256 + r.uniform(-90, 90); y = 512 + r.uniform(-40, 40); a = r.uniform(0, 180)
+        b += G(fill("M-56 0 Q0 -22 56 0 Q0 22 -56 0 Z", "#b3a066" if k % 3 else "#8f9e5a", 5), x, y, a)
+    return d, b
+
+
+def sotoba():
+    """Wooden grave tablets (sotoba) leaning behind a little stone: carved notches, faded script."""
+    d = []; b = ""
+    for k, (x, h, rot) in enumerate(((196, 300, -8), (250, 340, 2), (304, 280, 9))):
+        top = 740 - h
+        slat = (f"M{x - 18} 740 L{x - 18} {top + 40} L{x - 10} {top + 30} L{x - 18} {top + 20} L{x} {top} "
+                f"L{x + 18} {top + 20} L{x + 10} {top + 30} L{x + 18} {top + 40} L{x + 18} 740 Z")
+        g = fill(slat, "#b9a382" if k != 1 else "#cdb994", 6)
+        g += line(f"M{x} {top + 60} L{x} {top + 60 + h * .45}", 6, "#6a5642")
+        b += f'<g transform="rotate({rot} {x} 740)">{g}</g>'
+    b += fill(blob(256, 726, 70, 26, 8, .18, 5), RK, 6) + brush((210, 716), (240, 706), (280, 708), 6, RK_L, .8)
+    return d, b
+
+
+YOMI_SCENERY = [("higanbana", higanbana, "up"), ("takenoko", takenoko, "up"), ("sasa", sasa_litter, "mid"), ("sotoba", sotoba, "up", .85)]
+
+
 # ================================================================ decorations
 def toro(k):
     """Stone lantern (ishidoro): mossy granite, a flame flickering in the firebox."""
@@ -1063,10 +1197,13 @@ ALL = {
     "yomi-rock": dict(frames=[yomi_rock], cols=1, rows=1, target=(40, 420, 476, 746), size=[2.8, 4.2], clips=STILL),
     "yomi-rock-b": dict(frames=[yomi_rock_b], cols=1, rows=1, target=(56, 360, 456, 746), size=[2.8, 4.2], clips=STILL),
     "jizo": dict(frames=[jizo], cols=1, rows=1, target=(150, 300, 362, 744), size=[1.5, 2.25], clips=STILL),
+    "bamboo": dict(frames=[bamboo(1)], cols=1, rows=1, target=(40, 24, 472, 744), size=[3.6, 5.4], clips=STILL),
+    "bamboo-b": dict(frames=[bamboo(2)], cols=1, rows=1, target=(60, 60, 452, 744), size=[3.2, 4.8], clips=STILL),
+    "yanagi": dict(frames=[yanagi], cols=1, rows=1, target=(12, 40, 500, 736), size=[4.92, 7.38], clips=STILL),
 }
 # What the game uses (tools/art/build.py builds these into themes/harvest/sprites like every other sprite;
 # theme.json holds their entries). The wanderers and the guandao stay preview-only for now.
-GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo")
+GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo", "bamboo", "bamboo-b", "yanagi")
 SPRITES = {k: {kk: v for kk, v in ALL[k].items() if kk in ("frames", "cols", "rows", "target")} for k in GAME}
 
 
@@ -1173,7 +1310,8 @@ NAMES = {"miko": "Shrine maiden (wanderer)", "daoshi-wanderer": "Taoist exorcist
          "kasa": "Kasa-obake, umbrella ghost (mob)", "rokurokubi": "Rokurokubi, long neck (mob)", "yukionna": "Yuki-onna, snow woman (mob)", "chochin": "Chochin-obake, lantern ghost (mob)",
          "jiangshi": "Jiangshi, hopping corpse (mob)", "sakura": "Old cherry (tree)", "matsu": "Sacred pine (tree)",
          "toro": "Stone lantern (decoration)", "torii": "Torii gate (decoration)", "katana": "Kagekiri, katana (weapon)", "guandao": "Dragon guandao (weapon)",
-         "yomi-rock": "Garden stones (rock node)", "yomi-rock-b": "Sacred boulder (rock node)", "jizo": "Jizo statue (decoration)"}
+         "yomi-rock": "Garden stones (rock node)", "yomi-rock-b": "Sacred boulder (rock node)", "jizo": "Jizo statue (decoration)",
+         "bamboo": "Bamboo clump (tree, the Bamboo Thicket)", "bamboo-b": "Bamboo clump, lesser (tree)", "yanagi": "Weeping willow (tree, the Spider-lily Marsh)"}
 
 
 def write_preview(out_dir, manifest):

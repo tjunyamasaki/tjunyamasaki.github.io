@@ -17,6 +17,10 @@ export const REGIONS = Object.freeze({
   briarlair:{name:'The Briar Throne', tier:2, area:true, boss:'briarmother'},
   // Only in a hollow of that land (worldgen.mjs LANDS). `haunt`: a night wave that finds you here is of its own dead.
   yomi:{name:'The Shrine of Yomi', tier:2, area:true, haunt:true},
+  // A Yomi hollow's other places (worldgen.mjs AREAS, yomi.mjs): its dead walk them at night too.
+  chikurin:{name:'The Bamboo Thicket', tier:2, area:true, haunt:true},
+  higan:{name:'The Spider-lily Marsh', tier:2, area:true, haunt:true},
+  onsen:{name:'The Hot-spring Terrace', tier:2, area:true, haunt:true},
 });
 /** Region ids that are seeded areas rather than rings. */
 export const AREA_IDS = Object.freeze(Object.keys(REGIONS).filter(id=>REGIONS[id].area));
@@ -56,6 +60,10 @@ export const NODE_POOLS = Object.freeze({
   briarlair:['bush','bush','bush','tree','tree','grass','mushroom'],
   // Its trees grow as cherry and sacred pine, its rocks as mossy garden stones (worldgen.mjs generateNodes).
   yomi:['tree','tree','tree','tree','rock','grass','grass','mushroom'],
+  // Bamboo (its trees grow as stalks), the marsh's reeds and willows, the terrace's stones and ore.
+  chikurin:['tree','tree','tree','tree','tree','grass','mushroom','bush'],
+  higan:['grass','grass','grass','bush','bush','tree','mushroom','glowcap'],
+  onsen:['rock','rock','rock','ore','shardrock','grass','tree','bush'],
 });
 
 /** Creatures that live in a region by day and guard its caches. */
@@ -71,7 +79,11 @@ export const RESIDENTS = Object.freeze({
   // Mother Briar's brood: her lair crawls with briarlings.
   briarlair:['crawler','crawler','crawler'],
   // The shrine's dead: paper-lantern ghosts in packs, and the hopping corpses.
-  yomi:['chochin','chochin','jiangshi','kasa','kasa','rokurokubi','yukionna','daoshi'],
+  yomi:['chochin','chochin','jiangshi','kasa','kasa','daoshi'],
+  // The umbrellas and the long-necked hide in the bamboo; the dead cross the black river; the snow woman haunts the steam.
+  chikurin:['kasa','kasa','rokurokubi','chochin'],
+  higan:['jiangshi','jiangshi','chochin','rokurokubi','daoshi'],
+  onsen:['yukionna','yukionna','kasa','chochin'],
 });
 /**
  * A haunted area's own night (REGIONS[id].haunt, night.mjs): who rises after a wanderer standing there, by weight,
@@ -79,6 +91,9 @@ export const RESIDENTS = Object.freeze({
  */
 export const HAUNTS = Object.freeze({
   yomi:[['chochin',4],['jiangshi',2.5],['kasa',3],['rokurokubi',1.5,3],['yukionna',1.4,4],['daoshi',.8,6]],
+  chikurin:[['kasa',4],['chochin',2.5],['rokurokubi',2,3],['jiangshi',1]],
+  higan:[['jiangshi',3.5],['chochin',3],['rokurokubi',1.5,3],['daoshi',1.1,5]],
+  onsen:[['chochin',3],['kasa',3],['yukionna',2.2,3],['jiangshi',1]],
 });
 /** The weighted roster a haunted area sends at this threat (or its residents when it has none). */
 export function hauntRoster(zone, threat=1){

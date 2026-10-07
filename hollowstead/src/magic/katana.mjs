@@ -23,6 +23,16 @@ export const DRAW = Object.freeze({
 });
 /** Seconds from the skill's cast to the sheath (its pose, lock and vanish follow from it). */
 export const DRAW_TOTAL = DRAW.vanish+(DRAW.lines-1)*DRAW.every+DRAW.appear+DRAW.sheath;
+/**
+ * Optional tuning a wielder can carry as `p.kataMods` (the Kagekiri Ronin class sets it from its talents,
+ * src/classes/ronin.mjs; nothing else does, so the weapon is unchanged everywhere else). All optional:
+ * damage, cooldown, snap (multipliers), reach, hang, maxCuts (added), third (damage x on the set's third draw),
+ * thirdReach (added reach on the third draw).
+ */
+const NO_MODS = Object.freeze({});
+const modsOf = p => (p?.kataMods && typeof p.kataMods === 'object') ? p.kataMods : NO_MODS;
+/** Listeners told after every draw ({cut, hits}) and every snap ({cuts, taken, hits, skill}). Host only. */
+export const KATA_HOOKS = {draw: [], snap: []};
 
 export const magicPack = {
   id: PACK,
@@ -65,39 +75,73 @@ export function use(world, player){
   const n = Number.isInteger(player.kataCount) ? ((player.kataCount%3)+3)%3 : 0;
   // The set fans out: a little left, a little right, then straight down the middle.
   const a = Math.atan2(dz, dx)+[-1, 1, 0][n]*IAI.turn*Math.PI/180, ux = Math.cos(a), uz = Math.sin(a);
-  const power = ownerPower(world, player);
-  const x0 = round(player.x+ux*IAI.start), z0 = round(player.z+uz*IAI.start), x1 = round(player.x+ux*IAI.reach), z1 = round(player.z+uz*IAI.reach);
+  const power = ownerPower(world, player), M = modsOf(player);
+  const reach = IAI.reach+(M.reach || 0)+(n === 2 ? M.thirdReach || 0 : 0), damage = IAI.damage*(M.damage || 1)*(n === 2 ? M.third || 1 : 1);
+  const x0 = round(player.x+ux*IAI.start), z0 = round(player.z+uz*IAI.start), x1 = round(player.x+ux*reach), z1 = round(player.z+uz*reach);
   let hits = 0;
   for(const e of hostiles(world)){
     if(gap(e, x0, z0, x1, z1) > IAI.width+bodyOf(e)*.5) continue;
-    hurt(world, e, IAI.damage*power, player.id); hits++;
+    hurt(world, e, damage*power, player.id); hits++;
   }
-  const cut = {id: world.nextId('kcut'), packId: PACK, ownerId: player.id, kind: 'cut', n, x0, z0, x1, z1, age: 0, life: IAI.hang, power: round(power)};
-  const list = (world.magicSweeps ||= []);
-  list.push(cut);
-  // Only so many cuts hang at once: the oldest closes quietly.
-  const mine = list.filter(c => c.packId === PACK && c.ownerId === player.id && !c.snapped);
-  for(let i = 0; i < mine.length-IAI.maxCuts; i++) list.splice(list.indexOf(mine[i]), 1);
+  const cut = {id: world.nextId('kcut'), packId: PACK, ownerId: player.id, kind: 'cut', n, x0, z0, x1, z1, age: 0, life: round(IAI.hang+(M.hang || 0)), power: round(power)};
+  (world.magicSweeps ||= []).push(cut);
+  trimCuts(world, player);
   player.kataCount = (n+1)%3;
   if(n === 2) player.kataSnapAt = round(world.time+IAI.snapDelay);
   player.kataUses = (player.kataUses || 0)+1;
   if(player.kataUses%IAI.wearEvery === 0) world.wearEquipped(player, 'weapon', 1);
   player.dx = dx; player.dz = dz; player.rest = false;
-  player.cooldown = IAI.cooldown+(n === 2 ? .14 : 0);
+  player.cooldown = round((IAI.cooldown+(n === 2 ? .14 : 0))*(M.cooldown || 1));
   player.action = 'attack'; player.actionUntil = world.time+.5; player.aimUntil = world.time+.5;
   world.event('katadraw', player.x, player.z, '', {player: player.id, itemId: PACK, n, hits, x0, z0, x1, z1});
+  for(const hook of KATA_HOOKS.draw) hook(world, player, {cut, hits});
   return cut;
 }
 
+/** Only so many cuts hang at once: the oldest closes quietly. */
+function trimCuts(world, p){
+  const list = world.magicSweeps || [], mine = list.filter(c => c.packId === PACK && c.ownerId === p.id && !c.snapped);
+  for(let i = 0; i < mine.length-(IAI.maxCuts+(modsOf(p).maxCuts || 0)); i++) list.splice(list.indexOf(mine[i]), 1);
+}
+/**
+ * Lay one straight cut from (x0, z0) to (x1, z1) for the wielder, outside the draw's set: it hits what
+ * stands on it for `damage` (already scaled; 0 lays it quietly) and then hangs like any other cut, waiting
+ * for the sheath. Used by the Kagekiri Ronin's skills (src/classes/ronin.mjs). Returns the cut, or null.
+ */
+export function layCut(world, p, x0, z0, x1, z1, {damage = 0, life = IAI.hang+(modsOf(p).hang || 0), width = IAI.width, n = 0, tag = '', flash = true} = {}){
+  if(!world || !armed(p) || ![x0, z0, x1, z1].every(Number.isFinite)) return null;
+  [x0, z0, x1, z1] = [x0, z0, x1, z1].map(round);
+  let hits = 0;
+  if(damage > 0) for(const e of hostiles(world)){
+    if(gap(e, x0, z0, x1, z1) > width+bodyOf(e)*.5) continue;
+    hurt(world, e, damage, p.id); hits++;
+  }
+  const cut = {id: world.nextId('kcut'), packId: PACK, ownerId: p.id, kind: 'cut', n, x0, z0, x1, z1, age: 0, life: round(life), power: round(ownerPower(world, p)), ...(tag ? {tag} : {})};
+  (world.magicSweeps ||= []).push(cut);
+  trimCuts(world, p);
+  if(flash) world.event('katadraw', (x0+x1)/2, (z0+z1)/2, '', {player: p.id, itemId: PACK, n, hits, x0, z0, x1, z1, laid: true});
+  return Object.assign(cut, {hits});
+}
+/** Every cut the wielder has hanging, newest last (read-only use: the class skills aim with them). */
+export const hangingCuts = (world, p) => p ? cutsOf(world, p.id) : [];
+/** Distance from a foe to a cut, the same test the blade uses. */
+export const cutGap = (e, c) => gap(e, c.x0, c.z0, c.x1, c.z1);
+/** Sheathe now (the Kagekiri Ronin's Nōtō): snap every hanging cut at `bonus` times the usual damage. */
+export function snapCuts(world, p, bonus = 1){
+  if(!armed(p)) return 0;
+  p.kataSnapAt = 0; p.kataCount = 0;
+  return snap(world, p, null, bonus);
+}
+
 /** The sheath clicks: every cut the wielder has hanging snaps shut on whatever stands in it now. */
-function snap(world, p, skill = null){
+function snap(world, p, skill = null, bonus = 1){
   const cuts = cutsOf(world, p.id);
   if(!cuts.length) return 0;
-  const foes = hostiles(world), taken = new Map();
+  const foes = hostiles(world), taken = new Map(), M = modsOf(p);
   let hits = 0;
   const lines = [];
   for(const c of cuts){
-    const amount = skill ? (c.skill ? skill.snap : skill.snap*.6) : IAI.damage*IAI.snap*(c.power || ownerPower(world, p));
+    const amount = skill ? (c.skill ? skill.snap : skill.snap*.6) : IAI.damage*IAI.snap*(c.power || ownerPower(world, p))*(M.snap || 1)*bonus;
     for(const e of foes){
       if(gap(e, c.x0, c.z0, c.x1, c.z1) > (c.skill ? DRAW.width : IAI.width)+bodyOf(e)*.5) continue;
       const n = taken.get(e.id) || 0;
@@ -108,6 +152,7 @@ function snap(world, p, skill = null){
     if(lines.length < 16) lines.push([c.x0, c.z0, c.x1, c.z1]);
   }
   world.event('katasnap', p.x, p.z, '', {player: p.id, itemId: PACK, lines, hits, skill: !!skill, foes: taken.size});
+  for(const hook of KATA_HOOKS.snap) hook(world, p, {cuts, taken, hits, skill: !!skill, bonus});
   return hits;
 }
 

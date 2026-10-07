@@ -38,6 +38,8 @@ import {createUpdateChecker} from './updates.mjs?v=harvest-18';
 import {skillBlock, skillFor} from './skills.mjs?v=harvest-18';
 import {labClear, labDps, labEquip, labLevel, labRank, labResetStats, labSpawn, labStrength, labToggle} from './lab.mjs?v=harvest-18';
 import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/lab.mjs?v=harvest-18';
+import {classBarMarkup, classBarState, classPickMarkup, classStripMarkup, classToolsMarkup, talentTreeMarkup} from './ui/classes.mjs?v=harvest-18';
+import {classOf, pointsFree} from './classes/registry.mjs?v=harvest-18';
 import {REFINE_CURRENCY, bookLines, carriedBooks, carriedGear, modText, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
 import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
 import {shelfMarkup} from './ui/bookshelf.mjs?v=harvest-18';
@@ -72,6 +74,8 @@ let healPick='elixir',healHad=false,healPicker=false,autoAttack=true,pickPending
 /** Dungeons: the variation picked on the title screen ('' = a new one every floor). */
 let dungeonPick='';
 /** Weapon lab panel state (presentation only; the lab's rules live in lab.mjs). */
+/** Classes mode panels (presentation only; the rules live in classes/). */
+let classOpen='',classTalent='',classSheetCache='',classStripCache='',classBarSig='',classPickCache='',classPoints=0;
 let labOpen='',labRankPick=3,labFoe='mix',labCount=10,labFormation='ahead',labSheetCache='',labBarCache='',labMeterCache='';
 /** The arena is a swarm fight: start a little wider than the exploring camera. */
 const ARENA_ZOOM=.8;
@@ -295,13 +299,13 @@ function enterGame(){
   linkLost=false;cancelPlacement();cancelMaintenance();
   if(world?.homestead){connectionText='Homestead';saveText='The homestead sandbox is not saved';showStatus('');}
   else if(world?.showcase){connectionText='Showcase';saveText='Not saved';showStatus('');}
-  else if(world?.arena){connectionText=world.arena.lab?'Weapon lab':'Battle arena';saveText=world.arena.lab?'The lab is not saved':'Arena runs are not saved';showStatus('');}
+  else if(world?.arena){connectionText=world.arena.lab?'Weapon lab':world.arena.classes?'Classes':'Battle arena';saveText=world.arena.lab?'The lab is not saved':world.arena.classes?'The classes mode is not saved':'Arena runs are not saved';showStatus('');}
   else if(world?.dungeon){connectionText=mode==='solo'?'Dungeon run':connectionText||'Connected to camp';saveText='Dungeon runs are not saved';showStatus('');}
   else if(mode==='solo'){connectionText='Expedition saved locally';saveText='Saved on this browser';showStatus('Expedition saved locally');}
   else{connectionText=connectionText||'Connected to camp';saveText=mode==='guest'?'Kept by the host':'Saved on this browser';}
-  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase&&!world?.homestead);announce(world?.homestead?'The homestead. Open Build (B) for soil, floors and walls; drag across the ground to lay a line. Free building and test tools are in the menu.':world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':world?.mode==='vigil'?(dayOf(world)===1&&world.time<5?(world.land==='yomi'?'The Vigil begins. Somewhere in the outer rings a shrine grove waits, and its dead do not rest.':'The Vigil begins. One fire, one save, as long as you can keep it.'):'The vigil goes on. The fire remembers you.'):dayOf(world)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
-  document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);document.body.classList.toggle('dungeon',!!world?.dungeon);document.body.classList.toggle('homestead',!!world?.homestead);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
-  showLab(!!world?.arena?.lab);
+  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase&&!world?.homestead);announce(world?.homestead?'The homestead. Open Build (B) for soil, floors and walls; drag across the ground to lay a line. Free building and test tools are in the menu.':world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?.classes?'Classes · a test ground':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':world?.mode==='vigil'?(dayOf(world)===1&&world.time<5?(world.land==='yomi'?'The Vigil begins. Somewhere in the outer rings a shrine grove waits, and its dead do not rest.':'The Vigil begins. One fire, one save, as long as you can keep it.'):'The vigil goes on. The fire remembers you.'):dayOf(world)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
+  document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);document.body.classList.toggle('classes',!!world?.arena?.classes);document.body.classList.toggle('dungeon',!!world?.dungeon);document.body.classList.toggle('homestead',!!world?.homestead);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
+  showLab(!!world?.arena?.lab);showClasses(!!world?.arena?.classes);
 }
 async function goHome(){
   leaveArena();
@@ -309,7 +313,7 @@ async function goHome(){
   void checkForUpdate();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
-function setBusy(value){busy=value;for(const id of ['mode-expedition','mode-join','host','join','solo','continue','showcase','homestead','arena','lab','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
+function setBusy(value){busy=value;for(const id of ['mode-expedition','mode-join','host','join','solo','continue','showcase','homestead','arena','lab','classes','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
 function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status,wasDeep=!!world.dungeon;world=World.restore(data);dirty=true;if(!!world.dungeon!==wasDeep&&!$('room-panel').hidden)roomLabels();if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');showFrontPanel('room-panel');$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
 async function hostCamp(dungeon=null,vigil=null){
   if(busy)return;if(dungeon&&(typeof dungeon!=='object'||(typeof Event!=='undefined'&&dungeon instanceof Event)))dungeon=null;if(typeof vigil!=='string')vigil=null;setBusy(true);sound.unlock();storeProfile();showStatus(dungeon?'Opening the dungeon doors…':vigil?'Lighting the vigil fire…':'Opening the camp…');
@@ -452,6 +456,68 @@ function showDungeonPanel(open){
   if(!open)return;
   $('dungeon-floors').innerHTML=[{id:'',name:'Any depths',blurb:'A new variation on every floor.'},...VARIANTS].map(v=>`<button type="button" class="dungeon-floor" data-variant="${v.id}" aria-pressed="${dungeonPick===v.id}"><b>${escapeHtml(v.name)}</b><small>${escapeHtml(v.blurb)}</small></button>`).join('');
 }
+/** Classes mode: the arena's waves, a class instead of weapon cards, a talent point every level (classes/mode.mjs). Not saved. */
+function startClasses(){
+  sound.unlock();storeProfile();
+  world=new World((Math.random()*0xffffffff)>>>0,{classes:true});
+  world.addPlayer('host',$('player-name').value,character);
+  mode='solo';room='';cancelPlacement();cancelMaintenance();clearSelection();classOpen='';classTalent='';classPoints=0;
+  if(zoomBeforeArena==null){zoomBeforeArena=renderer.zoom;renderer.setZoom(ARENA_ZOOM);}
+  enterGame();
+}
+function showClasses(open){
+  const panel=$('class-panel');if(!panel)return;
+  panel.hidden=!open;$('class-bar').hidden=!open;
+  classSheetCache='';classStripCache='';classBarSig='';classPickCache='';
+  if(!open){$('class-pick').hidden=true;classOpen='';return;}
+  paintClasses(true);
+}
+/** The class picker, the tools strip, the open sheet and the skill bar; each rebuilt only when its markup changes. */
+function paintClasses(force=false){
+  const p=me();if(!p||!world?.arena?.classes||$('class-panel').hidden)return;
+  const chosen=!!classOf(p),pick=$('class-pick');
+  const picking=!chosen&&!['victory','defeat'].includes(world.status)&&sheet!=='menu'&&sheet!=='guide';
+  if(picking){if(force||!classPickCache){classPickCache=classPickMarkup(icon);$('class-offers').innerHTML=classPickCache;}pick.hidden=false;}
+  else if(!pick.hidden)pick.hidden=true;
+  const strip=chosen?classStripMarkup(p,{open:classOpen}):'';
+  if(force||strip!==classStripCache){classStripCache=strip;$('class-strip').innerHTML=strip;}
+  const sheetEl=$('class-sheet');
+  const html=!chosen?'':classOpen==='talents'?talentTreeMarkup(p,{selected:classTalent}):classOpen==='tools'?classToolsMarkup(world,p):'';
+  sheetEl.hidden=!html;sheetEl.classList.toggle('tree-open',classOpen==='talents');
+  if(html&&(force||html!==classSheetCache)){
+    const scroll=sheetEl.querySelector('.lab-body')?.scrollTop||0;classSheetCache=html;
+    sheetEl.innerHTML=`<header><b>${classOpen==='talents'?'Talents':'Test tools'}</b><button type="button" data-class-panel="close" aria-label="Close">✕</button></header><div class="lab-body">${html}</div>`;
+    const body=sheetEl.querySelector('.lab-body');if(body)body.scrollTop=scroll;
+  }
+  const sig=chosen?JSON.stringify([p.classId,p.classBar,p.talents]):'';
+  if(force||sig!==classBarSig){classBarSig=sig;$('class-bar').innerHTML=chosen?classBarMarkup(world,p):'';}
+  const free=chosen?pointsFree(p):0;
+  if(free>classPoints&&chosen&&p.level>1)toast(free>1?`${free} talent points to spend ✧`:'A talent point to spend ✧');
+  classPoints=free;
+  paintClassBar(p);
+}
+/** Every frame: Ki, and each bar skill's recharge ring and readiness. */
+function paintClassBar(p){
+  if(!p||!world?.arena?.classes)return;
+  const st=classBarState(world,p);if(!st)return;
+  const bar=$('class-ki-bar');if(bar)bar.style.width=`${clamp(st.ki/st.kiMax,0,1)*100}%`;
+  const value=$('class-ki-value');if(value&&value.textContent!==String(st.ki))value.textContent=String(st.ki);
+  for(const slot of st.slots){
+    const el=document.querySelector(`#class-bar [data-class-skill="${slot.id}"]`);if(!el)continue;
+    el.style.setProperty('--cd',slot.cd.toFixed(3));el.classList.toggle('ready',!slot.block);el.classList.toggle('cooling',slot.block==='cooldown');el.classList.toggle('starved',slot.block==='resource');
+  }
+}
+function classCommand(value){
+  const p=me();if(!p||!world?.arena?.classes)return;
+  const [key,arg]=value.split(':');
+  if(key==='respec')void send({type:'classTalent',op:'respec'}).then(()=>toast('Every point is yours again'));
+  else if(key==='level')void send({type:'classTest',op:'level',n:Number(arg)||1});
+  else if(key==='spawn')void send({type:'classTest',op:'spawn',n:Number(arg)||10});
+  else if(key==='toggle')void send({type:'classTest',op:'toggle',key:arg});
+  else if(['clear','wave','ki'].includes(key))void send({type:'classTest',op:key});
+  dirty=true;
+}
+function classPanel(name){classOpen=name==='close'||classOpen===name?'':name;dirty=true;paintClasses(true);}
 /** Weapon lab: the arena without rounds. Any weapon at any rank; foes on demand; a damage meter. */
 function startLab(){
   sound.unlock();storeProfile();
@@ -497,7 +563,7 @@ function labCommand(value){
   dirty=true;paintLab(true);
 }
 function leaveArena(){
-  showLab(false);document.body.classList.remove('lab','dungeon');
+  showLab(false);showClasses(false);document.body.classList.remove('lab','dungeon','classes');
   $('arena-pick').hidden=true;pickPending=null;arenaMarkup='';document.body.classList.remove('arena');
   if(zoomBeforeArena!=null){renderer.setZoom(zoomBeforeArena);zoomBeforeArena=null;}
 }
@@ -1208,6 +1274,14 @@ function paintDodge(p){
 /** The skill button: the skill of the weapon in hand, its recharge ring, and whether the stamina is there. */
 function paintSkill(p){
   const el=$('skill');if(!el||!p)return;
+  // The Classes mode: the button is the class's ultimate, paid for in its resource (Ki).
+  if(world?.arena?.classes){
+    const st=classOf(p)?classBarState(world,p):null,u=st?.ultimate,locked=u?.block==='locked',sig=`class|${u?.name}|${locked}`;
+    if(sig!==skillSig){skillSig=sig;el.innerHTML=`<span class="skill-glyph" aria-hidden="true">✦</span><small>${escapeHtml(locked?`Lv ${u.level}`:u?.name||'Skill')}</small>`;el.setAttribute('aria-label',u?`Ultimate: ${u.name}. ${u.text}`:'Skill');el.title=u?`${u.name} (Q) · ${u.cost} Ki · ${u.text}`:'';}
+    el.style.setProperty('--cd',(u?.cd||0).toFixed(3));el.style.setProperty('--fuel',clamp(st?st.ki/st.kiMax:0,0,1).toFixed(3));
+    el.classList.toggle('ready',!!u&&!u.block);el.classList.toggle('weary',!!u&&(u.block==='resource'||locked));el.classList.toggle('cooling',u?.block==='cooldown');
+    return;
+  }
   const info=skillFor(p),block=skillBlock(world,p),sig=`${info?.itemId}|${info?.name}`;
   if(sig!==skillSig){
     skillSig=sig;
@@ -1226,7 +1300,7 @@ function paintArenaClock(){
     $('day-progress').style.left=`${clamp(labDps(world)/Math.max(1,a.stats?.peak||1),0,1)*100}%`;
     return;
   }
-  $('region-name').textContent=a.phase==='fight'?`${left} LEFT`:a.phase==='pick'?'CHOOSE A WEAPON':a.phase==='countdown'?`GET READY · ${Math.max(1,Math.ceil(a.timer))}`:'WAVE CLEARED';
+  $('region-name').textContent=a.phase==='fight'?`${left} LEFT`:a.phase==='pick'?'CHOOSE A WEAPON':a.phase==='class'?'CHOOSE A CLASS':a.phase==='countdown'?`GET READY · ${Math.max(1,Math.ceil(a.timer))}`:a.classes&&a.hold?'WAVES HELD':'WAVE CLEARED';
   $('day-number').textContent=`WAVE ${String(Math.max(1,a.wave)).padStart(2,'0')}`;
   const track=$('day-track');if(track.dataset.stops!=='arena'){track.dataset.stops='arena';track.style.background='linear-gradient(90deg,#c6855d,#e0523f)';}
   const done=a.phase==='fight'&&a.total?1-left/a.total:a.phase==='countdown'?0:1;
@@ -1286,6 +1360,7 @@ function ui(){
     }
     if(world?.showcase)paintShowcase();
     if(world?.arena?.lab)paintLab();
+    if(world?.arena?.classes)paintClasses();
     if(sheet==='catalog'&&catalog.source==='station'){const station=world.buildings.find(b=>b.id===catalog.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(sheet==='refine'){const station=world.buildings.find(b=>b.id===refining.stationId&&b.hp>0);if(!station||distance(p,station)>=5){closeSheet();toast('Station out of range');}}
     if(sheet==='shelf'){const shelf=world.buildings.find(b=>b.id===shelving.shelfId&&b.hp>0);if(!shelf||distance(p,shelf)>=RULES.reach){closeSheet();toast('Bookshelf out of reach');}}
@@ -1343,7 +1418,7 @@ function setupControls(){
   $('looks').onclick=e=>{const b=e.target.closest('[data-look]');if(!b)return;pickWanderer(baseOf(character),b.dataset.look);};
   $('mode-expedition').onclick=()=>{if(!busy){syncSaveOption();showFrontPanel('expedition-panel');}};$('expedition-back').onclick=()=>showFrontPanel('home-panel');
   $('mode-join').onclick=()=>{if(!busy){showFrontPanel('join-panel');$('room-input').focus();}};$('join-back').onclick=()=>showFrontPanel('home-panel');
-  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('homestead').onclick=()=>{if(!busy)startHomestead();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-lands').onclick=e=>{const b=e.target.closest('[data-land]');if(!b||busy)return;vigilLand=b.dataset.land;try{localStorage.setItem('hollowstead.vigilLand',vigilLand);}catch{}for(const el of $('vigil-lands').children)el.setAttribute('aria-pressed',String(el===b));};$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(vigilKey())?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(vigilKey())?'resume':'new');};$('vigil-slots').onclick=e=>{const b=e.target.closest('[data-slot]');if(b&&!busy)pickVigilSlot(Number(b.dataset.slot));};$('vigil-copy').onclick=copyVigil;$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
+  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('homestead').onclick=()=>{if(!busy)startHomestead();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('classes').onclick=()=>{if(!busy)startClasses();};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true);};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-lands').onclick=e=>{const b=e.target.closest('[data-land]');if(!b||busy)return;vigilLand=b.dataset.land;try{localStorage.setItem('hollowstead.vigilLand',vigilLand);}catch{}for(const el of $('vigil-lands').children)el.setAttribute('aria-pressed',String(el===b));};$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(vigilKey())?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(vigilKey())?'resume':'new');};$('vigil-slots').onclick=e=>{const b=e.target.closest('[data-slot]');if(b&&!busy)pickVigilSlot(Number(b.dataset.slot));};$('vigil-copy').onclick=copyVigil;$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;syncSoundButton();sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   // Pack, Build and Light answer on release over the same button (pointer events, so a held joystick does not swallow the tap).
@@ -1477,7 +1552,7 @@ function setupControls(){
     if(cmd==='maintain'){closeSheet();maintenance=true;maintenanceTarget=null;selected=null;dirty=true;}
     if(cmd==='remove-tool')startRemoveTool();
   };
-  $('new-expedition').onclick=()=>{if(world?.dungeon){const pin=world.dungeon.forced;$('end-screen').hidden=true;lastEnd='';if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World((Math.random()*0xffffffff)>>>0,{dungeon:{variant:pin}});for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();document.body.classList.add('dungeon');announce(dungeonWelcome());network.broadcast();}else startDungeon(pin||'');return;}if(world?.arena){$('end-screen').hidden=true;lastEnd='';if(world.arena.lab)startLab();else startArena();return;}if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World();for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();lastEnd='';$('end-screen').hidden=true;network.broadcast();save();}else solo();};
+  $('new-expedition').onclick=()=>{if(world?.dungeon){const pin=world.dungeon.forced;$('end-screen').hidden=true;lastEnd='';if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World((Math.random()*0xffffffff)>>>0,{dungeon:{variant:pin}});for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();document.body.classList.add('dungeon');announce(dungeonWelcome());network.broadcast();}else startDungeon(pin||'');return;}if(world?.arena){$('end-screen').hidden=true;lastEnd='';if(world.arena.lab)startLab();else if(world.arena.classes)startClasses();else startArena();return;}if(mode==='host'){const people=world.players.filter(p=>p.online);world=new World();for(const p of people)world.addPlayer(p.id,p.name,p.character);world.start();lastEnd='';$('end-screen').hidden=true;network.broadcast();save();}else solo();};
   $('end-home').onclick=goHome;$('endless').onclick=()=>{world.status='playing';world.endless=true;world.bossSpawned=true;lastEnd='';$('end-screen').hidden=true;save();network?.broadcast();};
   window.addEventListener('keydown',event=>{
     if(['INPUT','TEXTAREA'].includes(event.target.tagName)||$('game').hidden||!$('end-screen').hidden)return;
@@ -1508,6 +1583,14 @@ function setupControls(){
     if(!$('arena-pick').hidden){
       if(named?.startsWith('action-')){const index=Number(named.slice(7))-1;if(pickPending!=null){if(index<3){const at=pickPending;pickPending=null;arenaMarkup='';void send({type:'arenaPick',choice:at,replace:index}).then(refresh);}}else void choosePick(index);}
       return;
+    }
+    // Classes mode: 1-4 cast the bar's skills, T opens the talents; with the picker up, 1-4 choose a class.
+    if(world?.arena?.classes){
+      if(!$('class-pick').hidden){if(named?.startsWith('action-')){const card=document.querySelectorAll('#class-offers [data-class]')[Number(named.slice(7))-1];if(card)void send({type:'classPick',classId:card.dataset.class}).then(()=>{dirty=true;paintClasses(true);});}return;}
+      if(classOf(actor)){
+        if(key==='t'){classPanel('talents');return;}
+        if(named?.startsWith('action-')&&allowsCombat(modeName)){const id=actor.classBar?.[Number(named.slice(7))-1];if(id)void send({type:'classSkill',skill:id},{quiet:true});return;}
+      }
     }
     if(named==='weapon-next'){event.preventDefault();cycleWeapon();return;}
     if(named==='potion'){event.preventDefault();void drinkPotion();return;}
@@ -1562,7 +1645,7 @@ function frame(now){
     attack:allowsCombat(modeName)&&(hold.attack||keys.has(' ')||autoSwing(modeName)),
     target:selected,
   };
-  if(playing){paintDodge(me());paintSkill(me());}
+  if(playing){paintDodge(me());paintSkill(me());paintClassBar(me());}
   {const p=playing?me():null;hurtFx.update(p,p?maxHealth(p):1,dt);}
   if(mode==='host'||mode==='solo'){world.input(localId,input);if(playing){acc+=dt;let steps=0;while(acc>=RULES.tick&&steps++<4){world.tick();acc-=RULES.tick;}}else acc=0;localClient?.tick();}
   if(networkTime>.075){networkTime=0;if(mode==='guest'&&playing)network?.input(input);if(mode==='host')network?.broadcast();}
@@ -1598,6 +1681,29 @@ async function init(){
   labPanel?.addEventListener('pointerdown',event=>event.stopPropagation());
   labPanel?.addEventListener('pointerup',event=>event.stopPropagation());
   labPanel?.addEventListener('click',event=>{event.stopPropagation();const button=event.target.closest('[data-lab]');if(button){sound?.unlock();labCommand(button.dataset.lab);}});
+  // Classes mode: the tools strip and sheet (talents, test tools), the skill bar and the class picker.
+  const classPanelEl=$('class-panel');
+  classPanelEl?.addEventListener('pointerdown',event=>event.stopPropagation());
+  classPanelEl?.addEventListener('pointerup',event=>event.stopPropagation());
+  classPanelEl?.addEventListener('click',event=>{
+    event.stopPropagation();sound?.unlock();
+    const panel=event.target.closest('[data-class-panel]'),node=event.target.closest('[data-talent]'),learnIt=event.target.closest('[data-talent-learn]'),op=event.target.closest('[data-class-op]');
+    if(panel){classPanel(panel.dataset.classPanel);return;}
+    if(learnIt){void send({type:'classTalent',op:'learn',node:learnIt.dataset.talentLearn}).then(()=>{dirty=true;paintClasses(true);});return;}
+    if(node){classTalent=node.dataset.talent;paintClasses(true);return;}
+    if(op)classCommand(op.dataset.classOp);
+  });
+  $('class-bar').addEventListener('pointerdown',event=>{
+    const button=event.target.closest('button');if(!button)return;event.preventDefault();event.stopPropagation();sound?.unlock();
+    if(button.dataset.classPanel){classPanel('talents');return;}
+    if(button.dataset.classSkill&&allowsCombat(currentMode()))void send({type:'classSkill',skill:button.dataset.classSkill},{quiet:true});
+  });
+  $('class-pick').addEventListener('click',event=>{
+    event.stopPropagation();
+    if(event.target.closest('#class-menu')){$('class-pick').hidden=true;openSheet('menu');return;}
+    const card=event.target.closest('[data-class]');if(!card)return;sound?.unlock();
+    void send({type:'classPick',classId:card.dataset.class}).then(result=>{if(result?.ok){dirty=true;paintClasses(true);}});
+  });
   $('front-fullscreen')?.addEventListener('click',()=>void toggleFullscreen());
   document.addEventListener('fullscreenchange',onFullscreenChange);
   document.addEventListener('webkitfullscreenchange',onFullscreenChange);
@@ -1606,10 +1712,11 @@ async function init(){
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void checkForUpdate();});
   setInterval(()=>void checkForUpdate(),60000);
   $('loading').hidden=true;$('front').hidden=false;requestAnimationFrame(frame);
-  if(params.has('dev')||params.has('showcase')||params.has('homestead')||params.has('arena')||params.has('lab')||params.has('dungeon'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,startLab,startDungeon,labCommand,setTime(t){world.time=t;},get network(){return network;}};
+  if(params.has('dev')||params.has('showcase')||params.has('homestead')||params.has('arena')||params.has('lab')||params.has('classes')||params.has('dungeon'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,startLab,startDungeon,labCommand,setTime(t){world.time=t;},get network(){return network;}};
   if(params.has('showcase'))startShowcase();
   else if(params.has('homestead'))startHomestead();
   else if(params.has('lab'))startLab();
+  else if(params.has('classes'))startClasses();
   else if(params.has('arena'))startArena();
   else if(params.has('dungeon'))startDungeon(params.get('dungeon')||'');
 }

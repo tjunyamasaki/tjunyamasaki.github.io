@@ -19,7 +19,7 @@ const rankOfOwner = p => p && typeof p === 'object' ? rankOf(p, PACK) : 1;
 
 // ------------------------------------------------------------------ shapes
 /** A cherry petal, inked: a small teardrop with a notch, spinning in the picture plane. */
-function petal(d, x, z, y, r, spin, alpha, color = PETAL){
+export function petal(d, x, z, y, r, spin, alpha, color = PETAL){
   if(!(alpha > .02)) return;
   const c = Math.cos(spin), s = Math.sin(spin), q = (u, v) => at(x, z, y, (u*c-v*s)*r, (u*s+v*c)*r);
   const pts = [q(0, 1), q(.6, .3), q(.48, -.55), q(0, -.28), q(-.48, -.55), q(-.6, .3), q(0, 1)];

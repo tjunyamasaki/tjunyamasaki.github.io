@@ -7,7 +7,7 @@ export const TRANSACTION_PROTOCOL=1;
 const outcome=code=>({ok:code==='ok',code});
 // Gameplay ping and automatic eat are not world actions. Legacy inventory
 // packets stay excluded: their replacements require revisions.
-const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','skill','dash','lantern','repair','dismantle','upgrade','hotbar','arenaPick','cart','strike','refine','ascendWeapon','tile','shelf']);
+const WORLD_ACTIONS=new Set(['move','craft','build','interact','attack','skill','dash','lantern','repair','dismantle','upgrade','hotbar','arenaPick','cart','strike','refine','ascendWeapon','tile','shelf','classPick','classSkill','classTalent','classTest']);
 function validWorldAction(cmd){
   if(typeof cmd.type!=='string')return false;
   if(['move','build'].includes(cmd.type)&&(!Number.isFinite(cmd.x)||!Number.isFinite(cmd.z)))return false;
@@ -19,6 +19,10 @@ function validWorldAction(cmd){
   if(cmd.type==='refine'&&(typeof cmd.stationId!=='string'||typeof cmd.itemId!=='string'||!Number.isInteger(cmd.slot)||(cmd.bookId!=null&&typeof cmd.bookId!=='string')))return false;
   if(cmd.type==='shelf'&&(typeof cmd.shelfId!=='string'||!['store','take'].includes(cmd.op)||(cmd.bookId!=null&&typeof cmd.bookId!=='string')||(cmd.count!=null&&!Number.isSafeInteger(cmd.count))))return false;
   if(cmd.type==='ascendWeapon'&&(typeof cmd.stationId!=='string'||typeof cmd.itemId!=='string'))return false;
+  // The Classes mode (classes/mode.mjs).
+  if(['classPick','classSkill'].includes(cmd.type)&&typeof (cmd.type==='classPick'?cmd.classId:cmd.skill)!=='string')return false;
+  if(cmd.type==='classTalent'&&(!['learn','respec','slot'].includes(cmd.op)||(cmd.op==='learn'&&typeof cmd.node!=='string')||(cmd.op==='slot'&&(typeof cmd.skill!=='string'||!Number.isInteger(cmd.slot)))))return false;
+  if(cmd.type==='classTest'&&(typeof cmd.op!=='string'||(cmd.key!=null&&typeof cmd.key!=='string')||(cmd.n!=null&&!Number.isSafeInteger(cmd.n))))return false;
   if(cmd.type==='arenaPick'&&(!Number.isInteger(cmd.choice)||(cmd.replace!=null&&!(Number.isInteger(cmd.replace)&&cmd.replace>=0&&cmd.replace<HOTBAR_SLOTS))))return false;
   return true;
 }

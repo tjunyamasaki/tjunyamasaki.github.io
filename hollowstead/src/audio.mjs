@@ -59,6 +59,17 @@ export class Sound {
       for(let i=0;i<n;i++)this.sweep(2000-i*120,420,.09,'sawtooth',.009,.07+i*(big?.03:.045));this.sweep(170,48,big?.5:.3,'triangle',big?.08:.05,.06);return;}
     if(type==='katavanish'){this.sweep(900,140,.4,'sine',.03);this.sweep(2600,300,.28,'sawtooth',.007);return;}
     if(type==='kataline'){this.sweep(4400,1500,.06,'sawtooth',.006);this.sweep(1500+((ev?.n||0)%4)*90,900,.12,'sine',.007);return;}
+    // The Kagekiri Ronin's skills (src/classes/ronin.mjs): a breath of shadow, threads reeling in, a crossing ringing out,
+    // the sheath's hard click, petals falling, a shadow rising, a glint coming back, a chime for a talent learned.
+    if(type==='roninstep'){if(ev?.start){this.sweep(700,140,.22,'sine',.03);this.sweep(3000,600,.16,'sawtooth',.006);}else this.sweep(2400,4200,.08,'sawtooth',.006);return;}
+    if(type==='roninlure'){this.sweep(180,520,.3,'triangle',.035);this.sweep(1600,700,.25,'sawtooth',.005);return;}
+    if(type==='ronincrux'){const n=Math.min(4,ev?.pts?.length||1);for(let i=0;i<n;i++)this.sweep(2800+i*380,2700+i*380,.22,'sine',.012,i*.05);this.sweep(260,90,.14,'triangle',.04);return;}
+    if(type==='roninsheath'){this.sweep(5200,5100,.12,'sine',.012);this.sweep(420,160,.1,'square',.012);this.sweep(1400,1380,.4,'sine',.01+.0002*(ev?.ki||0),.05);return;}
+    if(type==='roninblossom'){for(const [i,f] of [1568,1760,2093,2349].entries())this.sweep(f,f*.99,.35,'sine',.008,i*.06);return;}
+    if(type==='roninecho'||type==='roninreturned'){this.sweep(160,480,.4,'sine',.03);this.sweep(980,1960,.35,'triangle',.006,.05);return;}
+    if(type==='roninreturn'){this.sweep(1800,4600,.12,'sawtooth',.006);this.sweep(1320,1980,.2,'sine',.012);return;}
+    if(type==='roninpetals'){this.sweep(3600,2400,.18,'sine',.008);return;}
+    if(type==='talent'){for(const [i,f] of [660,880,1320].entries())this.sweep(f,f,.3,'sine',.014,i*.07);return;}
     if(type==='kataappear'){this.sweep(300,960,.26,'sine',.022);this.sweep(2200,2240,.2,'sine',.006,.08);return;}
     // The Shrine of Yomi's weapons: the guandao's whistling crescent (longer as the line holds), its echo and the
     // dragon; the talismans' flick and burn; the bone hand's grab, crash and avalanche.

@@ -16,6 +16,7 @@ Pick a wanderer and a name on the left of the title screen, then a card on the r
 - **Dungeons** is a crawl through floors carved fresh every time, alone or with up to three friends. See [Dungeons](#dungeons).
 - **Arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
 - **Weapon lab** is the arena without rounds, for trying and balancing weapons. See [Weapon lab](#weapon-lab).
+- **Classes** is a test ground for a new way to grow: choose a class instead of collecting weapons, and spend a talent point every level. See [Classes](#classes).
 - **Showcase** is a sandbox clearing for placing anything in the game.
 - **The Vigil** builds and farms on the grid (soil, floors, walls and camp objects a cell at a time, from the Build menu, paid for in materials). **Homestead** (or `?homestead` in the address) is a calm sandbox for the same system: till soil, sow day and night crops, lay floors, run fences, palisades, stone walls and gates, close rooms with house walls and sleep through the night, cook blessing dishes, and test raids against your walls. Solo, free building by default, not saved. See `docs/HOMESTEAD.md`.
 
@@ -109,6 +110,24 @@ The arena keeps only health and level: no hunger, courage, weapon wear or loot. 
 - **Foes** chooses what to spawn (a mix, or one kind), how many, how strong (the arena wave it is drawn from) and where: ahead of you, around you, or from the wall. **Spawn** (N) and **Clear** (X) work at any time.
 - Switches: **Invulnerable**, **Foes stand still** (training dummies that never strike back), **Free skills** (no cooldown or stamina, for trying looks quickly) and **Auto-attack**.
 - The meter shows damage per second (averaged over five seconds), total damage, the peak, kills and foes alive. It counts every point of health foes lose, whatever dealt it; **Reset meter** starts it over.
+
+## Classes
+
+**Classes** on the title screen (or `?classes` in the address) is a test ground for class-based progression, MMO style. It is the arena's clearing and endless waves, but there are no weapon cards: you choose a **class**, its weapon is yours for good, and every level is a **talent point**. It is solo and never saved.
+
+- **Talents** (T) opens the class's tree: three branches, five rows each. A branch's next row opens for every three points you spend in it, and some talents need the one above them. Tap a talent to read it, then **Learn**. **Reset points** takes every point back.
+- Active skills you learn go on the **skill bar** (1–4) at the bottom; the class's ultimate is on the ✦ button (Q). Skills spend the class's resource and recharge on their own timers.
+- **Tools** has the test switches: levels up and down (down refunds your points), spawn foes, clear them, call the next wave, fill the resource, **Invulnerable**, **Hold the waves** and **Free skills**.
+
+The first class is the **Kagekiri Ronin**, built on Kagekiri, the shrine blade of Yomi. Your attack is its iai draw: three draws make a set, every cut hangs in the air, and the third draw sheathes the blade and snaps every hanging cut shut on whatever stands in it. Where two of your cuts cross, the snap bursts there too (a **Crux**). Draws that land and snaps build **Ki**; skills spend it.
+
+| Branch | What it does | Skills | Capstone |
+| --- | --- | --- | --- |
+| **Iai** · the Draw | lays more cuts, longer and keener | **Crossing Cut** (an X of two cuts: a Crux of its own), **Swallow Return** (every cut near you strikes again and hangs anew) | **Endless Line**: cuts wait for the sheath |
+| **Kage** · the Shadow | moves you, and drags them onto your lines | **Shadow Step** (dash through foes; the path hangs as a cut), **Shadow Lure** (drag every foe near onto your nearest cut and hold it), **Shadow Echo** (each draw lays a twin across it) | **Return from Darkness**: a great snap readies Shadow Step |
+| **Sakura** · the Sheath | closes the lines | **Swift Sheath** (snap everything now, harder for the Ki you spend), **Falling Blossom** (six cuts close a ring round your mark: six corners, six Crux) | **Thousand Petals**: every closed cut looses a petal blade |
+
+The ultimate, **Hundred-Line Draw**, wakes at level 6. A typical turn: lay a Crossing Cut or a Falling Blossom where the swarm is coming, Shadow Lure everything onto the lines, then Swift Sheath to close them all at once.
 
 ## Shared chests
 

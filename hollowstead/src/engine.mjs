@@ -31,6 +31,7 @@ import {landReason, offerAt, shrineLabel, stepShrineCamp} from './shrinecamp.mjs
 import {HEARTH_MEND, stepSunburn, sunTook} from './sunburn.mjs?v=harvest-18';
 import {hushReason, hushedAt} from './hush.mjs?v=harvest-18';
 import {labKill, setupLab, stepLab} from './lab.mjs?v=harvest-18';
+import {classAction, setupClasses, stepClasses} from './classes/mode.mjs?v=harvest-18';
 import {ARSENAL, stepArsenal} from './arsenal.mjs?v=harvest-18';
 import {stepMobs} from './mobs.mjs?v=harvest-18';
 import {applyTiles, builtAt, carriedSeeds, cropTargets, gridWorld, refund, roomOfBuilding, setupHomestead, stepTiles, wildSeeds} from './homestead.mjs?v=harvest-18';
@@ -214,7 +215,7 @@ export class World {
     // The land (worldgen.mjs LANDS), a Vigil setting: registered with the seed before the hollow is built.
     if(typeof options?.land==='string'&&options.land!=='hollow'){this.land=options.land;}setLand(seed,this.land||null);
     for(const key of ['frameObstacles','fieldBudget','obstacleCache','flowFields'])Object.defineProperty(this,key,{value:key==='flowFields'?new Map():null,writable:true,configurable:true,enumerable:false});
-    const bare=this.showcase||options?.arena===true||options?.lab===true||!!options?.dungeon||options?.bare===true;
+    const bare=this.showcase||options?.arena===true||options?.lab===true||options?.classes===true||!!options?.dungeon||options?.bare===true;
     this.nodes=bare?[]:makeMap(seed);
     // A Vigil begins with no Heartfire (vigil.mjs): the Glimmerstone stands in the middle, where it used to burn.
     this.buildings=bare?[]:[this.mode==='vigil'?Object.assign(this.structure('glimmer',CENTER.x,CENTER.z),{fixed:true,scale:1.5}):this.structure('hearth',0,0)];this.enemies=[];this.drops=[];this.events=[];this.explored=[];
@@ -222,8 +223,9 @@ export class World {
     this.networkId=crypto.randomUUID();this.transactionRevision=0;this.chestSessions=new Map();this.night=null;
     this.harvestWork=new Map();this.reviveWork=new Map();this.activations=new Map();this.dismantleHolds=new Map();this.toolNoticeAt=new Map();this.damagedAt=new Map();this.pickupDwell=new Map();this.packNoticeAt=new Map();this.previewUid=1;
     this.stats={gathered:0,built:0,revives:0};this.inputs=new Map();this.rng=random(seed^0x1234);this.mobRng=random(seed^0xa11ce);this.spawnRng=random(seed^0x5eed);this.lootRng=random(seed^0x100f);this.discoverTimer=0;
-    if(options?.arena===true||options?.lab===true)setupArena(this);
+    if(options?.arena===true||options?.lab===true||options?.classes===true)setupArena(this);
     if(options?.lab===true)setupLab(this);
+    if(options?.classes===true)setupClasses(this);
     if(options?.dungeon)setupDungeon(this, options.dungeon===true?{}:options.dungeon);
     if(options?.homestead===true)setupHomestead(this);
   }
@@ -704,7 +706,7 @@ export class World {
     if(this.status!=='playing')return {ok:false,code:'unavailable'};
     if(p.down||p.ghost){if(cmd.type==='interact'&&p.charm>0){p.charm--;this.revivePlayer(p);this.event('heal',p.x,p.z,'Last charm');return {ok:true,code:'ok'};}return {ok:false,code:'unavailable'};}
     if(Object.hasOwn(INTENTS,cmd.type))return inventoryIntent(this,p,cmd);
-    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill','refine','ascendWeapon','tile','shelf'].includes(cmd.type))return {ok:false,code:'cooldown'};
+    if(p.cooldown>.05&&!['move','lantern','dash','dismantle','hotbar','arenaPick','cart','strike','skill','refine','ascendWeapon','tile','shelf','classPick','classSkill','classTalent','classTest'].includes(cmd.type))return {ok:false,code:'cooldown'};
     switch(cmd.type){
       case 'move':if(Number.isFinite(cmd.x)&&Number.isFinite(cmd.z)){const gx=clamp(cmd.x,-this.radius+1,this.radius-1),gz=clamp(cmd.z,-this.radius+1,this.radius-1),land=this.walkable(gx,gz)?null:this.landNear(gx,gz,6);p.goal={x:land?land.x:gx,z:land?land.z:gz,target:typeof cmd.target==='string'?cmd.target:null};p.rest=false;}break;
       case 'craft':return this.performCraft(p, cmd.recipe, cmd.stationId);
@@ -727,13 +729,15 @@ export class World {
       case 'eat':return {ok:false,code:'unsupported'};
       case 'interact':return this.interact(p, cmd.target)||{ok:false,code:'rejected'};
       case 'attack':this.attack(p);break;
-      case 'skill':return useSkill(this, p);
+      // The Classes mode (classes/mode.mjs): the skill button is the class's ultimate, and the class has commands of its own.
+      case 'skill':return this.arena?.classes?classAction(this, p, {type:'classSkill',skill:'ultimate'}):useSkill(this, p);
+      case 'classPick':case 'classSkill':case 'classTalent':case 'classTest':return classAction(this, p, cmd);
       case 'refine':return refineWeapon(this, p, cmd);
       case 'shelf':return this.dungeon||this.arena?{ok:false,code:'unavailable'}:shelfAction(this, p, cmd);
       case 'ascendWeapon':return ascendWeapon(this, p, cmd);
       case 'dash':return this.dodge(p);
       case 'hotbar':return this.selectHotbar(p, cmd.slot);
-      case 'arenaPick':return this.arena?arenaPick(this, p, cmd.choice, cmd.replace):{ok:false,code:'unavailable'};
+      case 'arenaPick':return this.arena&&!this.arena.classes?arenaPick(this, p, cmd.choice, cmd.replace):{ok:false,code:'unavailable'};
       case 'cart':return this.arena?{ok:false,code:'unavailable'}:cartAction(this, p, cmd);
       case 'strike':return rhythmStrike(this, p, cmd);
       case 'lantern':{
@@ -1732,7 +1736,7 @@ export class World {
   tick(dt=RULES.tick){
     pruneChests(this);if(this.status!=='playing')return;dt=clamp(dt,0,.1);
     let phase='day';
-    if(this.arena){this.time+=dt;if(this.arena.lab)stepLab(this,dt);else stepArena(this,dt);if(this.status!=='playing')return;}
+    if(this.arena){this.time+=dt;if(this.arena.lab)stepLab(this,dt);else if(this.arena.classes)stepClasses(this,dt);else stepArena(this,dt);if(this.status!=='playing')return;}
     else if(this.dungeon){this.time+=dt;stepDungeon(this,dt);stepDelve(this,dt);if(this.status!=='playing')return;}
     else{
     // Homestead sandbox with daylight held: dusk never comes (the clock skips to the next morning).

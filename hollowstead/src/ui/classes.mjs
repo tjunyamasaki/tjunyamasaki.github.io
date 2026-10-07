@@ -45,12 +45,10 @@ export function classBarState(world, p){
 }
 
 /** Tools strip under the vitals: the tree (with unspent points), the test switches. */
-/** Skill-button layouts round Attack (styles/classes.css): picked on the strip, kept per browser. */
-export const CLASS_LAYOUTS = Object.freeze({arc: 'Arc', block: 'Block', tower: 'Tower'});
-export function classStripMarkup(p, {open = '', tools = true, layout = 'arc'} = {}){
+export function classStripMarkup(p, {open = '', tools = true, editing = false} = {}){
   const free = classOf(p) ? pointsFree(p) : 0;
   return `<button type="button" data-class-panel="talents" aria-pressed="${open === 'talents'}" class="${free ? 'has-points' : ''}" title="Talents (T)">✧<small>Talents</small>${free ? `<i class="class-points">${free}</i>` : ''}</button>`
-    + `<button type="button" data-class-layout="next" title="Skill buttons: ${escape(CLASS_LAYOUTS[layout] || '')} (tap for the next layout)">▦<small>${escape(CLASS_LAYOUTS[layout] || 'Layout')}</small></button>`
+    + `<button type="button" data-class-panel="hud" aria-pressed="${editing}" title="Arrange your buttons">⊞<small>Buttons</small></button>`
     + (tools ? `<button type="button" data-class-panel="tools" aria-pressed="${open === 'tools'}" title="Test tools">⚙<small>Tools</small></button>` : '');
 }
 
@@ -77,7 +75,7 @@ export function talentTreeMarkup(p, {selected = ''} = {}){
     return `<section class="talent-tree tree-${escape(tree.id)}"><header><b>${escape(tree.name)}</b> <span>${escape(tree.sub)}</span><em>${inTree}</em></header><p>${escape(tree.blurb)}</p>${tiers}</section>`;
   }).join('');
   const node = def.nodes[selected];
-  let card = `<p class="talent-hint">Tap a talent to read it. Each level gives a point; a branch's next row opens every ${CLASS_RULES.tierPoints} points spent in it. Active skills go on the bar (keys 1-4); ${escape(def.ultimate.name)} is on ✦ (Q) from level ${def.ultimate.level}.</p>`;
+  let card = `<p class="talent-hint">Tap a talent to read it. Each level gives a point; a branch's next row opens every ${CLASS_RULES.tierPoints} points spent in it. Active skills go on your buttons (keys 1-8, arranged with ⊞ Buttons); ${escape(def.ultimate.name)} is on ✦ (Q) from level ${def.ultimate.level}.</p>`;
   if(node){
     const rank = talentRank(p, selected), why = learnReason(p, selected), skill = def.skills[selected];
     const next = rank < node.max ? node.text(rank+1) : '';

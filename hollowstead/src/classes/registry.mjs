@@ -18,7 +18,7 @@
 export const CLASS_RULES = Object.freeze({
   tierPoints: 3,      // points spent in a branch to open its next tier
   tiers: 5,
-  barSlots: 4,        // skills on the bar (keys 1-4)
+  barSlots: 8,        // skills on the bar (keys 1-8; the HUD shows the slots the player placed, src/ui/hud.mjs)
   gcd: .3,            // a short pause shared by every class skill
 });
 

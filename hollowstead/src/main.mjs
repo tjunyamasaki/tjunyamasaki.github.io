@@ -38,9 +38,10 @@ import {createUpdateChecker} from './updates.mjs?v=harvest-18';
 import {skillBlock, skillFor} from './skills.mjs?v=harvest-18';
 import {labClear, labDps, labEquip, labLevel, labRank, labResetStats, labSpawn, labStrength, labToggle} from './lab.mjs?v=harvest-18';
 import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/lab.mjs?v=harvest-18';
-import {CLASS_LAYOUTS, classBarMarkup, classBarState, classPickMarkup, classStripMarkup, classToolsMarkup, talentTreeMarkup} from './ui/classes.mjs?v=harvest-18';
+import {classBarMarkup, classBarState, classPickMarkup, classStripMarkup, classToolsMarkup, talentTreeMarkup} from './ui/classes.mjs?v=harvest-18';
 import {classOf, pointsFree} from './classes/registry.mjs?v=harvest-18';
 import {pathHearth} from './classes/mode.mjs?v=harvest-18';
+import {DEFAULT_HUD, HUD_BUTTONS, HUD_SIZES, addTile, bottomReach, fitHud, hudGrid, moveTile, removeTile, resizeTile, tileBox} from './ui/hud.mjs?v=harvest-18';
 import {REFINE_CURRENCY, bookLines, carriedBooks, carriedGear, modText, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
 import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
 import {shelfMarkup} from './ui/bookshelf.mjs?v=harvest-18';
@@ -76,11 +77,98 @@ let healPick='elixir',healHad=false,healPicker=false,autoAttack=true,pickPending
 let dungeonPick='';
 /** Weapon lab panel state (presentation only; the lab's rules live in lab.mjs). */
 /** Classes mode panels (presentation only; the rules live in classes/). */
-/** Where the class's skill buttons sit round Attack (ui/classes.mjs CLASS_LAYOUTS): kept per browser, or ?layout= in the address. */
-let classLayout='arc';
-try{const asked=new URLSearchParams(location.search).get('layout'),kept=localStorage.getItem('hollowstead.classLayout');classLayout=Object.hasOwn(CLASS_LAYOUTS,asked||'')?asked:Object.hasOwn(CLASS_LAYOUTS,kept||'')?kept:'arc';}catch{}
-document.body.dataset.classLayout=classLayout;
-function nextClassLayout(){const ids=Object.keys(CLASS_LAYOUTS);classLayout=ids[(ids.indexOf(classLayout)+1)%ids.length];document.body.dataset.classLayout=classLayout;try{localStorage.setItem('hollowstead.classLayout',classLayout);}catch{}toast(`Skill buttons: ${CLASS_LAYOUTS[classLayout]}`);paintClasses(true);}
+/**
+ * The action HUD of classed worlds (ui/hud.mjs): every combat button on a grid in the bottom-right, arranged
+ * by the player in the HUD editor and kept on this browser. The nearby actions (Gather, Feed...) move to the
+ * bottom centre, between the movement pad and the buttons.
+ */
+const HUD_KEY='hollowstead.hud.v1';
+let hudLayout=(()=>{try{const kept=JSON.parse(localStorage.getItem(HUD_KEY)||'null');return Array.isArray(kept)?kept:DEFAULT_HUD.map(t=>({...t}));}catch{return DEFAULT_HUD.map(t=>({...t}));}})();
+let hudEdit=null;
+function storeHud(){try{localStorage.setItem(HUD_KEY,JSON.stringify(hudLayout));}catch{}}
+/** The HUD's elements by button id. */
+function hudElements(){
+  const out={attack:$('attack'),ult:$('skill'),dodge:$('dodge'),heal:$('hotbar-potion')};
+  for(let i=0;i<8;i++)out[`skill${i+1}`]=document.querySelector(`#class-bar .class-slot[data-slot="${i}"]`);
+  return out;
+}
+function currentHudGrid(){
+  const pad=$('joystick')?.getBoundingClientRect();
+  return hudGrid(innerWidth,innerHeight,{padRight:pad&&pad.width?pad.right:160});
+}
+/** Put every HUD button where the layout says (or clear it all outside classed worlds). */
+function applyHud(on=!!world?.classed&&!$('class-panel').hidden){
+  const els=hudElements(),extras=[$('heal-swap'),$('heal-picker'),document.querySelector('#action-cluster .stamina-track'),document.querySelector('#class-bar .class-resource')];
+  const reset=el=>{if(!el)return;el.classList.remove('hud-btn','hud-off');for(const k of ['right','bottom','width','height','min-width','min-height','--hs'])el.style.removeProperty(k);};
+  if(!on){for(const el of [...Object.values(els),...extras])reset(el);const row=$('context-row');if(row){row.style.removeProperty('--ctx-left');row.style.removeProperty('--ctx-right');}return;}
+  const grid=currentHudGrid();hudLayout=fitHud(hudLayout,grid);
+  const placed=new Map(hudLayout.map(t=>[t.id,t]));
+  for(const [id,el] of Object.entries(els)){
+    if(!el)continue;const t=placed.get(id);
+    if(!t){el.classList.add('hud-off');continue;}
+    const b=tileBox(t,grid);el.classList.add('hud-btn');el.classList.remove('hud-off');
+    for(const [k,v] of [['right',b.right],['bottom',b.bottom],['width',b.size],['height',b.size],['min-width',b.size],['min-height',b.size],['--hs',b.size]])el.style.setProperty(k,`${Math.round(v)}px`);
+  }
+  // What rides on a button: the heal chooser on Heal, stamina under Attack, the class resource under the ultimate.
+  const box=id=>placed.has(id)?tileBox(placed.get(id),grid):null,heal=box('heal'),atk=box('attack'),ult=box('ult');
+  const [swap,picker,stamina,ki]=extras;
+  if(swap){swap.classList.toggle('hud-off',!heal);if(heal){swap.style.right=`${heal.right+heal.size-18}px`;swap.style.bottom=`${heal.bottom+heal.size-18}px`;}}
+  if(picker&&heal){picker.style.right=`${heal.right}px`;picker.style.bottom=`${heal.bottom+heal.size+10}px`;}
+  if(stamina&&atk){stamina.style.right=`${atk.right}px`;stamina.style.bottom=`${atk.bottom-8}px`;stamina.style.width=`${atk.size}px`;}
+  const kiAt=ult||atk;if(ki&&kiAt){ki.style.right=`${kiAt.right}px`;ki.style.bottom=`${kiAt.bottom-(ult?8:15)}px`;ki.style.width=`${kiAt.size}px`;}
+  // The nearby actions sit in the bottom centre, clear of the pad and of the buttons along the bottom.
+  const row=$('context-row'),pad=$('joystick')?.getBoundingClientRect(),corner=$('action-cluster').getBoundingClientRect();
+  if(row){row.style.setProperty('--ctx-left',`${Math.round((pad?.right||150)+12)}px`);row.style.setProperty('--ctx-right',`${Math.round(innerWidth-corner.right+bottomReach(hudLayout,grid,96)+12)}px`);}
+  // The class tools sit under the vitals.
+  const vitals=document.querySelector('.game-top .vitals')?.getBoundingClientRect(),strip=$('class-strip');
+  if(strip&&vitals){const top=Math.round(vitals.bottom+8);strip.style.top=`${top}px`;$('class-sheet').style.setProperty('--sheet-top',`${top+54}px`);}
+}
+// ------------------------------------------------------------------ the HUD editor
+function openHudEditor(){
+  if(!world?.classed||hudEdit)return;
+  hudEdit={selected:null,drag:null,wasPaused:paused};
+  if(mode==='solo')paused=true;
+  classOpen='';resetInput();hold.attack=false;
+  $('hud-editor').hidden=false;document.body.classList.add('hud-editing');
+  paintHudEditor();
+}
+function closeHudEditor(){
+  if(!hudEdit)return;
+  if(mode==='solo')paused=hudEdit.wasPaused;
+  hudEdit=null;$('hud-editor').hidden=true;document.body.classList.remove('hud-editing');
+  storeHud();applyHud();paintClasses(true);
+}
+function hudLabel(id){
+  const p=me(),def=classOf(p),slot=HUD_BUTTONS[id]?.slot;
+  if(slot!=null){const sid=p?.classBar?.[slot],skill=sid?def?.skills?.[sid]:null;return skill?{glyph:skill.glyph,name:skill.name,key:String(slot+1)}:{glyph:'+',name:`Skill ${slot+1} (empty)`,key:String(slot+1)};}
+  if(id==='ult')return {glyph:def?.ultimate?.glyph||'✦',name:def?.ultimate?.name||'Ultimate',key:'Q'};
+  return {glyph:HUD_BUTTONS[id].glyph,name:HUD_BUTTONS[id].label,key:{attack:'Space',dodge:'Shift',heal:'H'}[id]||''};
+}
+function paintHudEditor(){
+  if(!hudEdit)return;
+  const grid=currentHudGrid(),corner=$('action-cluster').getBoundingClientRect(),area=$('hud-edit-grid');
+  hudLayout=fitHud(hudLayout,grid);
+  area.style.right=`${Math.round(innerWidth-corner.right)}px`;area.style.bottom=`${Math.round(innerHeight-corner.bottom)}px`;
+  area.style.width=`${grid.cols*grid.step-grid.gap}px`;area.style.height=`${grid.rows*grid.step-grid.gap}px`;
+  let cells='';
+  for(let r=0;r<grid.rows;r++)for(let c=0;c<grid.cols;c++)cells+=`<i class="hud-cell" style="right:${c*grid.step}px;bottom:${r*grid.step}px;width:${grid.cell}px;height:${grid.cell}px"></i>`;
+  const tiles=hudLayout.map(t=>{const b=tileBox(t,grid),l=hudLabel(t.id);return `<button type="button" class="hud-tile${t.id===hudEdit.selected?' selected':''}${t.id==='attack'?' hud-attack':''}" data-hud-tile="${t.id}" style="right:${b.right}px;bottom:${b.bottom}px;width:${b.size}px;height:${b.size}px;--hs:${b.size}px" aria-label="${escapeHtml(l.name)}"><span>${escapeHtml(l.glyph)}</span><small>${escapeHtml(l.name)}</small>${l.key?`<kbd>${escapeHtml(l.key)}</kbd>`:''}</button>`;}).join('');
+  area.innerHTML=cells+tiles;
+  const sel=hudLayout.find(t=>t.id===hudEdit.selected);
+  $('hud-edit-selected').innerHTML=sel?`<span>${escapeHtml(hudLabel(sel.id).name)}</span>${Object.entries(HUD_SIZES).map(([k,v])=>`<button type="button" class="chip${sel.size===k?' active':''}" data-hud="size:${k}" aria-label="Size ${v.label}">${v.label}</button>`).join('')}${HUD_BUTTONS[sel.id].required?'':'<button type="button" class="chip hud-remove" data-hud="remove">Remove</button>'}`:'<p>Drag a button to move it (onto another to swap). Tap it to resize or remove it.</p>';
+  const missing=Object.keys(HUD_BUTTONS).filter(id=>!hudLayout.some(t=>t.id===id));
+  $('hud-edit-add').innerHTML=missing.length?`<span>Add</span>${missing.map(id=>`<button type="button" class="chip" data-hud="add:${id}">${escapeHtml(hudLabel(id).glyph)} ${escapeHtml(HUD_BUTTONS[id].slot!=null?`Skill ${HUD_BUTTONS[id].slot+1}`:HUD_BUTTONS[id].label)}</button>`).join('')}`:'<span>Every button is placed.</span>';
+}
+function hudCommand(value){
+  if(!hudEdit)return;
+  const grid=currentHudGrid(),[key,arg]=value.split(':');
+  if(key==='done'){closeHudEditor();return;}
+  if(key==='reset'){hudLayout=fitHud(DEFAULT_HUD,grid);hudEdit.selected=null;}
+  else if(key==='size'&&hudEdit.selected)hudLayout=resizeTile(hudLayout,grid,hudEdit.selected,arg);
+  else if(key==='remove'&&hudEdit.selected){hudLayout=removeTile(hudLayout,hudEdit.selected);hudEdit.selected=null;}
+  else if(key==='add'){const before=hudLayout.length;hudLayout=addTile(hudLayout,grid,arg);if(hudLayout.length===before)toast('No room left on the grid');else hudEdit.selected=arg;}
+  storeHud();paintHudEditor();
+}
 /** The Heartfire a wanderer is changing class at (the picker is open for it), or null. */
 let classPathAt=null;
 let classOpen='',classTalent='',classSheetCache='',classStripCache='',classBarSig='',classPickCache='',classPoints=0;
@@ -480,8 +568,8 @@ function showClasses(open){
   const panel=$('class-panel');if(!panel)return;
   panel.hidden=!open;$('class-bar').hidden=!open;
   classSheetCache='';classStripCache='';classBarSig='';classPickCache='';
-  if(!open){$('class-pick').hidden=true;classOpen='';return;}
-  paintClasses(true);
+  if(!open){$('class-pick').hidden=true;classOpen='';closeHudEditor();applyHud(false);return;}
+  paintClasses(true);applyHud(true);
 }
 /** The class picker, the tools strip, the open sheet and the skill bar; each rebuilt only when its markup changes. */
 function paintClasses(force=false){
@@ -501,7 +589,7 @@ function paintClasses(force=false){
     pick.hidden=false;
   }
   else if(!pick.hidden)pick.hidden=true;
-  const strip=chosen?classStripMarkup(p,{open:classOpen,tools:!!world.arena?.classes,layout:classLayout}):'';
+  const strip=chosen?classStripMarkup(p,{open:classOpen,tools:!!world.arena?.classes,editing:!!hudEdit}):'';
   if(force||strip!==classStripCache){classStripCache=strip;$('class-strip').innerHTML=strip;}
   const sheetEl=$('class-sheet');
   const html=!chosen?'':classOpen==='talents'?talentTreeMarkup(p,{selected:classTalent}):classOpen==='tools'&&world.arena?.classes?classToolsMarkup(world,p):'';
@@ -512,7 +600,7 @@ function paintClasses(force=false){
     const body=sheetEl.querySelector('.lab-body');if(body)body.scrollTop=scroll;
   }
   const sig=chosen?JSON.stringify([p.classId,p.classBar,p.talents]):'';
-  if(force||sig!==classBarSig){classBarSig=sig;$('class-bar').innerHTML=chosen?classBarMarkup(world,p):'';$('class-bar').style.setProperty('--class-color',classOf(p)?.resource?.color||'#ff8fb3');}
+  if(force||sig!==classBarSig){classBarSig=sig;$('class-bar').innerHTML=chosen?classBarMarkup(world,p):'';$('class-bar').style.setProperty('--class-color',classOf(p)?.resource?.color||'#ff8fb3');applyHud();}
   const free=chosen?pointsFree(p):0;
   if(free>classPoints&&chosen&&p.level>1)toast(free>1?`${free} talent points to spend ✧`:'A talent point to spend ✧');
   classPoints=free;
@@ -548,7 +636,7 @@ function openPathChange(hearthId){
   if(!world?.classed)return;
   classPathAt=hearthId;classOpen='';dirty=true;paintClasses(true);
 }
-function classPanel(name){classOpen=name==='close'||classOpen===name?'':name;dirty=true;paintClasses(true);}
+function classPanel(name){if(name==='hud'){hudEdit?closeHudEditor():openHudEditor();return;}classOpen=name==='close'||classOpen===name?'':name;dirty=true;paintClasses(true);}
 /** Weapon lab: the arena without rounds. Any weapon at any rank; foes on demand; a damage meter. */
 function startLab(){
   sound.unlock();storeProfile();
@@ -1615,12 +1703,14 @@ function setupControls(){
       if(named?.startsWith('action-')){const index=Number(named.slice(7))-1;if(pickPending!=null){if(index<3){const at=pickPending;pickPending=null;arenaMarkup='';void send({type:'arenaPick',choice:at,replace:index}).then(refresh);}}else void choosePick(index);}
       return;
     }
-    // Classes mode: 1-4 cast the bar's skills, T opens the talents; with the picker up, 1-4 choose a class.
+    // The HUD editor takes the keyboard while it is open: Escape (or Enter) closes it.
+    if(hudEdit){if(key==='escape'||key==='enter')closeHudEditor();return;}
+    // Classes mode: 1-8 cast the bar's skills, T opens the talents; with the picker up, 1-4 choose a class.
     if(world?.classed){
       if(!$('class-pick').hidden){if(key==='escape'&&classPathAt){classPathAt=null;paintClasses(true);return;}if(named?.startsWith('action-')){const card=document.querySelectorAll('#class-offers [data-class]')[Number(named.slice(7))-1];if(card&&!card.disabled)pickClass(card.dataset.class);}return;}
       if(classOf(actor)){
         if(key==='t'){classPanel('talents');return;}
-        if(named?.startsWith('action-')&&allowsCombat(modeName)){const id=actor.classBar?.[Number(named.slice(7))-1];if(id)void send({type:'classSkill',skill:id},{quiet:true});return;}
+        if(/^[1-8]$/.test(key)&&allowsCombat(modeName)){const id=actor.classBar?.[Number(key)-1];if(id)void send({type:'classSkill',skill:id},{quiet:true});return;}
       }
     }
     if(named==='weapon-next'){event.preventDefault();cycleWeapon();return;}
@@ -1720,7 +1810,6 @@ async function init(){
     event.stopPropagation();sound?.unlock();
     const panel=event.target.closest('[data-class-panel]'),node=event.target.closest('[data-talent]'),learnIt=event.target.closest('[data-talent-learn]'),op=event.target.closest('[data-class-op]');
     if(panel){classPanel(panel.dataset.classPanel);return;}
-    if(event.target.closest('[data-class-layout]')){nextClassLayout();return;}
     if(learnIt){void send({type:'classTalent',op:'learn',node:learnIt.dataset.talentLearn}).then(()=>{dirty=true;paintClasses(true);});return;}
     if(node){classTalent=node.dataset.talent;paintClasses(true);return;}
     if(op)classCommand(op.dataset.classOp);
@@ -1730,6 +1819,36 @@ async function init(){
     if(button.dataset.classPanel){classPanel('talents');return;}
     if(button.dataset.classSkill&&allowsCombat(currentMode()))void send({type:'classSkill',skill:button.dataset.classSkill},{quiet:true});
   });
+  // The HUD editor: drag a tile to a cell (onto another to swap); tap it to select; the bar's buttons act.
+  const editor=$('hud-editor');
+  editor.addEventListener('pointerdown',event=>{
+    event.stopPropagation();if(!hudEdit)return;
+    const tile=event.target.closest('[data-hud-tile]');if(!tile)return;
+    event.preventDefault();try{tile.setPointerCapture(event.pointerId);}catch{}
+    hudEdit.drag={id:tile.dataset.hudTile,el:tile,x:event.clientX,y:event.clientY,moved:false,pointerId:event.pointerId};
+  });
+  editor.addEventListener('pointermove',event=>{
+    const d=hudEdit?.drag;if(!d||d.pointerId!==event.pointerId)return;
+    const dx=event.clientX-d.x,dy=event.clientY-d.y;if(Math.hypot(dx,dy)>6)d.moved=true;
+    if(d.moved){d.el.style.transform=`translate(${dx}px,${dy}px)`;d.el.classList.add('dragging');}
+  });
+  const dropTile=event=>{
+    const d=hudEdit?.drag;if(!d||d.pointerId!==event.pointerId)return;hudEdit.drag=null;
+    if(!d.moved){hudEdit.selected=d.id;paintHudEditor();return;}
+    const grid=currentHudGrid(),area=$('hud-edit-grid').getBoundingClientRect(),t=hudLayout.find(q=>q.id===d.id);
+    if(t){
+      // Where the tile's bottom-right corner was dropped, in cells from the grid's corner.
+      const b=d.el.getBoundingClientRect(),span=HUD_SIZES[t.size]?.span||1,box=span*grid.cell+(span-1)*grid.gap,inset=(box-b.width)/2;
+      const c=Math.round((area.right-(b.right+inset))/grid.step),r=Math.round((area.bottom-(b.bottom+inset))/grid.step);
+      const next=moveTile(hudLayout,grid,d.id,c,r);
+      if(next===hudLayout)toast('No room there');
+      hudLayout=next;hudEdit.selected=d.id;storeHud();
+    }
+    paintHudEditor();
+  };
+  editor.addEventListener('pointerup',dropTile);editor.addEventListener('pointercancel',dropTile);
+  editor.addEventListener('click',event=>{event.stopPropagation();const b=event.target.closest('[data-hud]');if(b){sound?.unlock();hudCommand(b.dataset.hud);}});
+  window.addEventListener('resize',()=>{applyHud();if(hudEdit)paintHudEditor();});
   $('class-pick').addEventListener('click',event=>{
     event.stopPropagation();
     if(event.target.closest('#class-menu')){if(classPathAt){classPathAt=null;paintClasses(true);return;}$('class-pick').hidden=true;openSheet('menu');return;}

@@ -149,6 +149,9 @@ export const NODES = {
   thornpatch:{name:'Dread thorns',hits:2,workSeconds:1.6,handRate:.5,tool:'axe',toolRate:1.6,output:'backpack',loot:{fiber:3},regrow:99999,radius:0},
   // An omen of the later Dread Ages (omens.mjs): hold the action to wake its champion.
   dreadaltar:{name:'Bleeding altar',hits:1,workSeconds:2.4,handRate:1,output:'floor',loot:{},regrow:0,radius:.75,omen:true},
+  // The Shrine of Yomi's omens (omens.mjs): light the Obon lanterns, bow to a fox wedding.
+  obonlantern:{name:'Obon lantern',hits:1,workSeconds:1.6,handRate:1,output:'floor',loot:{},regrow:0,radius:.3,omen:true},
+  foxwedding:{name:'Fox wedding',hits:1,workSeconds:1.4,handRate:1,output:'floor',loot:{},regrow:0,radius:.4,omen:true},
 };
 export const STRUCTURES = {
   hearth:{name:'Heartfire',hp:600,radius:1,light:8},fire:{name:'Campfire',hp:160,radius:.55,light:6},

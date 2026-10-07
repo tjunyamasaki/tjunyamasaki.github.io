@@ -591,6 +591,12 @@ export function stepMobs(world, dt, obstacles){
       for(const p of people){const d = dist(p, e); if(d < nd){nd = d; near = p;}}
       if(near){const d = Math.max(.01, nd); target = {x: e.x+(e.x-near.x)/d*6, z: e.z+(e.z-near.z)/d*6, homing: true, id: 'flee:'+e.id};}
       else{e.vx *= .8; e.vz *= .8; continue;}
+    }else if(e.snuff){
+      // An Obon procession's hungry ghost (omens.mjs) wants the lanterns, not you: it makes straight for them.
+      target = {x: e.snuffX ?? e.x, z: e.snuffZ ?? e.z, homing: true, id: 'snuff:'+e.snuff};
+    }else if(e.parade && !e.provoked && e.march){
+      // A Hyakki Yagyō marcher (omens.mjs) keeps to the parade's road until something provokes it.
+      target = {x: e.march.x, z: e.march.z, homing: true, id: 'march:'+e.id};
     }else if(e.home){
       let prey = [preyFor(world, e, quarry, e.aggro ? ROAM.aggro+6 : ROAM.aggro)].find(q => q && Math.hypot(q.x-e.home.x, q.z-e.home.z) < e.leash+8) || null;
       // Underground a resting creature has to see you first: no waking a whole floor through the rock.

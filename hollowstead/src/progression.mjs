@@ -222,6 +222,25 @@ export const LOOT_TABLES = Object.freeze({
     {entries:[['ichor',[6,9],1]]},
     {count:[1,2], entries:[['ember',[3,5],2],['shard',[2,4],1]]},
   ]},
+  // The Shrine of Yomi's omens (omens.mjs). The Obon offering is rolled with luck from the lanterns that made it home.
+  obon:{xp:130, rolls:[
+    {count:[2,3], entries:[['ember',[3,5],2],['shard',[2,4],2],['elixir',[1,2],1],['ichor',[3,5],1]]},
+    {entries:[['rare',1,2],['epic',1,1]]},
+    {chance:.5, entries:[['epic',1,1]]},
+    {chance:.15, entries:[['legendary',1,1]]},
+  ]},
+  hyakki:{xp:160, rolls:[
+    {count:[3,4], entries:[['ember',[3,6],2],['bone',[3,5],1],['shard',[2,4],2],['rime',[2,3],1]]},
+    {entries:[['epic',1,1]]},
+    {chance:.35, entries:[['legendary',1,1]]},
+    {entries:[['ichor',[6,10],1]]},
+    {chance:.6, entries:[['sigil',[1,1],1]]},
+  ]},
+  foxwedding:{xp:90, rolls:[
+    {entries:[['rare',1,1]]},
+    {chance:.55, entries:[['epic',1,1]]},
+    {count:[1,2], entries:[['berry',[3,5],1],['elixir',[1,1],1],['ember',[2,3],1]]},
+  ]},
   goldpumpkin:{xp:60, rolls:[
     {entries:[['heartstone',[1,1],1]]},
     {entries:[['epic',1,1]]},
@@ -340,7 +359,7 @@ export function powerOf(p){
   // Honed: the weapon in hand's refinement (REFINE below).
   const honed=1+refineStat(p,'honed');
   // `boon`: a blessing that lasts a while (a dungeon's Fury shrine, until the next stairs).
-  const boon=(p?.boon>0?p.boon:1)*(p?.buffs?.fury?BUFF.fury:1);
+  const boon=(p?.boon>0?p.boon:1)*(p?.buffs?.fury?BUFF.fury:1)*(p?.buffs?.foxwed?BUFF.foxwed:1);
   // Ascension past ★5 (ASCEND below): small gains that keep coming.
   const ascended=arena?1:1+ascendBonus(ascensionOf(p,p?.equipment?.weapon?.itemId).level);
   return level*(1+(arena?ARENA_GROWTH.rank:MASTERY.rank)*(Math.min(ARENA_GROWTH.maxRank,rank)-1))*might*honed*boon*ascended;

@@ -222,3 +222,100 @@ test('a hot spring mends whoever sits in it and thaws frost; its geyser shoves o
   assert.ok(steam >= 1, 'a geyser went up');
   assert.ok(blasts(w, 'steam').every(s => s.all && s.push > 0));
 });
+
+// ------------------------------------------------------------------ the omens
+import {OMENS, YOMI_OMEN, omenKinds, spawnOmen, useOmen} from '../src/omens.mjs?v=harvest-18';
+import {NODES} from '../src/content.mjs';
+import {CONTEXT_ACTIONS as NODE_ACTIONS} from '../src/contracts.mjs';
+import {BUFF} from '../src/buffs.mjs?v=harvest-18';
+
+function omenWorld(){
+  const {w, p} = yomiWorld();
+  w.ambient = true; w.omens = []; w.omenT = 9e9;
+  return {w, p};
+}
+const tickOmens = (w, seconds, each = null) => {for(let t = 0; t < seconds-1e-9; t += T){each?.(); w.tick(T);}};
+
+test("the Shrine of Yomi's three omens come only in that land, marked and kept like every other", () => {
+  for(const kind of ['obon', 'hyakki', 'foxwedding']){
+    assert.equal(OMENS[kind].land, 'yomi');
+    assert.ok(LOOT_TABLES[kind]?.xp > 0, kind+' is worth the trip');
+    if(OMENS[kind].node){assert.ok(NODES[OMENS[kind].node]?.omen && THEME.sprites[OMENS[kind].node] && NODE_ACTIONS[OMENS[kind].node]?.length, kind+' has a node, art and an action');}
+  }
+  const plain = new World(31, {mode: 'vigil'}), yomi = new World(SEED, {mode: 'vigil', land: 'yomi'});
+  assert.ok(!omenKinds(plain).some(([id]) => OMENS[id].land), 'a plain hollow never sees them');
+  assert.ok(omenKinds(yomi).some(([id]) => id === 'obon'));
+  // Night only: the parade.
+  yomi.time = 10; assert.ok(!omenKinds(yomi).some(([id]) => id === 'hyakki'), 'no parade by day');
+  // Saved and restored with the world.
+  const {w} = omenWorld();
+  const o = spawnOmen(w, 'obon');
+  assert.ok(o && o.to, 'an Obon lantern waits by the shrine');
+  const back = World.restore(structuredClone(w.snapshot({purpose: 'save'})));
+  assert.ok(back.omens.some(entry => entry.id === o.id) && back.nodes.some(n => n.id === o.id && n.type === 'obonlantern'));
+});
+
+test('the Obon lanterns walk only beside the living, lose a light to every ghost that reaches them, and pay out at the shrine', () => {
+  const {w, p} = omenWorld();
+  const o = spawnOmen(w, 'obon'), node = w.nodes.find(n => n.id === o.id);
+  p.x = o.x+1; p.z = o.z; p.hp = p.maxHp = 1e6;
+  useOmen(w, node, [p.id]);
+  assert.ok(o.lit && o.lights === YOMI_OMEN.obon.lights && !w.nodes.some(n => n.id === o.id), 'lit: the procession sets out');
+  const start = [o.x, o.z];
+  // Alone, it waits.
+  p.x = o.x+30; tickOmens(w, 2, () => {p.hp = p.maxHp;});
+  assert.deepEqual([o.x, o.z], start, 'it waits for someone to walk beside it');
+  // Beside it, it walks, and the ghosts come for the light, not for you.
+  p.x = o.x; p.z = o.z;
+  let ghosts = [];
+  tickOmens(w, YOMI_OMEN.obon.firstAfter+.5, () => {p.x = o.x+1; p.z = o.z; p.hp = p.maxHp;});
+  ghosts = w.enemies.filter(e => e.snuff === o.id);
+  assert.ok(Math.hypot(o.x-start[0], o.z-start[1]) > 2, 'it walked');
+  assert.ok(ghosts.length >= YOMI_OMEN.obon.ghosts, 'hungry ghosts rose');
+  const before = o.lights;
+  tickOmens(w, 12, () => {p.x = o.x+1; p.z = o.z; p.hp = p.maxHp;});
+  assert.ok(o.lights < before || o.done, 'a ghost reached the lanterns');
+  // Walk it home (keep the ghosts off).
+  for(let i = 0; i < 4000 && !o.done; i++){w.enemies = w.enemies.filter(e => e.snuff !== o.id); p.x = o.x+1; p.z = o.z; p.hp = p.maxHp; w.tick(T);}
+  assert.ok(o.done, 'the procession ended');
+  assert.ok(Math.hypot(o.x-o.to[0], o.z-o.to[1]) < 1 || o.lights <= 0);
+});
+
+test('the Hyakki Yagyō keeps to its road until provoked, and its herald spills a hoard', () => {
+  const {w, p} = omenWorld();
+  const o = spawnOmen(w, 'hyakki');
+  assert.ok(o, 'a parade set out');
+  const marchers = w.enemies.filter(e => e.parade === o.id);
+  assert.ok(marchers.length >= YOMI_OMEN.hyakki.count && marchers.filter(e => e.herald).length === 1);
+  p.x = 0; p.z = 0; p.hp = p.maxHp = 1e6;
+  const herald = marchers.find(e => e.herald), d0 = Math.hypot(herald.x-o.to[0], herald.z-o.to[1]);
+  tickOmens(w, 3, () => {p.hp = p.maxHp;});
+  assert.ok(Math.hypot(herald.x-o.to[0], herald.z-o.to[1]) < d0-2, 'it marches on');
+  assert.ok(!marchers.some(e => e.provoked), 'nobody is near: nobody turns');
+  // Step close: the marchers near you turn.
+  p.x = herald.x+1; p.z = herald.z;
+  tickOmens(w, T*2, () => {p.hp = p.maxHp;});
+  assert.ok(herald.provoked && herald.raid, 'the herald turns on you');
+  // The herald falls: a hoard, the omen fulfilled.
+  const done = w.omensDone || 0, drops = w.drops.length;
+  herald.hp = 0; herald.lastHitBy = p.id;
+  tickOmens(w, T*2, () => {p.hp = p.maxHp;});
+  assert.equal(w.omensDone, done+1);
+  assert.ok(w.drops.length > drops, 'its hoard spilled');
+});
+
+test('a fox wedding blesses whoever keeps still beside it, and curses whoever strikes', () => {
+  for(const rude of [false, true]){
+    const {w, p} = omenWorld();
+    const o = spawnOmen(w, 'foxwedding'), node = w.nodes.find(n => n.id === o.id);
+    p.x = o.x+2; p.z = o.z; p.hp = p.maxHp = 1e6;
+    useOmen(w, node, [p.id]);
+    assert.equal(o.state, 'watching');
+    tickOmens(w, 2, () => {p.x = o.x+2; p.z = o.z;});
+    if(rude) p.aimUntil = w.time+.5;
+    tickOmens(w, YOMI_OMEN.foxwedding.watch, () => {p.x = o.x+2; p.z = o.z; p.hp = p.maxHp;});
+    assert.ok(o.done);
+    if(rude){assert.ok(!p.buffs?.foxwed, 'no blessing for the rude'); assert.ok(w.enemies.some(e => e.hunt), 'foxfire comes for you');}
+    else{assert.ok(p.buffs?.foxwed > w.time, 'blessed'); assert.ok(BUFF.foxwed > 1 && BUFF.foxward < 1);}
+  }
+});

@@ -6,7 +6,8 @@
 import {INK, TAU, at, bump, clamp01, easeIn, easeOut, fade, rnd} from './kit.mjs?v=harvest-18';
 import {ENEMIES} from '../content.mjs?v=harvest-18';
 import {areasOf} from '../worldgen.mjs?v=harvest-18';
-import {OMENS} from '../omens.mjs?v=harvest-18';
+import {OMENS, YOMI_OMEN} from '../omens.mjs?v=harvest-18';
+const YOMI_NEAR = YOMI_OMEN.foxwedding.near;
 import {HUSH} from '../hush.mjs?v=harvest-18';
 
 const STYLE = Object.freeze({
@@ -237,6 +238,11 @@ export const HOLLOW_EVENTS = {
     d.light(ev.x, ev.z, 9*fade(t));
   }},
   // The Shrine of Yomi's yokai (yokai.mjs): a daoshi's bell rings out over the dead it rouses.
+  // The Shrine of Yomi's omens (omens.mjs): a lantern lit or snuffed, a fox wedding's blessing or curse.
+  obon: {life: () => 1.4, paint(d, ev, age, seed){const t = age/1.4; d.bloom(ev.x, ev.z, .8, 2.4*fade(t), '#ffb45a', .6*fade(t)); d.motes(ev.x, ev.z, 12, t, 1, '#ffe2a0', fade(t), seed, {rise: 2.4, size: .1}); d.light(ev.x, ev.z, 4*fade(t));}},
+  snuff: {life: () => 1, paint(d, ev, age, seed){const t = age/1; d.motes(ev.x, ev.z, 8, t, .6, '#5a5068', .8*fade(t), seed, {rise: 2, size: .14}); d.ring(ev.x, ev.z, .4+1.2*t, .06, '#ffb45a', .6*fade(t), {glow: true});}},
+  foxblessing: {life: () => 2, kick: () => ({flash: .1, color: '#ffe0b0'}), paint(d, ev, age, seed){const t = age/2; for(let i = 0; i < 3; i++) d.ring(ev.x, ev.z, 1+i*1.4+easeOut(t)*4, .1, i ? '#ffc98a' : '#fff6ea', .8*fade(t), {glow: true}); d.sparks(ev.x, ev.z, 1, 20, t, '#ffe0b0', fade(t), seed, {up: 6, speed: 4});}},
+  foxcurse: {life: () => 1.4, kick: () => ({shake: .3}), paint(d, ev, age, seed){const t = age/1.4; d.ring(ev.x, ev.z, 1+5*easeOut(t), .16, '#ff6a3a', .8*fade(t), {glow: true}); d.sparks(ev.x, ev.z, .8, 16, t, '#ffb46a', fade(t), seed, {speed: 6, up: 3});}},
   bell: {life: () => 1.2, paint(d, ev, age){const t = age/1.2; for(let i = 0; i < 3; i++){const k = Math.min(1, Math.max(0, t*1.6-i*.18)); if(k > 0) d.ring(ev.x, ev.z, .8+(ev.radius || 8)*easeOut(k), .1, i ? '#f0cf5a' : '#fff3c0', .75*fade(k), {glow: true});} d.light(ev.x, ev.z, 3*fade(t));}},
   seal: {life: () => 1.8, paint(d, ev, age){const t = age/1.8; d.sigil(ev.x, ev.z, (ev.radius || 2.6)*.62, '#f0cf5a', .5*fade(t), {spin: t*2, sides: 3});}},
   mimic: {life: () => .8, kick: () => ({shake: .35}), paint(d, ev, age){const t = age/.8; d.ring(ev.x, ev.z, 1+2*t, .14, '#f2c14e', fade(t), {glow: true});}},
@@ -287,6 +293,22 @@ export function paintHollow(d, world, lead, clock){
     if(o.done) continue;
     const c = OMENS[o.kind]?.color || '#ffd27a';
     if(d.near(o.x, o.z, 30)){d.beam(o.x, o.z, 0, 12, .5+.1*Math.sin(clock*2+o.x), c, .28); d.pool(o.x, o.z, 1.6, c, .35); d.light(o.x, o.z, 2.6);}
+    // The Obon procession: its lanterns float in a line behind the leading one, bobbing, until they reach the shrine.
+    if(o.kind === 'obon' && o.lit && o.to && d.near(o.x, o.z, 14)){
+      const fx = (o.from?.[0] ?? o.x)-o.to[0], fz = (o.from?.[1] ?? o.z)-o.to[1], l = Math.hypot(fx, fz) || 1, ux = fx/l, uz = fz/l;
+      for(let i = 0; i < (o.lights || 0); i++){
+        const x = o.x+ux*i*.95+(i%2 ? -uz : uz)*.35, z = o.z+uz*i*.95+(i%2 ? ux : -ux)*.35, y = .55+.12*Math.sin(clock*2+i*1.3);
+        d.orb(x, z, y, .26, INK, .9); d.orb(x, z, y, .21, '#f2e8cf', 1); d.orb(x, z, y, .13, '#ffcf7a', 1, {glow: true});
+        d.bloom(x, z, y, .7, '#ffb45a', .35); if(i < 6) d.light(x, z, 1.6);
+      }
+    }
+    // A fox wedding: rain falls from a clear sky round it, and foxfire glows.
+    if(o.kind === 'foxwedding' && d.near(o.x, o.z, 10)){
+      for(let i = 0; i < 14; i++){const a = i*2.399, r = 1+((i*.37)%1)*4.5, x = o.x+Math.cos(a)*r, z = o.z+Math.sin(a)*r, y = 3.5*((clock*1.6+i*.17)%1);
+        d.path([[x+.12, y+.5, z], [x, y, z]], .035, '#cfe6ff', .6, {glow: true});}
+      if(o.state === 'watching') d.ring(o.x, o.z, YOMI_NEAR, .06, '#ffc98a', .35+.2*Math.sin(clock*3), {glow: true});
+      d.light(o.x, o.z, 2.4);
+    }
     if(o.kind === 'soulrift' && d.near(o.x, o.z, 6)){
       // The tear itself: a turning wound of violet light.
       const open = o.state === 'open' ? 1.4 : 1;
@@ -317,6 +339,10 @@ export function paintHollow(d, world, lead, clock){
     if(!(e.hp > 0) || !d.near(e.x, e.z, 4)) continue;
     if(e.gilded){d.motes(e.x, e.z, 4, (clock*.9+e.x*.1)%1, .7, '#ffe08a', .8, Number(String(e.id).slice(1)) || 1, {rise: 1.2, size: .07}); d.pool(e.x, e.z, 1.2, '#ffd25a', .3); d.light(e.x, e.z, 2.2);}
     // A bleeding altar's Dread champion (omens.mjs) walks in a slow red pulse.
+    // A Hyakki Yagyō marcher keeps to the road in a faint red haze until something provokes it.
+    if(e.parade && !e.provoked){d.pool(e.x, e.z, 1.1, '#e05a50', .16+.06*Math.sin(clock*2+e.x)); if(e.herald){d.ring(e.x, e.z, 1.5, .07, '#ffb45a', .5, {glow: true}); d.light(e.x, e.z, 2.2);}}
+    // An Obon ghost wants the light: it trails a thin line toward the lanterns it hunts.
+    if(e.snuff) d.motes(e.x, e.z, 2, (clock+e.x*.1)%1, .4, '#ffcf7a', .5, Number(String(e.id).slice(1)) || 5, {rise: .8, size: .06});
     if(e.champion){const beat = .5+.5*Math.sin(clock*3+e.x); d.pool(e.x, e.z, 2.2, '#e0465a', .22+.1*beat); d.ring(e.x, e.z, 1.8+.25*beat, .08, '#ff4a5e', .45, {glow: true}); d.light(e.x, e.z, 2.6);}
     if(ENEMIES[e.type]?.boss){
       const c = e.type === 'unblinking' ? STYLE.void : STYLE.thorn, rage = (e.phase || 1)-1;

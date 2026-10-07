@@ -1011,6 +1011,63 @@ def sotoba():
 YOMI_SCENERY = [("higanbana", higanbana, "up"), ("takenoko", takenoko, "up"), ("sasa", sasa_litter, "mid"), ("sotoba", sotoba, "up", .85)]
 
 
+# ================================================================ omens (src/omens.mjs): an Obon lantern, a fox wedding
+FOX = "#e8a35a"; FOX_D = "#bf7a3a"; FOX_L = "#f8d29a"; FOX_W = "#fff6ea"
+
+
+def obon_lantern(k=0.0):
+    """A floating Obon lantern (toro nagashi): a paper box on a wooden float, a candle glowing through it."""
+    d = []; b = ""
+    flick = math.sin(2 * math.pi * k)
+    b += f'<ellipse cx="256" cy="560" rx="{f(150 + 10 * flick)}" ry="{f(160 + 10 * flick)}" fill="{FL_M}" opacity=".18" stroke="none"/>'
+    b += fill(blob(256, 730, 150, 22, 9, .12, 3), "#5f7d8a", 7)           # a still puddle of water
+    b += brush((150, 726), (230, 718), (330, 724), 6, "#9fc0cc", .8)
+    b += rrect(150, 676, 212, 44, 10, WD, 7) + brush((168, 690), (240, 684), (330, 690), 6, WD_L)
+    box = "M170 676 L170 480 L342 480 L342 676 Z"
+    glow = fill_ns(blob(256, 590, 70, 80, 8, .05, 2), FL_I, .85 + .1 * flick)
+    frame = line("M256 480 L256 676 M170 580 L342 580", 6, WD_D)
+    b += shaded(d, box, PAPER, PAPER_D, 14, -6, glow + frame)
+    b += rrect(160, 462, 192, 26, 8, WD, 7)
+    b += fill(f"M218 596 L232 {f(560 - 10 * flick)} L246 596 Z", FL_M, 0)
+    b += line("M200 520 Q216 512 230 522 M282 640 Q300 632 314 644", 5, SCRIPT)
+    return d, b
+
+
+def fox(x, y, s=1.0, face=1, bride=False):
+    """A fox spirit sitting up: white mask, red markings, a full tail (a bride wears a white hood)."""
+    def draw():
+        g = ""
+        g += fill(f"M{-30 * face} 40 Q{-110 * face} 20 {-96 * face} -40 Q{-70 * face} -10 {-20 * face} 10 Z", FOX, 6)
+        g += fill(f"M{-96 * face} -40 Q{-104 * face} -60 {-84 * face} -66 Q{-80 * face} -40 {-70 * face} -24 Z", FOX_W, 5)
+        g += fill("M-40 60 Q-48 -20 0 -30 Q48 -20 40 60 Q0 70 -40 60 Z", FOX if not bride else FOX_W, 7)
+        g += ell(0, -64, 42, 38, FOX_W, 7)
+        for sgn in (-1, 1):
+            g += fill(f"M{sgn * 14} -92 L{sgn * 34} -134 L{sgn * 40} -84 Z", FOX_W, 6) + fill_ns(f"M{sgn * 22} -98 L{sgn * 33} -122 L{sgn * 35} -92 Z", RD, .9)
+            g += line(f"M{sgn * 30} -66 Q{sgn * 18} -74 {sgn * 8} -66", 5, RD)
+        g += line("M-26 -50 Q-10 -40 0 -46 Q10 -40 26 -50", 4, RD) + f'<circle cx="0" cy="-40" r="5" fill="{O}" stroke="none"/>'
+        if bride:
+            g += fill("M-52 -60 Q-56 -116 0 -120 Q56 -116 52 -60 Q30 -86 0 -88 Q-30 -86 -52 -60 Z", FOX_W, 6)
+        return g
+    return G(at_scale(s, draw), x, y, 0, s)
+
+
+def fox_wedding(k=0.0):
+    """A fox bride under a red wedding umbrella with her groom, foxfires floating round them."""
+    d = []; b = ""
+    b += fill(blob(256, 736, 170, 18, 9, .12, 6), "#6f8a5a", 6)
+    # the umbrella, held over the bride (behind her: drawn first)
+    b += stroke("M300 420 L352 668", 8, LACQ)
+    top = 300
+    canopy = f"M300 {top} Q190 {top + 40} 160 {top + 130} Q300 {top + 150} 440 {top + 130} Q410 {top + 40} 300 {top} Z"
+    ribs = "".join(line(f"M300 {top + 6} L{x} {top + 132}", 4, VERM_D) for x in (190, 245, 300, 355, 410))
+    b += shaded(d, canopy, VERM, VERM_D, 12, -6, ribs + brush((190, top + 112), (230, top + 50), (290, top + 20), 8, VERM_L))
+    b += f'<circle cx="300" cy="{top - 4}" r="12" fill="{LACQ}" stroke-width="{sw(5)}"/>'
+    b += fox(170, 676, .9, 1) + fox(320, 672, 1.0, -1, bride=True)
+    for i, (x, y) in enumerate(((110, 520), (420, 470), (80, 380), (460, 600))):
+        b += hitodama(x, y + 10 * math.sin(2 * math.pi * (k + i * .25)), .6, k + i * .25).replace(HITO, "#ffb46a").replace(HITO_L, "#fff0c8")
+    return d, b
+
+
 # ================================================================ decorations
 def toro(k):
     """Stone lantern (ishidoro): mossy granite, a flame flickering in the firebox."""
@@ -1200,10 +1257,14 @@ ALL = {
     "bamboo": dict(frames=[bamboo(1)], cols=1, rows=1, target=(40, 24, 472, 744), size=[3.6, 5.4], clips=STILL),
     "bamboo-b": dict(frames=[bamboo(2)], cols=1, rows=1, target=(60, 60, 452, 744), size=[3.2, 4.8], clips=STILL),
     "yanagi": dict(frames=[yanagi], cols=1, rows=1, target=(12, 40, 500, 736), size=[4.92, 7.38], clips=STILL),
+    "obonlantern": dict(frames=[(lambda k: (lambda: obon_lantern(k / 4)))(k) for k in range(4)], cols=4, rows=1, target=(110, 300, 402, 744), size=[1.7, 2.55],
+                        clips={"idle": {"frames": [0, 1, 2, 3], "fps": 5}}),
+    "foxwedding": dict(frames=[(lambda k: (lambda: fox_wedding(k / 4)))(k) for k in range(4)], cols=4, rows=1, target=(40, 160, 472, 744), size=[3.2, 4.8],
+                       clips={"idle": {"frames": [0, 1, 2, 3], "fps": 4}}),
 }
 # What the game uses (tools/art/build.py builds these into themes/harvest/sprites like every other sprite;
 # theme.json holds their entries). The wanderers and the guandao stay preview-only for now.
-GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo", "bamboo", "bamboo-b", "yanagi")
+GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo", "bamboo", "bamboo-b", "yanagi", "obonlantern", "foxwedding")
 SPRITES = {k: {kk: v for kk, v in ALL[k].items() if kk in ("frames", "cols", "rows", "target")} for k in GAME}
 
 
@@ -1311,7 +1372,8 @@ NAMES = {"miko": "Shrine maiden (wanderer)", "daoshi-wanderer": "Taoist exorcist
          "jiangshi": "Jiangshi, hopping corpse (mob)", "sakura": "Old cherry (tree)", "matsu": "Sacred pine (tree)",
          "toro": "Stone lantern (decoration)", "torii": "Torii gate (decoration)", "katana": "Kagekiri, katana (weapon)", "guandao": "Dragon guandao (weapon)",
          "yomi-rock": "Garden stones (rock node)", "yomi-rock-b": "Sacred boulder (rock node)", "jizo": "Jizo statue (decoration)",
-         "bamboo": "Bamboo clump (tree, the Bamboo Thicket)", "bamboo-b": "Bamboo clump, lesser (tree)", "yanagi": "Weeping willow (tree, the Spider-lily Marsh)"}
+         "bamboo": "Bamboo clump (tree, the Bamboo Thicket)", "bamboo-b": "Bamboo clump, lesser (tree)", "yanagi": "Weeping willow (tree, the Spider-lily Marsh)",
+         "obonlantern": "Obon lantern (omen)", "foxwedding": "Fox wedding (omen)"}
 
 
 def write_preview(out_dir, manifest):

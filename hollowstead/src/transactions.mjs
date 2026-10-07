@@ -21,6 +21,7 @@ function validWorldAction(cmd){
   if(cmd.type==='ascendWeapon'&&(typeof cmd.stationId!=='string'||typeof cmd.itemId!=='string'))return false;
   // The Classes mode (classes/mode.mjs).
   if(['classPick','classSkill'].includes(cmd.type)&&typeof (cmd.type==='classPick'?cmd.classId:cmd.skill)!=='string')return false;
+  if(cmd.type==='classPick'&&cmd.hearth!=null&&typeof cmd.hearth!=='string')return false;
   if(cmd.type==='classTalent'&&(!['learn','respec','slot'].includes(cmd.op)||(cmd.op==='learn'&&typeof cmd.node!=='string')||(cmd.op==='slot'&&(typeof cmd.skill!=='string'||!Number.isInteger(cmd.slot)))))return false;
   if(cmd.type==='classTest'&&(typeof cmd.op!=='string'||(cmd.key!=null&&typeof cmd.key!=='string')||(cmd.n!=null&&!Number.isSafeInteger(cmd.n))))return false;
   if(cmd.type==='arenaPick'&&(!Number.isInteger(cmd.choice)||(cmd.replace!=null&&!(Number.isInteger(cmd.replace)&&cmd.replace>=0&&cmd.replace<HOTBAR_SLOTS))))return false;

@@ -7,15 +7,16 @@ const escape = value => String(value).replace(/[&<>"']/g, c => ({'&': '&amp;', '
 const KIND = {skill: 'ACTIVE SKILL', passive: 'PASSIVE', capstone: 'CAPSTONE'};
 
 /** The first screen: one card per class. */
-export function classPickMarkup(icon = () => ''){
+export function classPickMarkup(icon = () => '', {current = null} = {}){
   return Object.values(CLASSES).map(def => {
+    const mine = def.id === current;
     const skills = Object.values(def.skills).map(s => `<li><i>${escape(s.glyph)}</i>${escape(s.name)}</li>`).join('');
-    return `<button type="button" class="class-card" data-class="${escape(def.id)}" aria-label="${escape(def.name)}" style="--class-color:${escape(def.resource.color || '#ff8fb3')}">`
+    return `<button type="button" class="class-card${mine ? ' current' : ''}" data-class="${escape(def.id)}" ${mine ? 'disabled ' : ''}aria-label="${escape(def.name)}" style="--class-color:${escape(def.resource.color || '#ff8fb3')}">`
       + `<span class="class-card-icon">${icon(def.weapon)}</span><b>${escape(def.name)}</b><small class="class-role">${escape(def.role)}</small>`
       + `<span class="class-blurb">${escape(def.blurb)}</span>`
       + `<span class="class-trees">${def.trees.map(t => `<em>${escape(t.name)} · ${escape(t.sub)}</em>`).join('')}</span>`
       + `<ul class="class-skills">${skills}<li class="ult"><i>${escape(def.ultimate.glyph)}</i>${escape(def.ultimate.name)}</li></ul>`
-      + `<span class="class-go">Walk this path →</span></button>`;
+      + `<span class="class-go">${mine ? 'Your path' : current ? 'Take up this path →' : 'Walk this path →'}</span></button>`;
   }).join('');
 }
 

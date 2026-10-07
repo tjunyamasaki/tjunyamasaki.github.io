@@ -15,6 +15,7 @@ const SPECS = Object.freeze({
   cook: {icon: '◕', label: 'Cook', activation: 'tap'},
   awaken: {icon: '✦', label: 'Awaken', activation: 'tap'},
   home: {icon: '⌂', label: 'Make home', activation: 'tap'},
+  path: {icon: '✧', label: 'Change path', activation: 'tap'},
   mend: {icon: '✺', label: 'Mend', activation: 'tap'},
   repair: {icon: '✚', label: 'Repair', activation: 'tap'},
   craft: {icon: '⚒', label: 'Craft', activation: 'tap'},
@@ -319,6 +320,10 @@ export function describeContext(facts) {
       disabledReason: fed ? 'Needs 1 wood' : 'The fire has plenty of fuel',
       command: buildingCommand('feed', id),
     }));
+    // A Class Vigil (classes/mode.mjs): the Heartfire is where a wanderer changes class.
+    if (facts.type === 'hearth' && facts.classed) {
+      list.push(make('path', {targetId: id, command: buildingCommand('path', id), panel: {sheet: 'path', stationId: id}}));
+    }
     // The Vigil (vigil.mjs): choose this Heartfire as the place you wake. Gone once it is home.
     if (facts.type === 'hearth' && facts.vigil && !facts.home) {
       list.push(make('home', {targetId: id, command: buildingCommand('home', id)}));

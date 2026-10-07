@@ -40,6 +40,7 @@ import {labClear, labDps, labEquip, labLevel, labRank, labResetStats, labSpawn, 
 import {arsenalMarkup, foesMarkup, labMeterMarkup, labStripMarkup} from './ui/lab.mjs?v=harvest-18';
 import {CLASS_LAYOUTS, classBarMarkup, classBarState, classPickMarkup, classStripMarkup, classToolsMarkup, talentTreeMarkup} from './ui/classes.mjs?v=harvest-18';
 import {classOf, pointsFree} from './classes/registry.mjs?v=harvest-18';
+import {pathHearth} from './classes/mode.mjs?v=harvest-18';
 import {REFINE_CURRENCY, bookLines, carriedBooks, carriedGear, modText, refineLines, refineView, refinesOf} from './refine.mjs?v=harvest-18';
 import {refineMarkup, refineTabs} from './ui/refine.mjs?v=harvest-18';
 import {shelfMarkup} from './ui/bookshelf.mjs?v=harvest-18';
@@ -80,6 +81,8 @@ let classLayout='arc';
 try{const asked=new URLSearchParams(location.search).get('layout'),kept=localStorage.getItem('hollowstead.classLayout');classLayout=Object.hasOwn(CLASS_LAYOUTS,asked||'')?asked:Object.hasOwn(CLASS_LAYOUTS,kept||'')?kept:'arc';}catch{}
 document.body.dataset.classLayout=classLayout;
 function nextClassLayout(){const ids=Object.keys(CLASS_LAYOUTS);classLayout=ids[(ids.indexOf(classLayout)+1)%ids.length];document.body.dataset.classLayout=classLayout;try{localStorage.setItem('hollowstead.classLayout',classLayout);}catch{}toast(`Skill buttons: ${CLASS_LAYOUTS[classLayout]}`);paintClasses(true);}
+/** The Heartfire a wanderer is changing class at (the picker is open for it), or null. */
+let classPathAt=null;
 let classOpen='',classTalent='',classSheetCache='',classStripCache='',classBarSig='',classPickCache='',classPoints=0;
 let labOpen='',labRankPick=3,labFoe='mix',labCount=10,labFormation='ahead',labSheetCache='',labBarCache='',labMeterCache='';
 /** The arena is a swarm fight: start a little wider than the exploring camera. */
@@ -484,8 +487,19 @@ function showClasses(open){
 function paintClasses(force=false){
   const p=me();if(!p||!world?.classed||$('class-panel').hidden)return;
   const chosen=!!classOf(p),pick=$('class-pick');
-  const picking=!chosen&&!['victory','defeat'].includes(world.status)&&sheet!=='menu'&&sheet!=='guide';
-  if(picking){if(force||!classPickCache){classPickCache=classPickMarkup(icon);$('class-offers').innerHTML=classPickCache;$('class-pick-kicker').textContent=world.arena?.classes?'CLASSES · A TEST GROUND':'THE CLASS VIGIL';}pick.hidden=false;}
+  if(classPathAt&&(!chosen||!pathHearth(world,p,classPathAt)||p.down||p.ghost))classPathAt=null;
+  const picking=(!chosen||!!classPathAt)&&!['victory','defeat'].includes(world.status)&&sheet!=='menu'&&sheet!=='guide';
+  if(picking){
+    const key=`${classPathAt||''}|${p.classId||''}`;
+    if(force||classPickCache!==key){
+      classPickCache=key;$('class-offers').innerHTML=classPickMarkup(icon,{current:classPathAt?p.classId:null});
+      $('class-pick-kicker').textContent=classPathAt?'AT THE HEARTFIRE':world.arena?.classes?'CLASSES · A TEST GROUND':'THE CLASS VIGIL';
+      $('class-pick-title').textContent=classPathAt?'Change your path':'Choose your path';
+      $('class-pick-lede').textContent=classPathAt?'A new class takes up its own weapon and a fresh tree. Your level stays, and every talent point comes back to spend again.':'A class keeps one weapon for good and grows through a talent tree: every level is a point to spend.';
+      $('class-menu').textContent=classPathAt?'Keep my path':'Menu';
+    }
+    pick.hidden=false;
+  }
   else if(!pick.hidden)pick.hidden=true;
   const strip=chosen?classStripMarkup(p,{open:classOpen,tools:!!world.arena?.classes,layout:classLayout}):'';
   if(force||strip!==classStripCache){classStripCache=strip;$('class-strip').innerHTML=strip;}
@@ -524,6 +538,15 @@ function classCommand(value){
   else if(key==='toggle')void send({type:'classTest',op:'toggle',key:arg});
   else if(['clear','wave','ki'].includes(key))void send({type:'classTest',op:key});
   dirty=true;
+}
+/** Take up a class (at the Heartfire when changing paths). */
+function pickClass(classId){
+  void send({type:'classPick',classId,...(classPathAt?{hearth:classPathAt}:{})}).then(result=>{if(result?.ok){classPathAt=null;classOpen='';}dirty=true;paintClasses(true);});
+}
+/** The Heartfire's Change path: the class picker, for a new class. */
+function openPathChange(hearthId){
+  if(!world?.classed)return;
+  classPathAt=hearthId;classOpen='';dirty=true;paintClasses(true);
 }
 function classPanel(name){classOpen=name==='close'||classOpen===name?'':name;dirty=true;paintClasses(true);}
 /** Weapon lab: the arena without rounds. Any weapon at any rank; foes on demand; a damage meter. */
@@ -611,7 +634,7 @@ function contextFacts(p){
   const base={kind:target.kind,id:entity.id,type:entity.type,wood:world.available(p,'wood'),stone:world.available(p,'stone'),seeds:world.available(p,'seed')};
   if(target.kind==='building'){
     const lock=world.chestSessions.get(entity.id);
-    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{}),...(entity.type==='hokora'?{offered:offerWait(world,entity)>0,embers:world.available(p,'ember')}:{}),...(entity.type==='bookshelf'?{shelved:shelfCount(entity),packBooks:p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0)}:{})};
+    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),classed:!!world.classed,home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{}),...(entity.type==='hokora'?{offered:offerWait(world,entity)>0,embers:world.available(p,'ember')}:{}),...(entity.type==='bookshelf'?{shelved:shelfCount(entity),packBooks:p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0)}:{})};
   }
   if(target.kind==='crop')return {...base,i:entity.i,j:entity.j,crop:entity.crop,seeds:entity.crop?[]:carriedSeeds(world,p).map(id=>({crop:id,name:CROPS[id].name}))};
   if(target.kind==='node'){const node=NODES[entity.type];return {...base,required:!!node?.required,toolReady:!(node?.tool)||world.hasTool(p,node.tool),toolLabel:node?.tool?label(node.tool).toLowerCase():''};}
@@ -666,7 +689,7 @@ async function runAction(action){
   if(action.id==='place'){await confirmPlace();return;}
   if(action.id==='rotate'){grid?.rotate();dirty=true;return;}
   if(action.id==='open'){await openChest(action.targetId);return;}
-  if(action.panel){const result=await send(action.command);if(result?.ok){if(action.panel.sheet==='refine')openRefine(action.panel.stationId);else if(action.panel.sheet==='shelf')openShelf(action.panel.stationId);else openStationCatalog(action.panel);}return;}
+  if(action.panel){const result=await send(action.command);if(result?.ok){if(action.panel.sheet==='refine')openRefine(action.panel.stationId);else if(action.panel.sheet==='path')openPathChange(action.panel.stationId);else if(action.panel.sheet==='shelf')openShelf(action.panel.stationId);else openStationCatalog(action.panel);}return;}
   if(action.command)await send(action.command);
 }
 async function confirmPlace(){
@@ -1594,7 +1617,7 @@ function setupControls(){
     }
     // Classes mode: 1-4 cast the bar's skills, T opens the talents; with the picker up, 1-4 choose a class.
     if(world?.classed){
-      if(!$('class-pick').hidden){if(named?.startsWith('action-')){const card=document.querySelectorAll('#class-offers [data-class]')[Number(named.slice(7))-1];if(card)void send({type:'classPick',classId:card.dataset.class}).then(()=>{dirty=true;paintClasses(true);});}return;}
+      if(!$('class-pick').hidden){if(key==='escape'&&classPathAt){classPathAt=null;paintClasses(true);return;}if(named?.startsWith('action-')){const card=document.querySelectorAll('#class-offers [data-class]')[Number(named.slice(7))-1];if(card&&!card.disabled)pickClass(card.dataset.class);}return;}
       if(classOf(actor)){
         if(key==='t'){classPanel('talents');return;}
         if(named?.startsWith('action-')&&allowsCombat(modeName)){const id=actor.classBar?.[Number(named.slice(7))-1];if(id)void send({type:'classSkill',skill:id},{quiet:true});return;}
@@ -1709,9 +1732,9 @@ async function init(){
   });
   $('class-pick').addEventListener('click',event=>{
     event.stopPropagation();
-    if(event.target.closest('#class-menu')){$('class-pick').hidden=true;openSheet('menu');return;}
-    const card=event.target.closest('[data-class]');if(!card)return;sound?.unlock();
-    void send({type:'classPick',classId:card.dataset.class}).then(result=>{if(result?.ok){dirty=true;paintClasses(true);}});
+    if(event.target.closest('#class-menu')){if(classPathAt){classPathAt=null;paintClasses(true);return;}$('class-pick').hidden=true;openSheet('menu');return;}
+    const card=event.target.closest('[data-class]');if(!card||card.disabled)return;sound?.unlock();
+    pickClass(card.dataset.class);
   });
   $('front-fullscreen')?.addEventListener('click',()=>void toggleFullscreen());
   document.addEventListener('fullscreenchange',onFullscreenChange);

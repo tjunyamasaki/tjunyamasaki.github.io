@@ -367,3 +367,32 @@ test('a class can be changed on the test ground: the old weapon and tuning go, t
   assert.deepEqual(p.talents, {});
   assert.ok(![p.equipment.weapon, ...p.inventory.slots].some(s => s?.itemId === 'katana'), 'the katana went with the class');
 });
+
+test('in a Class Vigil the path changes only at a Heartfire: level kept, points back, the new weapon bound', () => {
+  const world = new World(93, {mode: 'vigil', classed: true}), p = world.addPlayer('host', 'Jun');
+  world.start();
+  act(world, {type: 'classPick', classId: 'ronin'});
+  p.level = 12; p.talents = {kesagiri: 2, 'keen-edge': 3}; p.classBar = ['kesagiri'];
+  assert.equal(act(world, {type: 'classPick', classId: 'general'}).ok, false, 'not in the open');
+  const hearth = world.structure('hearth', p.x+30, p.z);
+  world.buildings.push(hearth);
+  assert.equal(act(world, {type: 'classPick', classId: 'general', hearth: hearth.id}).ok, false, 'not from afar');
+  hearth.x = p.x+1.5; hearth.z = p.z;
+  assert.equal(world.performBuildingAction(p, hearth.id, 'path').ok, true, 'the Heartfire offers the change');
+  assert.equal(act(world, {type: 'classPick', classId: 'general', hearth: hearth.id}).ok, true);
+  assert.equal(p.classId, 'general');
+  assert.equal(p.level, 12);
+  assert.deepEqual(p.talents, {});
+  assert.equal(pointsFree(p), 12);
+  assert.equal(p.equipment.weapon.itemId, 'guandao');
+  assert.ok(![p.equipment.weapon, ...p.inventory.slots].some(s => s?.itemId === 'katana'));
+  assert.equal(p.kataMods, null);
+  run(world, .1);
+  assert.ok(p.gdMods, 'the new class tunes its own weapon');
+  // The test ground's switches never reach a vigil, and an ordinary vigil's Heartfire offers no change.
+  const plain = new World(94, {mode: 'vigil'}), q = plain.addPlayer('host', 'Jun');
+  plain.start();
+  const fire = plain.structure('hearth', q.x+1, q.z); plain.buildings.push(fire);
+  assert.equal(plain.performBuildingAction(q, fire.id, 'path').ok, false);
+  assert.equal(plain.action('host', {type: 'classPick', classId: 'ronin'}).ok, false);
+});

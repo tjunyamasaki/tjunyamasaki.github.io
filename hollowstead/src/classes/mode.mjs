@@ -89,7 +89,10 @@ export function chooseClass(world, p, classId){
   const def = Object.hasOwn(CLASSES, classId) ? CLASSES[classId] : null;
   if(!def || !classedWorld(world)) return {ok: false, code: 'rejected'};
   const old = classOf(p);
-  if(old && old.id !== classId){old.clear?.(world, p); unbind(world, p);}
+  if(old && old.id !== classId){
+    old.clear?.(world, p); unbind(world, p);
+    world.event('announce', p.x, p.z, `${p.name} walks a new path: ${def.name}`);
+  }
   if(p.classId !== classId) Object.assign(p, {classId, talents: {}, classBar: [], classCd: {}, classGcd: 0, ki: 0});
   if(!bindWeapon(world, p, def.weapon)) return {ok: false, code: 'rejected'};
   def.sync?.(world, p);
@@ -205,11 +208,18 @@ function test(world, p, cmd){
   return {ok: false, code: 'unsupported'};
 }
 
-/** Why a wanderer cannot take up class `classId` now ('' when they can). */
-export function classPickReason(world, p, classId){
+/** How near a Heartfire a wanderer must stand to change class there. */
+export const PATH_REACH = 4;
+/** The Heartfire `hearthId` when it stands lit within reach of the wanderer, else null. */
+export const pathHearth = (world, p, hearthId) => (typeof hearthId === 'string' && (world.buildings || []).find(b => b.id === hearthId && b.type === 'hearth' && b.hp > 0 && Math.hypot(b.x-p.x, b.z-p.z) < PATH_REACH)) || null;
+/**
+ * Why a wanderer cannot take up class `classId` now ('' when they can). On the test ground any class at
+ * any time; elsewhere the first class is free, and a new one is taken up at a Heartfire (`hearthId`).
+ */
+export function classPickReason(world, p, classId, hearthId = null){
   if(!Object.hasOwn(CLASSES, classId || '')) return 'No such class';
-  if(testGround(world) || !classOf(p)) return '';
-  return p.classId === classId ? '' : 'Your path is chosen';
+  if(testGround(world) || !classOf(p) || p.classId === classId) return '';
+  return pathHearth(world, p, hearthId) ? '' : 'Change your path at a Heartfire';
 }
 
 /** Every class command, from World.action. */
@@ -217,7 +227,7 @@ export function classAction(world, p, cmd){
   if(!classedWorld(world) || !p) return {ok: false, code: 'unavailable'};
   // On the test ground any class at any time; elsewhere a wanderer chooses once (classPickReason says when else).
   if(cmd.type === 'classPick'){
-    const why = classPickReason(world, p, cmd.classId);
+    const why = classPickReason(world, p, cmd.classId, cmd.hearth);
     if(why){world.tell(p, why); return {ok: false, code: 'rejected'};}
     return chooseClass(world, p, cmd.classId);
   }

@@ -867,6 +867,7 @@ export class World {
     if(actionId==='repair')return this.action(p.id,{type:'repair',target:targetId});
     if(actionId==='awaken')return this.performUpgrade(p, targetId);
     if(actionId==='home')return this.makeHome(p, building);
+    if(actionId==='path')return this.classed&&building.type==='hearth'?{ok:true,code:'ok'}:{ok:false,code:'rejected'};
     if(actionId==='mend'){if(p.cooldown>.05)return {ok:false,code:'cooldown'};return mendWeapon(this, p, building);}
     if(actionId==='shelve')return storeBooks(this, p, building);
     if(actionId==='offer'){if(p.cooldown>.05)return {ok:false,code:'cooldown'};return offerAt(this, p, building);}

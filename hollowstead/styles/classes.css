@@ -4,7 +4,8 @@
    (#action-cluster, styles/hud.css: Attack in the corner, the ultimate on its left, Dodge above, Heal on the
    diagonal), in one of three layouts (body[data-class-layout]): arc, block or tower. */
 body.classes .hotbar{display:none}
-#class-bar{position:absolute;right:0;bottom:0;width:0;height:0;--cs:62px;pointer-events:none}
+body.classes #action-cluster{--cs:62px}
+#class-bar{position:absolute;right:0;bottom:0;width:0;height:0;pointer-events:none}
 #class-bar[hidden]{display:none}
 #class-bar .class-slot{position:absolute;width:var(--cs);height:var(--cs);min-width:var(--cs);min-height:var(--cs);padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px solid color-mix(in srgb,var(--class-color,#ff8fb3) 40%,transparent);border-radius:50%;background:radial-gradient(circle at 50% 36%,#4a2f45ee,#2a2230ee 72%);color:var(--cream);box-shadow:0 4px 14px #18132266;touch-action:none;pointer-events:auto}
 .class-slot .class-glyph{font-size:23px;line-height:1;color:#ffe1ea;text-shadow:0 0 8px color-mix(in srgb,var(--class-color,#ff8fb3) 53%,transparent)}
@@ -26,12 +27,12 @@ body.classes .hotbar{display:none}
 .class-resource i{flex:1;height:5px;border-radius:4px;background:#1e1929cc;border:1px solid color-mix(in srgb,var(--class-color,#ff8fb3) 27%,transparent);overflow:hidden}
 .class-resource em{display:block;height:100%;width:0;background:var(--class-color,#ff8fb3);box-shadow:0 0 8px color-mix(in srgb,var(--class-color,#ff8fb3) 53%,transparent);transition:width .12s linear}
 /* Arc: the skills fan out on an outer ring round Attack, from beside the ultimate up to above Dodge. */
-body[data-class-layout="arc"] #class-bar .class-slot{--r:calc(var(--atk) / 2 + var(--gap) + var(--skill) + var(--gap) + var(--cs) / 2 + 4px);right:calc(var(--atk) / 2 - cos(var(--a)) * var(--r) - var(--cs) / 2);bottom:calc(var(--atk) / 2 + sin(var(--a)) * var(--r) - var(--cs) / 2)}
+body[data-class-layout="arc"] #class-bar .class-slot{--r:calc(var(--atk) / 2 + var(--gap) + var(--skill) + var(--gap) + var(--cs) / 2 + 10px);right:calc(var(--atk) / 2 - cos(var(--a)) * var(--r) - var(--cs) / 2);bottom:calc(var(--atk) / 2 + sin(var(--a)) * var(--r) - var(--cs) / 2)}
 body[data-class-layout="arc"] #class-bar [data-slot="0"]{--a:176deg}
 body[data-class-layout="arc"] #class-bar [data-slot="1"]{--a:148deg}
 body[data-class-layout="arc"] #class-bar [data-slot="2"]{--a:120deg}
 body[data-class-layout="arc"] #class-bar [data-slot="3"]{--a:92deg}
-body.classes[data-class-layout="arc"] .context-row{bottom:calc(100% + var(--cs) + 22px)}
+body.classes[data-class-layout="arc"] .context-row{bottom:calc(100% + var(--cs) + 34px)}
 /* Block: a 2x2 grid just left of the ultimate, 1 and 2 nearest the thumb. */
 body[data-class-layout="block"] #class-bar .class-slot{right:calc(var(--atk) + var(--gap) + var(--skill) + var(--gap) + var(--col) * (var(--cs) + var(--gap)));bottom:calc(var(--row) * (var(--cs) + var(--gap)))}
 body[data-class-layout="block"] #class-bar [data-slot="0"]{--col:0;--row:0}
@@ -45,8 +46,8 @@ body[data-class-layout="tower"] #class-bar [data-slot="1"]{--col:1;--row:0}
 body[data-class-layout="tower"] #class-bar [data-slot="2"]{--col:0;--row:1}
 body[data-class-layout="tower"] #class-bar [data-slot="3"]{--col:1;--row:1}
 body.classes[data-class-layout="tower"] .context-row{bottom:calc(100% + 2 * (var(--cs) + var(--gap)) + 12px)}
-@media(max-width:600px){#class-bar{--cs:54px}}
-@media(max-height:430px){#class-bar{--cs:52px}.class-slot small{display:none}}
+@media(max-width:600px){body.classes #action-cluster{--cs:54px}}
+@media(max-height:430px){body.classes #action-cluster{--cs:52px}.class-slot small{display:none}}
 
 /* Tools strip (under the vitals) and its sheet, the weapon lab's look. */
 #class-panel{position:fixed;z-index:37;top:0;left:0;width:100%;height:100dvh;pointer-events:none;touch-action:manipulation}
@@ -139,3 +140,5 @@ body.classes[data-class-layout="tower"] .context-row{bottom:calc(100% + 2 * (var
 /* Title screen: the Classes card makes nine; Homestead gives up its double width so two rows still hold them all. */
 #front .mode-homestead{grid-column:auto}
 #classes-panel .menu-actions button small{display:block;font-size:11px;font-weight:400;opacity:.75;margin-top:2px}
+.class-card.current{opacity:.55;cursor:default;transform:none}
+.class-card.current .class-go{color:var(--muted)}

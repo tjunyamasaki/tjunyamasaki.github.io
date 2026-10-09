@@ -61,6 +61,7 @@ jobs:
           cp -r ball-game _site/ball-game
           rm -rf _site/ball-game/tests
           cp -r game-of-life _site/game-of-life
+          cp -r music-lab _site/music-lab
           cp -r css _site/css
           cp -r js _site/js
           cp -r assets _site/assets

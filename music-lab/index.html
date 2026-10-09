@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d12" />
+    <title>Music Lab</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="bar">
+        <div class="brand">
+          <a id="back" class="back" href="/links/" aria-label="Back to games"></a>
+          <h1>Music Lab</h1>
+        </div>
+
+        <div class="transport">
+          <button id="rec" class="round rec" type="button" title="Record (R)" aria-label="Record" aria-pressed="false"></button>
+          <button id="play" class="round play" type="button" title="Play / stop (Space)" aria-label="Play"></button>
+          <output id="clock" class="clock" aria-label="Position">1.1</output>
+        </div>
+
+        <div class="tempo">
+          <button id="bpm" class="chip bpm" type="button" title="Tempo · drag, scroll or click to type" aria-label="Tempo">
+            <span id="bpmVal">100</span><small>BPM</small>
+          </button>
+          <button id="metro" class="chip icon" type="button" title="Metronome (M)" aria-label="Metronome" aria-pressed="false"></button>
+          <div class="chip stepper" role="group" aria-label="Loop length">
+            <button id="barsDown" type="button" aria-label="Fewer bars"></button>
+            <span><b id="barsVal">4</b><small>bars</small></span>
+            <button id="barsUp" type="button" aria-label="More bars"></button>
+          </div>
+          <button id="dup" class="chip icon" type="button" title="Duplicate loop" aria-label="Duplicate loop"></button>
+        </div>
+
+        <div class="tools">
+          <button id="undo" class="ghost icon" type="button" title="Undo (Ctrl+Z)" aria-label="Undo"></button>
+          <button id="redo" class="ghost icon" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"></button>
+          <button id="share" class="ghost icon" type="button" title="Copy share link" aria-label="Copy share link"></button>
+          <button id="export" class="ghost icon" type="button" title="Download WAV" aria-label="Download WAV"></button>
+          <button id="new" class="ghost icon" type="button" title="New project" aria-label="New project"></button>
+        </div>
+      </header>
+
+      <section class="tracks" aria-label="Tracks">
+        <div id="trackList" class="track-list"></div>
+        <button id="addTrack" class="add-track" type="button">Add track</button>
+      </section>
+
+      <section class="editor" aria-label="Note editor">
+        <div id="edHead" class="ed-head"></div>
+        <div id="roll" class="roll"></div>
+        <div class="empty-state">
+          <button id="emptyAdd" class="cta" type="button">Add a track</button>
+        </div>
+      </section>
+    </div>
+
+    <dialog id="picker" class="picker" aria-label="Choose an instrument">
+      <div id="pickerGrid" class="picker-grid"></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

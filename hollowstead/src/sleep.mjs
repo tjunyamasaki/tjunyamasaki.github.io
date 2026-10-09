@@ -9,7 +9,9 @@ export const SLEEP = Object.freeze({hunger: 18, heal: 45, wake: 6});
 function asleep(world, p){
   if(!p.sleep) return false;
   const bed = world.buildings.find(b => b.id === p.sleep && b.hp > 0);
-  if(!bed || !roomOfBuilding(world, bed) || Math.hypot(p.x - bed.x, p.z - bed.z) > 3.2){p.sleep = null;return false;}
+  // Satoyama's farmhouse (satoyama/mode.mjs) is a room of its own: its bed is inside.
+  const house = bed?.type === 'minka';
+  if(!bed || (!house && !roomOfBuilding(world, bed)) || Math.hypot(p.x - bed.x, p.z - bed.z) > (house ? 4.2 : 3.2)){p.sleep = null;return false;}
   return true;
 }
 

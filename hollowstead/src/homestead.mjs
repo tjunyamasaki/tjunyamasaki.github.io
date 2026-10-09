@@ -90,6 +90,8 @@ export const OBJECTS = Object.freeze({
   // Satoyama's animal houses (satoyama/animals.mjs).
   coop: {w: 2, h: 2, art: 2.65},
   barn: {w: 3, h: 2, art: 4.35},
+  // Satoyama's farmhouse (satoyama/mode.mjs): there from the start, never taken down.
+  minka: {w: 3, h: 3, art: 4.4},
 });
 export const OBJECT_TYPES = Object.freeze(Object.keys(OBJECTS));
 /** Art fills 88% of the footprint's width; small art grows a little, never past 1.12. */

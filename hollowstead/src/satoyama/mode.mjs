@@ -17,7 +17,7 @@
 import {NODES, dayOf, phaseAt, phaseOf, scheduleOf} from '../content.mjs?v=harvest-18';
 import {eliteChance, enemyScale, maxHealth, pickWeighted} from '../progression.mjs?v=harvest-18';
 import {isMagicAlly} from '../magic/registry.mjs?v=harvest-18';
-import {growthRate} from '../homestead.mjs?v=harvest-18';
+import {growthRate, objectScale, objectSpot} from '../homestead.mjs?v=harvest-18';
 import {PLACES, ZONES, placeNodes, placeShape, placeZone} from './land.mjs?v=harvest-18';
 import {animalsOf, morning, stepAnimals} from './animals.mjs?v=harvest-18';
 
@@ -37,9 +37,10 @@ export const ROSTERS = Object.freeze({
   chikurin: Object.freeze([['kasa', 3], ['chochin', 2]]),
   higan: Object.freeze([['jiangshi', 2], ['rokurokubi', 2], ['chochin', 1]]),
   onsen: Object.freeze([['yukionna', 2], ['daoshi', 1], ['kasa', 2]]),
+  hakaba: Object.freeze([['jiangshi', 2], ['daoshi', 1.5], ['chochin', 1]]),
 });
 /** How many may be about one wanderer at once, by day. Night brings half as many again. */
-export const CAPS = Object.freeze({sugimori: 2, chikurin: 4, higan: 5, onsen: 6});
+export const CAPS = Object.freeze({sugimori: 2, chikurin: 4, higan: 5, onsen: 6, hakaba: 5});
 /** What a new wanderer brings to the farm: seeds of every day crop and a little food. */
 export const START_KIT = Object.freeze({daikonseed: 6, soyseed: 4, seed: 4, rootseed: 4, wheatseed: 4, berry: 3});
 
@@ -55,6 +56,7 @@ export function setupSatoyama(world){
   world.tiles = {rev: 0, cells: {}};
   world.animals = [];
   world.radius = PLACES.farm.extent;
+  ensureHouse(world);
   // The first morning is already up: no fade in from a night that never was.
   world.time = 8;
 }
@@ -79,6 +81,23 @@ export function satoyamaScale(world, tier = 1){
   const party = world.players.filter(p => p.online), level = party.length ? party.reduce((n, p) => n + (p.level || 1), 0) / party.length : 1;
   const night = phaseOf(world) === 'night', day = 1 + tier * 2.2 + (level - 1) * .45 + (night ? 1.5 : 0);
   return {scale: enemyScale(day), level: Math.round(day), elite: eliteChance(day, tier), boss: 1};
+}
+
+/**
+ * The farmhouse: a fixed camp object on the grid where the farm's land left room for it (land.mjs `home`). Sleep
+ * the night away inside; you arrive, and wake, at its door. Built once (an older farm gets it on its next morning).
+ */
+export function ensureHouse(world){
+  const s = world.satoyama;if(!s || s.place !== 'farm') return null;
+  let b = world.buildings.find(q => q.type === 'minka' && q.hp > 0);
+  if(!b && !s.house){
+    const home = placeShape(world.seed, 'farm').home, at = objectSpot(home.i, home.j, home.w, home.h);
+    b = world.structure('minka', at.x, at.z);
+    Object.assign(b, {foot: {i: home.i, j: home.j, w: home.w, h: home.h}, scale: objectScale('minka'), fixed: true});
+    world.buildings.push(b);world.gridRev = (world.gridRev || 0) + 1;
+  }
+  if(b) s.house = b.id;
+  return b || null;
 }
 
 // ------------------------------------------------------------------ travel
@@ -158,6 +177,7 @@ export function stepSatoyama(world, dt, before, phase, obstacles){
     if(before !== phase && phase === 'day' && !(p.charm > 0)) p.charm = 1;
   }
   if(s.place === 'farm'){
+    if(!s.house) ensureHouse(world);
     // Every morning the animals had (here or while away), once each.
     if(phase === 'day' && s.morning < s.day){for(let d = s.morning + 1; d <= s.day; d++)morning(world, d);s.morning = s.day;}
     stepAnimals(world, dt, obstacles, phase);

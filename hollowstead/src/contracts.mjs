@@ -95,7 +95,7 @@ export const EQUIPMENT_SLOT_ITEMS = Object.freeze({
   weapon: Object.freeze(['spear', 'sword', 'recurve', 'bonebow', 'broadsword', 'flamberge', 'crookstaff', 'skullstaff', 'tome',
     'fangs', 'soulchain', 'scythe', 'wisplantern', 'stormrod', 'starfall', 'crowtotem', 'jacklantern', 'wighthorn', 'censer']),
   body: Object.freeze(['armor', 'bonemail', 'shardplate']),
-  light: Object.freeze(['torch', 'everlantern', 'gravelight']),
+  light: Object.freeze(['torch', 'everlantern', 'gravelight', 'chochinlamp']),
   head: Object.freeze(['sporemask']),
   back: Object.freeze(['barrowcloak']),
   trinket: TRINKET_IDS,
@@ -142,7 +142,7 @@ export const CAULDRON_COOK_RECIPES = Object.freeze(['stew', 'elixir', 'greaterel
 export const SATOYAMA_RECIPES = Object.freeze({
   fieldBuild: Object.freeze(['fire', 'bench', 'chest', 'bed', 'coop', 'till', 'plank', 'roughplank', 'fieldstone', 'fence', 'wall', 'gate']),
   benchBuild: Object.freeze(['fire', 'bench', 'chest', 'bed', 'coop', 'barn', 'pot', 'toro', 'hokora', 'till', 'plank', 'roughplank', 'fieldstone', 'boards', 'flagstone', 'cobble', 'slabs', 'fence', 'wall', 'gate', 'stonewall', 'timberwall', 'masonwall']),
-  benchCraft: Object.freeze(['axe', 'pick', 'bandage', 'satchel']),
+  benchCraft: Object.freeze(['chochinlamp', 'axe', 'pick', 'bandage', 'satchel']),
   fireCook: Object.freeze(['roast', 'loaf', 'tamagoyaki']),
   potCook: Object.freeze(['misosoup', 'oden', 'purin', 'moonbroth']),
 });
@@ -174,6 +174,7 @@ export const CONTEXT_ACTIONS = Object.freeze({
   // Satoyama's animal houses (satoyama/animals.mjs).
   coop: Object.freeze(['feed', 'collect', 'hatch', 'repair']),
   barn: Object.freeze(['feed', 'collect', 'raise', 'repair']),
+  minka: Object.freeze(['rest']),
   fudaward: Object.freeze(['repair']),
   toro: Object.freeze(['repair']),
   cart: Object.freeze(['pull', 'open', 'upgrade', 'repair']),
@@ -233,6 +234,8 @@ export const CONTEXT_ACTIONS = Object.freeze({
   bamboostand: Object.freeze(['chop']),
   ironseam: Object.freeze(['mine']),
   saltcrust: Object.freeze(['mine']),
+  haka: Object.freeze(['mine']),
+  hitodama: Object.freeze(['gather']),
   farmgate: Object.freeze(['travel']),
   homegate: Object.freeze(['travel']),
   drop: Object.freeze([]),

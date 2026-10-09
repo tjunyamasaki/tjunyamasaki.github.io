@@ -97,20 +97,44 @@ function hudElements(){
 }
 function currentHudGrid(){
   const pad=$('joystick')?.getBoundingClientRect();
-  return hudGrid(innerWidth,innerHeight,{padRight:pad&&pad.width?pad.right:160});
+  return hudGrid(innerWidth,innerHeight,{padRight:pad&&pad.width?pad.right:160,margin:hudInset(hudGrid(innerWidth,innerHeight).cell).right});
+}
+/**
+ * How far the grid sits in from the bottom-right corner: the corner button's centre mirrors the movement
+ * pad's centre on the left, so both thumbs rest at the same height and the same distance from their edge.
+ * A screen too narrow for the grid beside the pad (a phone held upright) stacks the grid just above the pad.
+ */
+function hudInset(cell,cols=0,gap=0){
+  const pad=$('joystick')?.getBoundingClientRect();
+  if(!pad||!pad.width)return {right:14,bottom:6,stacked:false};
+  const cx=pad.left+pad.width/2,cy=innerHeight-(pad.top+pad.height/2),right=Math.max(14,Math.round(cx-cell/2));
+  const stacked=cols>0&&innerWidth-right-cols*(cell+gap)+gap<pad.right+8;
+  return {right,bottom:stacked?Math.round(innerHeight-pad.top+10):Math.max(6,Math.round(cy-cell/2)),stacked};
 }
 /** Put every HUD button where the layout says (or clear it all outside classed worlds). */
 function applyHud(on=!!world?.classed&&!$('class-panel').hidden){
   const els=hudElements(),extras=[$('heal-swap'),$('heal-picker'),document.querySelector('#action-cluster .stamina-track'),document.querySelector('#class-bar .class-resource')];
   const reset=el=>{if(!el)return;el.classList.remove('hud-btn','hud-off');for(const k of ['right','bottom','width','height','min-width','min-height','--hs'])el.style.removeProperty(k);};
-  if(!on){for(const el of [...Object.values(els),...extras])reset(el);const row=$('context-row');if(row){row.style.removeProperty('--ctx-left');row.style.removeProperty('--ctx-right');}return;}
+  const cluster=$('action-cluster');
+  if(!on){for(const el of [...Object.values(els),...extras])reset(el);cluster?.style.removeProperty('margin');const row=$('context-row');if(row){row.style.removeProperty('--ctx-left');row.style.removeProperty('--ctx-right');}return;}
   const grid=currentHudGrid();hudLayout=fitHud(hudLayout,grid);
+  const inset=hudInset(grid.cell,grid.cols,grid.gap);if(cluster)cluster.style.margin=`0 ${inset.right}px ${inset.bottom}px 0`;
   const placed=new Map(hudLayout.map(t=>[t.id,t]));
   for(const [id,el] of Object.entries(els)){
     if(!el)continue;const t=placed.get(id);
     if(!t){el.classList.add('hud-off');continue;}
     const b=tileBox(t,grid);el.classList.add('hud-btn');el.classList.remove('hud-off');
     for(const [k,v] of [['right',b.right],['bottom',b.bottom],['width',b.size],['height',b.size],['min-width',b.size],['min-height',b.size],['--hs',b.size]])el.style.setProperty(k,`${Math.round(v)}px`);
+  }
+  // A button is a little smaller than its cell: nudge the grid so the corner button's centre lands exactly opposite
+  // the pad's (across only, when the grid is stacked above the pad).
+  const pad0=$('joystick')?.getBoundingClientRect();
+  if(cluster&&pad0?.width){
+    const c=Object.values(els).filter(el=>el&&el.classList.contains('hud-btn')&&!el.classList.contains('hud-off')).map(el=>el.getBoundingClientRect()).filter(r=>r.width).sort((a,b)=>(b.right+b.bottom)-(a.right+a.bottom))[0];
+    if(c){
+      const dx=(innerWidth-(c.left+c.width/2))-(pad0.left+pad0.width/2),dy=(innerHeight-(c.top+c.height/2))-(innerHeight-(pad0.top+pad0.height/2));
+      if(Math.abs(dx)<grid.cell&&Math.abs(dy)<grid.cell)cluster.style.margin=`0 ${Math.max(6,inset.right-Math.round(dx))}px ${inset.stacked?inset.bottom:Math.max(4,inset.bottom-Math.round(dy))}px 0`;
+    }
   }
   // What rides on a button: the heal chooser on Heal, stamina under Attack, the class resource under the ultimate.
   const box=id=>placed.has(id)?tileBox(placed.get(id),grid):null,heal=box('heal'),atk=box('attack'),ult=box('ult');
@@ -735,7 +759,7 @@ function contextFacts(p){
   const base={kind:target.kind,id:entity.id,type:entity.type,wood:world.available(p,'wood'),stone:world.available(p,'stone'),seeds:world.available(p,'seed')};
   if(target.kind==='building'){
     const lock=world.chestSessions.get(entity.id);
-    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),classed:!!world.classed,home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{}),...(entity.type==='hokora'?{offered:offerWait(world,entity)>0,embers:world.available(p,'ember')}:{}),...(entity.type==='bookshelf'?{shelved:shelfCount(entity),packBooks:p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0)}:{}),satoyama:!!world.satoyama,...(isHouse(entity)?{house:houseFacts(world,entity),fiber:world.available(p,'fiber'),eggs:world.available(p,'egg')}:{})};
+    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='minka'||(entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity)),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),classed:!!world.classed,home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{}),...(entity.type==='hokora'?{offered:offerWait(world,entity)>0,embers:world.available(p,'ember')}:{}),...(entity.type==='bookshelf'?{shelved:shelfCount(entity),packBooks:p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0)}:{}),satoyama:!!world.satoyama,...(isHouse(entity)?{house:houseFacts(world,entity),fiber:world.available(p,'fiber'),eggs:world.available(p,'egg')}:{})};
   }
   // Satoyama (satoyama/animals.mjs): an animal to pet; a coop or barn's trough and what waits in it.
   if(target.kind==='animal')return {...base,name:animalName(entity).toLowerCase(),petted:entity.petDay===world.satoyama?.day};

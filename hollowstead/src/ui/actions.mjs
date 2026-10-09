@@ -210,7 +210,7 @@ export function isHarvestAction(id) {
 export function usableLantern(player) {
   if (!player || player.down || player.ghost) return null;
   const light = player.equipment?.light;
-  const lights = ['torch', 'everlantern', 'gravelight'];
+  const lights = ['torch', 'everlantern', 'gravelight', 'chochinlamp'];
   const equipped = lights.includes(light?.itemId) && light.durability > 0 ? light : null;
   let carried = null;
   for (const stack of player.inventory?.slots || []) {
@@ -494,7 +494,7 @@ export function describeContext(facts) {
     } else if (facts.growth >= 100) {
       list.push(make('harvest', {targetId: id, command: buildingCommand('harvest', id)}));
     }
-  } else if (facts.type === 'bed') {
+  } else if (facts.type === 'bed' || facts.type === 'minka') {
     // After dark a bed inside a closed room sleeps the night away (sleep.mjs); in the open it is too dangerous.
     const dark = facts.phase && facts.phase !== 'day';
     const hungry = facts.hunger < 20;

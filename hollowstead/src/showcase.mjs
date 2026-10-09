@@ -29,7 +29,7 @@ export const GALLERY_CATEGORIES = Object.freeze([
   {id: 'books', label: 'Books'},
 ]);
 /** Standing decoration the places use (worldgen.mjs areaProps, satoyama/land.mjs) that is no node or structure. */
-const DECORATION = ['torii', 'jizo', 'gorinto', 'ema', 'bonsho', 'yomi-grass', 'yomi-shrub', 'yomi-lilies', 'sakura', 'matsu', 'yanagi', 'bamboo', 'bamboo-b', 'plaza-prop'];
+const DECORATION = ['torii', 'jizo', 'gorinto', 'sotoba', 'ema', 'bonsho', 'yomi-grass', 'yomi-shrub', 'yomi-lilies', 'sakura', 'matsu', 'yanagi', 'bamboo', 'bamboo-b', 'plaza-prop'];
 /** The camp as Satoyama draws it (satoyama/view.mjs YOMI_SKINS). */
 const SKINS = ['y-bench', 'y-chest', 'y-fire', 'y-pot', 'y-bed'];
 

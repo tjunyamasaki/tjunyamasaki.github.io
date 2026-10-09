@@ -799,7 +799,7 @@ export class World {
     const inRange=entity=>distance(p,entity)<RULES.reach;
     const revive=this.players.find(q=>q.id!==p.id&&q.online&&q.down&&inRange(q));
     const candidates=[
-      ...this.nodes.filter(n=>!(n.ready>this.time)&&nodeAwake(n,this)&&inRange(n)&&(NODES[n.type].handRate||NODES[n.type].tool)).map(e=>({kind:'node',entity:e,label:['tree','stump','bamboostand'].includes(e.type)?'Chop':['rock','ore','grave','shardrock','rimecrystal','embervent','ironseam','saltcrust'].includes(e.type)?'Mine':isCache(e.type)||e.type==='fallenstar'||e.type==='mimic'?'Open':e.type==='witchcauldron'?'Sip':e.type==='thornpatch'?'Cut':e.type==='dreadaltar'||e.type==='gashamound'?'Wake':e.type==='obonlantern'?'Light':e.type==='foxwedding'?'Bow':NODES[e.type].landmark==='delve'?'Descend':NODES[e.type].landmark==='travel'?'Travel':'Gather'})),
+      ...this.nodes.filter(n=>!(n.ready>this.time)&&nodeAwake(n,this)&&inRange(n)&&(NODES[n.type].handRate||NODES[n.type].tool)).map(e=>({kind:'node',entity:e,label:['tree','stump','bamboostand'].includes(e.type)?'Chop':['rock','ore','grave','shardrock','rimecrystal','embervent','ironseam','saltcrust','haka'].includes(e.type)?'Mine':isCache(e.type)||e.type==='fallenstar'||e.type==='mimic'?'Open':e.type==='witchcauldron'?'Sip':e.type==='thornpatch'?'Cut':e.type==='dreadaltar'||e.type==='gashamound'?'Wake':e.type==='obonlantern'?'Light':e.type==='foxwedding'?'Bow':NODES[e.type].landmark==='delve'?'Descend':NODES[e.type].landmark==='travel'?'Travel':'Gather'})),
       // Satoyama's animals (satoyama/animals.mjs): pet them.
       ...(this.animals?.length?animalTargets(this,p,RULES.reach):[]),
       ...this.buildings.filter(b=>b.hp>0&&inRange(b)&&!(b.grid&&b.type!=='gate')&&(typeof id==='string'||b.towedBy!==p.id)).map(e=>({kind:'building',entity:e,label:this.buildingLabel(e)})),
@@ -810,7 +810,7 @@ export class World {
     if(revive)return {kind:'revive',entity:revive,label:'Revive teammate'};
     return candidates.sort((a,b)=>distance(p,a.entity)-distance(p,b.entity)||(a.entity.id<b.entity.id?-1:1))[0]||null;
   }
-  buildingLabel(b){return ({hearth:'Feed heartfire',fire:'Feed fire',bench:'Workbench',chest:'Open supplies',wall:'Repair wall',gate:b.open?'Close gate':'Open gate',trap:b.charges<3?'Rearm trap':'Briar trap',farm:b.planted?(b.growth>=100?'Harvest pumpkins':'Growing…'):'Plant seed',pot:'Cook a feast',lantern:'Soul lantern',bed:'Rest',ward:'Warding totem',hushstone:'Hushing stone',bookshelf:`Bookshelf · ${shelfCount(b)} ${shelfCount(b)===1?'book':'books'}`,toro:shrineLabel(this,b),hokora:shrineLabel(this,b),coop:'Chicken coop',barn:'Cow barn',fudaward:shrineLabel(this,b),cart:b.type==='cart'?cartLabel(b):''})[b.type];}
+  buildingLabel(b){return ({hearth:'Feed heartfire',fire:'Feed fire',bench:'Workbench',chest:'Open supplies',wall:'Repair wall',gate:b.open?'Close gate':'Open gate',trap:b.charges<3?'Rearm trap':'Briar trap',farm:b.planted?(b.growth>=100?'Harvest pumpkins':'Growing…'):'Plant seed',pot:'Cook a feast',lantern:'Soul lantern',bed:'Rest',ward:'Warding totem',hushstone:'Hushing stone',bookshelf:`Bookshelf · ${shelfCount(b)} ${shelfCount(b)===1?'book':'books'}`,toro:shrineLabel(this,b),hokora:shrineLabel(this,b),coop:'Chicken coop',barn:'Cow barn',minka:'Farmhouse',fudaward:shrineLabel(this,b),cart:b.type==='cart'?cartLabel(b):''})[b.type];}
   interact(p,target){
     const explicit=typeof target==='string'?target:null;
     const t=this.target(p, explicit);if(!t)return {ok:false,code:'rejected'};
@@ -830,9 +830,10 @@ export class World {
       if(e.type==='wall')this.action(p.id,{type:'repair',target:e.id});
       if(e.type==='farm'){if(!e.planted){if(this.pay(p,{seed:1})){e.planted=true;e.growth=0;}else this.tell(p,'Need 1 pumpkin seed');}else if(e.growth>=100){this.give(p,'pumpkin',3);this.give(p,'seed',2);e.planted=false;e.growth=0;this.event('loot',e.x,e.z,'+3 pumpkins · +2 seeds');}}
       if(e.type==='trap'&&e.charges<3){if(this.pay(p,{stone:1})){e.charges=3;e.hp=e.maxHp;}else this.tell(p,'Need 1 flint to rearm');}
-      if(e.type==='bed'){const dark=phaseOf(this)!=='day';
+      if(e.type==='bed'||e.type==='minka'){const dark=phaseOf(this)!=='day';
         // After dark a bed inside a room (homestead.mjs roomAt) sleeps the night away (sleep.mjs); out in the open it is too dangerous.
-        if(dark){if(p.sleep===e.id){p.sleep=null;this.tell(p,'You get up');}else if(roomOfBuilding(this,e)){p.sleep=e.id;p.goal=null;p.rest=false;this.tell(p,'You lie down to sleep through the night');}else this.tell(p,'Too dangerous to sleep in the open. Build a room around the bed');}
+        // Satoyama's farmhouse has its bed inside already.
+        if(dark){if(p.sleep===e.id){p.sleep=null;this.tell(p,'You get up');}else if(e.type==='minka'||roomOfBuilding(this,e)){p.sleep=e.id;p.goal=null;p.rest=false;this.tell(p,'You lie down to sleep through the night');}else this.tell(p,'Too dangerous to sleep in the open. Build a room around the bed');}
         else if(p.hunger<20)this.tell(p,'Eat before resting');else {p.rest=!p.rest;p.goal=null;}}
       p.cooldown=.45;
       return {ok:true,code:'ok'};
@@ -1656,7 +1657,8 @@ export class World {
     this.damagedAt.set(p.id,this.time);const armor=p.equipment.body;if(armor&&ARMOR_REDUCTION[armor.itemId]&&armor.durability>0){this.wearEquipped(p,'body',amount);amount*=1-ARMOR_REDUCTION[armor.itemId];}if(buffed(p,'warded'))amount*=BUFF.warded;if(buffed(p,'foxwed'))amount*=BUFF.foxward;amount=refineHurt(this,p,amount,source);p.hp-=amount;p.rest=false;this.event('hurt',p.x,p.z,`−${Math.ceil(amount)}`,{player:p.id});if(p.hp<=0){releaseChests(this,p.id);p.hp=0;p.down=40;p.revive=0;p.goal=null;this.event('announce',p.x,p.z,`${p.name} needs a hand!`);}}
   revivePlayer(p){p.down=0;p.ghost=false;p.hp=Math.round(maxHealth(p)/2);p.mendAfter=this.time+HEARTH_MEND.calm;p.courage=50;p.hunger=Math.max(35,p.hunger);p.revive=0;p.warp=null;
     // A Vigil wakes you at the Heartfire you made home, or by the Glimmerstone in the middle (vigil.mjs wakeSpot).
-    if(this.satoyama){const at=arrival(this,0);p.x=at.x;p.z=at.z;}
+    // Satoyama (satoyama/mode.mjs): rise beside a friend still standing; alone, wake at the farmhouse door (from the wilds too).
+    if(this.satoyama){if(!this.players.some(q=>q!==p&&q.online&&!q.down&&!q.ghost)){if(this.satoyama.place!=='farm'){wakeHome(this);return;}const at=arrival(this,0);p.x=at.x;p.z=at.z;}}
     else if(isVigil(this)&&!this.dungeon){const at=wakeSpot(this,p);p.x=at.x;p.z=at.z;}
     else{const hearth=this.buildings.find(b=>b.type==='hearth');if(hearth){p.x=hearth.x+2;p.z=hearth.z+2;}}
     this.event('heal',p.x,p.z,'Back on your feet');}

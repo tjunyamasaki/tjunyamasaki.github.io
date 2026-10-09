@@ -16,6 +16,8 @@ import {NODES} from '../content.mjs?v=harvest-18';
 import {valueNoise} from '../progression.mjs?v=harvest-18';
 
 export const LAND_CELL = .5;
+/** The building grid's cell (homestead.mjs CELL), for the farmhouse's plot. */
+const GRID_CELL = 1.5;
 export const PLACES = Object.freeze({
   farm: Object.freeze({name: 'The Farm', extent: 40}),
   wilds: Object.freeze({name: 'The Wilds', extent: 84}),
@@ -27,6 +29,7 @@ export const ZONES = Object.freeze({
   chikurin: {name: 'The Bamboo Thicket', tier: 1},
   higan: {name: 'The Spider-lily Marsh', tier: 2},
   onsen: {name: 'The Hot-spring Terrace', tier: 3},
+  hakaba: {name: 'The Nameless Graveyard', tier: 2},
 });
 const G = 0, W = 1, T = 2, V = 4;
 /** Detail flags (as worldgen.mjs DETAIL): a worn trail, a hot spring, the marsh's black water. */
@@ -130,11 +133,15 @@ function buildFarm(seed){
   const corner = Math.floor(rng() * 4), px = (corner & 1 ? 1 : -1) * (A * .58 + rng() * 3), pz = 1 + (corner & 2 ? 1 : -1) * (B * .5 + rng() * 2), pr = 3.2 + rng() * 1.6;
   const pond = {x: round2(px), z: round2(pz), r: round2(pr)};
   blob(s, px, pz, pr, 7.3, k => {if(s.grid[k] === G) s.grid[k] = W;});
-  const spawn = {x: round2((rng() * 2 - 1) * 4), z: round2(4 + rng() * 4)};
+  // The farmhouse (mode.mjs builds it): three by three grid cells a little north of the middle; you arrive at its door.
+  const near = {x: (rng() * 2 - 1) * 4, z: 4 + rng() * 4}, hi = Math.floor(near.x / GRID_CELL) - 1, hj = Math.floor((near.z - 1) / GRID_CELL) - 3;
+  const home = {i: hi, j: hj, w: 3, h: 3, x: (hi + 1.5) * GRID_CELL, z: (hj + 1.5) * GRID_CELL};
+  const spawn = {x: round2(home.x), z: round2((hj + 3) * GRID_CELL + 1.1)};
   s.zone.fill(0);
   const clear = clearance(s);
   const at = (x, z) => {const k = cellIndex(s, x, z);return k < 0 || s.grid[k] !== G ? 0 : clear[k];};
-  const free = (x, z, r) => Math.hypot(x - spawn.x, z - spawn.z) > r + 3.5 && !(Math.abs(x - gx) < 3.2 && z < top + 7) && Math.hypot(x - pond.x, z - pond.z) > pond.r + 1.6 + r;
+  const yard = (x, z, r) => x > hi * GRID_CELL - 2 - r && x < (hi + 3) * GRID_CELL + 2 + r && z > hj * GRID_CELL - 2 - r && z < (hj + 3) * GRID_CELL + 2 + r;
+  const free = (x, z, r) => Math.hypot(x - spawn.x, z - spawn.z) > r + 3.5 && !yard(x, z, r) && !(Math.abs(x - gx) < 3.2 && z < top + 7) && Math.hypot(x - pond.x, z - pond.z) > pond.r + 1.6 + r;
   const book = nodeBook(s);
   // Trees: a thick band round the edge, a couple of groves inside.
   const groves = [0, 1, 2].slice(0, 1 + Math.floor(rng() * 2)).map(() => ({x: (rng() * 2 - 1) * A * .6, z: 1 + (rng() * 2 - 1) * B * .55, r: 3 + rng() * 3}));
@@ -211,27 +218,27 @@ function buildFarm(seed){
     deco.add('l', x, z, .9);prop('yomi-lilies', x, z, {scale: round2(.85 + rng() * .3)});n++;
   }
   book.add('farmgate', gate.x, gate.z, 1.5, {look: 'torii'});
-  return finish(s, {place: 'farm', seed, spawn, gate, pond, nodes: book.nodes, props, areas: [{id: 'satofarm', x: 0, z: 1, r: Math.max(A, B)}]});
+  return finish(s, {place: 'farm', seed, spawn, gate, pond, home, nodes: book.nodes, props, areas: [{id: 'satofarm', x: 0, z: 1, r: Math.max(A, B)}]});
 }
 
 // ------------------------------------------------------------------ the wilds
-const WILD_AREAS = Object.freeze(['chikurin', 'higan', 'onsen']);
-const ZONE_CODE = Object.freeze({satofarm: 0, sugimori: 1, chikurin: 2, higan: 3, onsen: 4});
+const WILD_AREAS = Object.freeze(['chikurin', 'higan', 'onsen', 'hakaba']);
+const ZONE_CODE = Object.freeze({satofarm: 0, sugimori: 1, chikurin: 2, higan: 3, onsen: 4, hakaba: 5});
 const ZONE_IDS = Object.freeze(Object.keys(ZONE_CODE));
 function buildWilds(seed){
   const s = makeGrid(PLACES.wilds.extent), rng = rngFor(seed ^ 0x9a1d5), ox = rng() * 300, oz = rng() * 300;
   const hub = {id: 'sugimori', x: round2((rng() * 2 - 1) * 4), z: 50, r: 14};
-  const slots = [{x: -46, z: 12}, {x: 0, z: -34}, {x: 46, z: 12}];
+  const slots = [{x: -50, z: 16}, {x: -24, z: -44}, {x: 28, z: -44}, {x: 52, z: 16}];
   const order = WILD_AREAS.slice();
   for(let i = order.length - 1; i > 0; i--){const j = Math.floor(rng() * (i + 1));[order[i], order[j]] = [order[j], order[i]];}
-  const areas = [hub, ...order.map((id, i) => ({id, x: round2(slots[i].x + (rng() * 2 - 1) * 6), z: round2(slots[i].z + (rng() * 2 - 1) * 6), r: round2(20 + rng() * 4)}))];
+  const areas = [hub, ...order.map((id, i) => ({id, x: round2(slots[i].x + (rng() * 2 - 1) * 4), z: round2(slots[i].z + (rng() * 2 - 1) * 4), r: round2(19 + rng() * 3)}))];
   const inside = (a, x, z, pad = 0) => Math.hypot(x - a.x, z - a.z) + (valueNoise(x * .1 + a.x + ox, z * .1 - a.z + oz) - .5) * 6 < a.r + pad;
   for(let k = 0; k < s.N * s.N; k++){
     const x = cellX(s, k), z = cellZ(s, k);
     for(const a of areas)if(inside(a, x, z)){s.grid[k] = G;s.zone[k] = ZONE_CODE[a.id];break;}
   }
   // Trails: the crossing to each place, and round from one place to the next.
-  const links = [[0, 1], [0, 2], [0, 3], [1, 2], [2, 3]];
+  const links = [[0, 1], [0, 2], [0, 3], [0, 4], [1, 2], [2, 3], [3, 4]];
   const trails = [];
   for(const [a, b] of links){
     const A = areas[a], Bz = areas[b], mx = (A.x + Bz.x) / 2 + (rng() * 2 - 1) * 6, mz = (A.z + Bz.z) / 2 + (rng() * 2 - 1) * 6;
@@ -276,6 +283,9 @@ function buildWilds(seed){
   // The marsh: willows, iron sand by the pools, dry reeds.
   scatter(marsh, 'tree', 14, 1.6, 1, {look: 'yanagi'});scatter(marsh, 'ironseam', 10, 1.4, 1.2);scatter(marsh, 'weeds', 16, .8, .7);
   // The terrace: pines, rocks, salt crusting round the springs.
+  // The nameless graveyard: old graves that give up soul embers, ghost fires after dark, a few gnarled pines.
+  const graves = byId('hakaba');
+  scatter(graves, 'haka', 16, 1.3, 1.1);scatter(graves, 'hitodama', 10, 1.6, .8);scatter(graves, 'tree', 8, 1.8, 1, {look: 'matsu'});scatter(graves, 'weeds', 10, .8, .8);
   scatter(terrace, 'tree', 12, 1.6, 1, {look: 'matsu'});scatter(terrace, 'rock', 14, 1.2, 1.2, {look: 'yomi-rock'});scatter(terrace, 'saltcrust', 10, 1.2, 1);
   book.add('homegate', gate.x, gate.z, 1.5, {look: 'torii'});
   // Decoration: the forest wall, lilies in the marsh, stupas, jizo at the crossing, lanterns by the torii.
@@ -287,7 +297,7 @@ function buildWilds(seed){
     let zone = null;each(s, x, z, 6, (q, a, b, d) => {if(!zone && s.grid[q] === G)zone = ZONE_IDS[s.zone[q]];});
     if(!zone) continue;
     deco.add('t', x, z, 2.3);
-    const pick = rng(), key = zone === 'chikurin' ? 'bamboo' : zone === 'higan' ? (pick < .6 ? 'yanagi' : 'matsu') : zone === 'onsen' ? (pick < .7 ? 'matsu' : 'yomi-tree') : (pick < .5 ? 'matsu' : 'yomi-tree');
+    const pick = rng(), key = zone === 'chikurin' ? 'bamboo' : zone === 'higan' ? (pick < .6 ? 'yanagi' : 'matsu') : zone === 'onsen' ? (pick < .7 ? 'matsu' : 'yomi-tree') : zone === 'hakaba' ? (pick < .6 ? 'matsu' : 'yanagi') : (pick < .5 ? 'matsu' : 'yomi-tree');
     prop(key, x, z, {scale: round2(.9 + rng() * .35)});
   }
   const lantern = {light: 2.6, tint: '#f4a64a', scale: 1.1};
@@ -301,6 +311,7 @@ function buildWilds(seed){
     }
   };
   dress(marsh, 'yomi-lilies', 26, 1, .3, 3);dress(marsh, 'gorinto', 5, 2, 1.5);
+  dress(graves, 'gorinto', 9, 2, 1);dress(graves, 'sotoba', 10, 1.6, .8);dress(graves, 'jizo', 4, 2.4, 1.2);dress(graves, 'yomi-lilies', 10, 1, .3);
   dress(terrace, 'yomi-shrub', 10, 1.4, .5, 3);dress(grove, 'yomi-grass', 12, 1.2, .5);
   dress(hub, 'yomi-grass', 16, 1.1, .4, 4);dress(hub, 'yomi-shrub', 8, 1.4, .5, 3);
   return finish(s, {place: 'wilds', seed, spawn, gate, nodes: book.nodes, props, areas, pools, trails});
@@ -340,7 +351,7 @@ export function placeProps(seed, place){return placeShape(seed, place).props;}
 export function placeLights(seed, place){return placeProps(seed, place).filter(p => p.light > 0).map(p => ({x: p.x, z: p.z, radius: p.light}));}
 
 // ------------------------------------------------------------------ ground colours
-const TONES = {satofarm: '#7d7a56', sugimori: '#6a6a50', chikurin: '#5f6b4a', higan: '#5c4b4e', onsen: '#857e74', path: '#a08c66',
+const TONES = {satofarm: '#7d7a56', sugimori: '#6a6a50', chikurin: '#5f6b4a', higan: '#5c4b4e', onsen: '#857e74', hakaba: '#615a63', path: '#a08c66',
   water: '#3c5560', shore: '#6f7a62', thicket: '#323d31', void: '#1f1d27', blackwater: '#1f1c26', spring: '#8cc4bc'};
 const toRGB = h => {const n = parseInt(String(h).replace('#', ''), 16);return Number.isFinite(n) ? [n >> 16 & 255, n >> 8 & 255, n & 255] : [128, 128, 128];};
 /**

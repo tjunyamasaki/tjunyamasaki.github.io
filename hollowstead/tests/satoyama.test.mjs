@@ -6,7 +6,8 @@ import {CHARACTERS, ENEMIES, EQUIPMENT, ITEMS, NODES, RECIPES, RULES} from '../s
 import {cellAt, gridWorld} from '../src/homestead.mjs';
 import {contextRecipeIds} from '../src/interactions.mjs';
 import {PLACES, placeGround, placeNodes, placeProps, placeShape, placeWalkable, placeZone} from '../src/satoyama/land.mjs';
-import {ROSTERS, SATOYAMA, START_KIT, travel} from '../src/satoyama/mode.mjs';
+import {ROSTERS, SATOYAMA, START_KIT, travel, wakeHome} from '../src/satoyama/mode.mjs';
+import {phaseOf} from '../src/content.mjs';
 import {ANIMALS, HUSBANDRY} from '../src/satoyama/animals.mjs';
 import {buildingKey} from '../src/satoyama/view.mjs';
 import {loadMagicModules} from '../src/magic/load.mjs';
@@ -56,7 +57,7 @@ test('both places are built from the seed alone, and a walker can reach every to
   // The decoration changes with the seed; nothing stands in the middle of the farm.
   assert.notDeepEqual(placeProps(1, 'farm').map(p => p.key).sort(), placeProps(77, 'farm').map(p => p.key).sort());
   const {world} = farm(5);
-  assert.equal(world.buildings.length, 0);
+  assert.deepEqual(world.buildings.map(b => b.type), ['minka']);
   assert.equal(world.nodes.some(n => Math.hypot(n.x, n.z) < 2 && NODES[n.type].landmark), false);
 });
 
@@ -190,6 +191,76 @@ test('a fallen party wakes on the farm with what it carried', () => {
   assert.ok(p.hp > 0);
   assert.equal(p.inventory.slots.filter(Boolean).length, carried);
   assert.equal(world.walkable(p.x, p.z), true);
+});
+
+test('a lone wanderer who falls in the wilds wakes on the farm, at the farmhouse door, not at the crossing', () => {
+  const {world, p} = farm(31);
+  const house = world.buildings.find(b => b.type === 'minka');
+  travel(world, 'wilds');
+  p.charm = 1;world.hurt(p, 999);
+  assert.ok(p.down || p.ghost);
+  // Spending the last charm, as the dawn does, brings them home.
+  assert.equal(world.action(p.id, {type: 'interact'}).ok, true);
+  assert.equal(world.satoyama.place, 'farm');
+  assert.ok(Math.hypot(p.x - house.x, p.z - house.z) < 5, 'by the farmhouse');
+  assert.equal(world.walkable(p.x, p.z), true);
+});
+
+test('the farm starts with a farmhouse: fixed, sleeps the night away, and outlives a trip and a save', () => {
+  const {world, p} = farm(32);
+  const house = world.buildings.find(b => b.type === 'minka');
+  assert.ok(house && house.fixed && house.foot);
+  assert.ok(THEME.sprites.minka, 'art');
+  // Arrival is at its door, and the door is open ground.
+  assert.ok(Math.hypot(p.x - house.x, p.z - house.z) < 5);
+  assert.equal(world.walkable(p.x, p.z), true);
+  // It cannot be taken down, nor built over.
+  assert.equal(act(world, p, house, 'dismantle').ok, false);
+  assert.equal(world.action(p.id, {type: 'tile', tool: 'obj:coop', cells: [[house.foot.i + 1, house.foot.j + 1]]}).ok, false);
+  // After dark, lying down in it skips to the morning.
+  while(phaseOf(world) !== 'night') world.tick();
+  const day = Math.floor(world.time / RULES.cycle);
+  assert.equal(world.action(p.id, {type: 'interact', target: house.id}).ok, true);
+  assert.equal(p.sleep, house.id);
+  for(let i = 0; i < 5; i++) world.tick();
+  assert.equal(phaseOf(world), 'day');
+  assert.ok(Math.floor(world.time / RULES.cycle) > day);
+  // Only ever one, through travel and a save.
+  travel(world, 'wilds');travel(world, 'farm');
+  const back = World.fromSave(JSON.parse(JSON.stringify({world: world.snapshot({purpose: 'save'}), savedAt: 1})));
+  assert.equal(back.buildings.filter(b => b.type === 'minka').length, 1);
+  wakeHome(back);
+  assert.equal(back.buildings.filter(b => b.type === 'minka').length, 1);
+});
+
+test('the Nameless Graveyard gives soul embers: graves to break, ghost fires to catch', () => {
+  for(const seed of [1, 2026]){
+    const wilds = placeShape(seed, 'wilds'), grave = wilds.areas.find(a => a.id === 'hakaba');
+    assert.ok(grave, 'a graveyard in the wilds');
+    assert.equal(reachable(seed, 'wilds', wilds.spawn, {x: grave.x, z: grave.z}), true);
+    const types = new Set(placeNodes(seed, 'wilds').map(n => n.type));
+    assert.ok(types.has('haka') && types.has('hitodama'));
+    assert.equal(placeNodes(seed, 'farm').some(n => n.type === 'haka' || n.type === 'hitodama'), false);
+  }
+  for(const type of ['haka', 'hitodama', 'sotoba']) assert.ok(THEME.sprites[type], type);
+  assert.ok(NODES.haka.loot.ember > 0 && NODES.hitodama.loot.ember > 0);
+  assert.ok(ROSTERS.hakaba.some(([type]) => type === 'daoshi'));
+});
+
+test('a paper lantern is the first light: made at the bench from farm things, worn in the light slot', () => {
+  const {world, p} = farm(33);
+  assert.ok(contextRecipeIds({source: 'station', stationType: 'bench', tab: 'craft', satoyama: 'farm'}).includes('chochinlamp'));
+  for(const id of Object.keys(RECIPES.chochinlamp.cost)) assert.ok(['wood', 'fiber', 'stone'].includes(id), id);
+  assert.ok(THEME.sprites.chochinlamp && THEME.sprites[EQUIPMENT.chochinlamp.icon]);
+  for(const [id, n] of Object.entries(RECIPES.chochinlamp.cost)) world.give(p, id, n);
+  for(const [id, n] of [['wood', 20], ['stone', 10]]) world.give(p, id, n);
+  const bench = build(world, p, 'bench');
+  assert.ok(bench);
+  p.cooldown = 0;
+  assert.equal(world.action(p.id, {type: 'craft', requestId: `r${request++}`, recipe: 'chochinlamp', stationId: bench.id}).ok, true);
+  assert.equal(world.action(p.id, {type: 'lantern'}).ok !== false, true);
+  assert.equal(p.equipment.light?.itemId, 'chochinlamp');
+  assert.equal(p.lantern, true);
 });
 
 test('a save made in the wilds keeps the farm aside and comes back whole', () => {

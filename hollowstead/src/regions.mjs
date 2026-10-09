@@ -88,7 +88,7 @@ export function geared(p, id){
 export function regionUnlit(world, p){return !!p&&!world?.arena&&!world?.dungeon&&!world?.showcase&&hazardAt(p.x, p.z, world)==='crags'&&!geared(p, 'crags');}
 
 /** A night-only node's halo colour, or null for every other node. */
-export function nightGlow(node){return NODES[node?.type]?.night?NIGHT_GLOW[node.type]||'#d4fff5':null;}
+export function nightGlow(node){return NODES[node?.type]?.night?NIGHT_GLOW[node.type]||(node.type==='hitodama'?'#9fe0e8':'#d4fff5'):null;}
 
 /** Called by World.tick() for each living wanderer outside the arena and showcase, every tick. */
 export function applyRegions(world, p, dt, phase){

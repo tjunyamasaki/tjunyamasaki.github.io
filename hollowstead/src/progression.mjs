@@ -449,7 +449,7 @@ export const ARMOR_REDUCTION = Object.freeze({armor:.45, bonemail:.55, shardplat
  * A blow inside the i-frames is a perfect dodge: that charge comes back almost at once and some stamina returns.
  */
 export const DASH = Object.freeze({distance:3.4*1.15, time:.18, iframes:.32, charges:2, recharge:10, stamina:22, perfectCooldown:.15, perfectStamina:12});
-export const LIGHT_ITEMS = Object.freeze(['torch','everlantern','gravelight']);
+export const LIGHT_ITEMS = Object.freeze(['torch','everlantern','gravelight','chochinlamp']);
 export const EVERLANTERN_RADIUS_SCALE=1.45;
 
 /** How each non-magic weapon attacks. Damage comes from EQUIPMENT[id].damage. */

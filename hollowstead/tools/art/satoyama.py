@@ -22,7 +22,8 @@ sys.path.insert(0, HERE)
 from lib import *
 import lib
 from yomi import (VERM, VERM_D, VERM_L, SAK, SAK_D, SAK_L, STRAW as YSTRAW, STRAW_D as YSTRAW_D, STRAW_L as YSTRAW_L,
-                  PAPER, PAPER_D, PAPER_L, LACQ, LACQ_D, LACQ_L, PINE, PINE_D, PINE_L, BAMB, BAMB_D, BAMB_N, rope, shide, higanbana, river_stone)
+                  PAPER, PAPER_D, PAPER_L, LACQ, LACQ_D, LACQ_L, PINE, PINE_D, PINE_L, BAMB, BAMB_D, BAMB_N, rope, shide, higanbana, river_stone,
+                  hitodama, sotoba, HITO, HITO_L)
 from homestead import mound, soil_lip, longleaf, stalk, bundle, cotyledons, bowl, GREEN, GREEN_D, GREEN_L, SOIL, SOIL_D, SOIL_L
 
 GRASS = "#9aa86a"; GRASS_D = "#6f7c48"; GRASS_L = "#c6cf8e"
@@ -580,6 +581,87 @@ def purin():
     return d, b
 
 
+# ------------------------------------------------------------------ the farmhouse (src/satoyama/mode.mjs ensureHouse)
+def minka(k=0.0):
+    """A thatched farmhouse (minka): a stone footing, dark timber and white plaster, sliding paper doors with a warm
+    light behind them, a veranda, a deep thatched roof with a smoke vent, and a lantern by the door."""
+    d = []; b = ""
+    b += shaded(d, "M40 744 L52 700 L460 700 L472 744 Z", RK, RK_D, -10, -6, brush((70, 734), (200, 712), (420, 712), 6, RK_L))
+    wall = "M70 702 L70 470 L442 470 L442 702 Z"
+    b += shaded(d, wall, PAPER, PAPER_D, -14, 0)
+    for x in (70, 160, 352, 442):
+        b += rrect(x - 9, 470, 18, 232, 3, TANSU, 6)
+    b += rrect(64, 470, 384, 22, 3, TANSU_D, 6) + rrect(64, 586, 384, 14, 3, TANSU, 5)
+    # the sliding doors, lit from within
+    b += rrect(170, 500, 172, 200, 4, "#f2d48a", 7)
+    b += f'<rect x="174" y="504" width="164" height="192" fill="#ffe9a8" opacity="{.45 + .15 * math.sin(2 * math.pi * k):.2f}" stroke="none"/>'
+    for x in (213, 256, 299):
+        b += line(f"M{x} 500 L{x} 700", 4, TANSU)
+    for y in (550, 600, 650):
+        b += line(f"M170 {y} L342 {y}", 3, TANSU)
+    b += rrect(84, 512, 62, 56, 4, PAPER_L, 6) + line("M115 512 L115 568 M84 540 L146 540", 4, TANSU)
+    b += rrect(366, 512, 62, 56, 4, PAPER_L, 6) + line("M397 512 L397 568 M366 540 L428 540", 4, TANSU)
+    # the veranda
+    b += shaded(d, "M60 712 L452 712 L470 732 L42 732 Z", TWIG_L, TWIG, 0, -6)
+    # the roof: a deep hipped thatch with a timber ridge and a smoke vent
+    roof = "M14 492 Q60 488 96 452 L190 286 Q256 252 322 286 L416 452 Q452 488 498 492 Q500 470 484 452 L370 300 Q256 210 142 300 L28 452 Q12 470 14 492 Z"
+    b += shaded(d, "M14 492 Q40 420 120 330 Q190 248 256 236 Q322 248 392 330 Q472 420 498 492 Q256 520 14 492 Z", YSTRAW, YSTRAW_D, 0, -14,
+                "".join(line(f"M{x} 500 Q{256 + (x - 256) * .6} 400 {256 + (x - 256) * .25} 270", 4, YSTRAW_D) for x in range(40, 480, 34)))
+    b += brush((40, 470), (120, 360), (210, 270), 9, YSTRAW_L)
+    b += rrect(150, 232, 212, 30, 10, TANSU_D, 7) + rrect(222, 196, 68, 44, 6, TANSU, 6) + line("M232 208 L280 208 M232 224 L280 224", 4, TANSU_D)
+    for x in (176, 216, 296, 336):
+        b += line(f"M{x} 232 L{x - 6} 214", 6, TANSU_D)
+    b += f'<path d="M256 192 q-18 -26 0 -52 q18 -26 0 -52" fill="none" stroke="{BONE}" stroke-width="{sw(8)}" opacity="{.5 + .2 * math.sin(2 * math.pi * k):.2f}"/>'
+    # a lantern by the door, and a water barrel
+    b += line("M146 700 L146 610", 6, TANSU_D) + rrect(130, 584, 32, 40, 12, VERM, 6) + f'<circle cx="146" cy="604" r="22" fill="{FL_M}" opacity=".25" stroke="none"/>'
+    b += shaded(d, "M392 744 L396 690 L444 690 L448 744 Z", TWIG, TWIG_D, -6, 0, line("M394 708 L446 708 M396 728 L446 728", 5, IRONF))
+    b += fill(blob(60, 742, 40, 9, 7, .2, 3), MOSS, 5) + fill(blob(470, 740, 30, 8, 7, .2, 4), MOSS_D, 5)
+    return d, b
+
+
+# ------------------------------------------------------------------ the nameless graveyard (src/satoyama/land.mjs)
+def haka():
+    """An old family grave: a tall stone on a stepped base, a flower vase each side, an incense stand, moss."""
+    d = []; b = ""
+    b += shaded(d, "M120 744 L130 696 L382 696 L392 744 Z", RK_D, "#58546f", -8, -4)
+    b += shaded(d, "M160 698 L168 650 L344 650 L352 698 Z", RK, RK_D, -8, -4)
+    stone = "M206 652 L206 380 Q256 360 306 380 L306 652 Z"
+    b += shaded(d, stone, RK, RK_D, -14, -6, brush((220, 630), (218, 520), (224, 400), 8, RK_L))
+    b += line("M256 410 L256 430 M246 450 L266 450 M256 470 L256 520 M244 540 L268 540 M256 560 L256 600", 7, RK_D)
+    for x in (178, 334):
+        b += rrect(x - 14, 610, 28, 40, 6, RK_D, 6) + fill(f"M{x - 12} 612 L{x - 22} 576 M{x} 612 L{x} 568 M{x + 12} 612 L{x + 22} 580", "none", 0)
+        b += line(f"M{x - 8} 612 Q{x - 20} 590 {x - 24} 570 M{x} 612 L{x} 566 M{x + 8} 612 Q{x + 20} 592 {x + 26} 578", 6, PINE)
+        b += f'<circle cx="{x - 24}" cy="568" r="8" fill="{VERM}" stroke-width="{sw(4)}"/><circle cx="{x + 26}" cy="576" r="7" fill="{SAK}" stroke-width="{sw(4)}"/>'
+    b += rrect(234, 664, 44, 22, 5, RK_D, 5) + line("M246 664 L244 630 M256 664 L258 624 M266 664 L270 634", 3, BONE)
+    b += fill(blob(232, 380, 40, 12, 7, .2, 6), MOSS, 5) + fill(blob(150, 700, 30, 9, 6, .2, 7), MOSS_D, 5)
+    return d, b
+
+
+def ghost_fire(k=0.0):
+    """A ghost fire (hitodama) hanging over a grave plot after dark."""
+    d = []; b = ""
+    b += hitodama(256, 520 + 10 * math.sin(2 * math.pi * k), 1.5, k)
+    b += ell(256, 736, 60, 9, "#3a3a52", 0, extra=' opacity=".5"')
+    return d, b
+
+
+# ------------------------------------------------------------------ Satoyama's first light
+def chochin_lamp():
+    """A folding paper lantern (chōchin) hanging from a bamboo pole: white paper ribs, a red crest, a warm glow."""
+    d = []; b = ""
+    b += f'<circle cx="300" cy="520" r="120" fill="{FL_M}" opacity=".22" stroke="none"/>'
+    b += fill(limb((120, 744), (170, 520), (260, 300), 18, 14), BAMB, 7) + line("M138 640 L150 630 M178 470 L192 462", 5, BAMB_N)
+    b += line("M262 300 Q290 300 300 340", 6, TANSU_D)
+    b += rrect(258, 340, 84, 22, 8, LACQ, 6)
+    body = "M262 362 Q196 420 200 500 Q196 580 262 638 L338 638 Q404 580 400 500 Q404 420 338 362 Z"
+    b += shaded(d, body, PAPER_L, PAPER_D, 12, -6, "".join(line(f"M{206 + abs(y - 500) * .32:.0f} {y} Q300 {y + 10} {394 - abs(y - 500) * .32:.0f} {y}", 4, PAPER_D) for y in range(398, 640, 34)))
+    b += f'<path d="{body}" fill="{FL_M}" opacity=".25" stroke="none"/>'
+    b += f'<circle cx="300" cy="500" r="40" fill="{VERM}" stroke-width="{sw(5)}"/><circle cx="300" cy="500" r="18" fill="{PAPER_L}" stroke="none"/>'
+    b += f'<circle cx="300" cy="500" r="8" fill="{VERM}" stroke="none"/>'
+    b += rrect(258, 636, 84, 22, 8, LACQ, 6) + line("M300 658 L300 700", 6, VERM) + fill("M286 700 L314 700 L310 736 L290 736 Z", VERM, 5)
+    return d, b
+
+
 # ------------------------------------------------------------------ the showcase's display stand (src/showcase.mjs)
 def showstand():
     """A low lacquered display stand with a red cloth: the showcase sets weapons and gear on it."""
@@ -637,9 +719,14 @@ ART = {
     "oden": ((oden, ITEM), [1.1, 1.65], STILL, True),
     "purin": ((purin, ITEM), [1.1, 1.65], STILL, True),
     "showstand": ((showstand, (80, 580, 432, 746)), [1.6, 2.4], STILL, False),
+    "minka": (dict(frames=[(lambda k: (lambda: minka(k / 4)))(k) for k in range(4)], cols=4, rows=1, target=(8, 170, 504, 746), icon=True), [5.2, 7.8], ANIM4(2), True),
+    "haka": ((haka, (100, 330, 412, 746)), [1.8, 2.7], STILL, False),
+    "hitodama": (dict(frames=[(lambda k: (lambda: ghost_fire(k / 4)))(k) for k in range(4)], cols=4, rows=1, target=(150, 300, 362, 746)), [1.3, 1.95], ANIM4(5), False),
+    "sotoba": ((sotoba, (120, 380, 392, 746)), [1.5, 2.25], STILL, False),
+    "chochinlamp": ((chochin_lamp, (110, 290, 410, 746)), [1.1, 1.65], STILL, True),
 }
 # Item sprites are drawn in the world and as an inventory icon; the houses and the camp have an icon for the build list.
-ITEM_ICONS = ("bamboo-item", "ironsand", "springsalt", "egg", "milk", "daikon", "soybean", "daikonseed", "soyseed", "tamagoyaki", "misosoup", "oden", "purin")
+ITEM_ICONS = ("chochinlamp", "bamboo-item", "ironsand", "springsalt", "egg", "milk", "daikon", "soybean", "daikonseed", "soyseed", "tamagoyaki", "misosoup", "oden", "purin")
 SPRITES = {k: v[0] for k, v in ART.items()}
 ICONS = {k: (SPRITES[k][0] if isinstance(SPRITES[k], tuple) else SPRITES[k]["frames"][0]) for k in ITEM_ICONS}
 WIDE = {}

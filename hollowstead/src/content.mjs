@@ -86,6 +86,8 @@ export const EQUIPMENT = {
   bonemail:{name:'Barrow bonemail',icon:'bonemail',durability:240},
   shardplate:{name:'Moonshard plate',icon:'shardplate',durability:360},
   everlantern:{name:'Everburning lantern',icon:'everlantern',durability:999},
+  // Satoyama's first light: a folding paper lantern on a bamboo pole (light socket, burns like the hand lantern).
+  chochinlamp:{name:'Paper lantern',icon:'chochinlamp',durability:240},
   // Frontier gear: each outer region is safe only to the wanderer wearing its gear.
   sporemask:{name:'Glowcap mask',icon:'sporemask',durability:900},
   gravelight:{name:'Grave lantern',icon:'gravelight',durability:600},
@@ -168,6 +170,9 @@ export const NODES = {
   stump:{name:'Old stump',hits:3,workSeconds:3,handRate:0,tool:'axe',toolRate:1,required:true,output:'floor',loot:{wood:4,fiber:1},regrow:900,radius:.45},
   bamboostand:{name:'Bamboo culms',hits:3,workSeconds:2.4,handRate:.6,tool:'axe',toolRate:1.6,output:'floor',loot:{bamboo:3},regrow:360,radius:.4},
   ironseam:{name:'Iron sand seam',hits:4,workSeconds:3.2,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{ironsand:2,stone:1},regrow:480,radius:.5},
+  // The Nameless Graveyard (Satoyama's wilds): old graves that give up soul embers, and ghost fires after dark.
+  haka:{name:'Nameless grave',hits:4,workSeconds:3,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{ember:2,stone:1},regrow:600,radius:.45},
+  hitodama:{name:'Ghost fire',hits:1,workSeconds:1.4,handRate:1,output:'backpack',loot:{ember:1},regrow:300,radius:0,night:true},
   saltcrust:{name:'Spring salt crust',hits:2,workSeconds:2,handRate:1,tool:'pick',toolRate:1.6,output:'backpack',loot:{springsalt:2},regrow:420,radius:.3},
   farmgate:{name:'Torii to the wilds',hits:1,workSeconds:1.2,handRate:1,output:'floor',loot:{},regrow:0,radius:0,landmark:'travel'},
   homegate:{name:'Torii home',hits:1,workSeconds:1.2,handRate:1,output:'floor',loot:{},regrow:0,radius:0,landmark:'travel'},
@@ -189,6 +194,8 @@ export const STRUCTURES = {
   glimmer:{name:'Glimmerstone',hp:300,radius:.45,light:5,fuelless:true},
   // Satoyama's animal houses (satoyama/animals.mjs): each keeps its animals, a trough of hay and what they give.
   coop:{name:'Chicken coop',hp:260,radius:.8},barn:{name:'Cow barn',hp:320,radius:.9},
+  // The farmhouse every Satoyama farm starts with (satoyama/mode.mjs): sleep the night away inside; you wake at its door.
+  minka:{name:'Farmhouse',hp:999,radius:1.9,light:3.5,fuelless:true},
   // Homestead barriers (homestead.mjs): only ever placed on the grid.
   fence:{name:'Fence',hp:120,radius:.42},stonewall:{name:'Stone wall',hp:420,radius:.48},
   timberwall:{name:'Timber wall',hp:360,radius:.7},masonwall:{name:'Masonry wall',hp:560,radius:.72},
@@ -260,6 +267,7 @@ export const RECIPES = {
   masonwall:{kind:'build',grid:true,cost:{stone:5},station:'bench',desc:'The sturdiest house wall. Closes a room like timber does.'},
   satchel:{kind:'tool',cost:{fiber:8,wood:3},station:'bench',desc:'Wear it in the bag socket: six more pack slots.'},
   // Satoyama (src/satoyama): the animal houses, and what the farm's own produce cooks into.
+  chochinlamp:{kind:'tool',cost:{fiber:4,wood:2},station:'bench',desc:'A paper lantern on a bamboo pole: light to see by after dark. Wear it in the light socket and toggle it with Light; it burns a little while it is lit.'},
   coop:{kind:'build',cost:{wood:10,bamboo:6,fiber:4},desc:'A coop for chickens. A hen moves in when it is built; feed hay into its trough and each fed hen lays an egg every morning. Hatch eggs here to raise more (four at most).'},
   barn:{kind:'build',cost:{wood:16,bamboo:8,stone:6,ironsand:2},station:'bench',desc:'A barn for cows. A cow moves in when it is built; keep hay in its trough and each fed cow gives milk every morning. A happy cow can raise a calf (two at most).'},
   tamagoyaki:{kind:'cook',cost:{egg:2},station:'fire',desc:'A rolled omelette: +24 hunger, +12 health.'},

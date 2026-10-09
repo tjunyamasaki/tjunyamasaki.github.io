@@ -107,7 +107,9 @@ function normalize(raw) {
 
 let P = normalize(read(STORE)) || demoProject();
 let selId = P.tracks[0]?.id ?? null;
-const prefs = { metronome: false, len: 4, octave: 4, ...read(PREFS) };
+const prefs = { metronome: false, len: 4, octave: 4, tool: 'draw', ...read(PREFS) };
+let clip = null;
+let clipHidden = false;
 let startStep = 0;
 let recording = false;
 let dirty = true;
@@ -146,6 +148,7 @@ function edit(fn) {
 
 function restore(json) {
   P = JSON.parse(json);
+  roll.clearSel();
   if (!selTrack()) selId = P.tracks[0]?.id ?? null;
   refresh();
 }
@@ -562,6 +565,7 @@ function openPicker(mode) {
 /* ---------- Editor header ---------- */
 
 function renderEditorHead() {
+  renderSelbar();
   const tr = selTrack();
   const head = $('edHead');
   if (!tr) {
@@ -573,6 +577,10 @@ function renderEditorHead() {
   head.style.setProperty('--c', meta.color);
   head.innerHTML = `
     <button class="ed-inst" type="button" title="Change instrument">${icon(tr.inst)}<span></span>${icon('chevron')}</button>
+    <div class="seg tools-seg" role="group" aria-label="Tool">
+      <button type="button" data-tool="draw" title="Draw notes (B)" aria-label="Draw" aria-pressed="${roll.tool === 'draw'}">${icon('pencil')}</button>
+      <button type="button" data-tool="select" title="Select notes (V) · or Shift-drag" aria-label="Select" aria-pressed="${roll.tool === 'select'}">${icon('cursor')}</button>
+    </div>
     ${
       drums
         ? ''
@@ -591,6 +599,7 @@ function renderEditorHead() {
     <button class="ghost icon" id="clearTrack" type="button" title="Clear notes" aria-label="Clear notes">${icon('trash')}</button>`;
   head.querySelector('.ed-inst span').textContent = tr.name;
   head.querySelector('.ed-inst').addEventListener('click', () => openPicker('change'));
+  head.querySelectorAll('[data-tool]').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.tool)));
   head.querySelector('#clearTrack').addEventListener('click', () => {
     if (!tr.notes.length) return;
     edit(() => (tr.notes = []));
@@ -611,6 +620,54 @@ function renderEditorHead() {
   head.querySelector('#octDown').addEventListener('click', () => shiftOctave(-1));
   head.querySelector('#octUp').addEventListener('click', () => shiftOctave(1));
   renderOctave();
+}
+
+function setTool(tool) {
+  roll.tool = prefs.tool = tool;
+  write(PREFS, prefs);
+  $('edHead')
+    .querySelectorAll('[data-tool]')
+    .forEach((b) => b.setAttribute('aria-pressed', b.dataset.tool === tool));
+  roll.hover = null;
+  roll.draw();
+}
+
+/* ---------- Selection, copy & paste ---------- */
+
+function renderSelbar() {
+  const n = roll.selected().length;
+  const canPaste = !!clip && !!selTrack() && clip.drums === isDrums(selTrack());
+  const show = n > 0 || (canPaste && !clipHidden);
+  $('selbar').hidden = !show;
+  if (!show) return;
+  $('selCount').textContent = n ? String(n) : '';
+  $('selCount').hidden = !n;
+  for (const id of ['selCopy', 'selRepeat', 'selDelete']) $(id).hidden = !n;
+  $('selPaste').hidden = !canPaste;
+}
+
+function copySel() {
+  const c = roll.copy();
+  if (!c) return false;
+  clip = c;
+  clipHidden = false;
+  renderSelbar();
+  toast(`Copied ${c.notes.length} note${c.notes.length === 1 ? '' : 's'}`);
+  return true;
+}
+
+function pasteClip() {
+  if (!clip || !selTrack()) return;
+  if (clip.drums !== isDrums(selTrack())) {
+    toast(clip.drums ? 'Paste drums into a drum track' : 'Paste notes into an instrument track');
+    return;
+  }
+  const at = roll.mouseStep != null ? Math.floor(roll.mouseStep / 4) * 4 : startStep;
+  roll.paste(clip, at);
+}
+
+function ensureLength(steps) {
+  if (steps > total()) P.bars = clamp(Math.ceil(steps / STEPS_PER_BAR), 1, MAX_BARS);
 }
 
 function setLen(l) {
@@ -694,18 +751,42 @@ function setupKeyboard() {
   window.addEventListener('keydown', (e) => {
     const typing = e.target.closest?.('input, select, textarea, [contenteditable]');
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
-      const k = e.key.toLowerCase();
-      if (typing && k !== 'z' && k !== 'y') return;
-      if (k === 'z' && !typing) {
+      if (typing || $('picker').open) return;
+      const k = e.code;
+      const act = {
+        KeyZ: () => (e.shiftKey ? redo() : undo()),
+        KeyY: redo,
+        KeyC: copySel,
+        KeyX: () => copySel() && roll.deleteSel(),
+        KeyV: pasteClip,
+        KeyD: () => roll.duplicate(),
+        KeyA: () => roll.selectAll(),
+      }[k];
+      if (act) {
         e.preventDefault();
-        e.shiftKey ? redo() : undo();
-      } else if (k === 'y' && !typing) {
-        e.preventDefault();
-        redo();
+        act();
       }
       return;
     }
     if (typing || e.altKey || $('picker').open) return;
+    const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.code];
+    if (arrows && roll.selected().length) {
+      e.preventDefault();
+      const [ds, dr] = arrows;
+      roll.nudge(ds * (e.shiftKey ? STEPS_PER_BAR : 1), dr * (e.shiftKey && !isDrums(selTrack()) ? 12 : 1));
+      return;
+    }
+    if (e.code === 'Delete' || e.code === 'Backspace') {
+      if (roll.selected().length) {
+        e.preventDefault();
+        roll.deleteSel();
+      }
+      return;
+    }
+    if (e.code === 'Escape') {
+      roll.clearSel();
+      return;
+    }
     if (e.code === 'Space') {
       e.preventDefault();
       if (!e.repeat) togglePlay();
@@ -724,6 +805,8 @@ function setupKeyboard() {
     else if (e.code === 'KeyX') shiftOctave(1);
     else if (e.code === 'KeyR') toggleRecord();
     else if (e.code === 'KeyM') toggleMetronome();
+    else if (e.code === 'KeyV') setTool('select');
+    else if (e.code === 'KeyB') setTool('draw');
   });
   window.addEventListener('keyup', (e) => liveUp('key:' + e.code));
   window.addEventListener('blur', () => {
@@ -839,7 +922,10 @@ const roll = new Roll($('roll'), {
   setLen,
   live: liveNotes,
   keyLabels,
+  selChanged: () => renderSelbar(),
+  ensureLength,
 });
+roll.tool = prefs.tool === 'select' ? 'select' : 'draw';
 
 function setupStatic() {
   $('back').innerHTML = icon('back');
@@ -853,6 +939,21 @@ function setupStatic() {
   $('share').innerHTML = icon('link');
   $('export').innerHTML = icon('download');
   $('new').innerHTML = icon('newfile');
+  $('selCopy').innerHTML = icon('copy');
+  $('selPaste').innerHTML = icon('paste');
+  $('selRepeat').innerHTML = icon('repeat');
+  $('selDelete').innerHTML = icon('trash');
+  $('selClose').innerHTML = icon('close');
+  $('selCopy').addEventListener('click', copySel);
+  $('selPaste').addEventListener('click', pasteClip);
+  $('selRepeat').addEventListener('click', () => roll.duplicate());
+  $('selDelete').addEventListener('click', () => roll.deleteSel());
+  $('selClose').addEventListener('click', () => {
+    clipHidden = true;
+    roll.clearSel();
+    renderSelbar();
+  });
+  setupFullscreen();
   $('addTrack').insertAdjacentHTML('afterbegin', icon('plus'));
   $('emptyAdd').insertAdjacentHTML('afterbegin', icon('plus'));
 
@@ -881,6 +982,30 @@ function setupStatic() {
   setupPicker();
   setupKeyboard();
   new ResizeObserver(() => (dirty = true)).observe($('trackList'));
+}
+
+function setupFullscreen() {
+  const btn = $('fs');
+  const root = document.documentElement;
+  const request = root.requestFullscreen || root.webkitRequestFullscreen;
+  if (!request || !(document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
+    btn.hidden = true;
+    return;
+  }
+  const current = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const render = () => {
+    const on = !!current();
+    btn.innerHTML = icon(on ? 'shrink' : 'expand');
+    btn.title = on ? 'Exit fullscreen' : 'Fullscreen';
+    btn.setAttribute('aria-label', btn.title);
+  };
+  btn.addEventListener('click', () => {
+    if (current()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else request.call(root, { navigationUI: 'hide' })?.catch?.(() => {});
+  });
+  document.addEventListener('fullscreenchange', render);
+  document.addEventListener('webkitfullscreenchange', render);
+  render();
 }
 
 let lastPos = null;

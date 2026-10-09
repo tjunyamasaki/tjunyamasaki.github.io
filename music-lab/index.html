@@ -40,6 +40,7 @@
           <button id="share" class="ghost icon" type="button" title="Copy share link" aria-label="Copy share link"></button>
           <button id="export" class="ghost icon" type="button" title="Download WAV" aria-label="Download WAV"></button>
           <button id="new" class="ghost icon" type="button" title="New project" aria-label="New project"></button>
+          <button id="fs" class="ghost icon" type="button" title="Fullscreen" aria-label="Fullscreen"></button>
         </div>
       </header>
 
@@ -51,6 +52,14 @@
       <section class="editor" aria-label="Note editor">
         <div id="edHead" class="ed-head"></div>
         <div id="roll" class="roll"></div>
+        <div id="selbar" class="selbar" hidden>
+          <span id="selCount" class="sel-count"></span>
+          <button id="selCopy" type="button" title="Copy (Ctrl+C)" aria-label="Copy"></button>
+          <button id="selPaste" type="button" title="Paste at the playhead (Ctrl+V)" aria-label="Paste"></button>
+          <button id="selRepeat" type="button" title="Repeat after itself (Ctrl+D)" aria-label="Repeat"></button>
+          <button id="selDelete" type="button" title="Delete (Del)" aria-label="Delete"></button>
+          <button id="selClose" type="button" title="Deselect (Esc)" aria-label="Deselect"></button>
+        </div>
         <div class="empty-state">
           <button id="emptyAdd" class="cta" type="button">Add a track</button>
         </div>

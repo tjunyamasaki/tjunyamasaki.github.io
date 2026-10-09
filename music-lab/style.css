@@ -60,6 +60,10 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 svg {
   display: block;
   width: 20px;
@@ -99,6 +103,8 @@ svg {
   font-size: 1.35rem;
   letter-spacing: -0.02em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .back {
@@ -785,6 +791,85 @@ body.empty .empty-state {
   box-shadow: 0 10px 30px -10px rgba(110, 231, 183, 0.6);
 }
 
+.tools-seg button {
+  min-width: 34px;
+  display: grid;
+  place-items: center;
+}
+
+.tools-seg svg {
+  width: 16px;
+  height: 16px;
+}
+
+.selbar {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(28, 33, 44, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 14px 40px -12px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+  animation: rise 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.selbar[hidden],
+.selbar [hidden] {
+  display: none;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+.selbar button {
+  width: 40px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #c8ceda;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.selbar button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+#selDelete:hover {
+  color: var(--rec);
+}
+
+#selClose {
+  color: var(--muted);
+}
+
+.sel-count {
+  min-width: 26px;
+  height: 22px;
+  margin: 0 6px 0 8px;
+  padding: 0 7px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--accent);
+  color: #08110d;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Instrument picker ---------- */
 
 .picker {
@@ -866,7 +951,7 @@ body.empty .empty-state {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: max(24px, env(safe-area-inset-bottom));
+  bottom: max(84px, env(safe-area-inset-bottom));
   transform: translate(-50%, 12px);
   padding: 9px 16px;
   border-radius: 20px;
@@ -928,7 +1013,7 @@ body.empty .empty-state {
   }
 
   .ghost.icon {
-    width: 34px;
+    width: 32px;
     height: 34px;
   }
 
@@ -1012,12 +1097,21 @@ body.empty .empty-state {
   }
 
   .ed-inst {
-    max-width: 150px;
+    padding: 0 6px 0 8px;
+    gap: 4px;
+  }
+
+  .ed-inst span {
+    display: none;
   }
 
   .seg button {
     min-width: 0;
-    padding: 0 6px;
+    padding: 0 5px;
+  }
+
+  .tools-seg button {
+    min-width: 30px;
   }
 
   .octave {

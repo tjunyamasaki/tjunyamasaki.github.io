@@ -14,6 +14,7 @@ export const SCALES = {
 };
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const MAX_STEPS = 16 * STEPS_PER_BAR;
 
 function roundRect(g, x, y, w, h, r) {
   r = Math.min(r, w / 2, h / 2);
@@ -46,6 +47,9 @@ export class Roll {
     this.pressed = new Set();
     this.scrollMemo = new Map();
     this.trackId = null;
+    this.tool = 'draw';
+    this.sel = new Set();
+    this.range = null;
 
     const s = this.scroller;
     s.addEventListener('scroll', () => this.draw());
@@ -54,6 +58,7 @@ export class Roll {
     s.addEventListener('pointerup', (e) => this.up(e));
     s.addEventListener('pointercancel', (e) => this.cancel(e));
     s.addEventListener('pointerleave', () => {
+      this.mouseStep = null;
       if (!this.drag) {
         this.hover = null;
         this.draw();
@@ -95,6 +100,7 @@ export class Roll {
     if (this.trackId && this.trackId !== tr?.id) this.scrollMemo.set(this.trackId, this.scroller.scrollTop);
     const switched = this.trackId !== tr?.id;
     this.trackId = tr?.id ?? null;
+    if (switched) this.clearSel();
 
     const w = this.host.clientWidth;
     const h = this.host.clientHeight;
@@ -103,9 +109,8 @@ export class Roll {
     this.RH = 26;
     const vw = this.scroller.clientWidth || w;
     const fit = (vw - this.KW) / this.total;
-    this.sw = Math.max(this.coarse ? 24 : 15, fit) * this.zoom;
-    if (this.sw * this.total < vw - this.KW) this.sw = fit;
-    this.rh = this.drums ? clamp((h - this.RH) / DRUMS.length, 30, 50) : this.coarse ? 22 : 17;
+    this.sw = Math.max(this.coarse ? 32 : 22, fit) * this.zoom;
+    this.rh = this.drums ? clamp((h - this.RH) / DRUMS.length, 40, 64) : this.coarse ? 30 : 24;
     this.spacer.style.width = this.KW + this.total * this.sw + 'px';
     this.spacer.style.height = this.RH + this.rows * this.rh + 'px';
 
@@ -251,7 +256,7 @@ export class Roll {
 
     // Hover preview
     const hv = this.hover;
-    if (hv && !this.drag && hv.empty) {
+    if (hv && !this.drag && hv.empty && this.tool === 'draw') {
       const l = drums ? 1 : Math.min(this.api.len(), total - hv.step);
       const x = KW + hv.step * sw - sx;
       const y = RH + hv.row * rh - sy;
@@ -263,8 +268,17 @@ export class Roll {
       g.globalAlpha = 1;
     }
 
+    // Selected time range
+    if (this.range) {
+      const x = KW + this.range.s0 * sw - sx;
+      g.fillStyle = 'rgba(110,231,183,0.06)';
+      g.fillRect(x, RH, (this.range.s1 - this.range.s0) * sw, h - RH);
+    }
+
     // Notes
     const notes = [...tr.notes, ...this.api.live()];
+    g.font = '600 10.5px ui-sans-serif, system-ui, sans-serif';
+    g.textBaseline = 'middle';
     for (const n of notes) {
       if (n.s >= total) continue;
       const b = noteBox(n);
@@ -285,10 +299,34 @@ export class Roll {
         g.fill();
       }
       g.globalAlpha = 1;
-      if (!drums && b.nw > 16 && rh > 12) {
-        g.fillStyle = 'rgba(0,0,0,0.22)';
-        g.fillRect(b.x + b.nw - 5, b.y + 4, 2, rh - 8);
+      if (this.sel.has(n)) {
+        g.strokeStyle = '#fff';
+        g.lineWidth = 2;
+        roundRect(g, b.x + pad + 1, b.y + pad + 1, b.nw - pad * 2 - 2, rh - pad * 2 - 2, drums ? 5 : 3);
+        g.stroke();
       }
+      if (!drums && b.nw > 16) {
+        g.fillStyle = 'rgba(0,0,0,0.22)';
+        g.fillRect(b.x + b.nw - 6, b.y + 6, 2, rh - 12);
+        if (b.nw > 34) {
+          g.fillStyle = 'rgba(8,10,14,0.7)';
+          g.fillText(NOTE_NAMES[n.p % 12] + (Math.floor(n.p / 12) - 1), b.x + 7, b.y + rh / 2 + 0.5);
+        }
+      }
+    }
+
+    // Marquee
+    const mq = this.drag?.mode === 'marquee' && this.drag.rect;
+    if (mq) {
+      const x = KW + mq.x0 - sx;
+      const y = RH + mq.y0 - sy;
+      g.fillStyle = 'rgba(110,231,183,0.1)';
+      g.fillRect(x, y, mq.x1 - mq.x0, mq.y1 - mq.y0);
+      g.strokeStyle = 'rgba(110,231,183,0.8)';
+      g.lineWidth = 1;
+      g.setLineDash([4, 3]);
+      g.strokeRect(x + 0.5, y + 0.5, mq.x1 - mq.x0 - 1, mq.y1 - mq.y0 - 1);
+      g.setLineDash([]);
     }
 
     // Playhead / start marker
@@ -306,6 +344,15 @@ export class Roll {
     g.fillRect(0, 0, w, RH);
     g.fillStyle = 'rgba(255,255,255,0.06)';
     g.fillRect(0, RH - 1, w, 1);
+    if (this.range) {
+      const x0 = Math.max(KW, KW + this.range.s0 * sw - sx);
+      const x1 = KW + this.range.s1 * sw - sx;
+      if (x1 > x0) {
+        g.fillStyle = 'rgba(110,231,183,0.22)';
+        roundRect(g, x0, 3, x1 - x0, RH - 6, 4);
+        g.fill();
+      }
+    }
     g.font = '600 11px ui-sans-serif, system-ui, sans-serif';
     g.textBaseline = 'middle';
     for (let c = c0 - (c0 % 4); c < c1; c += 4) {
@@ -393,6 +440,7 @@ export class Roll {
     g.fillRect(0, 0, KW, RH);
   }
 
+
   local(e) {
     const r = this.scroller.getBoundingClientRect();
     const vx = e.clientX - r.left;
@@ -429,13 +477,132 @@ export class Roll {
     return { step, row };
   }
 
+  /* ---------- Selection ---------- */
+
+  selected() {
+    return (this.track?.notes || []).filter((n) => this.sel.has(n));
+  }
+
+  setSel(list, range = null) {
+    this.sel = new Set(list);
+    this.range = range;
+    this.api.selChanged();
+    this.draw();
+  }
+
+  clearSel() {
+    if (!this.sel.size && !this.range) return;
+    this.setSel([]);
+  }
+
+  selectAll() {
+    this.setSel(this.track?.notes.filter((n) => n.s < this.total) || []);
+  }
+
+  // Where a selection starts and how far a repeat should jump: the dragged
+  // ruler range if there is one, otherwise the notes rounded out to beats.
+  span(list) {
+    const r = this.range;
+    if (r && list.every((n) => n.s >= r.s0 && n.s < r.s1)) return { s0: r.s0, len: r.s1 - r.s0 };
+    const s0 = Math.floor(Math.min(...list.map((n) => n.s)) / 4) * 4;
+    const end = Math.max(...list.map((n) => n.s + n.l));
+    const unit = end - s0 > STEPS_PER_BAR ? STEPS_PER_BAR : 4;
+    return { s0, len: Math.max(unit, Math.ceil((end - s0) / unit) * unit) };
+  }
+
+  copy() {
+    const list = this.selected();
+    if (!list.length) return null;
+    const { s0, len } = this.span(list);
+    return { drums: this.drums, len, notes: list.map((n) => ({ s: n.s - s0, l: n.l, p: n.p, v: n.v })) };
+  }
+
+  place(clip, at) {
+    const tr = this.track;
+    const added = clip.notes.map((n) => ({ ...n, s: n.s + at })).filter((n) => n.s < MAX_STEPS);
+    if (!added.length) return added;
+    this.api.ensureLength(Math.max(...added.map((n) => n.s + 1)));
+    const taken = new Set(added.map((n) => n.s + ':' + n.p));
+    tr.notes = tr.notes.filter((n) => !taken.has(n.s + ':' + n.p));
+    tr.notes.push(...added);
+    return added;
+  }
+
+  paste(clip, at) {
+    if (!clip || !this.track || clip.drums !== this.drums) return false;
+    this.api.begin();
+    const added = this.place(clip, at);
+    this.setSel(added, { s0: at, s1: at + clip.len });
+    this.api.commit();
+    this.showStep(at);
+    return true;
+  }
+
+  duplicate() {
+    const clip = this.copy();
+    if (!clip) return false;
+    const at = this.span(this.selected()).s0 + clip.len;
+    if (at >= MAX_STEPS) return false;
+    this.api.begin();
+    const added = this.place(clip, at);
+    this.setSel(added, { s0: at, s1: at + clip.len });
+    this.api.commit();
+    this.showStep(at);
+    return true;
+  }
+
+  deleteSel() {
+    if (!this.sel.size) return;
+    this.api.begin();
+    this.track.notes = this.track.notes.filter((n) => !this.sel.has(n));
+    this.clearSel();
+    this.api.commit();
+  }
+
+  nudge(ds, drow) {
+    const list = this.selected();
+    if (!list.length) return;
+    const rows = list.map((n) => this.rowOf(n.p));
+    ds = clamp(ds, -Math.min(...list.map((n) => n.s)), this.total - 1 - Math.max(...list.map((n) => n.s)));
+    drow = clamp(drow, -Math.min(...rows), this.rows - 1 - Math.max(...rows));
+    if (!ds && !drow) return;
+    this.api.begin();
+    for (const n of list) {
+      n.s += ds;
+      n.p = this.pitchOf(this.rowOf(n.p) + drow);
+    }
+    if (this.range) this.range = { s0: this.range.s0 + ds, s1: this.range.s1 + ds };
+    if (drow) this.api.blip(list[0].p);
+    this.api.commit();
+  }
+
+  showStep(step) {
+    const x = step * this.sw;
+    const left = this.scroller.scrollLeft;
+    if (x < left || x > left + this.scroller.clientWidth - this.KW - 40) this.scroller.scrollLeft = Math.max(0, x - 40);
+  }
+
+  /* ---------- Pointer input ---------- */
+
+  snapBeat(x) {
+    return clamp(Math.round(x / this.sw / 4) * 4, 0, this.total);
+  }
+
+  seekAt(L) {
+    this.clearSel();
+    this.api.seek(clamp(Math.floor(L.x / this.sw / 4) * 4, 0, this.total - 4));
+  }
+
   down(e) {
     if (!this.track) return;
     const L = this.local(e);
     if (L.vy < this.RH) {
-      if (L.vx >= this.KW) {
-        const step = clamp(Math.floor(L.x / this.sw / 4) * 4, 0, this.total - 4);
-        this.api.seek(step);
+      if (L.vx < this.KW) return;
+      if (e.pointerType === 'touch') this.seekAt(L);
+      else {
+        const a = this.snapBeat(L.x);
+        this.drag = { mode: 'range', a, L };
+        this.scroller.setPointerCapture(e.pointerId);
       }
       return;
     }
@@ -452,47 +619,75 @@ export class Roll {
       if (h) {
         this.api.begin();
         this.track.notes.splice(this.track.notes.indexOf(h.n), 1);
+        this.sel.delete(h.n);
+        this.api.selChanged();
         this.api.commit();
       }
       return;
     }
     if (e.button !== 0) return;
     if (e.pointerType === 'touch') {
-      // Taps edit right away; a long press grabs a note (or draws a long one)
-      // so a normal swipe can still scroll the roll.
+      // Taps edit right away; a long press grabs notes (or draws a box) so a
+      // normal swipe can still scroll the roll.
       clearTimeout(this.touch?.timer);
       this.touch = {
-        id: e.pointerId,
         L,
         cx: e.clientX,
         cy: e.clientY,
         timer: setTimeout(() => {
           if (!this.touch) return;
           navigator.vibrate?.(8);
-          this.start(this.touch.L, e.pointerId, true);
+          this.start(this.touch.L, e.pointerId, true, {});
         }, 320),
       };
       return;
     }
-    this.start(L, e.pointerId, false);
+    this.start(L, e.pointerId, false, e);
   }
 
-  start(L, pointerId, long) {
+  start(L, pointerId, long, mods) {
     const c = this.cell(L);
     if (!c) return;
     const tr = this.track;
     const h = this.hit(L);
+    const selecting = this.tool === 'select' || !!mods.shiftKey;
+    const copy = !!(mods.altKey || mods.ctrlKey || mods.metaKey);
     this.api.begin();
-    if (this.drums) {
+    if (h && h.edge) {
+      if (!this.sel.has(h.n)) this.clearSel();
+      const items = this.sel.has(h.n) ? this.selected() : [h.n];
+      this.drag = { mode: 'resize', n: h.n, ox: L.x, items: items.map((n) => ({ n, l: n.l })) };
+    } else if (h && (this.sel.has(h.n) || selecting || !this.drums)) {
+      const was = this.sel.has(h.n);
+      if (!was) {
+        if (selecting) this.setSel(mods.shiftKey ? [...this.selected(), h.n] : [h.n]);
+        else this.clearSel();
+      }
+      const items = this.sel.has(h.n) ? this.selected() : [h.n];
+      this.drag = {
+        mode: 'move',
+        n: h.n,
+        items: items.map((n) => ({ n, s: n.s, p: n.p })),
+        ox: L.x,
+        oy: L.y,
+        moved: long,
+        copy,
+        was,
+        selecting,
+        shift: !!mods.shiftKey,
+        lastP: h.n.p,
+        lead: Math.max(0, items.indexOf(h.n)),
+      };
+      this.api.blip(h.n.p);
+    } else if (!h && selecting) {
+      if (!mods.shiftKey) this.clearSel();
+      this.drag = { mode: 'marquee', ox: L.x, oy: L.y, base: mods.shiftKey ? this.selected() : [], rect: null };
+    } else if (this.drums) {
+      this.clearSel();
       this.drag = { mode: 'paint', erase: !!h, seen: new Set() };
       this.paintAt(L);
-    } else if (h) {
-      if (h.edge) this.drag = { mode: 'resize', n: h.n };
-      else {
-        this.drag = { mode: 'move', n: h.n, ox: L.x, oy: L.y, os: h.n.s, op: h.n.p, moved: long };
-        this.api.blip(h.n.p);
-      }
     } else {
+      this.clearSel();
       const n = { s: c.step, l: Math.min(this.api.len(), this.total - c.step), p: this.pitchOf(c.row), v: 0.8 };
       tr.notes.push(n);
       this.api.blip(n.p);
@@ -533,48 +728,101 @@ export class Roll {
     }
     const d = this.drag;
     if (!d) {
-      if (e.pointerType === 'touch' || !this.track) return;
-      const c = L.vx >= this.KW && L.vy >= this.RH ? this.cell(L) : null;
-      const h = c && this.hit(L);
-      this.scroller.style.cursor = !c ? (L.vx < this.KW ? 'pointer' : 'default') : h ? (h.edge ? 'ew-resize' : 'grab') : 'crosshair';
-      const next = c ? { ...c, empty: !h } : null;
-      if (JSON.stringify(next) !== JSON.stringify(this.hover)) {
-        this.hover = next;
-        this.draw();
-      }
+      this.hoverAt(e, L);
       return;
     }
     const total = this.total;
+    const { sw, rh } = this;
     if (d.mode === 'keys') {
-      const row = clamp(Math.floor(L.y / this.rh), 0, this.rows - 1);
+      const row = clamp(Math.floor(L.y / rh), 0, this.rows - 1);
       const p = this.pitchOf(row);
       if (p !== d.p && e.pointerType !== 'touch') {
         this.api.keyOff(d.id);
         d.p = p;
         this.api.keyOn(d.id, p);
       }
+    } else if (d.mode === 'range') {
+      const b = this.snapBeat(L.x);
+      if (b !== d.a) {
+        const s0 = Math.min(d.a, b);
+        const s1 = Math.max(d.a, b);
+        this.setSel(this.track.notes.filter((n) => n.s >= s0 && n.s < s1), { s0, s1 });
+      }
     } else if (d.mode === 'paint') {
       this.paintAt(L);
     } else if (d.mode === 'create') {
       if (Math.abs(L.x - d.ox) > 4) d.dragged = true;
       if (d.dragged) {
-        d.n.l = clamp(Math.ceil(L.x / this.sw) - d.n.s, 1, total - d.n.s);
+        d.n.l = clamp(Math.ceil(L.x / sw) - d.n.s, 1, total - d.n.s);
         this.api.change();
       }
     } else if (d.mode === 'resize') {
-      d.n.l = clamp(Math.round(L.x / this.sw) - d.n.s, 1, total - d.n.s);
+      const dl = Math.round((L.x - d.ox) / sw);
+      for (const it of d.items) it.n.l = clamp(it.l + dl, 1, Math.max(1, total - it.n.s));
       this.api.change();
+    } else if (d.mode === 'marquee') {
+      const x0 = clamp(Math.min(d.ox, L.x), 0, total * sw);
+      const x1 = clamp(Math.max(d.ox, L.x), 0, total * sw);
+      const y0 = clamp(Math.min(d.oy, L.y), 0, this.rows * rh);
+      const y1 = clamp(Math.max(d.oy, L.y), 0, this.rows * rh);
+      d.rect = { x0, x1, y0, y1 };
+      const hits = this.track.notes.filter((n) => {
+        const r = this.rowOf(n.p);
+        return n.s < total && n.s * sw < x1 && Math.min(n.s + n.l, total) * sw > x0 && r * rh < y1 && (r + 1) * rh > y0;
+      });
+      this.sel = new Set([...d.base, ...hits]);
+      this.range = null;
+      this.draw();
     } else if (d.mode === 'move') {
       if (!d.moved && Math.hypot(L.x - d.ox, L.y - d.oy) > 4) d.moved = true;
-      if (d.moved) {
-        this.scroller.style.cursor = 'grabbing';
-        const s = clamp(d.os + Math.round((L.x - d.ox) / this.sw), 0, total - Math.min(d.n.l, total));
-        const p = clamp(d.op - (Math.floor(L.y / this.rh) - Math.floor(d.oy / this.rh)), LO, HI);
-        if (p !== d.n.p) this.api.blip(p);
-        d.n.s = s;
-        d.n.p = p;
-        this.api.change();
+      if (!d.moved) return;
+      if (d.copy) {
+        // Alt/Ctrl-drag leaves the originals in place and drags copies.
+        d.copy = false;
+        for (const it of d.items) {
+          it.n = { ...it.n };
+          this.track.notes.push(it.n);
+        }
+        this.setSel(d.items.map((it) => it.n));
       }
+      this.scroller.style.cursor = 'grabbing';
+      const rows = d.items.map((it) => this.rowOf(it.p));
+      const ds = clamp(Math.round((L.x - d.ox) / sw), -Math.min(...d.items.map((it) => it.s)), total - 1 - Math.max(...d.items.map((it) => it.s)));
+      const drow = clamp(Math.floor(L.y / rh) - Math.floor(d.oy / rh), -Math.min(...rows), this.rows - 1 - Math.max(...rows));
+      for (const it of d.items) {
+        it.n.s = it.s + ds;
+        it.n.p = this.pitchOf(this.rowOf(it.p) + drow);
+      }
+      const lead = d.items[d.lead];
+      if (lead.n.p !== d.lastP) {
+        d.lastP = lead.n.p;
+        this.api.blip(lead.n.p);
+      }
+      if (this.range) this.range = null;
+      this.api.change();
+    }
+  }
+
+  hoverAt(e, L) {
+    if (e.pointerType === 'touch' || !this.track) return;
+    if (L.vy < this.RH) {
+      this.mouseStep = null;
+      this.scroller.style.cursor = L.vx < this.KW ? 'default' : 'pointer';
+      if (this.hover) {
+        this.hover = null;
+        this.draw();
+      }
+      return;
+    }
+    const c = L.vx >= this.KW ? this.cell(L) : null;
+    this.mouseStep = c ? c.step : null;
+    const h = c && this.hit(L);
+    const select = this.tool === 'select' || e.shiftKey;
+    this.scroller.style.cursor = !c ? (L.vx < this.KW ? 'pointer' : 'default') : h ? (h.edge ? 'ew-resize' : 'grab') : select ? 'default' : 'crosshair';
+    const next = c && !select ? { ...c, empty: !h } : null;
+    if (JSON.stringify(next) !== JSON.stringify(this.hover)) {
+      this.hover = next;
+      this.draw();
     }
   }
 
@@ -605,9 +853,24 @@ export class Roll {
       this.api.keyOff(d.id);
       return;
     }
+    if (d.mode === 'range') {
+      if (!this.range) this.seekAt(d.L);
+      return;
+    }
     const notes = this.track?.notes;
-    if (d.mode === 'move' && !d.moved && notes) notes.splice(notes.indexOf(d.n), 1);
-    if ((d.mode === 'create' && d.dragged) || d.mode === 'resize') this.api.setLen(d.n.l);
+    if (d.mode === 'move' && !d.moved && notes) {
+      if (d.selecting) {
+        if (d.shift && d.was) {
+          this.sel.delete(d.n);
+          this.setSel([...this.sel]);
+        } else if (d.was) this.setSel([d.n]);
+      } else {
+        notes.splice(notes.indexOf(d.n), 1);
+        if (this.sel.delete(d.n)) this.api.selChanged();
+      }
+    }
+    if (d.mode === 'marquee') this.api.selChanged();
+    if ((d.mode === 'create' && d.dragged) || (d.mode === 'resize' && d.items.length === 1)) this.api.setLen(d.n.l);
     this.api.commit();
     this.draw();
   }
@@ -617,9 +880,20 @@ export class Roll {
     if (!c) return;
     const notes = this.track.notes;
     const h = this.hit(L);
+    if (this.tool === 'select') {
+      if (!h) this.clearSel();
+      else if (this.sel.has(h.n)) {
+        this.sel.delete(h.n);
+        this.setSel([...this.sel]);
+      } else this.setSel([...this.selected(), h.n]);
+      return;
+    }
     this.api.begin();
-    if (h) notes.splice(notes.indexOf(h.n), 1);
-    else {
+    if (h) {
+      notes.splice(notes.indexOf(h.n), 1);
+      if (this.sel.delete(h.n)) this.api.selChanged();
+    } else {
+      this.clearSel();
       const n = { s: c.step, l: this.drums ? 1 : Math.min(this.api.len(), this.total - c.step), p: this.pitchOf(c.row), v: 0.8 };
       notes.push(n);
       this.api.blip(n.p);

@@ -22,6 +22,7 @@ import {hushReason} from './hush.mjs?v=harvest-18';
 import {shelfCount, spillShelf} from './bookshelf.mjs?v=harvest-18';
 import {landReason} from './shrinecamp.mjs?v=harvest-18';
 import {hearthReason, kindleHearth, bankHearth} from './vigil.mjs?v=harvest-18';
+import {houseBuilt, houseGone} from './satoyama/animals.mjs?v=harvest-18';
 
 export const CELL = 1.5;
 export const MAX_CELLS = 48;
@@ -31,7 +32,7 @@ export const WORK_RANGE = 6;
 export const BUILDING_LIMIT = 450;
 
 /** True where building and farming happen on the grid: the Vigil and the Homestead, never underground. */
-export const gridWorld = world => !!world && !world.dungeon && !world.arena && (!!world.homestead || world.mode === 'vigil');
+export const gridWorld = world => !!world && !world.dungeon && !world.arena && (!!world.homestead || world.mode === 'vigil' || world.satoyama?.place === 'farm');
 
 /** Ground kinds. `recipe`: the RECIPES entry that lays it (its cost is per cell). */
 export const GROUNDS = Object.freeze({
@@ -86,6 +87,9 @@ export const OBJECTS = Object.freeze({
   // The Vigil's home (vigil.mjs): the big fire takes four cells.
   hearth: {w: 2, h: 2, art: 3.8},
   glimmer: {w: 1, h: 1, art: 1.22},
+  // Satoyama's animal houses (satoyama/animals.mjs).
+  coop: {w: 2, h: 2, art: 2.65},
+  barn: {w: 3, h: 2, art: 4.35},
 });
 export const OBJECT_TYPES = Object.freeze(Object.keys(OBJECTS));
 /** Art fills 88% of the footprint's width; small art grows a little, never past 1.12. */
@@ -110,6 +114,9 @@ export const CROPS = Object.freeze({
   // Rare: their seeds only come from the rare blooms on some common nights.
   moonpetal: {name: 'Moonpetal', seed: 'petalseed', grow: 150, yield: {moonpetal: 2}, seeds: [0, 1], night: true, rare: true, glow: '#fff4c6'},
   ghostgourd: {name: 'Ghostgourd', seed: 'gourdseed', grow: 160, yield: {ghostgourd: 1}, seeds: [1, 1], night: true, rare: true, glow: '#9ff0ff'},
+  // Satoyama's: a quick root, and a bean bush that keeps giving.
+  daikon: {name: 'Daikon', seed: 'daikonseed', grow: 70, yield: {daikon: 2}, seeds: [1, 2]},
+  soybean: {name: 'Soybean', seed: 'soyseed', grow: 110, yield: {soybean: 3}, seeds: [0, 1], regrow: 55},
 });
 export const CROP_TYPES = Object.freeze(Object.keys(CROPS));
 /** Growth (0..100) at which each of the four art frames starts. */
@@ -420,6 +427,7 @@ function applyCell(world, p, toolId, i, j, rotation){
     if(tool.type === 'hearth') kindleHearth(world, b);
     bury(world, i, j, w, h);
     world.buildings.push(b);world.stats.built++;
+    houseBuilt(world, b);
     world.event('tile', c.x, c.z, '', {tool: toolId});world.event('build', c.x, c.z, STRUCTURES[tool.type]?.name || tool.type);
     return true;
   }
@@ -449,6 +457,7 @@ function applyCell(world, p, toolId, i, j, rotation){
     if(barrier || object){
       const gone = barrier || object;
       if(gone.type === 'hearth') bankHearth(world, gone);
+      houseGone(world, gone);
       got = refund(world, p, recipeCost(gone.type), gone);
       world.dropContainer?.(gone.store, gone.x, gone.z);
       if(gone.overflow) world.dropContainer?.(gone.overflow, gone.x, gone.z);

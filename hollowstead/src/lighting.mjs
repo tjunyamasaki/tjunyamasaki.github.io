@@ -12,6 +12,7 @@ import {GRAVELIGHT_RADIUS_SCALE, regionDarkness} from './regions.mjs?v=harvest-1
 import {DUNGEON, layoutOf} from './dungeon/run.mjs?v=harvest-18';
 import {variantOf} from './dungeon/variants.mjs?v=harvest-18';
 import {areaLights} from './worldgen.mjs?v=harvest-18';
+import {placeLights} from './satoyama/land.mjs?v=harvest-18';
 
 export const HEARTH_LEVEL_STEP = 1.5;
 export const PLAYER_LIGHT_RADIUS = RANGES.lanternLight;
@@ -150,6 +151,8 @@ export function collectLightSources(world){
   if(world&&!world.arena&&!world.dungeon&&!world.showcase&&!world.homestead&&world.land){
     for(const light of areaLights(world.seed))sources.push({x:light.x, z:light.z, radius:light.radius, kind:'shrine', id:'shrine'});
   }
+  // Satoyama's stone lanterns by the torii (satoyama/land.mjs placeLights).
+  if(world?.satoyama)for(const light of placeLights(world.seed, world.satoyama.place))sources.push({x:light.x, z:light.z, radius:light.radius, kind:'shrine', id:'shrine'});
   return sources;
 }
 
@@ -218,7 +221,8 @@ export function dungeonLights(world, viewer, sources){
 export function frameLighting(world, theme, viewer=null){
   let lighting=resolveLighting(theme);
   // The battle arena keeps no clock: it is always lit enough to read every telegraph.
-  let darkness=world?.arena?0:phaseDarkness(hollowTime(world), scheduleOf(world), lighting);
+  // ...and so is the showcase gallery (showcase.mjs): every piece is shown in daylight.
+  let darkness=world?.arena||world?.gallery?0:phaseDarkness(hollowTime(world), scheduleOf(world), lighting);
   if(world&&!world.arena&&!world.dungeon){
     // Tonight's moon may tint or deepen the dark; some regions are dark even by day (per viewer).
     const moon=moonLighting(world);

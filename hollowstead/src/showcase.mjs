@@ -1,228 +1,152 @@
-// Solo showcase sandbox. The spawn list is built from the live content tables.
-import { ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES, label } from './content.mjs?v=harvest-18';
-import { clearMagicLists, deleteMagicEntity, magicItems, magicMobById, magicMobEntries } from './magic/registry.mjs?v=harvest-18';
+// Showcase: a gallery of every object in the game, laid out on an empty floor in rows by kind, all visible at
+// once so their art can be compared, fixed or replaced. Weapons and gear stand on display stands; materials, food
+// and books lie on the floor. Walk among them; the nearest (or a tapped) one is inspected: its name, id, sprite
+// key, world size and frames.
+//
+// The layout is presentation only (world.gallery, built from the live content tables and the theme): nothing in
+// it collides, moves, fights or can be picked up. Solo, never saved.
+import {CHARACTERS, ENEMIES, EQUIPMENT, ITEMS, NODES, STRUCTURES, label} from './content.mjs?v=harvest-18';
+import {clearMagicLists, magicItems, magicMobEntries} from './magic/registry.mjs?v=harvest-18';
+import {BOOKS} from './refine-mods.mjs?v=harvest-18';
+import {CROPS} from './homestead.mjs?v=harvest-18';
+import {itemSpriteKey} from './inventory.mjs?v=harvest-18';
+import {ANIMALS} from './satoyama/animals.mjs?v=harvest-18';
 
-const PLACE_RANGE = 5.5;
-export const SHOWCASE_MOB_COUNTS = [1, 5, 10, 20];
-export const SHOWCASE_MOB_COUNT_MAX = 20;
+/** How the floor is laid: rows this wide, this much air between things, and between kinds. */
+export const GALLERY = Object.freeze({slot: 2.1, width: 64, x0: -32, z0: -46, gap: .7, rowGap: 1.6, catGap: 3.4, reach: 3.2, stand: 'showstand', lift: .62});
 
-export function clampShowcaseMobCount(count){
-  const n = Math.floor(Number(count));
-  if(!Number.isFinite(n) || n < 1) return 1;
-  return Math.min(n, SHOWCASE_MOB_COUNT_MAX);
+/** The kinds of things, in the order they are laid out. */
+export const GALLERY_CATEGORIES = Object.freeze([
+  {id: 'wanderers', label: 'Wanderers'},
+  {id: 'creatures', label: 'Creatures'},
+  {id: 'animals', label: 'Animals'},
+  {id: 'nature', label: 'Trees, rocks & finds'},
+  {id: 'crops', label: 'Crops'},
+  {id: 'buildings', label: 'Buildings'},
+  {id: 'decoration', label: 'Decoration'},
+  {id: 'gear', label: 'Weapons & gear'},
+  {id: 'items', label: 'Materials & food'},
+  {id: 'books', label: 'Books'},
+]);
+/** Standing decoration the places use (worldgen.mjs areaProps, satoyama/land.mjs) that is no node or structure. */
+const DECORATION = ['torii', 'jizo', 'gorinto', 'ema', 'bonsho', 'yomi-grass', 'yomi-shrub', 'yomi-lilies', 'sakura', 'matsu', 'yanagi', 'bamboo', 'bamboo-b', 'plaza-prop'];
+/** The camp as Satoyama draws it (satoyama/view.mjs YOMI_SKINS). */
+const SKINS = ['y-bench', 'y-chest', 'y-fire', 'y-pot', 'y-bed'];
+
+/** Every thing to show, by category: [{cat, id, key, name, frame?, stand?}], only what the theme can draw. */
+export function galleryEntries(theme){
+  const has = key => !!key && !!theme?.sprites?.[key];
+  const out = [], seen = new Set();
+  const add = (cat, id, key, name, extra = {}) => {
+    const tag = `${cat}:${key}:${extra.frame ?? ''}`;
+    if(!has(key) || seen.has(tag)) return;
+    seen.add(tag);out.push({cat, id, key, name, ...extra});
+  };
+  for(const c of CHARACTERS) if(c.look || c.fixed) add('wanderers', c.id, c.id, c.look ? `${c.name} · ${c.look}` : c.name);
+  for(const [id, e] of Object.entries(ENEMIES)) add('creatures', id, id, e.name);
+  for(const entry of magicMobEntries()) add('creatures', entry.id, entry.id, entry.name);
+  for(const [type, a] of Object.entries(ANIMALS)){add('animals', type, type, a.name);add('animals', `${type}-young`, `${type}-young`, a.young);}
+  for(const [type, n] of Object.entries(NODES)){
+    const variants = theme?.sprites?.[type]?.variants;
+    for(const key of variants?.length ? [...new Set(variants)] : [type]) add('nature', type, key, key === type ? n.name : `${n.name} · ${key}`);
+  }
+  for(const [id, crop] of Object.entries(CROPS)) for(let f = 0; f < 4; f++) add('crops', id, `crop-${id}`, `${crop.name} · ${['sprout', 'young', 'growing', 'ripe'][f]}`, {frame: f});
+  for(const [id, s] of Object.entries(STRUCTURES)) add('buildings', id, id, s.name);
+  for(const key of SKINS) add('buildings', key.slice(2), key, `${STRUCTURES[key.slice(2)]?.name || key} · Satoyama`);
+  for(const key of DECORATION) add('decoration', key, key, key);
+  for(const id of [...Object.keys(EQUIPMENT), ...Object.keys(magicItems)]) add('gear', id, itemSpriteKey(id), label(id), {stand: true});
+  for(const id of Object.keys(ITEMS)) add('items', id, itemSpriteKey(id), label(id));
+  for(const id of Object.keys(BOOKS)) add('books', id, itemSpriteKey(id), label(id));
+  return out;
 }
 
-export function showcaseCategories(){
-  const materials = [];
-  const food = [];
-  const gear = [];
-  for(const [id, item] of Object.entries(ITEMS)){
-    const row = {id, name: item.name, kind: 'item'};
-    if(item.food) food.push(row);
-    else if(item.heal) gear.push(row);
-    else materials.push(row);
+/**
+ * The gallery's floor plan: {entries:[{id, cat, item, key, name, x, z, w, h, frame?, lift?}], headers:[{cat, label, x, z}], start:{x, z}}.
+ * Things stand in rows left to right, as wide as their art; a row is as deep as its tallest piece.
+ */
+export function galleryLayout(theme){
+  const G = GALLERY, list = galleryEntries(theme), entries = [], headers = [];
+  let z = G.z0, n = 0;
+  for(const cat of GALLERY_CATEGORIES){
+    const mine = list.filter(e => e.cat === cat.id);
+    if(!mine.length) continue;
+    // The kind's name floats over its first row, just above the tallest piece in it (y: world height).
+    const head = {cat: cat.id, label: cat.label, x: G.x0, z, y: 0};headers.push(head);
+    let x = G.x0, rowH = 0, tall = 0;const row = [];
+    const flush = () => {
+      const rz = +(z + rowH * .55).toFixed(2);
+      for(const e of row)e.z = rz;
+      if(!head.y){head.z = rz;head.y = +(tall + .5).toFixed(2);}
+      z += rowH * .55 + G.rowGap;row.length = 0;x = G.x0;rowH = 0;tall = 0;
+    };
+    for(const e of mine){
+      const def = theme.sprites[e.key], stand = e.stand ? theme.sprites[G.stand] : null;
+      // Small pieces still get room for their name underneath.
+      const w = Math.max(G.slot, Math.max(def.size[0], stand ? stand.size[0] : 0) * .82), h = Math.max(1.4, def.size[1] * .75 + (stand ? G.lift : 0));
+      if(x > G.x0 && x + w > G.x0 + G.width) flush();
+      const placed = {id: `g${n++}`, cat: e.cat, item: e.id, key: e.key, name: e.name, x: +(x + w / 2).toFixed(2), z: 0, w: +w.toFixed(2), h: +h.toFixed(2)};
+      if(e.frame != null) placed.frame = e.frame;
+      if(stand) placed.lift = G.lift;
+      entries.push(placed);row.push(placed);
+      x += w + G.gap;rowH = Math.max(rowH, h);tall = Math.max(tall, def.size[1] * .8 + (stand ? G.lift : 0));
+    }
+    flush();z += G.catGap;
   }
-  for(const [id, item] of Object.entries(EQUIPMENT)){
-    if(Object.hasOwn(magicItems, id)) continue;
-    gear.push({id, name: item.name, kind: 'item'});
+  return {entries, headers, start: {x: G.x0 + 2, z: G.z0 - 1.5}};
+}
+
+/** Renderer entries ({e, key, kind:'prop'}) for a gallery: each thing, and a stand under each piece of gear. */
+export function galleryProps(world, theme){
+  const g = world?.gallery;if(!g) return [];
+  const out = [];
+  for(const e of g.entries){
+    if(e.lift && theme.sprites[GALLERY.stand]) out.push({e: {id: `${e.id}s`, x: e.x, z: e.z - .02}, key: GALLERY.stand, kind: 'prop'});
+    out.push({e: {id: e.id, x: e.x, z: e.z, frame: e.frame, lift: e.lift}, key: e.key, kind: 'prop'});
   }
-  const magic = Object.values(magicItems).map(item => ({id: item.id, name: item.name, kind: 'item'}));
-  const buildings = Object.entries(STRUCTURES).filter(([id]) => !['fence', 'stonewall', 'timberwall', 'masonwall'].includes(id)).map(([id, spec]) => ({id, name: spec.name, kind: 'building'}));
-  const nature = Object.entries(NODES).map(([id, spec]) => ({id, name: spec.name, kind: 'node'}));
-  const mobs = Object.entries(ENEMIES).map(([id, spec]) => ({id, name: spec.name, kind: 'mob'}));
-  for(const entry of magicMobEntries()){
-    if(!mobs.some(mob => mob.id === entry.id)) mobs.push({id: entry.id, name: entry.name, kind: 'mob'});
-  }
-  return [
-    {id: 'materials', label: 'Materials', entries: materials},
-    {id: 'food', label: 'Food', entries: food},
-    {id: 'gear', label: 'Gear', entries: gear},
-    {id: 'magic', label: 'Magic', entries: magic},
-    {id: 'buildings', label: 'Buildings', entries: buildings},
-    {id: 'nature', label: 'Nature', entries: nature},
-    {id: 'mobs', label: 'Mobs', entries: mobs},
-  ];
+  return out;
+}
+
+/** The gallery piece nearest a point within `reach`, or null. */
+export function galleryNear(world, x, z, reach = GALLERY.reach){
+  let best = null, bd = reach;
+  for(const e of world?.gallery?.entries || []){const d = Math.hypot(e.x - x, e.z - z);if(d < bd){bd = d;best = e;}}
+  return best;
 }
 
 function escapeHtml(value){
   return String(value).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 }
 
-export function showcaseMarkup({active = 'materials', tool = '', open = false, icon = () => '', mobCount = 1} = {}){
-  const removing = tool === 'remove';
-  const count = clampShowcaseMobCount(mobCount);
-  const bar = `<div class="showcase-bar"><button type="button" data-showcase-tool="open" aria-expanded="${open ? 'true' : 'false'}">Spawn</button><button type="button" data-showcase-tool="remove" aria-pressed="${removing ? 'true' : 'false'}">${removing ? 'Remove armed' : 'Remove'}</button><button type="button" data-showcase-tool="clear">Clear</button></div>`;
-  if(!open) return bar;
-  const categories = showcaseCategories();
-  const current = categories.find(category => category.id === active) || categories[0];
-  const chips = categories.map(category => `<button type="button" class="chip ${category.id === current.id ? 'active' : ''}" data-showcase-cat="${category.id}">${escapeHtml(category.label)}</button>`).join('');
-  const rows = current.entries.length
-    ? current.entries.map(entry => `<button type="button" data-showcase-spawn="${escapeHtml(entry.kind)}:${escapeHtml(entry.id)}">${entry.kind==='item'?icon(entry.id):''}<span>${escapeHtml(entry.name)}</span></button>`).join('')
-    : '<p class="muted small">Nothing in this list yet.</p>';
-  const counts = current.id === 'mobs'
-    ? `<div class="showcase-counts" role="group" aria-label="Mob count">${SHOWCASE_MOB_COUNTS.map(value => `<button type="button" class="chip ${value === count ? 'active' : ''}" data-showcase-count="${value}">${value}</button>`).join('')}</div>`
-    : '';
-  const note = removing
-    ? 'Tap an object or creature to delete it.'
-    : current.id === 'mobs' && count > 1
-      ? `Items go into the pack. Tap the ground to place ${count} creatures.`
-      : 'Items go into the pack. Tap the ground to place an armed object.';
-  return `${bar}<div class="showcase-sheet" role="dialog" aria-label="Spawn list"><div class="showcase-head"><span>Spawn</span><button type="button" data-showcase-tool="close">Close</button></div><div class="showcase-cats">${chips}</div>${counts}<div class="showcase-list" role="list">${rows}</div><p class="muted small showcase-note">${note}</p></div>`;
-}
-
-function separation(kind, type){
-  if(kind === 'node') return Math.max(0.45, NODES[type]?.radius || 0);
-  if(kind === 'building') return Math.max(0.6, STRUCTURES[type]?.radius || 0);
-  return 0.4;
-}
-
-export function showcasePlaceReason(world, player, kind, type, x, z){
-  if(!world?.showcase || !player) return 'Showcase is closed';
-  if(!Number.isFinite(x) || !Number.isFinite(z) || !world.walkable(x, z)) return 'Outside the clearing';
-  if(Math.hypot(x - player.x, z - player.z) > PLACE_RANGE) return 'Move closer to this spot';
-  if(kind === 'mob') return ENEMIES[type] || magicMobById(type) ? '' : 'Unknown creature';
-  if(kind === 'node' && !NODES[type]) return 'Unknown object';
-  if(kind === 'building' && !STRUCTURES[type]) return 'Unknown structure';
-  if(kind !== 'node' && kind !== 'building') return 'Unknown object';
-  if(kind === 'building' && type === 'hearth' && world.buildings.some(building => building.type === 'hearth' && building.hp > 0)) return 'The Heartfire is already here';
-  const radius = separation(kind, type);
-  if(world.players.some(other => other.online && !other.ghost && Math.hypot(other.x - x, other.z - z) < radius + 0.4)) return 'A wanderer is standing here';
-  if(world.buildings.some(building => Math.hypot(building.x - x, building.z - z) < Math.max(0.65, STRUCTURES[building.type]?.radius || 0) + radius + 0.1)) return 'Too close to another structure';
-  if(world.nodes.some(node => !node.ready && Math.hypot(node.x - x, node.z - z) < separation('node', node.type) + radius)) return 'Too close to another object';
-  return '';
-}
-
-function showcaseMobOffset(index, total){
-  if(total <= 1) return [0, 0];
-  const ring = Math.floor(index / 8);
-  const slot = index % 8;
-  const around = Math.min(8, total - ring * 8);
-  const radius = 0.85 + ring * 0.7;
-  const angle = (slot / around) * Math.PI * 2;
-  return [Math.cos(angle) * radius, Math.sin(angle) * radius];
-}
-
-function spawnShowcaseMob(world, player, type, x, z){
-  const magic = magicMobById(type);
-  if(magic) return spawnMagicMob(world, magic, x, z, player) || null;
-  if(!ENEMIES[type]) return null;
-  const enemy = world.spawnEnemy(type, x, z);
-  if(enemy) enemy.spawned = true;
-  return enemy;
-}
-
-export function placeShowcase(world, player, kind, type, x, z, count = 1){
-  const reason = showcasePlaceReason(world, player, kind, type, x, z);
-  if(reason) return {ok: false, reason};
-  if(kind === 'node'){
-    const node = {id: world.nextId('n'), type, x, z, hits: NODES[type].hits, ready: 0, spawned: true};
-    world.nodes.push(node);
-    return {ok: true, entity: node};
-  }
-  if(kind === 'building'){
-    const building = world.structure(type, x, z);
-    building.spawned = true;
-    world.buildings.push(building);
-    return {ok: true, entity: building};
-  }
-  const n = clampShowcaseMobCount(count);
-  const entities = [];
-  for(let i = 0; i < n; i++){
-    const [ox, oz] = showcaseMobOffset(i, n);
-    const spawned = spawnShowcaseMob(world, player, type, x + ox, z + oz);
-    if(spawned) entities.push(spawned);
-  }
-  if(!entities.length) return {ok: false, reason: 'Unknown creature'};
-  return {ok: true, entity: entities[0], entities, count: entities.length};
-}
-
-function spawnMagicMob(world, magic, x, z, player){
-  const mod = magic.module;
-  const before = world.enemies.length;
-  const summonsBefore = Array.isArray(world.magicSummons) ? world.magicSummons.length : 0;
-  if(typeof mod.spawn === 'function'){
-    const made = mod.spawn(world, x, z, player);
-    if(made && typeof made === 'object'){
-      made.ally = made.ally !== false;
-      made.spawned = true;
-      if(Array.isArray(world.magicSummons) && world.magicSummons.includes(made)) return made;
-      if(!world.enemies.includes(made)) world.enemies.push(made);
-      return made;
-    }
-  }
-  if(Array.isArray(world.magicSummons) && world.magicSummons.length > summonsBefore){
-    const made = world.magicSummons[world.magicSummons.length - 1];
-    made.ally = true;
-    made.spawned = true;
-    return made;
-  }
-  if(world.enemies.length > before){
-    const made = world.enemies[world.enemies.length - 1];
-    made.ally = true;
-    made.spawned = true;
-    return made;
-  }
-  const spec = magic.skeleton || {};
-  const hp = Number(spec.hp) > 0 ? Number(spec.hp) : 36;
-  const idle = spec.sprites && typeof spec.sprites.idle === 'string' ? spec.sprites.idle.replace(/\.png$/, '-0.png') : '';
-  const summon = {
-    id: world.nextId('sk'),
-    ownerId: player?.id ?? null,
-    type: magic.id,
-    name: spec.name || magic.name,
-    x, z, hp, maxHp: hp, age: 0,
-    facing: 1, anim: 'idle', sprite: idle, action: 'idle',
-    damage: Number(spec.damage) > 0 ? Number(spec.damage) : 6,
-    range: 0.8, swinging: false, swingT: 0, didHit: false, nextSwing: 0,
-    ally: true, spawned: true,
+/** What the inspector says of a piece: its name, ids and art. */
+export function inspectLines(entry, theme){
+  if(!entry) return null;
+  const def = theme?.sprites?.[entry.key] || {};
+  const frames = (def.columns || 1) * (def.rows || 1), clips = Object.keys(def.clips || {}).join(', ');
+  return {
+    name: entry.name, item: entry.item, key: entry.key, cat: GALLERY_CATEGORIES.find(c => c.id === entry.cat)?.label || entry.cat,
+    size: def.size ? `${def.size[0]} × ${def.size[1]}` : '', sheet: `${def.columns || 1} × ${def.rows || 1}${frames > 1 ? ` · ${frames} frames` : ''}`,
+    clips, frame: entry.frame, src: String(def.src || '').split('/').pop().split('?')[0], icon: def.icon ? String(def.icon).split('/').pop().split('?')[0] : '',
   };
-  if(!Array.isArray(world.magicSummons)) world.magicSummons = [];
-  world.magicSummons.push(summon);
-  return summon;
 }
 
-export function grantShowcaseItem(world, player, itemId){
-  const drops = world.drops.length;
-  const accepted = world.give(player, itemId, 1);
-  return {ok: accepted > 0 || world.drops.length > drops, accepted, dropped: world.drops.length > drops};
+/**
+ * The showcase panel: a strip of the kinds (tap one to walk to its rows), a labels switch, and the inspector.
+ * `inspect` from inspectLines; `icon(key)` for a small picture.
+ */
+export function showcaseMarkup({inspect = null, labels = true, icon = () => ''} = {}){
+  const chips = GALLERY_CATEGORIES.map(c => `<button type="button" class="chip" data-showcase-go="${c.id}">${escapeHtml(c.label)}</button>`).join('');
+  const bar = `<div class="showcase-bar"><div class="showcase-cats" role="group" aria-label="Go to">${chips}</div><button type="button" data-showcase-tool="labels" aria-pressed="${labels ? 'true' : 'false'}">Labels</button></div>`;
+  if(!inspect) return `${bar}<div class="showcase-inspect muted small">Walk up to anything, or tap it, to inspect it.</div>`;
+  const rows = [['Kind', inspect.cat], ['Id', inspect.item], ['Sprite', inspect.key], ['Size', inspect.size], ['Sheet', inspect.sheet], ['Clips', inspect.clips], ['Frame', inspect.frame ?? ''], ['File', inspect.src], ['Icon', inspect.icon]]
+    .filter(([, v]) => v !== '' && v != null).map(([k, v]) => `<div><span>${k}</span><b>${escapeHtml(v)}</b></div>`).join('');
+  return `${bar}<div class="showcase-inspect" role="status"><header>${icon(inspect.item)}<b>${escapeHtml(inspect.name)}</b></header><div class="showcase-facts">${rows}</div></div>`;
 }
 
-export function removeShowcaseTarget(world, entity){
-  if(!world?.showcase || !entity || world.players?.includes(entity)) return false;
-  let removed = false;
-  const keep = list => {
-    const next = list.filter(entry => entry !== entity && entry.id !== entity.id);
-    if(next.length !== list.length) removed = true;
-    return next;
-  };
-  world.nodes = keep(world.nodes);
-  world.buildings = keep(world.buildings);
-  world.enemies = keep(world.enemies);
-  world.drops = keep(world.drops);
-  if(deleteMagicEntity(world, entity)) removed = true;
-  return removed;
-}
-
+/** Empty a showcase world of everything that moves or was dropped (the gallery itself stays). */
 export function clearShowcaseWorld(world){
   if(!world?.showcase) return;
-  world.nodes = [];
-  world.buildings = [];
-  world.enemies = [];
-  world.drops = [];
-  world.hostile = [];
-  world.projectiles = [];
-  world.harvestWork?.clear?.();
-  world.reviveWork?.clear?.();
-  world.dismantleHolds?.clear?.();
-  world.chestSessions?.clear?.();
+  world.nodes = [];world.buildings = [];world.enemies = [];world.drops = [];world.hostile = [];world.projectiles = [];
+  world.harvestWork?.clear?.();world.reviveWork?.clear?.();world.dismantleHolds?.clear?.();world.chestSessions?.clear?.();
   clearMagicLists(world);
-  for(const player of world.players||[]) delete player.magicCast;
-}
-
-export function showcaseSpawnName(kind, id){
-  if(kind === 'item') return label(id);
-  if(kind === 'node') return NODES[id]?.name || id;
-  if(kind === 'building') return STRUCTURES[id]?.name || id;
-  if(kind === 'mob') return ENEMIES[id]?.name || magicMobById(id)?.name || id;
-  return id;
+  for(const player of world.players || []) delete player.magicCast;
 }

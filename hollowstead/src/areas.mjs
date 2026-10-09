@@ -14,6 +14,7 @@ import {areasOf} from './worldgen.mjs?v=harvest-18';
 import {addBlast} from './blasts.mjs?v=harvest-18';
 import {tryDescend} from './delve.mjs?v=harvest-18';
 import {gashaFell, stepYomi, wakeMound} from './yomi.mjs?v=harvest-18';
+import {travelGate} from './satoyama/mode.mjs?v=harvest-18';
 
 /** The Heartfire's levels: 1-3 as ever, then 4 and 5 for what only the areas give (and, last, a heartstone). */
 export const HEARTH_MAX = 5;
@@ -109,4 +110,6 @@ export function useLandmark(world, node, p){
   if(kind === 'delve') tryDescend(world, node, p);
   // The Mound of the Starved (a Yomi hollow's marsh): wake the Gashadokuro at night (yomi.mjs).
   if(kind === 'gasha') wakeMound(world, node, p);
+  // Satoyama's torii (satoyama/mode.mjs): the farm and the wilds, one place at a time.
+  if(kind === 'travel') travelGate(world, node, p);
 }

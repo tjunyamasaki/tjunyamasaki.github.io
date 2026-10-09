@@ -20,6 +20,8 @@ import {dungeonProps} from './dungeon/art.mjs?v=harvest-18';
 import {layoutOf} from './dungeon/run.mjs?v=harvest-18';
 import {HomesteadLayer, cropGlow, recentHit} from './homestead-render.mjs?v=harvest-18';
 import {cropEntities} from './homestead.mjs?v=harvest-18';
+import {animalEntries, buildingKey, groundKey, satoyamaGround, satoyamaProps} from './satoyama/view.mjs?v=harvest-18';
+import {galleryProps} from './showcase.mjs?v=harvest-18';
 /** The Heartfire plaza is kept flat (no standing props) so buildings and drops read on it; the arena keeps its runestones. */
 export function plazaProps(){return [];}
 /** An area's standing props (worldgen.mjs areaProps: the Shrine of Yomi's torii, lanterns and jizo); lanterns glow. */
@@ -28,6 +30,11 @@ export function areaPropList(world,theme){if(!world?.land||world.arena||world.du
 export const vanished=(p,world)=>p.vanish>(world?.time??0);
 /** Runestones ringing the battle arena's wall (presentation only; nothing collides with them). */
 export function arenaProps(world,theme){if(!world?.arena||!theme.sprites['plaza-prop'])return [];const R=world.radius-.35,n=22;return [...Array(n)].map((_,i)=>{const a=i/n*Math.PI*2;return {e:{id:'arena-stone'+i,x:Math.cos(a)*R,z:Math.sin(a)*R},key:'plaza-prop',kind:'prop'};});}
+/** The showcase gallery's floor (showcase.mjs): a quiet checker of big flagstones, so every piece reads against it. */
+export function galleryTile(x,z){
+  if(Math.abs(x)>78||Math.abs(z)>110)return '#2a2531';
+  return (Math.floor(x/4)+Math.floor(z/4))%2?'#6e695c':'#76705f';
+}
 /** Arena floor colour at x,z: flagstone bands and spokes inside the wall, dark beyond it. */
 export function arenaTile(x,z,R){
   const r=Math.hypot(x,z);
@@ -250,11 +257,11 @@ export class Renderer {
     this.dungeonLayer||=new DungeonLayer(this.scene,material=>this.bindNight(material));
     if(world?.dungeon){this.ground=null;this.scatter=null;this.dungeonLayer.build(world);this.scenery.build(seed, world);this.seed=seed;return;}
     this.dungeonLayer.dispose();
-    const arena=!!world?.arena,R=world?.radius||RULES.radius;
-    const rng=random(seed),positions=[],colors=[];const col=new THREE.Color();const tile=arena?1:2;
-    const edge=arena?R+12:RULES.radius+8;
+    const gallery=!!world?.gallery,arena=!!world?.arena||gallery,R=world?.radius||RULES.radius;
+    const rng=random(seed),positions=[],colors=[];const col=new THREE.Color();const tile=gallery?2:arena?1:2;
+    const edge=gallery?96:arena?R+12:RULES.radius+8;
     if(arena)for(let z=-edge;z<edge;z+=tile)for(let x=-edge;x<edge;x+=tile){
-      if(arena){col.set(arenaTile(x+tile/2,z+tile/2,R));col.multiplyScalar(.97+rng()*.05);}
+      if(arena){col.set(gallery?galleryTile(x+tile/2,z+tile/2):arenaTile(x+tile/2,z+tile/2,R));col.multiplyScalar(.97+rng()*.05);}
       else{const b=biome(x,z);col.set(this.theme.palette[b]);const path=Math.abs(x+Math.sin(z*.16)*3)<1.8||Math.abs(z-Math.sin(x*.17)*4)<1.6;
       if(path)col.lerp(new THREE.Color(this.theme.palette.path),.6);col.multiplyScalar(.92+rng()*.15);}
       for(const [a,b]of [[x,z],[x,z+tile],[x+tile,z],[x+tile,z],[x,z+tile],[x+tile,z+tile]]){positions.push(a,-.04,b);colors.push(col.r,col.g,col.b);}
@@ -263,18 +270,18 @@ export class Renderer {
     if(arena)this.ground=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true}));
     else{
       // The hollow's ground (worldgen.groundColors): one texel per unit, filtered, on a single quad that runs on into the void.
-      const g=groundColors(seed,this.theme.palette),n=g.size,E=g.extent,data=new Uint8Array(n*n*4);for(let q=0;q<n*n;q++){data[q*4]=g.rgb[q*3];data[q*4+1]=g.rgb[q*3+1];data[q*4+2]=g.rgb[q*3+2];data[q*4+3]=255;}
+      const g=satoyamaGround(world,this.theme.palette)||groundColors(seed,this.theme.palette),n=g.size,E=g.extent,data=new Uint8Array(n*n*4);for(let q=0;q<n*n;q++){data[q*4]=g.rgb[q*3];data[q*4+1]=g.rgb[q*3+1];data[q*4+2]=g.rgb[q*3+2];data[q*4+3]=255;}
       const map=new THREE.DataTexture(data,n,n,THREE.RGBAFormat);map.colorSpace=THREE.SRGBColorSpace;map.magFilter=THREE.LinearFilter;map.minFilter=THREE.LinearFilter;map.generateMipmaps=false;map.needsUpdate=true;
       const F=E+160,uv=v=>(v+E)/(2*E),quad=[[-F,-F],[-F,F],[F,-F],[F,-F],[-F,F],[F,F]];geo.setAttribute('position',new THREE.Float32BufferAttribute(quad.flatMap(([x,z])=>[x,-.04,z]),3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(quad.flatMap(([x,z])=>[uv(x),uv(z)]),2));geo.deleteAttribute('color');
       this.ground=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map}));
     }
     this.bindNight(this.ground.material);this.scene.add(this.ground);
-    if(arena){
+    if(arena&&!gallery){
       // The wall: a glowing ring at the edge of the walkable disc.
       this.arenaWall=new THREE.Mesh(new THREE.RingGeometry(R-1.12,R-.88,128),new THREE.MeshBasicMaterial({color:0xe0776b,transparent:true,opacity:.75,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
       this.arenaWall.rotation.x=-Math.PI/2;this.arenaWall.position.y=.02;this.scene.add(this.arenaWall);
     }
-    const pos=[],cols=[];for(let i=0;i<(arena?1400:8000);i++){const x=(rng()-.5)*2*edge,z=(rng()-.5)*2*edge,s=.05+rng()*.2;if(arena?Math.hypot(x,z)>R-1.5:!walkableAt(seed,x,z))continue;col.set(rng()<.5?'#bc9767':'#4b5350');for(const[a,b]of [[x,z],[x+s,z+s],[x-s,z+s*.6]]){pos.push(a,.001,b);cols.push(col.r,col.g,col.b);}}
+    const pos=[],cols=[];if(!world?.satoyama&&!gallery)for(let i=0;i<(arena?1400:8000);i++){const x=(rng()-.5)*2*edge,z=(rng()-.5)*2*edge,s=.05+rng()*.2;if(arena?Math.hypot(x,z)>R-1.5:!walkableAt(seed,x,z))continue;col.set(rng()<.5?'#bc9767':'#4b5350');for(const[a,b]of [[x,z],[x+s,z+s],[x-s,z+s*.6]]){pos.push(a,.001,b);cols.push(col.r,col.g,col.b);}}
     const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));sg.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));this.scatter=new THREE.Mesh(sg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));this.bindNight(this.scatter.material);this.scene.add(this.scatter);
     this.scenery.build(seed, world);
     this.seed=seed;
@@ -421,7 +428,7 @@ export class Renderer {
     this.afterimages=this.afterimages.filter(a=>{a.life+=dt;a.sprite.material.opacity=a.life<0?0:Math.max(0,.55*(1-a.life/.3));if(a.life>.3){this.scene.remove(a.sprite);a.sprite.material.dispose();return false;}return true;});
   }
   render(world,localId,dt,{target=null,placement=null,demo=false,homestead=null}={}){
-    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;const terrainKey=`${world.seed}:${world.arena?'arena':world.dungeon?`dungeon:${layoutOf(world)?.key}`:'world'}`;if(this.terrainKey!==terrainKey){this.terrainKey=terrainKey;this.terrain(world.seed,world);this.homestead?.dispose();this.weaponFx.reset();for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
+    this.clock+=dt;this.magicFrame=this.magicClock.sample(world,this.clock);this.localId=localId;const terrainKey=`${world.seed}:${world.gallery?'gallery':world.arena?'arena':world.dungeon?`dungeon:${layoutOf(world)?.key}`:world.satoyama?groundKey(world):'world'}`;if(this.terrainKey!==terrainKey){this.terrainKey=terrainKey;this.terrain(world.seed,world);this.homestead?.dispose();this.weaponFx.reset();for(const o of [...this.objects.values()])this.remove(o);this.lastEvent=0;this.ghost=null;}
     const p=world.player(localId)||world.players[0]||{x:0,z:2};const fx=demo?0:p.x,fz=demo?-1:p.z;
     this.focus.x+=(fx-this.focus.x)*Math.min(1,dt*6);this.focus.z+=(fz-this.focus.z)*Math.min(1,dt*6);
     // Weapon effects first: their camera kick and their light on the night ground belong to this frame.
@@ -431,14 +438,14 @@ export class Renderer {
     const frame=frameLighting(world, this.theme, world.player(localId)||null);if(weapon?.lights.length)frame.sources.push(...weapon.lights);this.view=frame;this.paintField(frame);this.paintFlash(weapon);
     const bg=new THREE.Color(this.theme.palette.background).lerp(new THREE.Color(frame.lighting.nightTint), frame.darkness);this.scene.background.copy(bg);this.scene.fog.color.copy(bg);
     this.paintPlaza(world,frame);if(world.dungeon)this.dungeonLayer?.update(world,frame,this.clock);this.scenery.update(world,frame,dt,this.focus);(this.homestead||=new HomesteadLayer(this)).update(world,frame,dt,homestead,this.clock,target?.id||null);this.combat.begin();
-    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:e.type,kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).filter(e=>!e.painted).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online&&!vanished(e,world)).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme),...areaPropList(world,this.theme)];
+    const alive=new Set();const entities=[...world.nodes.filter(n=>!n.ready&&nodeAwake(n,world)).map(e=>({e,key:spriteVariant(this.theme,e.type,e),kind:'node'})),...world.buildings.filter(e=>!e.grid).map(e=>({e,key:buildingKey(world,e.type,this.theme),kind:'building'})),...cropEntities(world).map(e=>({e,key:'crop-'+e.type,kind:'crop'})),...animalEntries(world,this.theme),...satoyamaProps(world,this.theme),...galleryProps(world,this.theme),...world.drops.map(e=>({e,key:itemSpriteKey(e.stack?.itemId),kind:'drop'})),...world.enemies.map(e=>({e,key:e.type,kind:'enemy'})),...(world.projectiles||[]).filter(e=>!e.painted).map(e=>({e,key:PROJECTILE_KEYS[e.kind]||'mbolt',kind:'projectile'})),...(world.allies||[]).map(e=>({e,key:e.type,kind:'ally'})),...(world.zones||[]).filter(e=>e.kind!=='star').map(e=>({e,key:'frostcloud',kind:'zone'})),...magicVisuals(world).filter(entry=>!usesMagicEffects(entry.entity)).map(entry=>({e:entry.entity,key:entry.key,kind:'magic'})),...world.players.filter(e=>e.online&&!vanished(e,world)).map(e=>{const rig=this.rigPose(e);return {e,key:rig?.key||e.character,kind:'player',rig};}),...plazaProps(world,this.theme),...arenaProps(world,this.theme),...dungeonProps(world,this.theme),...areaPropList(world,this.theme)];
     entities.sort((a,b)=>Number(a.kind==='drop')-Number(b.kind==='drop'));
     for(const {e,key,kind,rig}of entities){
       if(kind==='drop'&&!this.theme.sprites[key])continue;
       const id=kind+e.id;alive.add(id);let o=this.objects.get(id);const visible=Math.abs(e.x-this.focus.x)<25&&Math.abs(e.z-this.focus.z)<29;if(!visible&&!o){alive.delete(id);continue;}if(!o||o.key!==key||(o.fallback&&this.textures.has(key))){if(o)this.remove(o);o=kind==='drop'?this.dropSprite(key,id,e):this.sprite(key,id);if(!o){alive.delete(id);continue;}}o.sprite.visible=o.shadow.visible=visible;if(o.beacon&&!visible)this.syncBeacon(o,null,e,null,0,false);if(o.glow)o.glow.visible=visible;if(o.danger)o.danger.visible=false;if(o.eyes)o.eyes.visible=visible;if(o.health){o.health.back.visible=o.health.fill.visible=false;}if(!visible)continue;
       const present=kind==='drop'?this.dropMotion.sample(e,world,this.clock,dt,id=>{const body=this.objects.get('player'+id);return body?.initialized?{x:body.x,z:body.z}:null;}):null;
       const tx=present?present.x:e.x, tz=present?present.z:e.z;
-      const smooth=(['player','enemy','magic','ally'].includes(kind)||key==='cart')&&!demo?Math.min(1,dt*(e.id===localId||(key==='cart'&&e.towedBy===localId)?22:13)):1;
+      const smooth=(['player','enemy','magic','ally','animal'].includes(kind)||key==='cart')&&!demo?Math.min(1,dt*(e.id===localId||(key==='cart'&&e.towedBy===localId)?22:13)):1;
       if(!o.initialized){o.x=tx;o.z=tz;o.initialized=true;}else{o.x+=(tx-o.x)*smooth;o.z+=(tz-o.z)*smooth;}
       const special=kind==='ally'?(e.anim||'idle'):magicClipName(e, kind),moving=special?special==='walk':e.action==='walk'||kind==='enemy',motion=this.theme.motion,clipName=special||(e.down||e.ghost?'down':kind==='enemy'?(e.windup>0||e.act>0?'attack':'walk'):e.action||'idle'),clip=o.def.clips[clipName]||o.def.clips.walk||o.def.clips.attack||o.def.clips.idle;
       const cols=o.def.columns||1,rows=o.def.rows||1,frameIndex=rig?rig.frame:key==='gravecraft-skeleton'?skeletonFrame(e,this.magicFrame.lead,o.def):Number.isInteger(e.frame)?e.frame%Math.max(1,cols*rows):clip.frames[Math.floor(this.clock*(clip.fps||1))%clip.frames.length];
@@ -454,8 +461,8 @@ export class Renderer {
       if(key==='gravecraft-skeleton')sy*=Math.min(1,((e.age||0)+this.magicFrame.lead)/.24);
       if(kind==='projectile'&&e.small){sx*=.7;sy*=.7;} // a fork's arrow or a shard (refine.mjs)
       if(o.hitUntil>this.clock){const squash=Math.sin((o.hitUntil-this.clock)*14)*(motion.hitSquash||0);sx*=1+squash;sy*=1-squash;}
-      const flip=(kind==='player'&&e.dx<-.1)||((kind==='magic'||kind==='ally')&&e.facing===-1)||(kind==='enemy'&&e.face===-1);
-      o.sprite.scale.set(flip?-sx:sx,sy,1);o.sprite.position.set(o.x,bob+(present?.y||0)+(kind==='projectile'?.9:0),o.z);if(kind==='projectile')o.shadow.visible=false;o.shadow.position.set(o.x,.018,o.z);if(kind==='building'&&e.scale)o.shadow.scale.setScalar(o.def.size[0]*.26*e.scale);
+      const flip=(kind==='player'&&e.dx<-.1)||((kind==='magic'||kind==='ally')&&e.facing===-1)||((kind==='enemy'||kind==='animal')&&e.face===-1);
+      o.sprite.scale.set(flip?-sx:sx,sy,1);o.sprite.position.set(o.x,bob+(present?.y||0)+(kind==='projectile'?.9:0)+(e.lift||0),o.z);if(kind==='projectile')o.shadow.visible=false;o.shadow.position.set(o.x,.018,o.z);if(kind==='building'&&e.scale)o.shadow.scale.setScalar(o.def.size[0]*.26*e.scale);
       if(kind==='zone'){o.shadow.visible=false;if(e.kind==='star'){const fall=Math.max(0,1-e.age/e.delay);o.sprite.position.y=.4+fall*9;o.sprite.position.x=o.x+fall*3;}else{const life=Math.min(1,e.age*3)*Math.min(1,(e.life-e.age)*2);o.sprite.scale.set(sx*e.radius/1.3,sy*e.radius/1.3,1);o.sprite.position.y=-.2;o.sprite.material.opacity=.8*life;}}
       if(kind==='ally'&&ALLIES[key]?.fly){o.sprite.position.y=.9+Math.sin(this.clock*6+e.x)*.15;}
       if(kind==='projectile')o.sprite.material.rotation=-(e.aim||0);
@@ -465,9 +472,9 @@ export class Renderer {
       // Crops lean in the wind (duskwheat most); a ripe one breathes a little so it reads as ready.
       if(kind==='crop'){const wheat=key==='crop-duskwheat';o.sprite.material.rotation=Math.sin(this.clock*(wheat?2.1:1.4)+e.x*1.7+e.z*.9)*(wheat?.055:.025);if(e.ripe){const b=1+Math.sin(this.clock*3.2+e.x*2)*.025;o.sprite.scale.x*=b;o.sprite.scale.y*=2-b;}}
       const lootGlow=kind==='drop'?dropGlow(e):null;
-      const emissive=(kind==='crop'&&e.ripe&&!!cropGlow(e.type))||(kind==='prop'&&e.glow)||(kind==='building'&&STRUCTURES[key]?.light&&(STRUCTURES[key]?.fuelless||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e))||!!lootGlow;
+      const emissive=(kind==='crop'&&e.ripe&&!!cropGlow(e.type))||(kind==='prop'&&e.glow)||(kind==='building'&&STRUCTURES[kind==='building'?e.type:key]?.light&&(STRUCTURES[kind==='building'?e.type:key]?.fuelless||e.fuel>0))||(kind==='player'&&equippedLanternLit(e))||(kind==='node'&&!!nightGlow(e))||!!lootGlow;
       let display=entityBrightness(frame, o.x, o.z, {local:kind==='player'&&e.id===localId, emissive});
-      if(kind==='building'&&STRUCTURES[key]?.light&&!STRUCTURES[key]?.fuelless&&!(e.fuel>0))display*=0.45;
+      if(kind==='building'&&STRUCTURES[kind==='building'?e.type:key]?.light&&!STRUCTURES[kind==='building'?e.type:key]?.fuelless&&!(e.fuel>0))display*=0.45;
       const lamp=brightnessAt(frame.sources, o.x, o.z, 1, frame.lighting);
       const lampStrength=lamp>frame.lighting.ambientNight?Math.min(1,(lamp-frame.lighting.ambientNight)/Math.max(0.01, frame.lighting.litBrightness-frame.lighting.ambientNight)):0;
       this.shadeSprite(o.sprite.material, display, lampStrength, frame.darkness, frame.lighting);
@@ -475,9 +482,9 @@ export class Renderer {
       if(kind==='enemy'&&e.gilded)o.sprite.material.color.lerp(new THREE.Color('#ffd25a'), .6);
       if(kind==='enemy'&&this.textures.has('glow-'+key)){if(!o.eyes){const gdef=this.theme.sprites['glow-'+key],tex=this.textures.get('glow-'+key).clone();tex.needsUpdate=true;tex.repeat.set(1/(gdef.columns||1),1/(gdef.rows||1));o.eyes=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));o.eyes.center.copy(o.sprite.center);this.scene.add(o.eyes);}o.eyes.material.map.offset.copy(o.sprite.material.map.offset);o.eyes.scale.copy(o.sprite.scale);o.eyes.position.set(o.sprite.position.x,o.sprite.position.y+.03,o.sprite.position.z+.03);o.eyes.material.rotation=o.sprite.material.rotation;o.eyes.visible=o.sprite.visible;o.eyes.material.opacity=glowStrength(frame.darkness,e,this.clock);}
       if(kind==='building'&&key==='farm'&&e.growth>=100&&display>0.55)o.sprite.material.color.lerp(new THREE.Color('#efd394'), .45);
-      if(kind!=='zone')o.sprite.material.opacity=kind==='drop'?dropBlink(e,world.time,this.clock):e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&e.type==='tree'&&e.z>p.z&&distance(e,p)<4?.38:kind==='enemy'&&e.veiled?.13+.05*Math.sin(this.clock*3+e.x):kind==='enemy'&&e.sink?.12:1;
+      if(kind!=='zone')o.sprite.material.opacity=kind==='drop'?dropBlink(e,world.time,this.clock):e.ghost?.4:kind==='ally'?Math.min(1,e.spawn*4,(e.life-e.age)*2):key==='gravecraft-skeleton'?Math.min(1,Math.max(0,(24-(e.age||0)-this.magicFrame.lead)/.4)):kind==='node'&&(e.type==='tree'||e.type==='bamboostand')&&e.z>p.z&&distance(e,p)<4?.38:kind==='enemy'&&e.veiled?.13+.05*Math.sin(this.clock*3+e.x):kind==='enemy'&&e.sink?.12:1;
       const fade=labelOpacity(display, frame.darkness, frame.lighting);
-      if(kind==='building'&&STRUCTURES[key].light){const lit=STRUCTURES[key]?.fuelless||e.fuel>0;this.glow(o,STRUCTURES[key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
+      if(kind==='building'&&STRUCTURES[kind==='building'?e.type:key].light){const lit=STRUCTURES[kind==='building'?e.type:key]?.fuelless||e.fuel>0;this.glow(o,STRUCTURES[kind==='building'?e.type:key].light+(key==='hearth'?(e.level-1)*1.5:0));o.glow.visible=lit&&visible;o.glow.material.opacity=lit?(.12+frame.darkness*.16)*(1+Math.sin(this.clock*9)*.05):0;}
       if(kind==='player'){const pool=frame.sources.find(source=>source.kind==='player'&&source.id===e.id);if(pool){this.glow(o,pool.radius);o.glow.material.opacity=.1+frame.darkness*.12;}else if(o.glow)o.glow.visible=false;if(rig){this.syncRigParts(e,o,rig,alive);const old=this.objects.get('held'+e.id);if(old)this.remove(old);}else{const held=this.syncHeldWeapon(e,o,world);if(held)alive.add(held);}this.syncWeaponRig(e,o,world,weapon);}
       // Night-only finds (regions.mjs) glow in the dark so they can be found from afar.
       if(kind==='node'){const hue=nightGlow(e);if(hue){this.glow(o,1.1);o.glow.material.color.set(hue);o.glow.material.opacity=(.16+.42*frame.darkness)*(.8+.2*Math.sin(this.clock*2.4+e.x));}}

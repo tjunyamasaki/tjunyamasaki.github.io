@@ -6294,6 +6294,988 @@
           "fps": 1
         }
       }
+    },
+    "weeds": {
+      "src": "./sprites/weeds.svg?v=sato1",
+      "size": [
+        1.5,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "twigs": {
+      "src": "./sprites/twigs.svg?v=sato1",
+      "size": [
+        1.5,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "pebbles": {
+      "src": "./sprites/pebbles.svg?v=sato1",
+      "size": [
+        1.5,
+        2.25
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "stump": {
+      "src": "./sprites/stump.svg?v=sato1",
+      "size": [
+        1.8,
+        2.7
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "ironseam": {
+      "src": "./sprites/ironseam.svg?v=sato1",
+      "size": [
+        2.4,
+        3.6
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "saltcrust": {
+      "src": "./sprites/saltcrust.svg?v=sato1",
+      "size": [
+        2.0,
+        3.0
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "yomi-grass": {
+      "src": "./sprites/yomi-grass.svg?v=sato1",
+      "size": [
+        1.9,
+        2.85
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "yomi-shrub": {
+      "src": "./sprites/yomi-shrub.svg?v=sato1",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "yomi-lilies": {
+      "src": "./sprites/yomi-lilies.svg?v=sato1",
+      "size": [
+        1.4,
+        2.1
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "hen": {
+      "src": "./sprites/hen.svg?v=sato1",
+      "size": [
+        1.4,
+        2.1
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 6
+        },
+        "peck": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 4
+        },
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "hen-young": {
+      "src": "./sprites/hen-young.svg?v=sato1",
+      "size": [
+        0.9,
+        1.35
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 6
+        },
+        "peck": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 4
+        },
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "cow": {
+      "src": "./sprites/cow.svg?v=sato1",
+      "size": [
+        3.0,
+        4.5
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 6
+        },
+        "peck": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 4
+        },
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "cow-young": {
+      "src": "./sprites/cow-young.svg?v=sato1",
+      "size": [
+        2.0,
+        3.0
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 2,
+      "clips": {
+        "walk": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 6
+        },
+        "peck": {
+          "frames": [
+            4,
+            5,
+            6,
+            5
+          ],
+          "fps": 4
+        },
+        "idle": {
+          "frames": [
+            7
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "crop-daikon": {
+      "src": "./sprites/crop-daikon.svg?v=sato1",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "crop-soybean": {
+      "src": "./sprites/crop-soybean.svg?v=sato1",
+      "size": [
+        2.2,
+        3.3
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "coop": {
+      "src": "./sprites/coop.svg?v=sato1",
+      "size": [
+        3.0,
+        4.5
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/coop-icon.svg?v=sato1"
+    },
+    "barn": {
+      "src": "./sprites/barn.svg?v=sato1",
+      "size": [
+        4.6,
+        6.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/barn-icon.svg?v=sato1"
+    },
+    "y-bench": {
+      "src": "./sprites/y-bench.svg?v=sato1",
+      "size": [
+        2.028,
+        3.042
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/y-bench-icon.svg?v=sato1"
+    },
+    "y-chest": {
+      "src": "./sprites/y-chest.svg?v=sato1",
+      "size": [
+        1.794,
+        2.691
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/y-chest-icon.svg?v=sato1"
+    },
+    "y-fire": {
+      "src": "./sprites/y-fire.svg?v=sato1",
+      "size": [
+        2.6,
+        3.9
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 7
+        }
+      },
+      "icon": "./sprites/y-fire-icon.svg?v=sato1"
+    },
+    "y-pot": {
+      "src": "./sprites/y-pot.svg?v=sato1",
+      "size": [
+        2.5,
+        3.75
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 4,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "fps": 4
+        }
+      },
+      "icon": "./sprites/y-pot-icon.svg?v=sato1"
+    },
+    "y-bed": {
+      "src": "./sprites/y-bed.svg?v=sato1",
+      "size": [
+        2.5,
+        3.75
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/y-bed-icon.svg?v=sato1"
+    },
+    "bamboo-item": {
+      "src": "./sprites/bamboo-item.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/bamboo-item-icon.svg?v=sato1"
+    },
+    "ironsand": {
+      "src": "./sprites/ironsand.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/ironsand-icon.svg?v=sato1"
+    },
+    "springsalt": {
+      "src": "./sprites/springsalt.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/springsalt-icon.svg?v=sato1"
+    },
+    "egg": {
+      "src": "./sprites/egg.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/egg-icon.svg?v=sato1"
+    },
+    "milk": {
+      "src": "./sprites/milk.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/milk-icon.svg?v=sato1"
+    },
+    "daikon": {
+      "src": "./sprites/daikon.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/daikon-icon.svg?v=sato1"
+    },
+    "soybean": {
+      "src": "./sprites/soybean.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/soybean-icon.svg?v=sato1"
+    },
+    "daikonseed": {
+      "src": "./sprites/daikonseed.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/daikonseed-icon.svg?v=sato1"
+    },
+    "soyseed": {
+      "src": "./sprites/soyseed.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/soyseed-icon.svg?v=sato1"
+    },
+    "tamagoyaki": {
+      "src": "./sprites/tamagoyaki.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/tamagoyaki-icon.svg?v=sato1"
+    },
+    "misosoup": {
+      "src": "./sprites/misosoup.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/misosoup-icon.svg?v=sato1"
+    },
+    "oden": {
+      "src": "./sprites/oden.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/oden-icon.svg?v=sato1"
+    },
+    "purin": {
+      "src": "./sprites/purin.svg?v=sato1",
+      "size": [
+        1.1,
+        1.65
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      },
+      "icon": "./sprites/purin-icon.svg?v=sato1"
+    },
+    "miko": {
+      "src": "./sprites/miko.svg?v=sato1",
+      "size": [
+        2.25,
+        3.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 8,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          "fps": 2
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 10
+        },
+        "gather": {
+          "frames": [
+            9,
+            10,
+            11,
+            10
+          ],
+          "fps": 7
+        },
+        "dash": {
+          "frames": [
+            12
+          ],
+          "fps": 1
+        },
+        "down": {
+          "frames": [
+            13
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "daoshi-wanderer": {
+      "src": "./sprites/daoshi-wanderer.svg?v=sato1",
+      "size": [
+        2.25,
+        3.38
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 8,
+      "rows": 2,
+      "clips": {
+        "idle": {
+          "frames": [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          "fps": 2
+        },
+        "walk": {
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "fps": 9
+        },
+        "attack": {
+          "frames": [
+            6,
+            7,
+            8
+          ],
+          "fps": 10
+        },
+        "gather": {
+          "frames": [
+            9,
+            10,
+            11,
+            10
+          ],
+          "fps": 7
+        },
+        "dash": {
+          "frames": [
+            12
+          ],
+          "fps": 1
+        },
+        "down": {
+          "frames": [
+            13
+          ],
+          "fps": 1
+        }
+      }
+    },
+    "showstand": {
+      "src": "./sprites/showstand.svg?v=sato1",
+      "size": [
+        1.6,
+        2.4
+      ],
+      "anchor": [
+        0.5,
+        0.04
+      ],
+      "columns": 1,
+      "rows": 1,
+      "clips": {
+        "idle": {
+          "frames": [
+            0
+          ],
+          "fps": 1
+        }
+      }
     }
   },
   "motion": {

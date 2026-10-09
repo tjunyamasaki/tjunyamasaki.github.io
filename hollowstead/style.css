@@ -195,21 +195,19 @@ body.arena #hotbar-potion{display:none}
 @media(max-height:520px) and (min-width:601px) and (max-width:800px){.bottom-controls{bottom:calc(74px + env(safe-area-inset-bottom))}}
 #showcase-panel{position:fixed;z-index:36;top:0;left:0;width:100%;height:100dvh;padding:0;background:none;border:0;box-shadow:none;pointer-events:none;touch-action:manipulation}
 #showcase-panel[hidden]{display:none!important}
-#showcase-panel .showcase-bar{pointer-events:auto;position:absolute;top:calc(104px + env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));display:flex;gap:6px;z-index:2;touch-action:manipulation}
-#showcase-panel .showcase-bar button{min-height:44px;padding:8px 12px}
-#showcase-panel .showcase-sheet{pointer-events:auto;position:absolute;z-index:3;left:50%;top:calc(156px + env(safe-area-inset-top));transform:translateX(-50%);width:min(420px,calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)));max-height:min(58dvh,calc(100dvh - 300px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));display:flex;flex-direction:column;gap:6px;padding:8px;background:#2e2835f2;border:1px solid #c5ab794a;border-radius:12px;box-shadow:0 12px 40px #17111f66;touch-action:manipulation;overscroll-behavior:contain}
-#showcase-panel .showcase-head,#showcase-panel .showcase-cats,#showcase-panel .showcase-counts{display:flex;gap:6px;flex:none}
-#showcase-panel .showcase-head{align-items:center;justify-content:space-between}
-#showcase-panel .showcase-head span{font:12px ui-monospace,monospace;letter-spacing:1px}
-#showcase-panel .showcase-cats,#showcase-panel .showcase-counts{overflow-x:auto;scrollbar-width:none}
-#showcase-panel .showcase-counts button{min-width:44px}
-#showcase-panel .showcase-head button,#showcase-panel .showcase-list button,#showcase-panel .chip{min-height:44px}
-#showcase-panel .showcase-list{overflow:auto;display:flex;flex-direction:column;gap:4px;min-height:0;overscroll-behavior:contain;touch-action:pan-y}
-#showcase-panel .showcase-list button{text-align:left;padding:8px 10px}
-#showcase-panel .showcase-list button:has(.item-icon){display:flex;align-items:center;gap:7px;padding:5px 7px;min-height:49px}
-#showcase-panel .showcase-list .item-icon{width:36px;height:36px;object-fit:contain;flex:none;filter:drop-shadow(0 1px 2px #1119)}
-#showcase-panel .showcase-list button span{min-width:0;overflow-wrap:anywhere}
-#showcase-panel .showcase-note{margin:0}
+#showcase-panel .showcase-bar{pointer-events:auto;position:absolute;top:calc(104px + env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));left:max(190px,env(safe-area-inset-left));display:flex;justify-content:flex-end;gap:6px;z-index:2;touch-action:manipulation}
+#showcase-panel .showcase-cats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;min-width:0}
+#showcase-panel .showcase-bar button{min-height:38px;padding:6px 11px;flex:none}
+#showcase-panel .showcase-inspect{pointer-events:auto;position:absolute;left:max(10px,env(safe-area-inset-left));top:calc(156px + env(safe-area-inset-top));width:min(300px,calc(100vw - 20px));padding:10px 12px;background:#2e2835f2;border:1px solid #c5ab794a;border-radius:12px;box-shadow:0 12px 40px #17111f66;font-size:13px}
+#showcase-panel .showcase-inspect header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#showcase-panel .showcase-inspect header .item-icon{width:34px;height:34px}
+#showcase-panel .showcase-facts>div{display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-top:1px solid #ffffff0d}
+#showcase-panel .showcase-facts span{color:var(--muted)}
+#showcase-panel .showcase-facts b{font:12px ui-monospace,monospace;text-align:right;word-break:break-all}
+#gallery-labels{position:fixed;inset:0;z-index:30;pointer-events:none;overflow:hidden}
+#gallery-labels[hidden]{display:none}
+#gallery-labels span{position:absolute;left:0;top:0;font-size:10.5px;line-height:1.1;color:#f4ead2;text-shadow:0 1px 2px #1a1420,0 0 3px #1a1420;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+#gallery-labels span.gallery-head{font:600 15px/1.2 Georgia,serif;letter-spacing:.5px;color:#f2c98a;max-width:none}
 .front-secondary{flex-wrap:wrap}
 @media(max-width:700px){
   #showcase-panel .showcase-bar{top:calc(100px + env(safe-area-inset-top))}

@@ -28,7 +28,7 @@
 
 /* Your wanderer: four portraits and a name. */
 .menu-wanderer{grid-column:1;grid-row:3;align-self:end;justify-self:start;display:flex;flex-direction:column;gap:8px;width:min(100%,300px);padding:10px;border:1px solid #d8bd953b;border-radius:16px;background:#2b2532cc;backdrop-filter:blur(12px)}
-.menu-characters{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.menu-characters{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
 .menu-characters .character{height:auto;min-height:0;padding:6px 2px 5px;margin:0;border-radius:12px;background:#ffffff0a;border:1px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px}
 .menu-characters .character .portrait{flex:none;width:30px;height:44px}
 .menu-characters .character small{font-size:10px;margin:0;color:var(--muted)}
@@ -182,3 +182,7 @@
   .menu-brand h1{font-size:clamp(42px,6.6vw,56px)}
 }
 @media(min-width:1000px) and (min-height:620px){.menu-characters .character .still{width:36px;height:54px}}
+.menu-looks.looks-off .look{opacity:.35;pointer-events:none}
+
+/* Satoyama (src/satoyama): the tenth card takes the last two cells of the second row. */
+#front .mode-satoyama{grid-column:span 2;border-color:#c8483a66;background:radial-gradient(ellipse at 30% 30%,#c8483a26,transparent 70%),#2b2532d9}

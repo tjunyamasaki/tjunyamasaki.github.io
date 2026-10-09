@@ -8,7 +8,7 @@ Creating a weapon? Start with the focused [weapon authoring guide](WEAPON_AUTHOR
 
 ## Enter the woods
 
-Pick a wanderer and a name on the left of the title screen, then a card on the right.
+Pick a wanderer and a name on the left of the title screen, then a card on the right. Besides the four wanderers (each hooded, masked or as a witch) there are the Shrine of Yomi's two, **Sayo** the shrine maiden and **Ling** the wandering exorcist, who keep a look of their own.
 
 - **Expedition**: **New expedition** starts alone at once, without a connection service. **Gather your friends** opens a waiting camp: share its invite link or five-character code, then select **Enter the woods**. Friends can join an expedition already underway. When this browser holds a save, the card is marked *Saved* and **Continue expedition** resumes it; tick **Bring my saved expedition** before gathering friends to resume it together.
 - **Join a camp** takes a friend's five-character code (an invite link fills it in for you).
@@ -17,7 +17,8 @@ Pick a wanderer and a name on the left of the title screen, then a card on the r
 - **Arena** is combat only: a small round clearing, nothing in it but the swarm. See [Battle arena](#battle-arena).
 - **Weapon lab** is the arena without rounds, for trying and balancing weapons. See [Weapon lab](#weapon-lab).
 - **Classes** is a new way to grow: choose a class instead of collecting weapons, and spend a talent point every level. It opens **The Class Vigil** (a Vigil played by class, in its own save slots) and a **Test ground**. See [Classes](#classes).
-- **Showcase** is a sandbox clearing for placing anything in the game.
+- **Satoyama** (or `?satoyama`) is a farm and the wilds, kept apart, in the Shrine of Yomi, played by class. See [Satoyama](#satoyama).
+- **Showcase** (or `?showcase`) is a gallery: every object in the game laid out on an empty floor in rows by kind, all visible at once, so art can be compared and fixed. See [Showcase](#showcase).
 - **The Vigil** builds and farms on the grid (soil, floors, walls and camp objects a cell at a time, from the Build menu, paid for in materials). **Homestead** (or `?homestead` in the address) is a calm sandbox for the same system: till soil, sow day and night crops, lay floors, run fences, palisades, stone walls and gates, close rooms with house walls and sleep through the night, cook blessing dishes, and test raids against your walls. Solo, free building by default, not saved. See `docs/HOMESTEAD.md`.
 
 The icons at the top right open the field guide, fullscreen and sound.
@@ -152,6 +153,23 @@ The **Hundred-Seal Daoshi** is built on the Hundred Seals. Your attack flicks a 
 | **Shen** · the Spirit | hold the swarm where the seals reach | **Warding Talisman** (a ward that throws for you), **Binding Circle** (root and seal a circle) | **Exorcism**: the weak burn twice as hard |
 
 Its ultimate is **Grand Seal**. A turn: Binding Circle the pack, Spirit Thread the seals across it, then let one talisman start the chain.
+
+## Satoyama
+
+**Satoyama** on the title screen keeps one farm in its own save (`hollowstead.satoyama.v1`); **Back to the farm** continues it, **A new farm** starts another (it asks twice when one is kept). Solo, played by class: choose a path when it begins; every level is a talent point. No weapon, armour or modifier book is ever made or dropped.
+
+- **The farm** is a valley clearing ringed by forest, overgrown: weeds, fallen branches, loose stones and old stumps (an axe), a few sakura and pines, rocks, a pond somewhere. Its keepsakes (jizo, stupas, a wayside shrine, a bell...) and where things grow change with every seed; nothing stands in the middle. Nothing ever comes here, day or night: no waves, no hunters. Build on the grid as on the Vigil (soil, floors, fences and walls, camp objects); the camp is drawn the Yomi way (a carpenter's bench, a tansu chest, an irori fire, a kama, a futon). What you clear stays cleared; only weeds creep back where nothing is built.
+- **The wilds** lie north, through the torii at the farm's edge (hold **Travel** there, with everyone gathered). A cedar crossing, where the torii home stands, leads to three places, each with its own dead and what only it gives: the **Bamboo Thicket** (kasa-obake and chōchin-obake; bamboo, cut with an axe), the **Spider-lily Marsh** (jiangshi and rokurokubi round dark pools; iron sand, with a pick) and the **Hot-spring Terrace** (yuki-onna, a fallen daoshi; spring salt from the crusted stones). More of the dead walk at night. A party that falls wakes on the farm with what it carried.
+- **While you are away** the farm waits as you left it, but its time runs on: crops catch up on their growing, and the animals have every morning they missed.
+- **Animals.** A **chicken coop** (wood, bamboo, dry grass) brings a hen; a **cow barn** (at the workbench: wood, bamboo, stone, iron sand) brings a cow. Feed dry grass into the house's trough (**Hay**); every morning each grown animal with hay eats one and gives an egg or milk, which waits in the house until you **Collect** it. Pet each animal once a day; a happy one sometimes gives two. Hatch an egg at the coop for a chick (four hens at most); a happy cow lets the barn raise a calf (two cows at most). A chick or calf grows up after two mornings.
+- **Crops.** Every new wanderer brings seeds: the familiar day crops and two of Satoyama's own, **daikon** (quick) and **soybean** (a bush that keeps giving). The kitchen: **tamagoyaki** at a fire; **miso soup** (calm), **oden** (well fed) and **purin** (light step) in a kama.
+- **Change path** at a wayside shrine (built at the workbench) instead of a Heartfire.
+
+The rules live in `src/satoyama/` (`land.mjs` the two places, `mode.mjs` travel and the wilds, `animals.mjs`, `view.mjs` what the renderers draw); the art in `tools/art/satoyama.py`.
+
+## Showcase
+
+**Showcase** lays every object out on an empty, always-lit floor, in labelled rows by kind: wanderers (every look), creatures, animals, trees, rocks and finds (every variant), crops (every growth stage), buildings (with Satoyama's look), decoration, weapons and gear (on display stands), materials and food, and books. Walk among them, or tap one: the inspector names it and shows its id, sprite key, world size, sheet, clips and files. The strip at the top walks you to a kind; **Labels** hides the names. Nothing there can be picked up or fights back. The layout comes from the live content tables and the theme (`src/showcase.mjs`), so a new sprite shows up on its own.
 
 ## Shared chests
 

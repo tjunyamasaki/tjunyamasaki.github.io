@@ -58,9 +58,9 @@ def target(t):
 
 
 def registry():
-    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig, dread, homeward, yomi
+    import nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig, dread, homeward, yomi, satoyama
     reg = {}
-    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig, dread, homeward, yomi):
+    for mod in (nodes, structures, items, actors, longnight, arsenal, wanderers, camp, frontier, scenery, refine, relics, vigil, haul, homestead, rig, dread, homeward, yomi, satoyama):
         for key, spec in getattr(mod, "SPRITES", getattr(mod, "NODES", {})).items():
             reg[key] = spec
     return reg
@@ -115,8 +115,8 @@ def main():
         im = lib.render_png(svg)
         thumbs.append((k, im, tuple(c // 2 for c in reg[k].get("cell", (512, 768))) if isinstance(reg[k], dict) else (256, 384)))
         print("built", k, im.size)
-    import longnight, arsenal, frontier, scenery, refine, relics, vigil, haul, homestead, dread, homeward
-    icons = {**longnight.ICONS, **arsenal.ICONS, **getattr(frontier, "ICONS", {}), **getattr(scenery, "ICONS", {}), **refine.ICONS, **relics.ICONS, **vigil.ICONS, **haul.ICONS, **homestead.ICONS, **dread.ICONS, **homeward.ICONS}
+    import longnight, arsenal, frontier, scenery, refine, relics, vigil, haul, homestead, dread, homeward, satoyama
+    icons = {**longnight.ICONS, **arsenal.ICONS, **getattr(frontier, "ICONS", {}), **getattr(scenery, "ICONS", {}), **refine.ICONS, **relics.ICONS, **vigil.ICONS, **haul.ICONS, **homestead.ICONS, **dread.ICONS, **homeward.ICONS, **satoyama.ICONS}
     wide = {**longnight.WIDE, **arsenal.WIDE, **getattr(frontier, "WIDE", {}), **getattr(scenery, "WIDE", {})}
     for k, fn in icons.items():
         if a.only and k not in keys:

@@ -2,8 +2,8 @@
 .menu-tests{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
 .menu-row button[aria-pressed="true"]{border-color:#8fd3c0aa;background:#8fd3c033}
 
-/* Front menu: room for the seventh mode card. */
-#front .menu-modes{grid-template-columns:1.25fr repeat(4,1fr)}
+/* Front menu: five columns of mode cards beside the Expedition. */
+#front .menu-modes{grid-template-columns:1.25fr repeat(5,1fr)}
 #front .mode-homestead{grid-column:span 2;border-color:#9fd8a866;background:linear-gradient(135deg,#2f3a2fd9,#2b2532d9)}
 @media(max-width:700px) and (orientation:portrait){#front .menu-modes{grid-template-columns:repeat(2,1fr)}}
 

@@ -134,6 +134,18 @@ export const GRID_WORKBENCH_BUILD_RECIPES = Object.freeze([...GRID_FIELD_BUILD_R
 export const WORKBENCH_CRAFT_RECIPES = Object.freeze(['axe', 'pick', 'spear', 'torch', 'bandage', 'armor', 'sword', 'recurve', 'bonebow', 'broadsword', 'crookstaff', 'bonemail', 'shardplate', 'sporemask', 'gravelight', 'barrowcloak', 'satchel', 'haversack', 'warpscroll']);
 export const FIRE_COOK_RECIPES = Object.freeze(['roast', 'roastMeat', 'roastCaps', 'loaf']);
 export const CAULDRON_COOK_RECIPES = Object.freeze(['stew', 'elixir', 'greaterelixir', 'moonbroth', 'tonic', 'tea', 'gloomstew', 'gourdsoup']);
+/**
+ * Satoyama (src/satoyama): its own lists. The farm builds on the grid (nothing for defence: nothing comes there),
+ * the workbench makes tools and bags but never a weapon or armour (classes only), and the kitchen cooks what the
+ * farm grows. Nothing is built in the wilds.
+ */
+export const SATOYAMA_RECIPES = Object.freeze({
+  fieldBuild: Object.freeze(['fire', 'bench', 'chest', 'bed', 'coop', 'till', 'plank', 'roughplank', 'fieldstone', 'fence', 'wall', 'gate']),
+  benchBuild: Object.freeze(['fire', 'bench', 'chest', 'bed', 'coop', 'barn', 'pot', 'toro', 'hokora', 'till', 'plank', 'roughplank', 'fieldstone', 'boards', 'flagstone', 'cobble', 'slabs', 'fence', 'wall', 'gate', 'stonewall', 'timberwall', 'masonwall']),
+  benchCraft: Object.freeze(['axe', 'pick', 'bandage', 'satchel']),
+  fireCook: Object.freeze(['roast', 'loaf', 'tamagoyaki']),
+  potCook: Object.freeze(['misosoup', 'oden', 'purin', 'moonbroth']),
+});
 
 export const RECIPE_CONTEXTS = Object.freeze({
   fieldBuild: Object.freeze({source: 'field', stationType: null, tab: 'build', category: 'build', label: 'Build', recipes: FIELD_BUILD_RECIPES}),
@@ -158,7 +170,10 @@ export const CONTEXT_ACTIONS = Object.freeze({
   pot: Object.freeze(['cook', 'repair']),
   chest: Object.freeze(['open', 'repair']),
   bookshelf: Object.freeze(['browse', 'shelve', 'repair']),
-  hokora: Object.freeze(['offer', 'repair']),
+  hokora: Object.freeze(['offer', 'path', 'repair']),
+  // Satoyama's animal houses (satoyama/animals.mjs).
+  coop: Object.freeze(['feed', 'collect', 'hatch', 'repair']),
+  barn: Object.freeze(['feed', 'collect', 'raise', 'repair']),
   fudaward: Object.freeze(['repair']),
   toro: Object.freeze(['repair']),
   cart: Object.freeze(['pull', 'open', 'upgrade', 'repair']),
@@ -210,6 +225,16 @@ export const CONTEXT_ACTIONS = Object.freeze({
   gashamound: Object.freeze(['wake']),
   obonlantern: Object.freeze(['light']),
   foxwedding: Object.freeze(['bow']),
+  // Satoyama (satoyama/land.mjs): the farm's clutter, what only the wilds give, the torii between them.
+  weeds: Object.freeze(['gather']),
+  twigs: Object.freeze(['gather']),
+  pebbles: Object.freeze(['gather']),
+  stump: Object.freeze(['chop']),
+  bamboostand: Object.freeze(['chop']),
+  ironseam: Object.freeze(['mine']),
+  saltcrust: Object.freeze(['mine']),
+  farmgate: Object.freeze(['travel']),
+  homegate: Object.freeze(['travel']),
   drop: Object.freeze([]),
 });
 

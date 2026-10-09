@@ -4,36 +4,57 @@ import {World} from '../src/engine.mjs';
 import {ENEMIES, EQUIPMENT, ITEMS, NODES, RULES, STRUCTURES} from '../src/content.mjs';
 import {makeStack} from '../src/inventory.mjs';
 import {collectMagicSprites, magicItems, magicMobEntries, registerMagicModule} from '../src/magic/registry.mjs?v=harvest-18';
-import {SHOWCASE_MOB_COUNT_MAX, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseCategories, showcaseMarkup} from '../src/showcase.mjs';
+import {readFileSync} from 'node:fs';
+import {CHARACTERS} from '../src/content.mjs';
+import {CROPS} from '../src/homestead.mjs';
+import {GALLERY, GALLERY_CATEGORIES, clearShowcaseWorld, galleryEntries, galleryLayout, galleryNear, galleryProps, inspectLines, showcaseMarkup} from '../src/showcase.mjs';
 
-test('showcase catalog stays closed until Spawn and can be dismissed', () => {
-  const closed = showcaseMarkup({open: false, tool: ''});
-  assert.match(closed, /data-showcase-tool="open"/);
-  assert.match(closed, /data-showcase-tool="remove"/);
-  assert.equal(closed.includes('showcase-sheet'), false);
-  assert.equal(closed.includes('data-showcase-cat'), false);
-  assert.equal(closed.includes('data-showcase-spawn'), false);
-  const open = showcaseMarkup({open: true, active: 'materials'});
-  assert.match(open, /data-showcase-tool="close"/);
-  assert.match(open, /data-showcase-cat="materials"/);
-  assert.match(open, /data-showcase-spawn="item:/);
-  assert.match(open, /showcase-sheet/);
+const THEME = JSON.parse(readFileSync(new URL('../themes/harvest/theme.json', import.meta.url), 'utf8'));
+// The renderer registers every wanderer's looks (renderer.mjs registerLooks); the gallery sees them the same way.
+for(const c of CHARACTERS) if(c.look && !THEME.sprites[c.id]) THEME.sprites[c.id] = {...THEME.sprites[c.base], lazy: true};
+
+test('the gallery lays every kind of thing out in rows, each piece once, nothing overlapping', () => {
+  const {entries, headers, start} = galleryLayout(THEME);
+  assert.ok(entries.length > 200, `${entries.length} pieces`);
+  assert.deepEqual(headers.map(h => h.cat), GALLERY_CATEGORIES.map(c => c.id).filter(id => entries.some(e => e.cat === id)));
+  const tags = new Set(entries.map(e => `${e.cat}:${e.key}:${e.frame ?? ''}`));
+  assert.equal(tags.size, entries.length);
+  for(const e of entries){
+    assert.ok(THEME.sprites[e.key], e.key);
+    assert.ok(e.x - e.w / 2 >= GALLERY.x0 - .02 && e.x + e.w / 2 <= GALLERY.x0 + Math.max(GALLERY.width, e.w) + 3, `${e.key} in its row`);
+  }
+  // Pieces in one row never share ground; rows of a kind come one after another.
+  const rows = new Map();for(const e of entries)(rows.get(e.z) || rows.set(e.z, []).get(e.z)).push(e);
+  for(const row of rows.values()){row.sort((a, b) => a.x - b.x);for(let i = 1; i < row.length; i++)assert.ok(row[i].x - row[i].w / 2 >= row[i - 1].x + row[i - 1].w / 2 - .02);}
+  assert.ok(Number.isFinite(start.x) && Number.isFinite(start.z));
 });
 
-test('showcase item rows use the shared icon helper', () => {
-  const icon = id => `<img class="item-icon" data-icon="${id}" alt="">`;
-  for (const active of ['materials', 'food', 'gear']) {
-    const html = showcaseMarkup({open: true, active, icon});
-    assert.match(html, /class="item-icon"/);
-    assert.match(html, /data-showcase-spawn="item:/);
-  }
-  const materials = showcaseMarkup({open: true, active: 'materials', icon});
-  assert.match(materials, /data-icon="wood"/);
-  const mobs = showcaseMarkup({open: true, active: 'mobs', icon, mobCount: 10});
-  assert.equal(mobs.includes('class="item-icon"'), false);
-  assert.match(mobs, /data-showcase-count="1"/);
-  assert.match(mobs, /data-showcase-count="10"/);
-  assert.match(mobs, /place 10 creatures/);
+test('the gallery shows the live tables: every creature, structure, crop stage, item and Yomi wanderer', () => {
+  const entries = galleryEntries(THEME), has = (cat, id) => entries.some(e => e.cat === cat && e.id === id);
+  for(const id of Object.keys(ENEMIES)) if(THEME.sprites[id]) assert.equal(has('creatures', id), true, id);
+  for(const id of Object.keys(STRUCTURES)) if(THEME.sprites[id]) assert.equal(has('buildings', id), true, id);
+  for(const id of ['miko', 'daoshi-wanderer']) assert.equal(has('wanderers', id), true, id);
+  for(const id of ['hen', 'cow']) assert.equal(has('animals', id), true, id);
+  for(const id of Object.keys(CROPS)) assert.equal(entries.filter(e => e.cat === 'crops' && e.id === id).length, 4, id);
+  for(const id of ['wood', 'egg', 'daikon', 'tamagoyaki']) assert.equal(has('items', id), true, id);
+  // Weapons and gear stand on display stands; everything else lies on the floor.
+  const {entries: laid} = galleryLayout(THEME);
+  assert.equal(laid.filter(e => e.cat === 'gear').every(e => e.lift > 0), true);
+  assert.equal(laid.filter(e => e.cat !== 'gear').some(e => e.lift), false);
+  const props = galleryProps({gallery: {entries: laid.filter(e => e.cat === 'gear').slice(0, 3)}}, THEME);
+  assert.deepEqual(props.map(p => p.key).filter(k => k === GALLERY.stand).length, 3);
+});
+
+test('the inspector names the piece nearest you, or the one you tapped', () => {
+  const world = new World(7, {showcase: true});world.gallery = galleryLayout(THEME);
+  const piece = world.gallery.entries.find(e => e.key === 'hen');
+  assert.equal(galleryNear(world, piece.x + .2, piece.z)?.id, piece.id);
+  assert.equal(galleryNear(world, 500, 500), null);
+  const lines = inspectLines(piece, THEME);
+  assert.equal(lines.key, 'hen');assert.equal(lines.cat, 'Animals');assert.match(lines.sheet, /4 × 2 · 8 frames/);
+  const html = showcaseMarkup({inspect: lines});
+  assert.match(html, /data-showcase-go="creatures"/);assert.match(html, /Hen/);assert.match(html, /hen\.svg/);
+  assert.match(showcaseMarkup({}), /Walk up to anything/);
 });
 
 test('showcase world has no nodes and the player takes no damage or hunger loss', () => {
@@ -61,50 +82,6 @@ test('showcase world has no nodes and the player takes no damage or hunger loss'
   assert.equal(player.hunger, 100);
   assert.equal(player.courage, 100);
   assert.equal(player.down, 0);
-});
-
-test('showcase list follows the live content tables and can place, remove, and clear', () => {
-  const categories = showcaseCategories();
-  const ids = name => categories.find(category => category.id === name).entries.map(entry => entry.id);
-  assert.deepEqual(ids('nature').sort(), Object.keys(NODES).sort());
-  // Grid-only homestead barriers (homestead.mjs) are built with the Homestead tools, not spawned here.
-  assert.deepEqual(ids('buildings').sort(), Object.keys(STRUCTURES).filter(id => !['fence', 'stonewall', 'timberwall', 'masonwall'].includes(id)).sort());
-  assert.deepEqual(ids('mobs').filter(id => ENEMIES[id]).sort(), Object.keys(ENEMIES).sort());
-  const carried = new Set([...ids('materials'), ...ids('food'), ...ids('gear'), ...ids('magic')]);
-  for (const id of Object.keys(ITEMS)) assert.equal(carried.has(id), true);
-  for (const id of Object.keys(EQUIPMENT)) assert.equal(carried.has(id), true);
-  const world = new World(3, {showcase: true});
-  const player = world.addPlayer('host', 'Jun');
-  world.start();
-  player.x = 0;
-  player.z = 0;
-  const granted = grantShowcaseItem(world, player, 'wood');
-  assert.equal(granted.accepted, 1);
-  assert.equal(player.inventory.slots.filter(slot => slot?.itemId === 'wood').length, 1);
-  const placed = placeShowcase(world, player, 'node', 'tree', 2, 0);
-  assert.equal(placed.ok, true);
-  assert.equal(world.nodes.length, 1);
-  assert.equal(removeShowcaseTarget(world, world.nodes[0]), true);
-  assert.equal(world.nodes.length, 0);
-  const mob = placeShowcase(world, player, 'mob', 'crawler', 1.5, 0.5);
-  assert.equal(mob.ok, true);
-  assert.equal(mob.count, 1);
-  assert.equal(world.enemies.length, 1);
-  const batch = placeShowcase(world, player, 'mob', 'crawler', 2, 0, 10);
-  assert.equal(batch.ok, true);
-  assert.equal(batch.count, 10);
-  assert.equal(world.enemies.length, 11);
-  const capped = placeShowcase(world, player, 'mob', 'crawler', -2, 0, 99);
-  assert.equal(capped.ok, true);
-  assert.equal(capped.count, SHOWCASE_MOB_COUNT_MAX);
-  assert.equal(world.enemies.length, 11 + SHOWCASE_MOB_COUNT_MAX);
-  clearShowcaseWorld(world);
-  assert.equal(world.nodes.length, 0);
-  assert.equal(world.buildings.length, 0);
-  assert.equal(world.enemies.length, 0);
-  assert.equal(world.drops.length, 0);
-  assert.equal(world.players.length, 1);
-  assert.equal(world.players[0].hp, 100);
 });
 
 test('each present magic module exports magicPack, use, and step', async () => {
@@ -147,7 +124,7 @@ function arm(player, itemId, durability){
 
 test('present magic weapons hit hostiles once and a placed skeleton can be removed', async () => {
   await loadMagic();
-  const magic = showcaseCategories().find(category => category.id === 'magic').entries.map(entry => entry.id);
+  const magic = Object.keys(magicItems);
   for(const id of ['barrow-rattle', 'cinder-staff', 'widows-needle', 'spirit-fan', 'mourning-bell']) assert.equal(magic.includes(id), true);
   assert.equal(magicMobEntries().some(entry => entry.id === 'skeleton'), true);
   const sprites = new Set(collectMagicSprites().map(([key]) => key));
@@ -225,11 +202,6 @@ test('present magic weapons hit hostiles once and a placed skeleton can be remov
   }
   assert.equal(struck, true);
 
-  const placed = placeShowcase(world, player, 'mob', 'skeleton', 3, 1);
-  assert.equal(placed.ok, true);
-  assert.equal(world.magicSummons.some(summon => summon.spawned && summon.type === 'skeleton'), true);
-  assert.equal(removeShowcaseTarget(world, placed.entity), true);
-  assert.equal(world.magicSummons.includes(placed.entity), false);
   clearShowcaseWorld(world);
   assert.equal(world.magicSummons.length, 0);
   assert.equal(world.players.length, 1);

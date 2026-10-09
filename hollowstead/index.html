@@ -47,6 +47,7 @@
         <button id="classes" class="mode-card mode-classes" type="button" data-icon="katana"><span class="mode-icon" aria-hidden="true"></span><b>Classes</b><small>Vigil · test ground</small></button>
         <button id="showcase" class="mode-card" type="button" data-icon="jacklantern"><span class="mode-icon" aria-hidden="true"></span><b>Showcase</b><small>Sandbox</small></button>
         <button id="homestead" class="mode-card mode-homestead" type="button" data-icon="pumpkin"><span class="mode-icon" aria-hidden="true"></span><b>Homestead</b><small>Build &amp; farm</small></button>
+        <button id="satoyama" class="mode-card mode-satoyama" type="button" data-icon="torii"><span class="mode-icon" aria-hidden="true"></span><b>Satoyama</b><small id="satoyama-hint">Farm · wilds</small></button>
       </section>
 
       <section class="menu-sheet" id="expedition-panel" hidden aria-labelledby="expedition-title">
@@ -84,6 +85,13 @@
         <header><button id="classes-back" class="menu-back" type="button" aria-label="Back">←</button><h2 id="classes-title">Classes</h2></header>
         <p class="menu-lede">Grow by class instead of by weapon: choose a path, keep its weapon for good, and spend a talent point every level.</p>
         <div class="menu-actions"><button id="classes-vigil" class="primary wide" type="button">The Class Vigil <small id="class-vigil-hint">Endless save</small> <span>→</span></button><button id="classes-test" class="wide" type="button">Test ground <small>Waves, test switches, not saved</small> <span>→</span></button></div>
+      </section>
+
+      <section class="menu-sheet" id="satoyama-panel" hidden aria-labelledby="satoyama-title">
+        <header><button id="satoyama-back" class="menu-back" type="button" aria-label="Back">←</button><h2 id="satoyama-title">Satoyama</h2></header>
+        <p class="menu-lede">A valley farm in the Shrine of Yomi. Clear it, build and grow at home, where nothing comes for you. When you want a fight, walk north through the torii into the wilds. Played by class.</p>
+        <div id="satoyama-save" class="vigil-save"></div>
+        <div class="menu-actions"><button id="satoyama-continue" class="primary wide" type="button" hidden>Back to the farm <span>→</span></button><button id="satoyama-new" class="wide" type="button">A new farm <span>→</span></button></div>
       </section>
 
       <section class="menu-sheet" id="room-panel" hidden aria-labelledby="room-heading">
@@ -142,7 +150,8 @@
         <div class="stamina-track" aria-hidden="true"><i id="stamina-bar"></i></div>
       </div>
     </div>
-    <aside id="showcase-panel" hidden aria-label="Showcase spawns"></aside>
+    <div id="gallery-labels" hidden aria-hidden="true"></div>
+    <aside id="showcase-panel" hidden aria-label="Showcase gallery"></aside>
     <aside id="class-panel" hidden aria-label="Class tools"><div id="class-strip" class="lab-strip class-strip" role="toolbar" aria-label="Class tools"></div><section id="class-sheet" class="class-sheet" hidden></section></aside>
     <aside id="lab-panel" hidden aria-label="Weapon lab"><div id="lab-strip" class="lab-strip" role="toolbar" aria-label="Weapon lab tools"></div><div id="lab-meter" class="lab-meter" aria-live="off"></div><section id="lab-sheet" class="lab-sheet" hidden></section></aside>
     <nav class="hotbar" aria-label="Game actions">

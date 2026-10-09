@@ -29,7 +29,7 @@ import {DASH, MEND, refineSlots} from './progression.mjs?v=harvest-18';
 import {ascendView, conditionOf, masteryView, mendPlan, namedView, weaponName} from './mastery.mjs?v=harvest-18';
 import {AGES, ageInfo} from './ages.mjs?v=harvest-18';
 import {LANDS} from './worldgen.mjs?v=harvest-18';
-import {clampShowcaseMobCount, clearShowcaseWorld, grantShowcaseItem, placeShowcase, removeShowcaseTarget, showcaseMarkup, showcasePlaceReason, showcaseSpawnName} from './showcase.mjs?v=harvest-18';
+import {galleryLayout, galleryNear, inspectLines, showcaseMarkup} from './showcase.mjs?v=harvest-18';
 import {cachedSrc,loadImage} from './assets.mjs?v=harvest-18';
 import {bindFeatureHud, frameFeatureHud, paintFeatureHud} from './ui/features.mjs?v=harvest-18';
 import {revealsCache, trinketTip} from './ui/trinkets.mjs?v=harvest-18';
@@ -54,6 +54,9 @@ import {dungeonStatus, layoutOf} from './dungeon/run.mjs?v=harvest-18';
 import {VARIANTS, isVariant} from './dungeon/variants.mjs?v=harvest-18';
 import {floorTones} from './dungeon/art.mjs?v=harvest-18';
 import {createGridControls, gridGlyph, homesteadMenuHTML, homesteadOption} from './ui/homestead.mjs?v=harvest-18';
+import {animalName, houseFacts, isHouse} from './satoyama/animals.mjs?v=harvest-18';
+import {ZONES, placeShape} from './satoyama/land.mjs?v=harvest-18';
+import {satoyamaGround} from './satoyama/view.mjs?v=harvest-18';
 import {CROPS, OBJECTS, barrierAt, carriedSeeds, cellAt, gridWorld, roomOfBuilding, tileAt, toolOfRecipe, WORK_RANGE} from './homestead.mjs?v=harvest-18';
 
 const $=id=>document.getElementById(id);
@@ -67,7 +70,7 @@ async function bounded(promise){let timer;try{return await Promise.race([promise
 let theme,renderer,sound,world,network=null,mode='front',localId='host',character='ember',room='',paused=false,remotePaused=false,hiddenPause=false,linkLost=false;
 let sheet=null,category='all',selected=null,placement=null,maintenance=false,maintenanceTarget=null;
 let grid=null,maintenanceCell=null;
-let showcaseCategory='materials',showcaseTool='',showcaseListOpen=false,showcaseMobCount=1,showcaseMarkupCache='',showcaseHistoryClosing=false,fullscreenNote='';
+let showcaseTool='',showcaseInspect=null,showcaseLabels=true,showcaseMarkupCache='',fullscreenNote='';
 let lastNotice=0,lastEvent=0,lastEnd='',lastTime=0,acc=0,uiTime=0,networkTime=0,saveTime=0,pingTime=0,lastMode='normal';
 let sheetMarkup='',tabsMarkup='',toastTimer,announceTimer,lastToast={text:'',at:0},dirty=true;
 let stick={x:0,z:0},hold={act:false,attack:false},keys=new Set(),pointer=null,pointerStart=null,busy=false;
@@ -203,7 +206,9 @@ try{const kept=Number(localStorage.getItem('hollowstead.vigilSlot'));if(Number.i
 function vigilPlan(key=vigilKey()){const doc=readStored(key);return doc?planContinue({v2:doc,v1:null}):{ok:false,code:'none',message:'No vigil is kept in this slot.'};}
 function storeProfile(){try{localStorage.setItem(PROFILE,JSON.stringify({name:$('player-name').value,character,sound:sound.enabled,autoAttack,healPick}));}catch{}}
 /** Title screen: one panel at a time on the right (modes, expedition, join, dungeons, vigil, waiting camp). */
-const FRONT_PANELS=['home-panel','expedition-panel','join-panel','dungeon-panel','vigil-panel','classes-panel','room-panel'];
+const FRONT_PANELS=['home-panel','expedition-panel','join-panel','dungeon-panel','vigil-panel','classes-panel','satoyama-panel','room-panel'];
+/** Satoyama (src/satoyama): one farm kept in its own slot. */
+const SATOYAMA_KEY='hollowstead.satoyama.v1';
 function showFrontPanel(id){for(const name of FRONT_PANELS){const el=$(name);if(el)el.hidden=name!==id;}}
 function syncSoundButton(){const el=$('front-sound');if(!el)return;const on=!!sound?.enabled;el.classList.toggle('is-off',!on);el.setAttribute('aria-pressed',String(on));el.setAttribute('aria-label',on?'Sound on':'Sound off');el.title=on?'Sound on':'Sound off';}
 /** Mode cards show the theme's own art (hearth, moon, stairs, blade…). */
@@ -221,6 +226,8 @@ function portrait(key){
   if(theme?.sprites?.[key])void portraitStill(key).then(src=>{if(src&&!portraitReady.has(key)){portraitReady.set(key,src);dirty=true;}});
   return `<span class="portrait" style="background-image:url('${cachedSrc(theme.sprites[key]?.src||theme.sprites.ember.src)}');background-size:${(theme.sprites[key]?.columns||1)*100}% ${(theme.sprites[key]?.rows||1)*100}%"></span>`;}
 function me(){return world?.player(localId);}
+/** Where a wanderer stands, by name: a region of the hollow, a Satoyama place (satoyama/land.mjs ZONES), or the showcase. */
+function placeName(p){if(world?.gallery)return 'Showcase';const id=world.regionOf?world.regionOf(p.x,p.z):regionAt(p.x,p.z);return REGIONS[id]?.name||ZONES[id]?.name||'';}
 const hurtFx=createHurtFx(typeof document!=='undefined'?document.getElementById('hurt-fx'):null,{reduceMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
 function commandError(result){return result?.message||({chestInUse:'Chest in use',sessionExpired:'Chest access ended',wrongSession:'Chest access changed',outOfRange:'Move closer',inventoryFull:'No room for that',staleRevision:'Items changed. Try again.',notOwner:'That item is not available',unknownItem:'That item is no longer here',incompatibleSocket:'That item does not fit this equipment slot',pending:'Wait for the current action',timeout:'Action not confirmed. Check the current inventory before trying again.',disconnected:'Connection closed',worldChanged:'The expedition changed',rateLimited:'Please wait a moment',notReady:'Waiting for the camp',paused:'The host has paused the expedition',stationRequired:'That needs the right station',missingFuel:'The fire needs wood',invalidQuantity:'Choose a smaller amount'})[result?.code]||'That action is not available';}
 function send(cmd,{quiet=false}={}){
@@ -275,7 +282,8 @@ function maintainChest(){
 }
 /** A standalone dungeon run (not a delve below an expedition, which keeps the hollow in world.surface and saves with it). */
 function isRun(w){return !!(w?.dungeon&&!w.surface);}
-function save(manual=false){if(world?.showcase||world?.arena||isRun(world)){if(manual)toast(world.dungeon?'Dungeon runs are not saved':world.arena?'Arena runs are not saved':world.homestead?'The homestead sandbox is not saved':'Showcase stays on this screen');return;}if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;
+function save(manual=false){if(world?.satoyama&&['solo','host'].includes(mode)&&world.status!=='lobby'){try{localStorage.setItem(SATOYAMA_KEY,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));saveText='Farm kept on this browser';if(manual)toast('Farm saved');dirty=true;}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}return;}
+  if(world?.showcase||world?.arena||isRun(world)){if(manual)toast(world.dungeon?'Dungeon runs are not saved':world.arena?'Arena runs are not saved':world.homestead?'The homestead sandbox is not saved':'Showcase stays on this screen');return;}if(!['solo','host'].includes(mode)||!world||world.status==='lobby')return;
   // A Vigil writes only to its own slot; an expedition never touches it.
   const vigil=world.mode==='vigil',key=vigil?playingVigilKey:SAVE_KEYS.expeditionV2;
   try{localStorage.setItem(key,JSON.stringify({world:world.snapshot({purpose:'save'}),savedAt:Date.now()}));saveText=vigil?'Vigil kept on this browser':'Saved on this browser';if(manual)toast(vigil?'Vigil saved':'Expedition saved');dirty=true;}catch{toast('Saving is unavailable in this browser. Keep this tab open.');}}
@@ -396,12 +404,13 @@ function enterGame(){
   $('front').hidden=true;$('game').hidden=false;$('end-screen').hidden=true;closeSheet();$('room-panel').hidden=true;document.body.classList.add('playing');
   linkLost=false;cancelPlacement();cancelMaintenance();
   if(world?.homestead){connectionText='Homestead';saveText='The homestead sandbox is not saved';showStatus('');}
+  else if(world?.satoyama){connectionText='Satoyama';saveText='Farm kept on this browser';showStatus('');}
   else if(world?.showcase){connectionText='Showcase';saveText='Not saved';showStatus('');}
   else if(world?.arena){connectionText=world.arena.lab?'Weapon lab':world.arena.classes?'Classes':'Battle arena';saveText=world.arena.lab?'The lab is not saved':world.arena.classes?'The classes mode is not saved':'Arena runs are not saved';showStatus('');}
   else if(world?.dungeon){connectionText=mode==='solo'?'Dungeon run':connectionText||'Connected to camp';saveText='Dungeon runs are not saved';showStatus('');}
   else if(mode==='solo'){connectionText='Expedition saved locally';saveText='Saved on this browser';showStatus('Expedition saved locally');}
   else{connectionText=connectionText||'Connected to camp';saveText=mode==='guest'?'Kept by the host':'Saved on this browser';}
-  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase&&!world?.homestead);announce(world?.homestead?'The homestead. Open Build (B) for soil, floors and walls; drag across the ground to lay a line. Free building and test tools are in the menu.':world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?.classes?'Classes · a test ground':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':world?.mode==='vigil'?(dayOf(world)===1&&world.time<5?(world.land==='yomi'?'The Vigil begins. Somewhere in the outer rings a shrine grove waits, and its dead do not rest.':'The Vigil begins. One fire, one save, as long as you can keep it.'):'The vigil goes on. The fire remembers you.'):dayOf(world)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
+  if(mode!=='guest'){world.start();save();}lastEnd='';showShowcase(!!world?.showcase&&!world?.homestead);announce(world?.satoyama?(world.time<12?'Your farm, overgrown. Clear it and build; nothing comes for you here. The torii to the north leads into the wilds.':world.satoyama.place==='wilds'?'Back in the wilds. The torii home is by the crossing.':'Back on the farm.'):world?.homestead?'The homestead. Open Build (B) for soil, floors and walls; drag across the ground to lay a line. Free building and test tools are in the menu.':world?.dungeon?dungeonWelcome():world?.arena?.lab?'The weapon lab. Any weapon, any rank; spawn foes whenever you like.':world?.arena?.classes?'Classes · a test ground':world?.arena?'The arena. Choose your first weapon.':world?.showcase?'An empty clearing. Spawn whatever you want to see.':world?.mode==='vigil'?(dayOf(world)===1&&world.time<5?(world.land==='yomi'?'The Vigil begins. Somewhere in the outer rings a shrine grove waits, and its dead do not rest.':'The Vigil begins. One fire, one save, as long as you can keep it.'):'The vigil goes on. The fire remembers you.'):dayOf(world)===1?'Welcome to the Hollow Harvest.':'The fire remembers you.');
   document.body.classList.toggle('arena',!!world?.arena);document.body.classList.toggle('lab',!!world?.arena?.lab);document.body.classList.toggle('classes',!!world?.classed);document.body.classList.toggle('dungeon',!!world?.dungeon);document.body.classList.toggle('homestead',!!world?.homestead);pickPending=null;arenaMarkup='';hotbarSig='';attackSig='';skillSig='';
   showLab(!!world?.arena?.lab);showClasses(!!world?.classed);
 }
@@ -411,7 +420,7 @@ async function goHome(){
   void checkForUpdate();
 }
 function demoWorld(){world=new World(20261031);world.addPlayer('host','Wanderer',character);world.players[0].x=2;world.players[0].z=2;world.buildings.push(world.structure('chest',-2.5,1),world.structure('bench',3,-1),world.structure('lantern',-4,-1));world.time=RULES.day+13;renderer.focus.set(0,0,0);lastEvent=0;renderer.lastEvent=0;}
-function setBusy(value){busy=value;for(const id of ['mode-expedition','mode-join','host','join','solo','continue','showcase','homestead','arena','lab','classes','classes-test','classes-vigil','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
+function setBusy(value){busy=value;for(const id of ['mode-expedition','mode-join','host','join','solo','continue','showcase','homestead','satoyama','satoyama-continue','satoyama-new','arena','lab','classes','classes-test','classes-vigil','dungeon','dungeon-solo','dungeon-host','vigil','vigil-solo','vigil-host']){const el=$(id);if(el)el.disabled=value;}}
 function makeNetwork(){return createNetwork({identity,getWorld:()=>world,onFrame:data=>{const previous=world.status,wasDeep=!!world.dungeon;world=World.restore(data);dirty=true;if(!!world.dungeon!==wasDeep&&!$('room-panel').hidden)roomLabels();if(mode==='guest'&&world.status==='playing'&&previous!=='playing'){if(previous==='lobby')enterGame();else{$('end-screen').hidden=true;lastEnd='';}}},onReady:id=>{localId=id;setBusy(false);showStatus('Connected. Waiting for the host.');showFrontPanel('room-panel');$('launch').hidden=true;$('room-code').textContent=room;$('room-note').textContent='The host will start when everyone is ready.';},onStatus:showStatus,onPause:value=>{remotePaused=value;$('connection-banner').hidden=!value;$('connection-banner').textContent='Host is away • the expedition is paused';},onLeave:text=>{endContextHold();resetInput();cancelPlacement();cancelMaintenance();linkLost=true;paused=true;setBusy(false);if($('game').hidden){$('room-panel').hidden=true;$('home-panel').hidden=false;showStatus(text,true);}else{$('connection-banner').textContent=text;$('connection-banner').hidden=false;showStatus(text,true);openSheet('menu');}}});}
 async function hostCamp(dungeon=null,vigil=null){
   if(busy)return;if(dungeon&&(typeof dungeon!=='object'||(typeof Event!=='undefined'&&dungeon instanceof Event)))dungeon=null;if(typeof vigil!=='string')vigil=null;setBusy(true);sound.unlock();storeProfile();showStatus(dungeon?'Opening the dungeon doors…':vigil?'Lighting the vigil fire…':'Opening the camp…');
@@ -483,44 +492,50 @@ function deleteVigil(){
 function syncVigilHint(){for(const [id,kind] of [['vigil-hint','weapons'],['class-vigil-hint','classes']]){const hint=$(id);if(!hint)continue;let kept=0;for(let i=1;i<=VIGIL_SLOTS;i++)if(readStored(vigilKey(i,kind)))kept++;const doc=readStored(vigilKey(vigilSlot,kind)),slot=kept>1||vigilSlot>1?`Slot ${vigilSlot} · `:'';hint.textContent=!doc?(slot?`${slot}empty`:'Endless save'):doc.invalid?`${slot}unreadable`:slot+vigilSummary(doc);}}
 /** The Dread Age a saved vigil stands in (ages.mjs), read straight from its Dread. */
 function ageFromDread(dread){let age=0;for(let i=1;i<AGES.length;i++)if(dread>=AGES[i].at)age=i;return age;}
+/** Showcase (showcase.mjs): the gallery of every object, its kinds to jump to, and the inspector. */
 function showShowcase(open){
-  const panel=$('showcase-panel');if(!panel)return;
-  if(!open){
-    panel.hidden=true;
-    if(showcaseListOpen){
-      showcaseListOpen=false;
-      if(history.state?.hollowsteadShowcase){showcaseHistoryClosing=true;try{history.back();}catch{showcaseHistoryClosing=false;}}
-    }
-    return;
-  }
-  panel.hidden=false;paintShowcase();
+  const panel=$('showcase-panel'),labels=$('gallery-labels');if(!panel)return;
+  panel.hidden=!open;if(labels){labels.hidden=!open;if(!open)labels.replaceChildren();}
+  showcaseInspect=null;showcaseMarkupCache='';
+  if(open)paintShowcase();
+}
+/** The inspected piece: the one tapped while you stay near it, else the nearest within reach. */
+function inspectedPiece(){
+  const p=me();if(!p||!world?.gallery)return null;
+  const tapped=showcaseInspect&&world.gallery.entries.find(e=>e.id===showcaseInspect);
+  if(tapped&&Math.hypot(tapped.x-p.x,tapped.z-p.z)<9)return tapped;
+  showcaseInspect=null;return galleryNear(world,p.x,p.z);
 }
 function paintShowcase(){
   const panel=$('showcase-panel');if(!panel||panel.hidden||!world?.showcase)return;
-  const html=showcaseMarkup({active:showcaseCategory,tool:showcaseTool,open:showcaseListOpen,icon,mobCount:showcaseMobCount});
+  const html=showcaseMarkup({inspect:inspectLines(inspectedPiece(),theme),labels:showcaseLabels,icon});
   if(html===showcaseMarkupCache)return;
   showcaseMarkupCache=html;panel.innerHTML=html;
 }
-function openShowcaseList(){
-  if(showcaseListOpen)return;
-  showcaseListOpen=true;showcaseMarkupCache='';paintShowcase();
-  try{history.pushState({hollowsteadShowcase:1},'');}catch{}
+/** Small names under the pieces in view (a pool of DOM labels, placed every frame). */
+const galleryLabelPool=[];
+function paintGalleryLabels(){
+  const layer=$('gallery-labels');if(!layer||layer.hidden||!world?.gallery)return;
+  const shown=[];
+  if(showcaseLabels){
+    const w=innerWidth,h=innerHeight;
+    for(const e of world.gallery.entries){const q=renderer.screenPoint(e.x,e.z,0);if(q.x<-60||q.x>w+60||q.y<-20||q.y>h+20)continue;shown.push([e.name,q.x,q.y+4,'']);if(shown.length>=90)break;}
+    for(const head of world.gallery.headers){const q=renderer.screenPoint(head.x,head.z,head.y||0);if(q.x<-300||q.x>w+60||q.y<-20||q.y>h+20)continue;shown.push([head.label,q.x,q.y,'gallery-head']);}
+  }
+  while(galleryLabelPool.length<shown.length){const el=document.createElement('span');layer.append(el);galleryLabelPool.push(el);}
+  galleryLabelPool.forEach((el,i)=>{const row=shown[i];el.hidden=!row;if(!row)return;if(el.textContent!==row[0])el.textContent=row[0];if(el.className!==row[3])el.className=row[3];el.style.transform=`translate(${Math.round(row[1])}px,${Math.round(row[2])}px) translateX(${row[3]?'0':'-50%'})`;});
 }
-function closeShowcaseList(){
-  if(!showcaseListOpen)return;
-  showcaseListOpen=false;showcaseMarkupCache='';paintShowcase();
-  if(history.state?.hollowsteadShowcase){showcaseHistoryClosing=true;try{history.back();}catch{showcaseHistoryClosing=false;}}
-}
-function onShowcasePop(){
-  if(showcaseHistoryClosing){showcaseHistoryClosing=false;return;}
-  if(!showcaseListOpen)return;
-  showcaseListOpen=false;showcaseMarkupCache='';paintShowcase();
+/** Walk straight to a kind's rows. */
+function goToGallery(cat){
+  const p=me(),head=world?.gallery?.headers.find(h=>h.cat===cat);if(!p||!head)return;
+  p.x=head.x+3;p.z=head.z+2.2;p.goal=null;showcaseInspect=null;renderer.focus?.set?.(p.x,0,p.z);dirty=true;
 }
 function startShowcase(){
   sound.unlock();storeProfile();
   world=new World((Math.random()*0xffffffff)>>>0,{showcase:true});
-  world.addPlayer('host',$('player-name').value,character);
-  mode='solo';room='';showcaseCategory='materials';showcaseTool='';showcaseListOpen=false;showcaseMobCount=1;showcaseMarkupCache='';
+  world.gallery=galleryLayout(theme);
+  const p=world.addPlayer('host',$('player-name').value,character);p.x=world.gallery.start.x;p.z=world.gallery.start.z;
+  mode='solo';room='';showcaseInspect=null;showcaseMarkupCache='';
   cancelPlacement();cancelMaintenance();clearSelection();
   enterGame();
 }
@@ -533,6 +548,32 @@ function startHomestead(){
   for(const [id,n] of [['wood',40],['stone',40],['fiber',20],...Object.values(CROPS).map(c=>[c.seed,12])])world.give(p,id,n);
   mode='solo';room='';showcaseTool='';cancelPlacement();cancelMaintenance();clearSelection();
   enterGame();
+}
+/**
+ * Satoyama (src/satoyama/mode.mjs): the kept farm, or a new one. Classed, saved in its own slot. A new farm
+ * over a kept one asks twice.
+ */
+let satoyamaConfirm=0;
+function startSatoyama(resume){
+  sound.unlock();storeProfile();
+  try{
+    if(resume){const doc=readStored(SATOYAMA_KEY),plan=doc?planContinue({v2:doc,v1:null}):null;if(!plan?.ok)throw new Error(plan?.message||'No farm is kept on this browser.');world=World.fromSave(plan.save);world.resumeExpedition();const p=world.player('host');if(!p)throw new Error('This farm is missing its keeper.');p.online=true;p.name=$('player-name').value||p.name;if(world.status!=='playing')world.status='playing';}
+    else{world=new World((Math.random()*0xffffffff)>>>0,{satoyama:true});world.addPlayer('host',$('player-name').value,character);}
+    localId='host';lastEvent=world.eventId;lastNotice=0;lastEnd='';selected=null;cancelPlacement();cancelMaintenance();clearSelection();resetInput();paused=false;remotePaused=false;linkLost=false;saveTime=0;dirty=true;
+    mode='solo';room='';classOpen='';classTalent='';classPoints=0;enterGame();
+  }catch(error){showStatus(error.message,true);}
+}
+function showSatoyamaPanel(open){
+  showFrontPanel(open?'satoyama-panel':'home-panel');satoyamaConfirm=0;
+  if(!open)return;
+  const doc=readStored(SATOYAMA_KEY),kept=!!(doc&&!doc.invalid&&doc.world),w=kept?doc.world:null,p=w?.players?.find(q=>q.id==='host');
+  $('satoyama-continue').hidden=!kept;$('satoyama-new').classList.toggle('primary',!kept);$('satoyama-new').innerHTML='A new farm <span>→</span>';
+  $('satoyama-save').innerHTML=kept?`<p><b>Day ${Math.floor((w.time||0)/RULES.cycle)+1}</b> · ${escapeHtml(p?.name||'Wanderer')}, level ${p?.level||1}${w.satoyama?.place==='wilds'?' · out in the wilds':' · on the farm'}</p>`:'<p>No farm yet.</p>';
+}
+function newSatoyama(){
+  if(busy)return;
+  if(readStored(SATOYAMA_KEY)&&!satoyamaConfirm){satoyamaConfirm=1;$('satoyama-new').innerHTML='Tap again: the kept farm is lost <span>→</span>';return;}
+  startSatoyama(false);
 }
 /** Battle arena: solo waves in a small round clearing. Not saved. */
 function startArena(){
@@ -581,7 +622,7 @@ function paintClasses(force=false){
     const key=`${classPathAt||''}|${p.classId||''}`;
     if(force||classPickCache!==key){
       classPickCache=key;$('class-offers').innerHTML=classPickMarkup(icon,{current:classPathAt?p.classId:null});
-      $('class-pick-kicker').textContent=classPathAt?'AT THE HEARTFIRE':world.arena?.classes?'CLASSES · A TEST GROUND':'THE CLASS VIGIL';
+      $('class-pick-kicker').textContent=classPathAt?(world.satoyama?'AT THE WAYSIDE SHRINE':'AT THE HEARTFIRE'):world.arena?.classes?'CLASSES · A TEST GROUND':world.satoyama?'SATOYAMA':'THE CLASS VIGIL';
       $('class-pick-title').textContent=classPathAt?'Change your path':'Choose your path';
       $('class-pick-lede').textContent=classPathAt?'A new class takes up its own weapon and a fresh tree. Your level stays, and every talent point comes back to spend again.':'A class keeps one weapon for good and grows through a talent tree: every level is a point to spend.';
       $('class-menu').textContent=classPathAt?'Keep my path':'Menu';
@@ -686,34 +727,6 @@ function leaveArena(){
   $('arena-pick').hidden=true;pickPending=null;arenaMarkup='';document.body.classList.remove('arena');
   if(zoomBeforeArena!=null){renderer.setZoom(zoomBeforeArena);zoomBeforeArena=null;}
 }
-function armShowcase(kind,id){
-  const p=me();if(!p)return;
-  showcaseTool='';
-  if(kind==='item'){
-    cancelPlacement();
-    const result=grantShowcaseItem(world,p,id);
-    if(!result.ok){toast('That cannot be carried');showcaseMarkupCache='';paintShowcase();return;}
-    toast(result.dropped?`${showcaseSpawnName(kind,id)} dropped at your feet`:`${showcaseSpawnName(kind,id)} added to the pack`);
-    dirty=true;closeShowcaseList();return;
-  }
-  cancelMaintenance();endContextHold();
-  placement={key:id,kind,showcase:true,count:kind==='mob'?showcaseMobCount:1,x:Math.round((p.x+p.dx*3)*2)/2,z:Math.round((p.z+p.dz*3)*2)/2,rotation:0,valid:false,anchored:false,pending:false,reason:'',stationId:null};
-  selected=null;closeShowcaseList();refresh();
-}
-function commitShowcase(x,z){
-  if(!placement?.showcase)return;
-  const p=me();if(!p)return;
-  const point={x,z};
-  const reason=showcasePlaceReason(world,p,placement.kind,placement.key,point.x,point.z);
-  placement.x=point.x;placement.z=point.z;placement.anchored=true;placement.valid=!reason;placement.reason=reason||'';
-  if(reason){toast(reason);refresh();return;}
-  const result=placeShowcase(world,p,placement.kind,placement.key,point.x,point.z,placement.count);
-  if(!result.ok){toast(result.reason||'Cannot place that here');return;}
-  const name=showcaseSpawnName(placement.kind,placement.key);
-  toast(result.count>1?`${result.count} ${name} placed`:`${name} placed`);
-  cancelPlacement();
-  refresh();
-}
 async function copyInvite(){const url=new URL(location.href);url.search='';url.searchParams.set('camp',room);try{await navigator.clipboard.writeText(url.href);mode==='front'||$('game').hidden?showStatus('Invite link copied. Send it to your friends.'):toast('Invite link copied');}catch{const text=`Camp code: ${room}`;$('game').hidden?showStatus(text):toast(text);}}
 function currentTarget(){const p=me();if(!p)return null;return world.target(p,selected)?.entity?world.target(p,selected):null;}
 function contextFacts(p){
@@ -722,8 +735,10 @@ function contextFacts(p){
   const base={kind:target.kind,id:entity.id,type:entity.type,wood:world.available(p,'wood'),stone:world.available(p,'stone'),seeds:world.available(p,'seed')};
   if(target.kind==='building'){
     const lock=world.chestSessions.get(entity.id);
-    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),classed:!!world.classed,home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{}),...(entity.type==='hokora'?{offered:offerWait(world,entity)>0,embers:world.available(p,'ember')}:{}),...(entity.type==='bookshelf'?{shelved:shelfCount(entity),packBooks:p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0)}:{})};
+    return {...base,hp:entity.hp,maxHp:entity.maxHp,fuel:entity.fuel||0,level:entity.level||1,open:!!entity.open,charges:entity.charges??0,planted:!!entity.planted,growth:entity.growth||0,resting:!!p.rest,sleeping:p.sleep===entity.id,inRoom:entity.type==='bed'&&!!world.tiles&&!!roomOfBuilding(world,entity),phase:phaseOf(world),hunger:p.hunger,delve:!!(world.surface&&entity.fixed),canAwaken:entity.type==='hearth'&&entity.level<HEARTH_MAX&&world.canPay(p,world.upgradeCost()),vigil:isVigil(world),classed:!!world.classed,home:!!p.home&&p.home===entity.id,maxLevel:HEARTH_MAX,mend:entity.type==='hearth'?mendPlan(p,world.canPay(p,MEND.cost)):null,busy:!!(lock&&lock.ownerId!==localId),...(entity.type==='cart'?cartFacts(world,p,entity):{}),...(entity.type==='hokora'?{offered:offerWait(world,entity)>0,embers:world.available(p,'ember')}:{}),...(entity.type==='bookshelf'?{shelved:shelfCount(entity),packBooks:p.inventory.slots.reduce((n,stack)=>n+(stack&&isBook(stack.itemId)?stack.quantity:0),0)}:{}),satoyama:!!world.satoyama,...(isHouse(entity)?{house:houseFacts(world,entity),fiber:world.available(p,'fiber'),eggs:world.available(p,'egg')}:{})};
   }
+  // Satoyama (satoyama/animals.mjs): an animal to pet; a coop or barn's trough and what waits in it.
+  if(target.kind==='animal')return {...base,name:animalName(entity).toLowerCase(),petted:entity.petDay===world.satoyama?.day};
   if(target.kind==='crop')return {...base,i:entity.i,j:entity.j,crop:entity.crop,seeds:entity.crop?[]:carriedSeeds(world,p).map(id=>({crop:id,name:CROPS[id].name}))};
   if(target.kind==='node'){const node=NODES[entity.type];return {...base,required:!!node?.required,toolReady:!(node?.tool)||world.hasTool(p,node.tool),toolLabel:node?.tool?label(node.tool).toLowerCase():''};}
   return base;
@@ -781,7 +796,6 @@ async function runAction(action){
   if(action.command)await send(action.command);
 }
 async function confirmPlace(){
-  if(placement?.showcase){commitShowcase(placement.x,placement.z);return;}
   if(!placement||placement.pending)return;
   if(!placement.valid){toast(placement.reason||'Cannot place that here');return;}
   const pending=placement;pending.pending=true;refresh();
@@ -1131,16 +1145,17 @@ function renderSheet(){
   else if(sheet==='menu'){title=world?.arena||world?.dungeon?'Catch your breath':'By the fire';kicker=world?.arena?'ARENA PAUSED':world?.dungeon&&mode==='solo'?'THE DEEP WAITS':mode==='solo'?'EXPEDITION PAUSED':linkLost?'CONNECTION CLOSED':'THE EXPEDITION CONTINUES';setTabs('');replaceContent(menuHTML());}
   else if(sheet==='map'){
     const deep=dungeonStatus(world);
-    title=deep?deep.name:world.arena?'The arena':'The Hollow Harvest';kicker=deep?`FLOOR ${deep.depth} · ${deep.cleared} OF ${deep.total} CHAMBERS CLEARED`:world.arena?`WAVE ${Math.max(1,world.arena.wave)} · ${waveLeft(world)} FOES LEFT`:`DAY ${dayOf(world)} · SHARED EXPLORATION`;setTabs('');
-    const place=p?REGIONS[world.regionOf?world.regionOf(p.x,p.z):regionAt(p.x,p.z)]?.name:'';const found=p?.regions?.length||1;
+    title=deep?deep.name:world.arena?'The arena':world.satoyama?(world.satoyama.place==='farm'?'The Farm':'The Wilds'):'The Hollow Harvest';kicker=deep?`FLOOR ${deep.depth} · ${deep.cleared} OF ${deep.total} CHAMBERS CLEARED`:world.arena?`WAVE ${Math.max(1,world.arena.wave)} · ${waveLeft(world)} FOES LEFT`:world.satoyama?`DAY ${dayOf(world)} · SATOYAMA`:`DAY ${dayOf(world)} · SHARED EXPLORATION`;setTabs('');
+    const place=p?placeName(p):'';const found=p?.regions?.length||1;
     const swatch=(color,text)=>`<span class="swatch" style="background:${color}"></span>${text}`;
     if(deep)replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Dungeon floor map"></canvas><p class="map-legend">● Wanderers &nbsp; <span style="color:#f2c14e">▼</span> Stairs down &nbsp; <span style="color:#bfe0ff">✧</span> Shrine &nbsp; <span style="color:#e0776b">●</span> Warden<br>${swatch(RARITY_COLORS.common,'Crate')} ${swatch(RARITY_COLORS.rare,'Iron-bound chest')} ${swatch(RARITY_COLORS.epic,'Moonlit coffer')} ${swatch(RARITY_COLORS.legendary,'Reliquary')}<br>${escapeHtml(deep.objective)}. Deepest floor this run: ${deep.best}.</p>`);
+    else if(world.satoyama)replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Map"></canvas><p class="map-legend">● Wanderers &nbsp; <span style="color:#c8483a">■</span> Torii &nbsp; <span style="color:#c4b096">◆</span> Camp &nbsp; <span style="color:#f4ece0">●</span> Animals &nbsp; <span style="color:#e0776b">●</span> The dead<br>You are in ${escapeHtml(place)}. ${world.satoyama.place==='farm'?'Nothing comes for you here. The torii to the north leads into the wilds.':'Each place has its own dead and gives what only it gives. Hold Travel at the torii by the crossing to go home.'}</p>`);
     else if(world.arena)replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Arena map"></canvas><p class="map-legend">● You &nbsp; <span style="color:#e0776b">●</span> Creatures &nbsp; <span style="color:#f2c14e">●</span> The Hollow King</p>`);
     else replaceContent(`<canvas id="full-map" width="600" height="600" aria-label="Explored world map"></canvas><p class="map-legend">✦ Heartfire &nbsp; ● Wanderers &nbsp; ◆ Camp &nbsp; <span style="color:#e0776b">●</span> Guardians<br>${swatch(RARITY_COLORS.common,'Crate')} ${swatch(RARITY_COLORS.rare,'Iron-bound chest')} ${swatch(RARITY_COLORS.epic,'Moonlit coffer')} ${swatch(RARITY_COLORS.legendary,'Reliquary')}<br>${place?`You are in ${escapeHtml(place)}. `:''}Regions discovered: ${found} of 6.<br>Danger and treasure grow the farther you travel from the Heartfire.</p>`);
     drawMap($('full-map'),true);
   }else if(!p)return;
   else if(sheet==='catalog'){
-    const onGrid=gridWorld(world),free=!!world.homestead?.free,model=catalogModel({...catalog,grid:onGrid,land:world.land||null});
+    const onGrid=gridWorld(world),free=!!world.homestead?.free,model=catalogModel({...catalog,grid:onGrid,land:world.land||null,satoyama:world.satoyama?.place||null});
     title=model.title;kicker=model.kicker;
     const tab=catalog.source==='field'||catalog.tab==='build'?'build':'craft';
     const ids=model.recipeIds.filter(id=>inCategory(id,category,tab));
@@ -1181,6 +1196,7 @@ function drawMap(canvas,full=false){
   if(!canvas)return;
   const ctx=canvas.getContext('2d'),size=canvas.width,R=RULES.radius,N=EXPLORE_SIZE,cell=EXPLORE_CELL;ctx.clearRect(0,0,size,size);ctx.fillStyle='#282733';ctx.fillRect(0,0,size,size);
   if(world.dungeon){drawDungeonMap(ctx,size,full);return;}
+  if(world.satoyama){drawSatoyamaMap(ctx,size,full);return;}
   if(world.arena){
     // The arena map is the whole disc: where the swarm is thick, and where the champions are.
     const AR=world.radius,scale=size/(AR*2+2),sx=x=>x*scale+size/2,sz=z=>z*scale+size/2;
@@ -1208,6 +1224,23 @@ function drawMap(canvas,full=false){
   for(const b of world.buildings){if(b.type!=='hearth'&&!known(b))continue;let x=sx(b.x),y=sz(b.z);if(b.type==='hearth'&&!full){x=clamp(x,8,size-8);y=clamp(y,8,size-8);}else if(!vis(b.x,b.z))continue;ctx.fillStyle=b.type==='hearth'?'#ffdda0':'#c4b096';const r=b.type==='hearth'?6:4;ctx.beginPath();ctx.moveTo(x,y-r);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r);ctx.lineTo(x-r,y);ctx.closePath();ctx.fill();}
   for(const q of world.players.filter(q=>q.online)){if(!vis(q.x,q.z))continue;ctx.fillStyle=CHARACTERS.find(c=>c.id===q.character)?.color||'#f4e3b2';ctx.strokeStyle='#27222e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sx(q.x),sz(q.z),q.id===localId?5:3.8,0,Math.PI*2);ctx.fill();ctx.stroke();}
   if(full){ctx.strokeStyle='#d8c29a44';ctx.lineWidth=1;ctx.beginPath();ctx.arc(sx(0),sz(0),R*scale,0,Math.PI*2);ctx.stroke();ctx.font='13px monospace';ctx.fillStyle='#e0caaa';ctx.textAlign='center';ctx.fillText('N',size/2,16);ctx.font='11px Georgia';ctx.fillText('HEARTFIRE',sx(0),sz(0)+18);}
+}
+/** Satoyama (satoyama/land.mjs): the whole place is known; the torii, the camp, the animals and the dead near you. */
+let satoyamaImage=null;
+function drawSatoyamaMap(ctx,size,full){
+  const place=world.satoyama.place,shape=placeShape(world.seed,place),g=satoyamaGround(world,theme.palette),key=`${world.seed}|${place}`;
+  if(satoyamaImage?.key!==key){const c=document.createElement('canvas');c.width=c.height=g.size;const im=c.getContext('2d').createImageData(g.size,g.size);for(let q=0;q<g.size*g.size;q++){im.data[q*4]=g.rgb[q*3];im.data[q*4+1]=g.rgb[q*3+1];im.data[q*4+2]=g.rgb[q*3+2];im.data[q*4+3]=255;}c.getContext('2d').putImageData(im,0,0);satoyamaImage={key,canvas:c};}
+  const me_=world.player(localId)||world.players[0]||{x:0,z:0},E=g.extent,span=full?E*2:68,scale=size/span,cx=full?0:me_.x,cz=full?0:me_.z;
+  const sx=x=>(x-cx)*scale+size/2,sz=z=>(z-cz)*scale+size/2;
+  ctx.imageSmoothingEnabled=true;ctx.drawImage(satoyamaImage.canvas,sx(-E),sz(-E),E*2*scale,E*2*scale);
+  const dot=(x,z,r,fill)=>{ctx.fillStyle=fill;ctx.beginPath();ctx.arc(sx(x),sz(z),r,0,Math.PI*2);ctx.fill();};
+  for(const b of world.buildings){const x=sx(b.x),y=sz(b.z),r=b.foot?5:3.5;ctx.fillStyle='#c4b096';ctx.beginPath();ctx.moveTo(x,y-r);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r);ctx.lineTo(x-r,y);ctx.closePath();ctx.fill();}
+  for(const a of world.animals||[])dot(a.x,a.z,full?2.2:2.8,'#f4ece0');
+  for(const e of world.enemies)if(e.hp>0&&!isMagicAlly(e)&&Math.hypot(e.x-me_.x,e.z-me_.z)<30)dot(e.x,e.z,full?1.8:2.4,'#e0776b');
+  // The torii: home from the wilds, out from the farm. Kept on the edge of the minimap when it is out of view.
+  const gx=clamp(sx(shape.gate.x),8,size-8),gy=clamp(sz(shape.gate.z),8,size-8);ctx.fillStyle='#c8483a';ctx.strokeStyle='#27222e';ctx.lineWidth=2;ctx.fillRect(gx-5,gy-5,10,10);ctx.strokeRect(gx-5,gy-5,10,10);
+  for(const q of world.players.filter(q=>q.online)){ctx.fillStyle=CHARACTERS.find(c=>c.id===q.character)?.color||'#f4e3b2';ctx.strokeStyle='#27222e';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sx(q.x),sz(q.z),q.id===localId?5:3.8,0,Math.PI*2);ctx.fill();ctx.stroke();}
+  if(full){ctx.font='12px Georgia';ctx.fillStyle='#f2dcb0';ctx.textAlign='center';ctx.fillText(place==='farm'?'TO THE WILDS':'HOME',gx,gy-10);for(const a of shape.areas||[])if(ZONES[a.id]&&place==='wilds')ctx.fillText(ZONES[a.id].name.replace(/^The /,'').toUpperCase(),sx(a.x),sz(a.z));}
 }
 /** A floor image, one pixel per cell (cached per floor). The map shows only what the party has walked near. */
 let floorImage=null;
@@ -1456,7 +1489,7 @@ function ui(){
   if($('room-panel')&&!$('room-panel').hidden){$('roster').innerHTML=world.players.filter(p=>p.online).map(p=>`<div class="roster-row">${portrait(p.character)}<span>${escapeHtml(p.name)}</span><small>${p.id==='host'?'HOST':'READY'}</small></div>`).join('')+Array.from({length:Math.max(0,4-world.players.filter(p=>p.online).length)},()=>'<div class="roster-row"><span class="party-dot" style="opacity:.3"></span><span class="muted small">Waiting for a wanderer…</span></div>').join('');}
   const p=me();
   if(!$('game').hidden&&p){
-    paintVital('hp',p.hp/maxHealth(p)*100,'Health');$('level-number').textContent=String(p.level||1);const xpPct=clamp((p.xp||0)/xpToNext(p.level||1)*100,0,100);$('xp-ring').style.setProperty('--xp',`${xpPct}%`);$('xp-ring').setAttribute('aria-valuenow',String(Math.round(xpPct)));$('level-chip').setAttribute('aria-label',`Open settings, level ${p.level||1}, ${Math.round(xpPct)} percent to next`);$('region-name').textContent=(REGIONS[world.regionOf?world.regionOf(p.x,p.z):regionAt(p.x,p.z)]?.name||'').toUpperCase();paintVital('hunger',p.hunger,'Hunger');paintVital('courage',p.courage,'Courage');
+    paintVital('hp',p.hp/maxHealth(p)*100,'Health');$('level-number').textContent=String(p.level||1);const xpPct=clamp((p.xp||0)/xpToNext(p.level||1)*100,0,100);$('xp-ring').style.setProperty('--xp',`${xpPct}%`);$('xp-ring').setAttribute('aria-valuenow',String(Math.round(xpPct)));$('level-chip').setAttribute('aria-label',`Open settings, level ${p.level||1}, ${Math.round(xpPct)} percent to next`);$('region-name').textContent=placeName(p).toUpperCase();paintVital('hunger',p.hunger,'Hunger');paintVital('courage',p.courage,'Courage');
     $('stamina-bar').style.width=`${p.stamina}%`;
     if(world.arena||world.dungeon){const chip=$('dread-chip');if(chip)chip.hidden=true;}
     if(world.arena)paintArenaClock();
@@ -1472,8 +1505,7 @@ function ui(){
     if(p.down||p.ghost){$('downed-text').textContent=world.dungeon?(p.charm?'Use your one last-chance charm, or let a friend hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds.`:'You keep your pack. You rise when the Warden falls, or at the next stairs.'):world.arena&&world.players.filter(q=>q.online).length<2?'The swarm has you.':p.charm?'Use your one last-chance charm, or let a teammate hold Revive beside you.':p.down?`A friend can hold Revive beside you. ${Math.ceil(p.down)} seconds until your supplies drop.`:'Your supplies are on the ground. You return at dawn if the camp survives.';$('use-charm').hidden=!p.charm;if(sheet)closeSheet();cancelPlacement();cancelMaintenance();inventoryPanel?.cancelDrag();}
     const boss=world.enemies.find(e=>e.hp>0&&ENEMIES[e.type]?.boss&&distance(p,e)<32)||world.enemies.find(e=>e.type==='king'||(e.warden&&e.hp>0));$('boss-bar').hidden=!boss;document.body.classList.toggle('boss',!!boss);if(boss){$('boss-bar').querySelector('em').style.width=`${boss.hp/boss.maxHp*100}%`;const name=boss.type==='king'?'THE HOLLOW KING':ENEMIES[boss.type]?.boss?`${label(boss.type)}${boss.phase>1?` · ${'I'.repeat(boss.phase)}`:''}`.toUpperCase():`${label(boss.type)} WARDEN`.toUpperCase();const tag=$('boss-bar').querySelector('span');if(tag.textContent!==name)tag.textContent=name;}
     if(placement){
-      if(placement.showcase){if(!placement.anchored){placement.x=Math.round((p.x+p.dx*3)*2)/2;placement.z=Math.round((p.z+p.dz*3)*2)/2;}const why=showcasePlaceReason(world,p,placement.kind,placement.key,placement.x,placement.z);placement.valid=!why;placement.reason=why||'';}
-      else if(placement.stationId&&!world.buildings.some(b=>b.id===placement.stationId&&b.hp>0)){cancelPlacement();toast('That workbench is gone');}
+      if(placement.stationId&&!world.buildings.some(b=>b.id===placement.stationId&&b.hp>0)){cancelPlacement();toast('That workbench is gone');}
       else if(placement.grid){const view=grid.view();placement.valid=!!view?.valid;placement.reason=view?.reason||'';}
       else{if(!placement.anchored){placement.x=Math.round((p.x+p.dx*3)*2)/2;placement.z=Math.round((p.z+p.dz*3)*2)/2;}const why=world.canBuild(p,placement.key,placement.x,placement.z,placement.stationId);placement.valid=!why;placement.reason=why||'';}
     }
@@ -1500,8 +1532,10 @@ function aimEntity(){
 /** Title screen wanderer: who (four) and which look (hooded, masked, witch). The id carries both: `moss-mask`. */
 function baseOf(id){return CHARACTERS.find(c=>c.id===id)?.base||id;}
 function lookOf(id){return CHARACTERS.find(c=>c.id===id)?.look||theme?.choices?.look?.default||'hood';}
+/** A wanderer with a look of their own (the Shrine of Yomi's: content.mjs `fixed`) wears no other. */
+const fixedLook=id=>!!CHARACTERS.find(c=>c.id===id)?.fixed;
 function pickWanderer(base,look){
-  const id=`${base}-${look}`;if(!CHARACTERS.some(c=>c.id===id))return;
+  const id=fixedLook(base)?base:`${base}-${look}`;if(!CHARACTERS.some(c=>c.id===id))return;
   character=id;if(mode==='front'&&world?.players?.[0])world.players[0].character=character;storeProfile();paintWanderers();
 }
 /**
@@ -1528,16 +1562,18 @@ function paintWanderers(){
   const who=$('characters'),how=$('looks');
   if(who.children.length!==bases.length)who.innerHTML=bases.map(c=>`<button class="character" type="button" data-character="${c.id}" aria-label="${c.name}, ${c.detail}"><img class="still" alt="" draggable="false"><small>${c.name}</small></button>`).join('');
   if(how.children.length!==LOOKS.length)how.innerHTML=LOOKS.map(l=>`<button class="look" type="button" data-look="${l.id}" aria-label="${l.name} look"><img class="still" alt="" draggable="false"><small>${l.name}</small></button>`).join('');
-  for(const el of who.children){const on=el.dataset.character===base;el.setAttribute('aria-pressed',String(on));fillStill(el.querySelector('img'),`${el.dataset.character}-${look}`);}
-  for(const el of how.children){const on=el.dataset.look===look;el.setAttribute('aria-pressed',String(on));fillStill(el.querySelector('img'),`${base}-${el.dataset.look}`);}
+  for(const el of who.children){const on=el.dataset.character===base,id=el.dataset.character;el.setAttribute('aria-pressed',String(on));fillStill(el.querySelector('img'),fixedLook(id)?id:`${id}-${look}`);}
+  // A wanderer with a look of their own greys the looks out (they still show on the last base with looks).
+  const fixed=fixedLook(base);how.classList.toggle('looks-off',fixed);
+  for(const el of how.children){const on=!fixed&&el.dataset.look===look;el.setAttribute('aria-pressed',String(on));el.disabled=fixed;fillStill(el.querySelector('img'),`${fixed?'ember':base}-${el.dataset.look}`);}
 }
 function setupControls(){
   paintWanderers();
   $('characters').onclick=e=>{const b=e.target.closest('[data-character]');if(!b)return;pickWanderer(b.dataset.character,lookOf(character));};
-  $('looks').onclick=e=>{const b=e.target.closest('[data-look]');if(!b)return;pickWanderer(baseOf(character),b.dataset.look);};
+  $('looks').onclick=e=>{const b=e.target.closest('[data-look]');if(!b||fixedLook(character))return;pickWanderer(baseOf(character),b.dataset.look);};
   $('mode-expedition').onclick=()=>{if(!busy){syncSaveOption();showFrontPanel('expedition-panel');}};$('expedition-back').onclick=()=>showFrontPanel('home-panel');
   $('mode-join').onclick=()=>{if(!busy){showFrontPanel('join-panel');$('room-input').focus();}};$('join-back').onclick=()=>showFrontPanel('home-panel');
-  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('homestead').onclick=()=>{if(!busy)startHomestead();};$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('classes').onclick=()=>{if(!busy){showFrontPanel('classes-panel');syncVigilHint();}};$('classes-back').onclick=()=>showFrontPanel('home-panel');$('classes-test').onclick=()=>{if(!busy)startClasses();};$('classes-vigil').onclick=()=>{if(!busy)showVigilPanel(true,'classes');};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true,'weapons');};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-lands').onclick=e=>{const b=e.target.closest('[data-land]');if(!b||busy)return;vigilLand=b.dataset.land;try{localStorage.setItem('hollowstead.vigilLand',vigilLand);}catch{}for(const el of $('vigil-lands').children)el.setAttribute('aria-pressed',String(el===b));};$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(vigilKey())?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(vigilKey())?'resume':'new');};$('vigil-slots').onclick=e=>{const b=e.target.closest('[data-slot]');if(b&&!busy)pickVigilSlot(Number(b.dataset.slot));};$('vigil-copy').onclick=copyVigil;$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
+  $('host').onclick=()=>hostCamp();$('join').onclick=joinCamp;$('solo').onclick=()=>solo();$('showcase').onclick=()=>{if(!busy)startShowcase();};$('homestead').onclick=()=>{if(!busy)startHomestead();};$('satoyama').onclick=()=>{if(!busy)showSatoyamaPanel(true);};$('satoyama-back').onclick=()=>showSatoyamaPanel(false);$('satoyama-continue').onclick=()=>{if(!busy)startSatoyama(true);};$('satoyama-new').onclick=newSatoyama;$('arena').onclick=()=>{if(!busy)startArena();};$('lab').onclick=()=>{if(!busy)startLab();};$('classes').onclick=()=>{if(!busy){showFrontPanel('classes-panel');syncVigilHint();}};$('classes-back').onclick=()=>showFrontPanel('home-panel');$('classes-test').onclick=()=>{if(!busy)startClasses();};$('classes-vigil').onclick=()=>{if(!busy)showVigilPanel(true,'classes');};$('dungeon').onclick=()=>{if(!busy)showDungeonPanel(true);};$('vigil').onclick=()=>{if(!busy)showVigilPanel(true,'weapons');};$('vigil-back').onclick=()=>showVigilPanel(false);$('vigil-delete').onclick=deleteVigil;$('vigil-lands').onclick=e=>{const b=e.target.closest('[data-land]');if(!b||busy)return;vigilLand=b.dataset.land;try{localStorage.setItem('hollowstead.vigilLand',vigilLand);}catch{}for(const el of $('vigil-lands').children)el.setAttribute('aria-pressed',String(el===b));};$('vigil-solo').onclick=()=>{if(busy)return;solo(false,readStored(vigilKey())?'resume':'new');};$('vigil-host').onclick=()=>{if(busy)return;hostCamp(null,readStored(vigilKey())?'resume':'new');};$('vigil-slots').onclick=e=>{const b=e.target.closest('[data-slot]');if(b&&!busy)pickVigilSlot(Number(b.dataset.slot));};$('vigil-copy').onclick=copyVigil;$('dungeon-back').onclick=()=>showDungeonPanel(false);$('dungeon-solo').onclick=()=>{if(!busy)startDungeon();};$('dungeon-host').onclick=()=>hostCamp({variant:isVariant(dungeonPick)?dungeonPick:null});$('dungeon-floors').onclick=e=>{const b=e.target.closest('[data-variant]');if(!b)return;dungeonPick=b.dataset.variant;for(const el of $('dungeon-floors').children)el.setAttribute('aria-pressed',String(el===b));};$('continue').onclick=()=>solo(true);$('launch').onclick=()=>{enterGame();network?.broadcast();};$('cancel-room').onclick=goHome;$('copy-room').onclick=copyInvite;$('front-guide').onclick=()=>openSheet('guide');
   $('front-sound').onclick=()=>{sound.enabled=!sound.enabled;syncSoundButton();sound.unlock();storeProfile();};
   $('close-sheet').onclick=closeSheet;$('level-chip').onclick=()=>{if($('game').hidden)return;sheet==='menu'?closeSheet():openSheet('menu');};$('minimap-button').onclick=()=>sheet==='map'?closeSheet():openSheet('map');
   // Pack, Build and Light answer on release over the same button (pointer events, so a held joystick does not swallow the tap).
@@ -1612,13 +1648,8 @@ function setupControls(){
     if(!pointerStart||Math.hypot(e.clientX-pointerStart.x,e.clientY-pointerStart.y)>12||!['solo','host','guest'].includes(mode)||$('game').hidden)return;
     const modeName=currentMode();if(!allowsMovement(modeName)&&modeName!=='normal')return;
     const point=renderer.worldPoint(e.clientX,e.clientY);if(!point)return;
-    if(world?.showcase&&showcaseTool==='remove'){
-      const picked=renderer.pick(e.clientX,e.clientY,world);
-      if(picked&&removeShowcaseTarget(world,picked))toast('Removed');
-      else toast('Nothing there to remove');
-      dirty=true;return;
-    }
-    if(placement?.showcase){commitShowcase(Math.round(point.x*2)/2,Math.round(point.z*2)/2);return;}
+    // The showcase gallery: a tap on a piece inspects it.
+    if(world?.gallery){const hit=galleryNear(world,point.x,point.z,1.4);if(hit){showcaseInspect=hit.id;showcaseMarkupCache='';paintShowcase();return;}}
     if(placement){placement.x=Math.round(point.x*2)/2;placement.z=Math.round(point.z*2)/2;placement.anchored=true;refresh();return;}
     const picked=renderer.pick(e.clientX,e.clientY,world);
     if(maintenance){
@@ -1681,11 +1712,10 @@ function setupControls(){
     if(key==='escape'&&inventoryPanel?.cardOpen?.()){inventoryPanel.closeCard();return;}
     if(key==='escape'&&picks&&(sheet==='inventory'||sheet==='chest')){endPicks();refresh();return;}
     if(key==='escape'){
-      const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!(selection&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement||showcaseTool==='remove',maintaining:maintenance});
+      const step=escapeStep({dragging:!!inventoryPanel?.dragging(),detailsOpen:!!(selection&&(sheet==='inventory'||sheet==='chest')),panel:sheet,placing:!!placement,maintaining:maintenance});
       if(step==='cancel-drag')inventoryPanel?.cancelDrag();
       else if(step==='close-details'){clearSelection();refresh();}
       else if(step==='close-panel')closeSheet();
-      else if(showcaseListOpen)closeShowcaseList();
       else if(step==='cancel-placement'){cancelPlacement();showcaseTool='';showcaseMarkupCache='';dirty=true;}
       else if(step==='cancel-maintenance'){cancelMaintenance();dirty=true;}
       else openSheet('menu');
@@ -1772,31 +1802,23 @@ function frame(now){
   if(networkTime>.075){networkTime=0;if(mode==='guest'&&playing)network?.input(input);if(mode==='host')network?.broadcast();}
   if(saveTime>10){saveTime=0;save();}if(pingTime>3){pingTime=0;network?.ping();}
   if(uiTime>.18){uiTime=0;dirty=true;ui();}
-  const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement:placement?.grid?null:placement,demo:$('game').hidden,homestead:!$('game').hidden&&placement?.grid?grid?.view():null});if(playing)frameFeatureHud(featureContext(me()),dt);requestAnimationFrame(frame);
+  const target=!$('game').hidden?aimEntity():null;renderer.render(world,localId,dt,{target,placement:placement?.grid?null:placement,demo:$('game').hidden,homestead:!$('game').hidden&&placement?.grid?grid?.view():null});if(world?.gallery&&!$('game').hidden)paintGalleryLabels();if(playing)frameFeatureHud(featureContext(me()),dt);requestAnimationFrame(frame);
 }
 async function init(){
   if(await checkForUpdate())return;
   await loadMagicModules();
   theme=await loadTheme();installMagicSprites(theme);try{renderer=new Renderer($('world'),theme);}catch{renderer=new CanvasRenderer($('world'),theme);}await renderer.preload();sound=new Sound(theme);const prefs=profile();character=CHARACTERS.some(c=>c.id===prefs.character)?prefs.character:'ember';$('player-name').value=String(prefs.name||'Wanderer').slice(0,18);sound.enabled=prefs.sound!==false;autoAttack=prefs.autoAttack!==false;if(typeof prefs.healPick==='string'&&ITEMS[prefs.healPick]?.heal>0)healPick=prefs.healPick;syncSoundButton();
   paintClock();demoWorld();setupControls();paintModeIcons();syncSoundButton();bindFeatureHud(featureContext(null));syncSaveOption();syncVigilHint();const params=new URLSearchParams(location.search);
-  const code=params.has('showcase')||params.has('homestead')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showFrontPanel('join-panel');showStatus('A place by the fire is waiting. Choose a name and join.');}
+  const code=params.has('showcase')||params.has('homestead')||params.has('satoyama')?'':params.get('camp');if(code){$('room-input').value=code.toUpperCase().slice(0,5);showFrontPanel('join-panel');showStatus('A place by the fire is waiting. Choose a name and join.');}
   grid=createGridControls({getWorld:()=>world,me,send,toast});
   const showcasePanel=$('showcase-panel');
   showcasePanel?.addEventListener('pointerdown',event=>event.stopPropagation());
   showcasePanel?.addEventListener('pointerup',event=>event.stopPropagation());
   showcasePanel?.addEventListener('click',event=>{
     event.stopPropagation();
-    const cat=event.target.closest('[data-showcase-cat]');
-    const count=event.target.closest('[data-showcase-count]');
-    const spawn=event.target.closest('[data-showcase-spawn]');
-    const tool=event.target.closest('[data-showcase-tool]');
-    if(cat){showcaseCategory=cat.dataset.showcaseCat;showcaseMarkupCache='';paintShowcase();return;}
-    if(count){showcaseMobCount=clampShowcaseMobCount(count.dataset.showcaseCount);showcaseMarkupCache='';paintShowcase();return;}
-    if(tool?.dataset.showcaseTool==='open'){showcaseListOpen?closeShowcaseList():openShowcaseList();return;}
-    if(tool?.dataset.showcaseTool==='close'){closeShowcaseList();return;}
-    if(tool?.dataset.showcaseTool==='clear'){clearShowcaseWorld(world);cancelPlacement();showcaseTool='';if(sheet)closeSheet();toast('The clearing is empty');showcaseMarkupCache='';paintShowcase();return;}
-    if(tool?.dataset.showcaseTool==='remove'){showcaseTool=showcaseTool==='remove'?'':'remove';if(showcaseTool)cancelPlacement();if(showcaseTool&&showcaseListOpen)closeShowcaseList();else{showcaseMarkupCache='';paintShowcase();}return;}
-    if(spawn){const value=spawn.dataset.showcaseSpawn,split=value.indexOf(':');armShowcase(value.slice(0,split),value.slice(split+1));}
+    const go=event.target.closest('[data-showcase-go]'),tool=event.target.closest('[data-showcase-tool]');
+    if(go){goToGallery(go.dataset.showcaseGo);return;}
+    if(tool?.dataset.showcaseTool==='labels'){showcaseLabels=!showcaseLabels;showcaseMarkupCache='';paintShowcase();}
   });
   const labPanel=$('lab-panel');
   labPanel?.addEventListener('pointerdown',event=>event.stopPropagation());
@@ -1858,14 +1880,14 @@ async function init(){
   $('front-fullscreen')?.addEventListener('click',()=>void toggleFullscreen());
   document.addEventListener('fullscreenchange',onFullscreenChange);
   document.addEventListener('webkitfullscreenchange',onFullscreenChange);
-  window.addEventListener('popstate',onShowcasePop);
   window.addEventListener('pageshow',()=>void checkForUpdate());
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void checkForUpdate();});
   setInterval(()=>void checkForUpdate(),60000);
   $('loading').hidden=true;$('front').hidden=false;requestAnimationFrame(frame);
-  if(params.has('dev')||params.has('showcase')||params.has('homestead')||params.has('arena')||params.has('lab')||params.has('classes')||params.has('dungeon'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,startLab,startDungeon,labCommand,setTime(t){world.time=t;},get network(){return network;}};
+  if(params.has('dev')||params.has('showcase')||params.has('homestead')||params.has('satoyama')||params.has('arena')||params.has('lab')||params.has('classes')||params.has('dungeon'))window.__HOLLOWSTEAD__={get world(){return world;},get mode(){return mode;},get sheet(){return sheet;},get placement(){return placement;},get maintenance(){return maintenance;},get uiMode(){return currentMode();},get showcaseTool(){return showcaseTool;},renderer,send,solo,openSheet,save,startShowcase,startArena,startLab,startDungeon,labCommand,setTime(t){world.time=t;},get network(){return network;}};
   if(params.has('showcase'))startShowcase();
   else if(params.has('homestead'))startHomestead();
+  else if(params.has('satoyama'))startSatoyama(params.get('satoyama')==='continue'&&!!readStored(SATOYAMA_KEY));
   else if(params.has('lab'))startLab();
   else if(params.has('classes'))startClasses();
   else if(params.has('arena'))startArena();

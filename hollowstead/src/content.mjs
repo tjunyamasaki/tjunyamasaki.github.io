@@ -54,6 +54,13 @@ export const ITEMS = {
   greaterelixir:{name:'Greater vigor draught',icon:'greaterelixir',heal:120,courage:40},
   // The Vigil (vigil.mjs WARP): read it and you are carried home to your Heartfire.
   warpscroll:{name:'Homeward scroll',icon:'warpscroll',warp:true},
+  // Satoyama (src/satoyama): what only the wilds give, the farm's animals and its two new crops, and their dishes.
+  bamboo:{name:'Bamboo culm',icon:'bamboo-item'},ironsand:{name:'Iron sand',icon:'ironsand'},springsalt:{name:'Spring salt',icon:'springsalt'},
+  egg:{name:'Egg',icon:'egg',food:6,heal:2},milk:{name:'Milk',icon:'milk',food:8,heal:4},
+  daikon:{name:'Daikon',icon:'daikon',food:12,heal:3},soybean:{name:'Soybeans',icon:'soybean',food:8},
+  daikonseed:{name:'Daikon seed',icon:'daikonseed'},soyseed:{name:'Soybean seed',icon:'soyseed'},
+  tamagoyaki:{name:'Tamagoyaki',icon:'tamagoyaki',food:24,heal:12},misosoup:{name:'Miso soup',icon:'misosoup',food:30,heal:14,buff:'calm'},
+  oden:{name:'Oden',icon:'oden',food:45,heal:20,buff:'fed'},purin:{name:'Purin',icon:'purin',food:20,heal:28,buff:'swift'},
 };
 export const EQUIPMENT = {
   axe:{name:'Woodcutter’s axe',icon:'axe',durability:70},pick:{name:'Flint pick',icon:'pick',durability:70},
@@ -154,6 +161,16 @@ export const NODES = {
   // The Shrine of Yomi's omens (omens.mjs): light the Obon lanterns, bow to a fox wedding.
   obonlantern:{name:'Obon lantern',hits:1,workSeconds:1.6,handRate:1,output:'floor',loot:{},regrow:0,radius:.3,omen:true},
   foxwedding:{name:'Fox wedding',hits:1,workSeconds:1.4,handRate:1,output:'floor',loot:{},regrow:0,radius:.4,omen:true},
+  // Satoyama (src/satoyama/land.mjs): the farm's clutter to clear, what only the wilds give, and the two torii between them.
+  weeds:{name:'Wild weeds',hits:1,workSeconds:.8,handRate:1,output:'backpack',loot:{fiber:2},regrow:900,radius:0},
+  twigs:{name:'Fallen branches',hits:1,workSeconds:.9,handRate:1,output:'backpack',loot:{wood:2},regrow:900,radius:0},
+  pebbles:{name:'Loose stones',hits:1,workSeconds:1,handRate:1,output:'backpack',loot:{stone:2},regrow:900,radius:0},
+  stump:{name:'Old stump',hits:3,workSeconds:3,handRate:0,tool:'axe',toolRate:1,required:true,output:'floor',loot:{wood:4,fiber:1},regrow:900,radius:.45},
+  bamboostand:{name:'Bamboo culms',hits:3,workSeconds:2.4,handRate:.6,tool:'axe',toolRate:1.6,output:'floor',loot:{bamboo:3},regrow:360,radius:.4},
+  ironseam:{name:'Iron sand seam',hits:4,workSeconds:3.2,handRate:0,tool:'pick',toolRate:1,required:true,output:'floor',loot:{ironsand:2,stone:1},regrow:480,radius:.5},
+  saltcrust:{name:'Spring salt crust',hits:2,workSeconds:2,handRate:1,tool:'pick',toolRate:1.6,output:'backpack',loot:{springsalt:2},regrow:420,radius:.3},
+  farmgate:{name:'Torii to the wilds',hits:1,workSeconds:1.2,handRate:1,output:'floor',loot:{},regrow:0,radius:0,landmark:'travel'},
+  homegate:{name:'Torii home',hits:1,workSeconds:1.2,handRate:1,output:'floor',loot:{},regrow:0,radius:0,landmark:'travel'},
 };
 export const STRUCTURES = {
   hearth:{name:'Heartfire',hp:600,radius:1,light:8},fire:{name:'Campfire',hp:160,radius:.55,light:6},
@@ -170,6 +187,8 @@ export const STRUCTURES = {
   // A standing stone whose runes glow after dark. One stands in the middle of every Vigil, where the Heartfire used to be.
   // `fuelless`: its light never needs wood (like the soul lantern).
   glimmer:{name:'Glimmerstone',hp:300,radius:.45,light:5,fuelless:true},
+  // Satoyama's animal houses (satoyama/animals.mjs): each keeps its animals, a trough of hay and what they give.
+  coop:{name:'Chicken coop',hp:260,radius:.8},barn:{name:'Cow barn',hp:320,radius:.9},
   // Homestead barriers (homestead.mjs): only ever placed on the grid.
   fence:{name:'Fence',hp:120,radius:.42},stonewall:{name:'Stone wall',hp:420,radius:.48},
   timberwall:{name:'Timber wall',hp:360,radius:.7},masonwall:{name:'Masonry wall',hp:560,radius:.72},
@@ -240,6 +259,13 @@ export const RECIPES = {
   timberwall:{kind:'build',grid:true,cost:{wood:4},station:'bench',desc:'A house wall. Ring a floor with house walls and a gate to make a room, and sleep the night away in it.'},
   masonwall:{kind:'build',grid:true,cost:{stone:5},station:'bench',desc:'The sturdiest house wall. Closes a room like timber does.'},
   satchel:{kind:'tool',cost:{fiber:8,wood:3},station:'bench',desc:'Wear it in the bag socket: six more pack slots.'},
+  // Satoyama (src/satoyama): the animal houses, and what the farm's own produce cooks into.
+  coop:{kind:'build',cost:{wood:10,bamboo:6,fiber:4},desc:'A coop for chickens. A hen moves in when it is built; feed hay into its trough and each fed hen lays an egg every morning. Hatch eggs here to raise more (four at most).'},
+  barn:{kind:'build',cost:{wood:16,bamboo:8,stone:6,ironsand:2},station:'bench',desc:'A barn for cows. A cow moves in when it is built; keep hay in its trough and each fed cow gives milk every morning. A happy cow can raise a calf (two at most).'},
+  tamagoyaki:{kind:'cook',cost:{egg:2},station:'fire',desc:'A rolled omelette: +24 hunger, +12 health.'},
+  misosoup:{kind:'cook',cost:{soybean:2,daikon:1,springsalt:1},station:'pot',desc:'Calm for 4 minutes: courage holds in the dark.'},
+  oden:{kind:'cook',cost:{daikon:2,egg:1},station:'pot',desc:'Well fed for 5 minutes: hunger fades half as fast.'},
+  purin:{kind:'cook',cost:{milk:1,egg:1},station:'pot',desc:'Light step for 3 minutes: 15% faster, breath returns sooner.'},
   haversack:{kind:'tool',cost:{fiber:12,bone:6,shard:5,ember:4},station:'bench',desc:'Wear it in the bag socket: twelve more pack slots.'},
 };
 /**
@@ -285,6 +311,11 @@ export const CHARACTERS = [
  */
 export const LOOKS = Object.freeze([{id:'hood',name:'Hooded'},{id:'mask',name:'Masked'},{id:'witch',name:'Witch'}]);
 for(const base of CHARACTERS.slice()) for(const look of LOOKS) CHARACTERS.push({...base,id:`${base.id}-${look.id}`,base:base.id,look:look.id});
+// The Shrine of Yomi's wanderers (tools/art/yomi.py): each has one look of their own (`fixed`), so they wear no other.
+CHARACTERS.push(
+  {id:'miko',name:'Sayo',detail:'The shrine maiden',color:'#e8746a',fixed:true},
+  {id:'daoshi-wanderer',name:'Ling',detail:'The wandering exorcist',color:'#5fb29a',fixed:true},
+);
 export const label = key => ITEMS[key]?.name || EQUIPMENT[key]?.name || magicItems[key]?.name || BOOKS[key]?.name || STRUCTURES[key]?.name || ENEMIES[key]?.name || key;
 /**
  * Day and night schedules, in seconds. An expedition keeps the standard one. The Vigil (a single save

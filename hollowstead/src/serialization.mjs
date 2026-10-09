@@ -45,6 +45,11 @@ export function repairIdCounter(world){
   // A delve keeps the hollow aside (delve.mjs world.surface): its ids still count.
   const surface=world.surface;
   if(surface){for(const b of surface.buildings||[]){visit(b.id);b.store?.slots?.forEach(st=>{if(st)visit(st.uid);});b.overflow?.slots?.forEach(st=>{if(st)visit(st.uid);});}for(const d of surface.drops||[]){visit(d.id);if(d.stack)visit(d.stack.uid);}for(const e of surface.enemies||[])visit(e.id);}
+  // Satoyama keeps the farm aside while the party is in the wilds (satoyama/mode.mjs), and its animals have ids too.
+  const farm=world.satoyama?.farm;
+  for(const b of farm?.buildings||[]){visit(b.id);b.store?.slots?.forEach(st=>{if(st)visit(st.uid);});b.overflow?.slots?.forEach(st=>{if(st)visit(st.uid);});}
+  for(const d of farm?.drops||[]){visit(d.id);if(d.stack)visit(d.stack.uid);}
+  for(const a of [...(farm?.animals||[]),...(world.animals||[])])visit(a.id);
   world.idCounter=next;
   return world;
 }

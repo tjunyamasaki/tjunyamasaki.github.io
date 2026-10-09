@@ -1523,7 +1523,7 @@ ALL = {
 }
 # What the game uses (tools/art/build.py builds these into themes/harvest/sprites like every other sprite;
 # theme.json holds their entries). The wanderers and the guandao stay preview-only for now.
-GAME = ("chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "gashadokuro", "gashamound", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo", "bamboo", "bamboo-b", "yanagi", "obonlantern", "foxwedding", "hokora", "fudaward", "gorinto", "ema", "bonsho")
+GAME = ("miko", "daoshi-wanderer", "chochin", "jiangshi", "kasa", "rokurokubi", "yukionna", "daoshi", "gashadokuro", "gashamound", "sakura", "matsu", "toro", "torii", "yomi-rock", "yomi-rock-b", "jizo", "bamboo", "bamboo-b", "yanagi", "obonlantern", "foxwedding", "hokora", "fudaward", "gorinto", "ema", "bonsho")
 SPRITES = {k: {kk: v for kk, v in ALL[k].items() if kk in ("frames", "cols", "rows", "target", "icon")} for k in GAME}
 
 

@@ -23,7 +23,7 @@ export const WARD = Object.freeze({
 const KINDS = new Set(WARD.kinds);
 
 /** True when the recipe may be built in this world (a Yomi piece only in the Shrine of Yomi's land). */
-export const landAllows = (world, recipeId) => !RECIPES[recipeId]?.land || RECIPES[recipeId].land === world?.land;
+export const landAllows = (world, recipeId) => !RECIPES[recipeId]?.land || RECIPES[recipeId].land === world?.land || (RECIPES[recipeId].land === 'yomi' && !!world?.satoyama);
 /** The reason a land-bound recipe is refused here, or ''. */
 export function landReason(world, recipeId){
   if(landAllows(world, recipeId)) return '';

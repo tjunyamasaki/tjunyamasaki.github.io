@@ -50,9 +50,15 @@ const SPECS = Object.freeze({
   light: {icon: '◈', label: 'Light', activation: 'hold'},
   bow: {icon: '☂', label: 'Bow', activation: 'hold'},
   ascend: {icon: '⇧', label: 'Climb out', activation: 'tap'},
+  // Satoyama (src/satoyama): the torii between the farm and the wilds, and the animals and their houses.
+  travel: {icon: '⛩', label: 'Travel', activation: 'hold'},
+  pet: {icon: '♥', label: 'Pet', activation: 'tap'},
+  collect: {icon: '◒', label: 'Collect', activation: 'tap'},
+  hatch: {icon: '◓', label: 'Hatch an egg', activation: 'tap'},
+  raise: {icon: '✿', label: 'Raise a calf', activation: 'tap'},
 });
 
-const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock', 'descend', 'sip', 'cut', 'wake', 'light', 'bow']);
+const HARVEST_IDS = new Set(['chop', 'mine', 'gather', 'unlock', 'descend', 'sip', 'cut', 'wake', 'light', 'bow', 'travel']);
 /** Context buttons the action cluster can show at once (main.mjs CONTEXT_BUTTONS). */
 const CONTEXT_SLOTS = 4;
 
@@ -301,6 +307,16 @@ export function describeContext(facts) {
     }));
   }
   if (facts.kind === 'drop') return [];
+  // Satoyama's animals (satoyama/animals.mjs): a fuss once a day.
+  if (facts.kind === 'animal') {
+    return [make('pet', {
+      targetId: facts.id,
+      label: facts.petted ? 'Petted today' : `Pet ${facts.name || ''}`.trim(),
+      enabled: !facts.petted,
+      disabledReason: 'It has had its fuss today',
+      command: {type: 'animal', op: 'pet', id: facts.id},
+    })];
+  }
   if (facts.kind === 'revive') {
     return [make('revive', {targetId: facts.id})];
   }
@@ -362,8 +378,8 @@ export function describeContext(facts) {
       command: buildingCommand('build', id),
       panel: {tab: 'build', stationType: 'bench', stationId: id},
     }));
-    // Weapon refinement (src/refine.mjs): opens its own panel rather than the recipe catalog.
-    list.push(make('refine', {
+    // Weapon refinement (src/refine.mjs): opens its own panel rather than the recipe catalog. Satoyama has no weapons to refine.
+    if (!facts.satoyama) list.push(make('refine', {
       targetId: id,
       command: buildingCommand('refine', id),
       panel: {sheet: 'refine', stationType: 'bench', stationId: id},
@@ -389,7 +405,33 @@ export function describeContext(facts) {
       disabledReason: 'You carry no modifier books',
       command: buildingCommand('shelve', id),
     }));
+  } else if (facts.type === 'coop' || facts.type === 'barn') {
+    // Satoyama's animal houses (satoyama/animals.mjs): hay in, eggs or milk out, one more animal.
+    const house = facts.house || {};
+    list.push(make('feed', {
+      targetId: id,
+      label: `Hay ${house.hay || 0}/${house.trough || 40}`,
+      enabled: (house.hay || 0) < (house.trough || 40) && facts.fiber > 0,
+      disabledReason: (house.hay || 0) >= (house.trough || 40) ? 'The trough is full' : 'Needs dry grass',
+      command: buildingCommand('feed', id),
+    }));
+    list.push(make('collect', {
+      targetId: id,
+      label: house.waiting ? `Collect ${house.waiting}` : 'Collect',
+      enabled: house.waiting > 0,
+      disabledReason: 'Nothing to collect yet',
+      command: buildingCommand('collect', id),
+    }));
+    const more = facts.type === 'coop' ? 'hatch' : 'raise';
+    list.push(make(more, {
+      targetId: id,
+      enabled: house.animals < house.max && (facts.type === 'coop' ? facts.eggs > 0 : !!house.happy && facts.fiber >= 10),
+      disabledReason: house.animals >= house.max ? 'No room for more' : facts.type === 'coop' ? 'Needs an egg' : house.happy ? 'Needs 10 dry grass' : 'A cow must be happy first',
+      command: buildingCommand(more, id),
+    }));
   } else if (facts.type === 'hokora') {
+    // Satoyama is played by class: its wayside shrine is where a wanderer changes path (classes/mode.mjs).
+    if (facts.satoyama && facts.classed) list.push(make('path', {targetId: id, command: buildingCommand('path', id), panel: {sheet: 'path', stationId: id}}));
     // Wayside shrine (src/shrinecamp.mjs): an offering of soul embers, once a day, for the kami's favour.
     list.push(make('offer', {
       targetId: id,

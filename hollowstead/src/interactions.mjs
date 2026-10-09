@@ -3,7 +3,7 @@
 import {NODES, RECIPES, label} from './content.mjs?v=harvest-18';
 import {
   CAULDRON_COOK_RECIPES, CONTEXT_ACTIONS, DISMANTLE_HOLD_SECONDS, FIELD_BUILD_RECIPES,
-  FIRE_COOK_RECIPES, FIRE_STATION_TYPES, GRID_FIELD_BUILD_RECIPES, GRID_WORKBENCH_BUILD_RECIPES, WORKBENCH_BUILD_RECIPES, WORKBENCH_CRAFT_RECIPES,
+  FIRE_COOK_RECIPES, FIRE_STATION_TYPES, GRID_FIELD_BUILD_RECIPES, SATOYAMA_RECIPES, GRID_WORKBENCH_BUILD_RECIPES, WORKBENCH_BUILD_RECIPES, WORKBENCH_CRAFT_RECIPES,
 } from './contracts.mjs?v=harvest-18';
 
 export function harvestProfile(nodeType){
@@ -48,9 +48,19 @@ export function stationRule(recipeId){
  * `land`: the world's land (World.land); recipes bound to another land (RECIPES land, shrinecamp.mjs) drop out.
  * Left undefined, nothing is filtered.
  */
-export function contextRecipeIds({source, stationType, tab, grid=false, land}){
+export function contextRecipeIds({source, stationType, tab, grid=false, land, satoyama=null}){
+  if(satoyama)return satoyamaRecipeList({source, stationType, tab, place:satoyama});
   const ids=contextRecipeList({source, stationType, tab, grid});
   return land===undefined?ids:ids.filter(id=>!RECIPES[id]?.land||RECIPES[id].land===land);
+}
+/** Satoyama (`place`: where the party is): the farm's own lists; nothing is built or cooked in the wilds but at a fire. */
+function satoyamaRecipeList({source, stationType, tab, place}){
+  const R=SATOYAMA_RECIPES,farm=place==='farm';
+  if(source==='field'&&tab==='build')return farm?[...R.fieldBuild]:[];
+  if(source==='station'&&stationType==='bench')return tab==='build'?(farm?[...R.benchBuild]:[]):[...R.benchCraft];
+  if(source==='station'&&(stationType==='fire'||stationType==='hearth')&&tab==='craft')return [...R.fireCook];
+  if(source==='station'&&stationType==='pot'&&tab==='craft')return [...R.potCook];
+  return [];
 }
 function contextRecipeList({source, stationType, tab, grid}){
   if(grid&&source==='field'&&tab==='build')return [...GRID_FIELD_BUILD_RECIPES];

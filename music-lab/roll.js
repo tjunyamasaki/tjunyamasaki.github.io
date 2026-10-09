@@ -1,5 +1,5 @@
 import { DRUMS, INSTRUMENTS } from './audio.js';
-import { STEPS_PER_BAR } from './engine.js';
+import { BEAT, STEPS_PER_BAR } from './engine.js';
 
 export const HI = 96;
 export const LO = 24;
@@ -109,7 +109,8 @@ export class Roll {
     this.RH = 26;
     const vw = this.scroller.clientWidth || w;
     const fit = (vw - this.KW) / this.total;
-    this.sw = Math.max(this.coarse ? 32 : 22, fit) * this.zoom;
+    // Minimum width of a 16th note (3 ticks).
+    this.sw = Math.max((this.coarse ? 32 : 22) / 3, fit) * this.zoom;
     this.rh = this.drums ? clamp((h - this.RH) / DRUMS.length, 40, 64) : this.coarse ? 30 : 24;
     this.spacer.style.width = this.KW + this.total * this.sw + 'px';
     this.spacer.style.height = this.RH + this.rows * this.rh + 'px';
@@ -213,12 +214,13 @@ export class Roll {
     // Columns
     const c0 = Math.max(0, Math.floor(sx / sw));
     const c1 = Math.min(total, Math.ceil((sx + w - KW) / sw));
+    const snap = this.api.snap();
     for (let c = c0; c <= c1; c++) {
+      const bar = c % STEPS_PER_BAR === 0;
+      const beat = c % BEAT === 0;
+      if (!beat && (c % snap || snap * sw < 8)) continue;
       const x = Math.round(KW + c * sw - sx);
       if (x < KW) continue;
-      const bar = c % STEPS_PER_BAR === 0;
-      const beat = c % 4 === 0;
-      if (!bar && !beat && sw < 9) continue;
       g.fillStyle = bar ? 'rgba(255,255,255,0.13)' : beat ? 'rgba(255,255,255,0.065)' : 'rgba(255,255,255,0.025)';
       g.fillRect(x, RH, 1, h - RH);
     }
@@ -257,7 +259,7 @@ export class Roll {
     // Hover preview
     const hv = this.hover;
     if (hv && !this.drag && hv.empty && this.tool === 'draw') {
-      const l = drums ? 1 : Math.min(this.api.len(), total - hv.step);
+      const l = drums ? snap : Math.min(this.api.len(), total - hv.step);
       const x = KW + hv.step * sw - sx;
       const y = RH + hv.row * rh - sy;
       g.strokeStyle = color;
@@ -355,7 +357,7 @@ export class Roll {
     }
     g.font = '600 11px ui-sans-serif, system-ui, sans-serif';
     g.textBaseline = 'middle';
-    for (let c = c0 - (c0 % 4); c < c1; c += 4) {
+    for (let c = c0 - (c0 % BEAT); c < c1; c += BEAT) {
       const x = KW + c * sw - sx;
       if (x < KW - 1) continue;
       if (c % STEPS_PER_BAR === 0) {
@@ -363,7 +365,7 @@ export class Roll {
         g.fillText(String(c / STEPS_PER_BAR + 1), x + 5, RH / 2);
         g.fillStyle = 'rgba(255,255,255,0.2)';
         g.fillRect(Math.round(x), 6, 1, RH - 6);
-      } else if (sw * 4 > 14) {
+      } else if (sw * BEAT > 14) {
         g.fillStyle = 'rgba(255,255,255,0.12)';
         g.fillRect(Math.round(x), RH - 7, 1, 6);
       }
@@ -470,8 +472,10 @@ export class Roll {
     return null;
   }
 
+  // The grid cell under the pointer, snapped to the current grid (16ths or triplets).
   cell(L) {
-    const step = Math.floor(L.x / this.sw);
+    const g = this.api.snap();
+    const step = Math.floor(L.x / this.sw / g) * g;
     const row = Math.floor(L.y / this.rh);
     if (step < 0 || step >= this.total || row < 0 || row >= this.rows) return null;
     return { step, row };
@@ -504,9 +508,9 @@ export class Roll {
   span(list) {
     const r = this.range;
     if (r && list.every((n) => n.s >= r.s0 && n.s < r.s1)) return { s0: r.s0, len: r.s1 - r.s0 };
-    const s0 = Math.floor(Math.min(...list.map((n) => n.s)) / 4) * 4;
+    const s0 = Math.floor(Math.min(...list.map((n) => n.s)) / BEAT) * BEAT;
     const end = Math.max(...list.map((n) => n.s + n.l));
-    const unit = end - s0 > STEPS_PER_BAR ? STEPS_PER_BAR : 4;
+    const unit = end - s0 > STEPS_PER_BAR ? STEPS_PER_BAR : BEAT;
     return { s0, len: Math.max(unit, Math.ceil((end - s0) / unit) * unit) };
   }
 
@@ -585,12 +589,12 @@ export class Roll {
   /* ---------- Pointer input ---------- */
 
   snapBeat(x) {
-    return clamp(Math.round(x / this.sw / 4) * 4, 0, this.total);
+    return clamp(Math.round(x / this.sw / BEAT) * BEAT, 0, this.total);
   }
 
   seekAt(L) {
     this.clearSel();
-    this.api.seek(clamp(Math.floor(L.x / this.sw / 4) * 4, 0, this.total - 4));
+    this.api.seek(clamp(Math.floor(L.x / this.sw / BEAT) * BEAT, 0, this.total - BEAT));
   }
 
   down(e) {
@@ -707,11 +711,12 @@ export class Roll {
     if (this.drag.seen.has(key)) return;
     this.drag.seen.add(key);
     const notes = this.track.notes;
-    const i = notes.findIndex((n) => n.s === c.step && n.p === c.row);
+    const g = this.api.snap();
+    const i = notes.findIndex((n) => n.p === c.row && n.s >= c.step && n.s < c.step + g);
     if (this.drag.erase) {
       if (i >= 0) notes.splice(i, 1);
     } else if (i < 0) {
-      notes.push({ s: c.step, l: 1, p: c.row, v: 0.8 });
+      notes.push({ s: c.step, l: g, p: c.row, v: 0.8 });
       this.api.blip(c.row);
     }
     this.api.change();
@@ -753,11 +758,13 @@ export class Roll {
     } else if (d.mode === 'create') {
       if (Math.abs(L.x - d.ox) > 4) d.dragged = true;
       if (d.dragged) {
-        d.n.l = clamp(Math.ceil(L.x / sw) - d.n.s, 1, total - d.n.s);
+        const g = this.api.snap();
+        d.n.l = clamp(Math.ceil(L.x / sw / g) * g - d.n.s, g, total - d.n.s);
         this.api.change();
       }
     } else if (d.mode === 'resize') {
-      const dl = Math.round((L.x - d.ox) / sw);
+      const g = this.api.snap();
+      const dl = Math.round((L.x - d.ox) / sw / g) * g;
       for (const it of d.items) it.n.l = clamp(it.l + dl, 1, Math.max(1, total - it.n.s));
       this.api.change();
     } else if (d.mode === 'marquee') {
@@ -787,7 +794,8 @@ export class Roll {
       }
       this.scroller.style.cursor = 'grabbing';
       const rows = d.items.map((it) => this.rowOf(it.p));
-      const ds = clamp(Math.round((L.x - d.ox) / sw), -Math.min(...d.items.map((it) => it.s)), total - 1 - Math.max(...d.items.map((it) => it.s)));
+      const g = this.api.snap();
+      const ds = clamp(Math.round((L.x - d.ox) / sw / g) * g, -Math.min(...d.items.map((it) => it.s)), total - 1 - Math.max(...d.items.map((it) => it.s)));
       const drow = clamp(Math.floor(L.y / rh) - Math.floor(d.oy / rh), -Math.min(...rows), this.rows - 1 - Math.max(...rows));
       for (const it of d.items) {
         it.n.s = it.s + ds;
@@ -894,7 +902,7 @@ export class Roll {
       if (this.sel.delete(h.n)) this.api.selChanged();
     } else {
       this.clearSel();
-      const n = { s: c.step, l: this.drums ? 1 : Math.min(this.api.len(), this.total - c.step), p: this.pitchOf(c.row), v: 0.8 };
+      const n = { s: c.step, l: this.drums ? this.api.snap() : Math.min(this.api.len(), this.total - c.step), p: this.pitchOf(c.row), v: 0.8 };
       notes.push(n);
       this.api.blip(n.p);
     }

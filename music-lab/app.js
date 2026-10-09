@@ -1,18 +1,27 @@
 import { DRUMS, INSTRUMENTS, renderSong } from './audio.js';
-import { Engine, STEPS_PER_BAR } from './engine.js';
+import { BEAT, Engine, STEPS_PER_BAR } from './engine.js';
 import { icon } from './icons.js';
 import { HI, LO, NOTE_NAMES, Roll, SCALES } from './roll.js';
 
 const STORE = 'music-lab:project';
 const PREFS = 'music-lab:prefs';
 const MAX_BARS = 16;
-const LENGTHS = [
-  [1, '1/16'],
-  [2, '1/8'],
-  [4, '1/4'],
-  [8, '1/2'],
-  [16, '1'],
-];
+// Note lengths in ticks (12 per beat). Triplet mode swaps in thirds of a beat.
+const LENGTHS = {
+  straight: [
+    [3, '1/16'],
+    [6, '1/8'],
+    [12, '1/4'],
+    [24, '1/2'],
+    [48, '1'],
+  ],
+  triplet: [
+    [2, '1/24'],
+    [4, '1/12'],
+    [8, '1/6'],
+    [16, '1/3'],
+  ],
+};
 // Physical key positions, so the layout works on any keyboard language.
 const PIANO_KEYS = ['KeyA', 'KeyW', 'KeyS', 'KeyE', 'KeyD', 'KeyF', 'KeyT', 'KeyG', 'KeyY', 'KeyH', 'KeyU', 'KeyJ', 'KeyK', 'KeyO', 'KeyL', 'KeyP', 'Semicolon'];
 const DRUM_KEYS = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK'];
@@ -53,20 +62,21 @@ function demoProject() {
     [59, 62, 67],
   ];
   const roots = [36, 33, 41, 43];
-  const n = (s, l, p) => ({ s, l, p, v: 0.8 });
+  // Written in 16ths; a 16th is 3 ticks.
+  const n = (s, l, p) => ({ s: s * 3, l: l * 3, p, v: 0.8 });
   for (let b = 0; b < 4; b++) {
-    const o = b * STEPS_PER_BAR;
+    const o = b * 16;
     for (const [s, l] of [[0, 6], [6, 6], [12, 4]]) for (const p of chords[b]) piano.notes.push(n(o + s, l, p));
     for (const [s, l, up] of [[0, 6, 0], [6, 4, 0], [10, 2, 12], [12, 4, 0]]) bass.notes.push(n(o + s, l, roots[b] + up));
     for (const s of [0, 6, 10]) drums.notes.push(n(o + s, 1, 0));
     for (const s of [4, 12]) drums.notes.push(n(o + s, 1, 1));
     for (let s = 0; s < 16; s += 2) drums.notes.push(n(o + s, 1, s === 14 && b % 2 ? 4 : 3));
   }
-  return { bpm: 96, bars: 4, key: 0, scale: 'major', tracks: [drums, piano, bass] };
+  return { res: STEPS_PER_BAR, bpm: 96, bars: 4, key: 0, scale: 'major', tracks: [drums, piano, bass] };
 }
 
 function blankProject() {
-  return { bpm: 110, bars: 4, key: 0, scale: 'major', tracks: [makeTrack('piano')] };
+  return { res: STEPS_PER_BAR, bpm: 110, bars: 4, key: 0, scale: 'major', tracks: [makeTrack('piano')] };
 }
 
 // Accept only well-formed data from storage or shared links.
@@ -74,6 +84,8 @@ function normalize(raw) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.tracks)) return null;
   const num = (v, a, b, d) => (Number.isFinite(+v) ? clamp(+v, a, b) : d);
   const bars = Math.round(num(raw.bars, 1, MAX_BARS, 4));
+  // Projects saved before triplet support counted 16 steps per bar.
+  const k = raw.res === STEPS_PER_BAR ? 1 : STEPS_PER_BAR / 16;
   const tracks = raw.tracks
     .filter((t) => t && INSTRUMENTS[t.inst])
     .slice(0, 64)
@@ -88,8 +100,8 @@ function normalize(raw) {
         solo: !!t.solo,
         notes: (Array.isArray(t.notes) ? t.notes : [])
           .map((n) => ({
-            s: Math.round(num(n?.s, 0, MAX_BARS * STEPS_PER_BAR - 1, 0)),
-            l: Math.round(num(n?.l, 1, MAX_BARS * STEPS_PER_BAR, 1)),
+            s: Math.round(num(n?.s * k, 0, MAX_BARS * STEPS_PER_BAR - 1, 0)),
+            l: Math.round(num(n?.l * k, 1, MAX_BARS * STEPS_PER_BAR, 3)),
             p: Math.round(num(n?.p, drums ? 0 : LO, drums ? DRUMS.length - 1 : HI, drums ? 0 : 60)),
             v: num(n?.v, 0.05, 1, 0.8),
           }))
@@ -97,6 +109,7 @@ function normalize(raw) {
       };
     });
   return {
+    res: STEPS_PER_BAR,
     bpm: Math.round(num(raw.bpm, 40, 240, 110)),
     bars,
     key: Math.round(num(raw.key, 0, 11, 0)),
@@ -107,7 +120,9 @@ function normalize(raw) {
 
 let P = normalize(read(STORE)) || demoProject();
 let selId = P.tracks[0]?.id ?? null;
-const prefs = { metronome: false, len: 4, octave: 4, tool: 'draw', ...read(PREFS) };
+const prefs = { metronome: false, lenIdx: 2, triplet: false, octave: 4, tool: 'draw', ...read(PREFS) };
+delete prefs.len;
+let customLen = null;
 let clip = null;
 let clipHidden = false;
 let startStep = 0;
@@ -268,13 +283,13 @@ function renderTransport() {
 function updateClock(pos) {
   const el = $('clock');
   if (pos != null && pos < 0) {
-    el.textContent = String(Math.ceil(-pos / 4));
+    el.textContent = String(Math.ceil(-pos / BEAT));
     el.classList.add('count');
     return;
   }
   el.classList.remove('count');
   const s = pos ?? startStep;
-  el.textContent = `${Math.floor(s / STEPS_PER_BAR) + 1}.${Math.floor((s % STEPS_PER_BAR) / 4) + 1}`;
+  el.textContent = `${Math.floor(s / STEPS_PER_BAR) + 1}.${Math.floor((s % STEPS_PER_BAR) / BEAT) + 1}`;
 }
 
 function setBars(n) {
@@ -581,13 +596,14 @@ function renderEditorHead() {
       <button type="button" data-tool="draw" title="Draw notes (B)" aria-label="Draw" aria-pressed="${roll.tool === 'draw'}">${icon('pencil')}</button>
       <button type="button" data-tool="select" title="Select notes (V) · or Shift-drag" aria-label="Select" aria-pressed="${roll.tool === 'select'}">${icon('cursor')}</button>
     </div>
+    <div class="grid-pick">
+      ${drums ? '' : `<div class="seg len-seg" role="group" aria-label="Note length"></div>`}
+      <button type="button" class="trip" id="tripBtn" title="Triplets: divide each beat in 3" aria-label="Triplets" aria-pressed="${prefs.triplet}">${icon('triplet')}</button>
+    </div>
     ${
       drums
         ? ''
-        : `<div class="seg" role="group" aria-label="Note length">${LENGTHS.map(
-            ([l, label]) => `<button type="button" data-len="${l}" aria-pressed="${prefs.len === l}">${label}</button>`,
-          ).join('')}</div>
-      <div class="scale-pick">
+        : `<div class="scale-pick">
         <select id="keySel" aria-label="Key">${NOTE_NAMES.map((n, i) => `<option value="${i}">${n}</option>`).join('')}</select>
         <select id="scaleSel" aria-label="Scale">${Object.entries(SCALES)
           .map(([k, s]) => `<option value="${k}">${s.name}</option>`)
@@ -605,12 +621,9 @@ function renderEditorHead() {
     edit(() => (tr.notes = []));
     toast('Cleared · Ctrl+Z to undo');
   });
+  head.querySelector('#tripBtn').addEventListener('click', toggleTriplet);
+  renderLengths();
   if (drums) return;
-  head.querySelectorAll('.seg button').forEach((b) =>
-    b.addEventListener('click', () => {
-      setLen(+b.dataset.len);
-    }),
-  );
   const keySel = head.querySelector('#keySel');
   const scaleSel = head.querySelector('#scaleSel');
   keySel.value = P.key;
@@ -662,7 +675,7 @@ function pasteClip() {
     toast(clip.drums ? 'Paste drums into a drum track' : 'Paste notes into an instrument track');
     return;
   }
-  const at = roll.mouseStep != null ? Math.floor(roll.mouseStep / 4) * 4 : startStep;
+  const at = roll.mouseStep != null ? Math.floor(roll.mouseStep / BEAT) * BEAT : startStep;
   roll.paste(clip, at);
 }
 
@@ -670,12 +683,57 @@ function ensureLength(steps) {
   if (steps > total()) P.bars = clamp(Math.ceil(steps / STEPS_PER_BAR), 1, MAX_BARS);
 }
 
-function setLen(l) {
-  prefs.len = l;
+const lengths = () => LENGTHS[prefs.triplet ? 'triplet' : 'straight'];
+
+function noteLen() {
+  const list = lengths();
+  return customLen ?? list[Math.min(prefs.lenIdx, list.length - 1)][0];
+}
+
+// Grid for placing notes: 16ths normally, thirds of a beat (or sixths for
+// 1/24 notes) in triplet mode.
+function snap() {
+  if (!prefs.triplet) return 3;
+  return noteLen() < 4 ? 2 : 4;
+}
+
+function renderLengths() {
+  const seg = $('edHead').querySelector('.len-seg');
+  $('tripBtn')?.setAttribute('aria-pressed', prefs.triplet);
+  if (!seg) return;
+  const cur = noteLen();
+  seg.innerHTML = lengths()
+    .map(([l, label], i) => `<button type="button" data-i="${i}" aria-pressed="${l === cur}">${label}</button>`)
+    .join('');
+  seg.querySelectorAll('button').forEach((b) =>
+    b.addEventListener('click', () => {
+      prefs.lenIdx = +b.dataset.i;
+      customLen = null;
+      write(PREFS, prefs);
+      renderLengths();
+      roll.draw();
+    }),
+  );
+}
+
+function toggleTriplet() {
+  prefs.triplet = !prefs.triplet;
+  customLen = null;
+  prefs.lenIdx = Math.min(prefs.lenIdx, lengths().length - 1);
   write(PREFS, prefs);
-  $('edHead')
-    .querySelectorAll('.seg button')
-    .forEach((b) => b.setAttribute('aria-pressed', +b.dataset.len === l));
+  renderLengths();
+  roll.draw();
+}
+
+// A note drawn or resized by hand becomes the length for the next ones.
+function setLen(l) {
+  const i = lengths().findIndex(([x]) => x === l);
+  if (i >= 0) {
+    prefs.lenIdx = i;
+    customLen = null;
+    write(PREFS, prefs);
+  } else customLen = l;
+  renderLengths();
 }
 
 function renderOctave() {
@@ -710,7 +768,8 @@ function liveDown(id, pitch) {
   let rec = null;
   if (recording && engine.playing) {
     const pos = engine.pos();
-    const s = pos == null ? -1 : Math.round(pos);
+    const g = snap();
+    const s = pos == null ? -1 : Math.round(pos / g) * g;
     if (s >= 0) rec = { s: s % total(), t0: engine.ctx.currentTime };
   }
   held.set(id, { v, pitch, rec, track: tr.id });
@@ -728,7 +787,8 @@ function liveUp(id) {
   const tr = P.tracks.find((t) => t.id === h.track);
   if (h.rec && tr) {
     const t = total();
-    const l = isDrums(tr) ? 1 : clamp(Math.round((engine.ctx.currentTime - h.rec.t0) / engine.sd), 1, t - h.rec.s);
+    const g = snap();
+    const l = isDrums(tr) ? g : clamp(Math.round((engine.ctx.currentTime - h.rec.t0) / engine.sd / g) * g, Math.min(g, t - h.rec.s), t - h.rec.s);
     tr.notes = tr.notes.filter((n) => !(n.s === h.rec.s && n.p === h.pitch));
     tr.notes.push({ s: h.rec.s, l, p: h.pitch, v: 0.8 });
     touch();
@@ -773,7 +833,7 @@ function setupKeyboard() {
     if (arrows && roll.selected().length) {
       e.preventDefault();
       const [ds, dr] = arrows;
-      roll.nudge(ds * (e.shiftKey ? STEPS_PER_BAR : 1), dr * (e.shiftKey && !isDrums(selTrack()) ? 12 : 1));
+      roll.nudge(ds * (e.shiftKey ? STEPS_PER_BAR : snap()), dr * (e.shiftKey && !isDrums(selTrack()) ? 12 : 1));
       return;
     }
     if (e.code === 'Delete' || e.code === 'Backspace') {
@@ -918,7 +978,8 @@ const roll = new Roll($('roll'), {
   keyOn: liveDown,
   keyOff: liveUp,
   seek,
-  len: () => prefs.len,
+  len: noteLen,
+  snap,
   setLen,
   live: liveNotes,
   keyLabels,

@@ -1,9 +1,12 @@
 import { audible, click, createMixer, noteOn } from './audio.js';
 
-export const STEPS_PER_BAR = 16;
+// Time is counted in ticks: 12 per beat divides evenly into 16ths (3 ticks)
+// and triplets (4 ticks for 1/12, 2 for 1/24).
+export const BEAT = 12;
+export const STEPS_PER_BAR = 4 * BEAT;
 
-// Look-ahead sequencer: a timer schedules the next few 16th steps on the
-// audio clock, so timing stays tight even when the main thread is busy.
+// Look-ahead sequencer: a timer schedules the next few ticks on the audio
+// clock, so timing stays tight even when the main thread is busy.
 export class Engine {
   constructor(getProject) {
     this.get = getProject;
@@ -32,7 +35,7 @@ export class Engine {
   }
 
   get sd() {
-    return 60 / this.get().bpm / 4;
+    return 60 / this.get().bpm / BEAT;
   }
 
   get latency() {
@@ -71,17 +74,17 @@ export class Engine {
     const horizon = now + (document.hidden ? 1.2 : 0.12);
     if (this.next < now - 0.2) this.next = now + 0.02;
     while (this.next < horizon) {
-      const sd = 60 / P.bpm / 4;
+      const sd = 60 / P.bpm / BEAT;
       const t = this.next;
       if (this.count > 0) {
         const k = STEPS_PER_BAR - this.count;
-        if (k % 4 === 0) click(ctx, this.mixer.master, t, k === 0);
+        if (k % BEAT === 0) click(ctx, this.mixer.master, t, k === 0);
         this.marks.push({ step: -this.count, time: t, sd });
         this.count--;
       } else {
         if (this.step >= total) this.step = 0;
         const s = this.step;
-        if (this.metronome && s % 4 === 0) click(ctx, this.mixer.master, t, s % STEPS_PER_BAR === 0);
+        if (this.metronome && s % BEAT === 0) click(ctx, this.mixer.master, t, s % STEPS_PER_BAR === 0);
         for (const tr of P.tracks) {
           if (!audible(tr, P.tracks)) continue;
           const bus = this.mixer.bus(tr.id);

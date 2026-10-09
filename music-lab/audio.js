@@ -510,8 +510,9 @@ export function createMixer(ctx) {
 }
 
 export async function renderSong(P, sampleRate = 44100) {
-  const sd = 60 / P.bpm / 4;
-  const total = P.bars * 16;
+  // Notes are in ticks: 12 per beat, 48 per bar (see engine.js).
+  const sd = 60 / P.bpm / 12;
+  const total = P.bars * 48;
   const lead = 0.02;
   const ctx = new OfflineAudioContext(2, Math.ceil((total * sd + 3.5) * sampleRate), sampleRate);
   const mx = createMixer(ctx);

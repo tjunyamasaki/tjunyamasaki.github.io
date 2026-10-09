@@ -22,6 +22,7 @@ const PATHS = {
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
   shrink: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
+  triplet: '<path d="M3.5 10V6.5h3.5M20.5 10V6.5H17"/><text x="12" y="11.2" text-anchor="middle" font-size="11" font-weight="800" font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor" stroke="none">3</text><circle cx="6" cy="17.5" r="1.9" fill="currentColor" stroke="none"/><circle cx="12" cy="17.5" r="1.9" fill="currentColor" stroke="none"/><circle cx="18" cy="17.5" r="1.9" fill="currentColor" stroke="none"/>',
   piano: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M8 13.5V19M16 13.5V19"/><rect x="6.5" y="5" width="3" height="8.5" rx=".6" fill="currentColor" stroke="none"/><rect x="14.5" y="5" width="3" height="8.5" rx=".6" fill="currentColor" stroke="none"/>',
   guitar: '<path d="m13.8 10.2 6-6"/><path d="m18.3 2.7 3 3"/><path d="M10.6 8.2c-1.6-.4-3.4.1-4.6 1.3-1 1-1.2 2.3-.9 3.3-1.3.4-2.3 1.6-2.3 3.1 0 2.2 1.9 4 4.2 3.9 1.3 0 2.3-.9 2.8-2 1 .3 2.3.1 3.3-.9 1.2-1.2 1.7-3 1.3-4.6"/><circle cx="10.2" cy="13.8" r="1.4"/>',
   bass: '<path d="M2.5 12c1.6 0 2.4-7 4.75-7S9.6 19 12 19s2.4-14 4.75-14S19.9 12 21.5 12"/>',

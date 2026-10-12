@@ -1,6 +1,7 @@
 import { DRUMS, INSTRUMENTS, renderSong } from './audio.js';
 import { BEAT, Engine, STEPS_PER_BAR } from './engine.js';
 import { icon } from './icons.js';
+import { Capture, detectHits, detectMelody, noteName } from './listen.js';
 import { HI, LO, NOTE_NAMES, Roll, SCALES } from './roll.js';
 
 const STORE = 'music-lab:project';
@@ -127,6 +128,7 @@ let clip = null;
 let clipHidden = false;
 let startStep = 0;
 let recording = false;
+let listening = null;
 let dirty = true;
 const held = new Map();
 const hist = { undo: [], redo: [], base: null };
@@ -222,6 +224,10 @@ function play(countIn = false) {
 }
 
 function stop() {
+  if (listening) {
+    finishListening();
+    return;
+  }
   if (recording) stopRecording();
   engine.stop();
   renderTransport();
@@ -234,6 +240,7 @@ function togglePlay() {
 }
 
 function toggleRecord() {
+  if (listening) return;
   if (recording) {
     stopRecording();
     return;
@@ -611,6 +618,8 @@ function renderEditorHead() {
       </div>`
     }
     <span class="grow"></span>
+    <button class="ghost icon listen-btn" id="micBtn" type="button" title="${drums ? 'Beatbox a rhythm in' : 'Sing or play notes in'}" aria-label="Listen to the microphone" aria-pressed="${!!listening}">${icon('mic')}</button>
+    <button class="ghost icon" id="fileBtn" type="button" title="Turn an audio file into notes" aria-label="Import audio file">${icon('audiofile')}</button>
     ${drums ? '' : `<div class="octave" title="Computer keyboard octave (Z / X)"><button type="button" id="octDown" aria-label="Octave down">${icon('minus')}</button><span id="octVal"></span><button type="button" id="octUp" aria-label="Octave up">${icon('plus')}</button></div>`}
     <button class="ghost icon" id="clearTrack" type="button" title="Clear notes" aria-label="Clear notes">${icon('trash')}</button>`;
   head.querySelector('.ed-inst span').textContent = tr.name;
@@ -622,6 +631,8 @@ function renderEditorHead() {
     toast('Cleared · Ctrl+Z to undo');
   });
   head.querySelector('#tripBtn').addEventListener('click', toggleTriplet);
+  head.querySelector('#micBtn').addEventListener('click', () => (listening ? finishListening() : startListening()));
+  head.querySelector('#fileBtn').addEventListener('click', () => $('audioFile').click());
   renderLengths();
   if (drums) return;
   const keySel = head.querySelector('#keySel');
@@ -1015,6 +1026,7 @@ function setupStatic() {
     renderSelbar();
   });
   setupFullscreen();
+  setupAudioInput();
   $('addTrack').insertAdjacentHTML('afterbegin', icon('plus'));
   $('emptyAdd').insertAdjacentHTML('afterbegin', icon('plus'));
 
@@ -1069,6 +1081,198 @@ function setupFullscreen() {
   render();
 }
 
+/* ---------- Audio to notes ---------- */
+
+const MAX_STEPS = MAX_BARS * STEPS_PER_BAR;
+const DRUM_ROWS = { kick: 0, snare: 1, hat: 3 };
+
+async function startListening() {
+  const tr = selTrack();
+  if (!tr) {
+    openPicker('add');
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) {
+    toast('This browser can’t record audio');
+    return;
+  }
+  if (recording) stopRecording();
+  const ctx = engine.audio();
+  let cap;
+  try {
+    cap = await Capture.open(ctx);
+  } catch (err) {
+    console.error(err);
+    toast(err?.name === 'NotAllowedError' ? 'Microphone access was blocked' : 'No microphone available');
+    return;
+  }
+  // One pass of the loop with a count-in and click, so the notes land on the beat.
+  const metronome = engine.metronome;
+  engine.metronome = true;
+  engine.start(startStep, true);
+  listening = {
+    cap,
+    metronome,
+    track: tr.id,
+    from: startStep,
+    songStart: engine.songStart,
+    end: engine.songStart + (total() - startStep) * engine.sd,
+    key: null,
+  };
+  renderTransport();
+  renderListen();
+}
+
+async function finishListening(cancel = false) {
+  const L = listening;
+  if (!L) return;
+  listening = null;
+  const { samples, sampleRate, t0 } = L.cap.take();
+  L.cap.close();
+  if (L.key != null) roll.pressed.delete(L.key);
+  engine.metronome = L.metronome;
+  engine.stop();
+  renderTransport();
+  renderListen();
+  dirty = true;
+  if (cancel) return;
+  const tr = P.tracks.find((t) => t.id === L.track);
+  if (!tr) return;
+  // Line the recording up with what the singer heard: the song started at
+  // songStart on the audio clock, and the sound reached their ears late by
+  // the output latency and came back late by the input latency.
+  const offset = t0 - L.songStart - L.cap.inputLatency - engine.latency;
+  await transcribe(tr, samples, sampleRate, { base: L.from, offset, limit: total() });
+}
+
+async function importAudio(file) {
+  const tr = selTrack();
+  if (!tr) {
+    openPicker('add');
+    return;
+  }
+  const ctx = engine.audio();
+  let buf;
+  try {
+    buf = await ctx.decodeAudioData(await file.arrayBuffer());
+  } catch (err) {
+    console.error(err);
+    toast('That file couldn’t be read');
+    return;
+  }
+  const n = Math.min(buf.length, buf.sampleRate * 180);
+  const mono = new Float32Array(n);
+  for (let c = 0; c < buf.numberOfChannels; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < n; i++) mono[i] += d[i] / buf.numberOfChannels;
+  }
+  await transcribe(tr, mono, buf.sampleRate, { base: startStep, align: true, limit: MAX_STEPS });
+}
+
+async function transcribe(tr, samples, sampleRate, { base, offset = 0, align = false, limit }) {
+  const drums = isDrums(tr);
+  toast('Finding notes…');
+  const found = drums ? await detectHits(samples, sampleRate) : await detectMelody(samples, sampleRate);
+  const sd = engine.sd;
+  const g = snap();
+  const shift = align && found.length ? -found[0].t : offset;
+  const at = (sec) => base + Math.round(sec / sd / g) * g;
+  let notes = [];
+  for (const f of found) {
+    const t = f.t + shift;
+    const s = at(t);
+    if (s < base || s >= limit) continue;
+    if (drums) notes.push({ s, l: g, p: DRUM_ROWS[f.kind], v: 0.8 });
+    else notes.push({ s, l: Math.max(g, at(t + f.d) - s), p: clamp(f.p, LO, HI), v: 0.8 });
+  }
+  // One note per grid slot (per drum row), and melody notes don't overlap.
+  const seen = new Set();
+  notes = notes.filter((n) => {
+    const k = drums ? n.s + ':' + n.p : n.s;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  if (!drums) {
+    for (let i = 0; i < notes.length - 1; i++) notes[i].l = Math.max(1, Math.min(notes[i].l, notes[i + 1].s - notes[i].s));
+  }
+  for (const n of notes) n.l = Math.min(n.l, limit - n.s);
+  if (!notes.length) {
+    toast(drums ? 'No hits heard — try louder' : 'No notes heard — try a clearer, louder sound');
+    return;
+  }
+  edit(() => {
+    ensureLength(Math.max(...notes.map((n) => n.s + 1)));
+    const taken = new Set(notes.map((n) => n.s + ':' + n.p));
+    tr.notes = tr.notes.filter((n) => !taken.has(n.s + ':' + n.p));
+    tr.notes.push(...notes);
+  });
+  if (selId !== tr.id) select(tr.id);
+  roll.setSel(notes);
+  roll.showStep(notes[0].s);
+  roll.reveal(notes[0].p);
+  toast(`${notes.length} ${drums ? 'hit' : 'note'}${notes.length === 1 ? '' : 's'} added · Ctrl+Z to undo`);
+}
+
+function renderListen() {
+  $('listen').hidden = !listening;
+  $('micBtn')?.setAttribute('aria-pressed', !!listening);
+  document.body.classList.toggle('listening', !!listening);
+}
+
+function updateListen(pos) {
+  const L = listening;
+  if (!L) return;
+  if (engine.ctx.currentTime > L.end + 0.15) {
+    finishListening();
+    return;
+  }
+  const { level, midi } = L.cap.peek();
+  $('listenLevel').style.transform = `scaleX(${Math.min(1, level * 6)})`;
+  const tr = selTrack();
+  const pitched = tr && tr.id === L.track && !isDrums(tr) && midi != null && midi >= LO && midi <= HI;
+  const key = pitched ? midi : null;
+  if (key !== L.key) {
+    if (L.key != null) roll.pressed.delete(L.key);
+    if (key != null) {
+      roll.pressed.add(key);
+      roll.reveal(key);
+    }
+    L.key = key;
+  }
+  $('listenNote').textContent = pos != null && pos < 0 ? String(Math.ceil(-pos / BEAT)) : key != null ? noteName(key) : isDrums(tr) && level > 0.05 ? '●' : '–';
+}
+
+function setupAudioInput() {
+  $('roll').append($('listen'));
+  $('listenStop').innerHTML = icon('stop');
+  $('listenCancel').innerHTML = icon('close');
+  $('listenStop').addEventListener('click', () => finishListening());
+  $('listenCancel').addEventListener('click', () => finishListening(true));
+  $('audioFile').addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) importAudio(file);
+  });
+  const editor = document.querySelector('.editor');
+  const isAudio = (f) => f && (f.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|flac|aac|webm)$/i.test(f.name));
+  editor.addEventListener('dragover', (e) => {
+    if (![...(e.dataTransfer?.items || [])].some((i) => i.kind === 'file')) return;
+    e.preventDefault();
+    editor.classList.add('drop');
+  });
+  editor.addEventListener('dragleave', (e) => {
+    if (!editor.contains(e.relatedTarget)) editor.classList.remove('drop');
+  });
+  editor.addEventListener('drop', (e) => {
+    e.preventDefault();
+    editor.classList.remove('drop');
+    const file = [...(e.dataTransfer?.files || [])].find(isAudio);
+    if (file) importAudio(file);
+    else toast('Drop an audio file');
+  });
+}
+
 let lastPos = null;
 function frame() {
   requestAnimationFrame(frame);
@@ -1076,6 +1280,7 @@ function frame() {
   if (engine.playing || dirty || pos !== lastPos) {
     lastPos = pos;
     dirty = false;
+    updateListen(pos);
     roll.follow(pos);
     roll.draw();
     drawOverviews(pos);

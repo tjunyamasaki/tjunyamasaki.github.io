@@ -50,6 +50,8 @@ export class Engine {
     this.step = step;
     this.count = countIn ? STEPS_PER_BAR : 0;
     this.next = this.ctx.currentTime + 0.08;
+    // Audio-clock time at which `step` plays (after any count-in).
+    this.songStart = this.next + this.count * this.sd;
     this.marks = [];
     this.tick();
     this.timer = setInterval(() => this.tick(), 25);

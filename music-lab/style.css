@@ -898,6 +898,95 @@ body.empty .empty-state {
   font-variant-numeric: tabular-nums;
 }
 
+.listen-btn[aria-pressed="true"] {
+  color: var(--rec);
+  background: rgba(255, 90, 110, 0.12);
+}
+
+.listen {
+  position: absolute;
+  top: 36px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 5px 5px 14px;
+  border-radius: 16px;
+  background: rgba(28, 33, 44, 0.94);
+  border: 1px solid rgba(255, 90, 110, 0.35);
+  box-shadow: 0 14px 40px -12px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+  animation: rise 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.listen-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--rec);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.listen-note {
+  min-width: 44px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.listen-meter {
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.listen-meter i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #f3d36b 70%, var(--rec));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.06s linear;
+}
+
+.listen button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #c8ceda;
+}
+
+.listen button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+#listenStop {
+  background: var(--rec);
+  color: #fff;
+}
+
+#listenStop:hover {
+  background: #ff7385;
+}
+
+#listenStop svg {
+  width: 16px;
+  height: 16px;
+}
+
+.editor.drop {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+
 /* ---------- Instrument picker ---------- */
 
 .picker {

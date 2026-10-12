@@ -60,6 +60,14 @@
           <button id="selDelete" type="button" title="Delete (Del)" aria-label="Delete"></button>
           <button id="selClose" type="button" title="Deselect (Esc)" aria-label="Deselect"></button>
         </div>
+        <div id="listen" class="listen" hidden>
+          <span class="listen-dot" aria-hidden="true"></span>
+          <span id="listenNote" class="listen-note">–</span>
+          <span class="listen-meter" aria-hidden="true"><i id="listenLevel"></i></span>
+          <button id="listenStop" type="button" title="Stop and add notes" aria-label="Stop and add notes"></button>
+          <button id="listenCancel" type="button" title="Cancel" aria-label="Cancel"></button>
+        </div>
+        <input id="audioFile" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.aac,.webm" hidden />
         <div class="empty-state">
           <button id="emptyAdd" class="cta" type="button">Add a track</button>
         </div>

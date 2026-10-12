@@ -1,7 +1,7 @@
 import { DRUMS, INSTRUMENTS, renderSong } from './audio.js';
 import { BEAT, Engine, STEPS_PER_BAR } from './engine.js';
 import { icon } from './icons.js';
-import { Capture, detectHits, detectMelody, noteName } from './listen.js';
+import { Capture, detectHits, detectMelody, estimateTempo, noteName } from './listen.js';
 import { HI, LO, NOTE_NAMES, Roll, SCALES } from './roll.js';
 
 const STORE = 'music-lab:project';
@@ -208,12 +208,24 @@ function refresh() {
 /* ---------- Toast ---------- */
 
 let toastTimer = 0;
-function toast(text) {
+// A short message, optionally with one action button (e.g. "Use 87 BPM").
+function toast(text, action = null) {
   const el = $('toast');
   el.textContent = text;
+  el.classList.toggle('has-action', !!action);
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = action.label;
+    b.addEventListener('click', () => {
+      el.classList.remove('show');
+      action.run();
+    });
+    el.append(b);
+  }
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+  toastTimer = setTimeout(() => el.classList.remove('show'), action ? 6000 : 1800);
 }
 
 /* ---------- Transport ---------- */
@@ -235,6 +247,10 @@ function stop() {
 }
 
 function togglePlay() {
+  if (listening) {
+    finishListening();
+    return;
+  }
   if (engine.playing) stop();
   else play(false);
 }
@@ -618,7 +634,7 @@ function renderEditorHead() {
       </div>`
     }
     <span class="grow"></span>
-    <button class="ghost icon listen-btn" id="micBtn" type="button" title="${drums ? 'Beatbox a rhythm in' : 'Sing or play notes in'}" aria-label="Listen to the microphone" aria-pressed="${!!listening}">${icon('mic')}</button>
+    <button class="ghost icon listen-btn" id="micBtn" type="button" title="${drums ? 'Beatbox a rhythm in' : 'Sing or play notes in'} at any tempo · start while the loop plays to record along with it" aria-label="Listen to the microphone" aria-pressed="${!!listening}">${icon('mic')}</button>
     <button class="ghost icon" id="fileBtn" type="button" title="Turn an audio file into notes" aria-label="Import audio file">${icon('audiofile')}</button>
     ${drums ? '' : `<div class="octave" title="Computer keyboard octave (Z / X)"><button type="button" id="octDown" aria-label="Octave down">${icon('minus')}</button><span id="octVal"></span><button type="button" id="octUp" aria-label="Octave up">${icon('plus')}</button></div>`}
     <button class="ghost icon" id="clearTrack" type="button" title="Clear notes" aria-label="Clear notes">${icon('trash')}</button>`;
@@ -1106,19 +1122,16 @@ async function startListening() {
     toast(err?.name === 'NotAllowedError' ? 'Microphone access was blocked' : 'No microphone available');
     return;
   }
-  // One pass of the loop with a count-in and click, so the notes land on the beat.
-  const metronome = engine.metronome;
-  engine.metronome = true;
-  engine.start(startStep, true);
-  listening = {
-    cap,
-    metronome,
-    track: tr.id,
-    from: startStep,
-    songStart: engine.songStart,
-    end: engine.songStart + (total() - startStep) * engine.sd,
-    key: null,
-  };
+  if (engine.playing) {
+    // Started while the loop plays: record along with it until the loop ends,
+    // keeping each note where it was heard against the loop.
+    const pos = Math.max(0, engine.pos() ?? 0);
+    const songStart = ctx.currentTime - engine.latency - pos * engine.sd;
+    listening = { cap, along: true, track: tr.id, from: 0, songStart, end: songStart + total() * engine.sd, key: null };
+  } else {
+    // Started from silence: no click to follow; the tempo is worked out afterwards.
+    listening = { cap, along: false, track: tr.id, from: startStep, end: ctx.currentTime + 120, key: null };
+  }
   renderTransport();
   renderListen();
 }
@@ -1130,15 +1143,18 @@ async function finishListening(cancel = false) {
   const { samples, sampleRate, t0 } = L.cap.take();
   L.cap.close();
   if (L.key != null) roll.pressed.delete(L.key);
-  engine.metronome = L.metronome;
-  engine.stop();
+  if (L.along) engine.stop();
   renderTransport();
   renderListen();
   dirty = true;
   if (cancel) return;
   const tr = P.tracks.find((t) => t.id === L.track);
   if (!tr) return;
-  // Line the recording up with what the singer heard: the song started at
+  if (!L.along) {
+    await transcribe(tr, samples, sampleRate, { base: L.from, free: true, limit: MAX_STEPS });
+    return;
+  }
+  // Line the recording up with what the singer heard: the loop started at
   // songStart on the audio clock, and the sound reached their ears late by
   // the output latency and came back late by the input latency.
   const offset = t0 - L.songStart - L.cap.inputLatency - engine.latency;
@@ -1166,21 +1182,52 @@ async function importAudio(file) {
     const d = buf.getChannelData(c);
     for (let i = 0; i < n; i++) mono[i] += d[i] / buf.numberOfChannels;
   }
-  await transcribe(tr, mono, buf.sampleRate, { base: startStep, align: true, limit: MAX_STEPS });
+  await transcribe(tr, mono, buf.sampleRate, { base: startStep, free: true, limit: MAX_STEPS });
 }
 
-async function transcribe(tr, samples, sampleRate, { base, offset = 0, align = false, limit }) {
+const HIT_WEIGHT = { kick: 1.2, snare: 1, hat: 0.5 };
+
+// Picks the tempo for a free recording. With an empty project the detected
+// tempo is used as is. Otherwise a detected tempo near half or double the
+// project's is read as the project's (same feel, fewer surprises).
+function chooseTempo(found, drums) {
+  const events = found.map((f) => ({ t: f.t, w: drums ? HIT_WEIGHT[f.kind] : 0.6 + Math.min(0.8, f.d) }));
+  const empty = !P.tracks.some((t) => t.notes.length);
+  const est = estimateTempo(events, empty ? 110 : P.bpm);
+  if (!est) return null;
+  let { bpm } = est;
+  if (!empty) {
+    for (const k of [2, 0.5]) if (Math.abs((bpm * k) / P.bpm - 1) < 0.08) bpm *= k;
+  }
+  const beat = 60 / bpm;
+  const phase = ((est.phase % beat) + beat) % beat;
+  return { bpm, beat, phase, empty };
+}
+
+async function transcribe(tr, samples, sampleRate, { base, offset = 0, free = false, limit }) {
   const drums = isDrums(tr);
   toast('Finding notes…');
   const found = drums ? await detectHits(samples, sampleRate) : await detectMelody(samples, sampleRate);
-  const sd = engine.sd;
+  let sd = engine.sd;
+  let shift = offset;
+  let tempo = null;
+  if (free && found.length) {
+    tempo = chooseTempo(found, drums);
+    if (tempo) {
+      // Count from the beat at (or just before) the first note, so a pickup
+      // keeps its place before the downbeat.
+      sd = tempo.beat / BEAT;
+      const first = Math.floor((found[0].t - tempo.phase) / tempo.beat + 0.15);
+      shift = -(tempo.phase + first * tempo.beat);
+    } else shift = -found[0].t;
+  }
   const g = snap();
-  const shift = align && found.length ? -found[0].t : offset;
   const at = (sec) => base + Math.round(sec / sd / g) * g;
   let notes = [];
   for (const f of found) {
     const t = f.t + shift;
-    const s = at(t);
+    let s = at(t);
+    if (s < base && free && t > -0.3 * BEAT * sd) s = base;
     if (s < base || s >= limit) continue;
     if (drums) notes.push({ s, l: g, p: DRUM_ROWS[f.kind], v: 0.8 });
     else notes.push({ s, l: Math.max(g, at(t + f.d) - s), p: clamp(f.p, LO, HI), v: 0.8 });
@@ -1201,7 +1248,10 @@ async function transcribe(tr, samples, sampleRate, { base, offset = 0, align = f
     toast(drums ? 'No hits heard — try louder' : 'No notes heard — try a clearer, louder sound');
     return;
   }
+  const bpm = tempo ? clamp(Math.round(tempo.bpm), 40, 240) : P.bpm;
+  const adopt = tempo?.empty && bpm !== P.bpm;
   edit(() => {
+    if (adopt) P.bpm = bpm;
     ensureLength(Math.max(...notes.map((n) => n.s + 1)));
     const taken = new Set(notes.map((n) => n.s + ':' + n.p));
     tr.notes = tr.notes.filter((n) => !taken.has(n.s + ':' + n.p));
@@ -1211,7 +1261,11 @@ async function transcribe(tr, samples, sampleRate, { base, offset = 0, align = f
   roll.setSel(notes);
   roll.showStep(notes[0].s);
   roll.reveal(notes[0].p);
-  toast(`${notes.length} ${drums ? 'hit' : 'note'}${notes.length === 1 ? '' : 's'} added · Ctrl+Z to undo`);
+  const what = `${notes.length} ${drums ? 'hit' : 'note'}${notes.length === 1 ? '' : 's'} added`;
+  if (adopt) toast(`${what} · tempo set to ${bpm} BPM`);
+  else if (tempo && Math.abs(bpm - P.bpm) > 2) {
+    toast(`${what} · you played at about ${bpm} BPM`, { label: `Use ${bpm} BPM`, run: () => edit(() => (P.bpm = bpm)) });
+  } else toast(`${what} · Ctrl+Z to undo`);
 }
 
 function renderListen() {
@@ -1277,7 +1331,7 @@ let lastPos = null;
 function frame() {
   requestAnimationFrame(frame);
   const pos = engine.pos();
-  if (engine.playing || dirty || pos !== lastPos) {
+  if (engine.playing || listening || dirty || pos !== lastPos) {
     lastPos = pos;
     dirty = false;
     updateListen(pos);

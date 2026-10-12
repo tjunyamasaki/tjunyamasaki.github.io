@@ -1088,6 +1088,31 @@ body.empty .empty-state {
   transform: translate(-50%, 0);
 }
 
+.toast.has-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  white-space: normal;
+  padding: 5px 5px 5px 16px;
+}
+
+.toast.has-action.show {
+  pointer-events: auto;
+}
+
+.toast button {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 15px;
+  background: var(--accent);
+  color: #08110d;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 /* ---------- Narrow screens ---------- */
 
 @media (max-width: 900px) {

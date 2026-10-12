@@ -201,6 +201,90 @@ export async function detectHits(samples, sampleRate) {
   return hits;
 }
 
+/**
+ * Finds the beat in a list of note or hit starts ({ t, w } in seconds, with a
+ * weight for how strongly each one marks the rhythm).
+ *
+ * The starts are smeared into a pulse train and autocorrelated; each tempo is
+ * scored by how strongly its beat and the next few multiples repeat, nudged
+ * toward everyday tempos. A least-squares fit to the beat and half-beat grid
+ * then fine-tunes the tempo and finds where the beats fall.
+ * Returns { bpm, phase } with phase the time of one beat, or null.
+ */
+export function estimateTempo(events, near = 110) {
+  if (events.length < 4) return null;
+  const R = 100;
+  const n = Math.ceil((Math.max(...events.map((e) => e.t)) + 1) * R);
+  const env = new Float32Array(n);
+  const sig = 3;
+  for (const e of events) {
+    const c = e.t * R;
+    for (let k = Math.max(0, Math.floor(c - 3 * sig)); k < Math.min(n, Math.ceil(c + 3 * sig)); k++) {
+      env[k] += e.w * Math.exp(-((k - c) ** 2) / (2 * sig * sig));
+    }
+  }
+  const maxLag = Math.min(n - 1, 520);
+  const ac = new Float32Array(maxLag + 2);
+  for (let L = 0; L <= maxLag; L++) {
+    let s = 0;
+    for (let i = 0; i + L < n; i++) s += env[i] * env[i + L];
+    ac[L] = (s * n) / (n - L); // undo the shrinking overlap at long lags
+  }
+  const at = (L) => {
+    if (L >= maxLag) return 0;
+    const i = Math.floor(L);
+    return (ac[i] + (ac[i + 1] - ac[i]) * (L - i)) / ac[0];
+  };
+  let best = null;
+  for (let bpm = 50; bpm <= 200; bpm += 0.5) {
+    const L = (60 * R) / bpm;
+    let s = 0;
+    for (let k = 1; k <= 4; k++) s += at(k * L) / k;
+    s *= Math.exp(-0.5 * (Math.log2(bpm / near) / 0.9) ** 2);
+    if (!best || s > best.s) best = { bpm, s };
+  }
+  if (!best || best.s <= 0) return null;
+
+  let T = 60 / best.bpm;
+  let phase = 0;
+  let fit = -1;
+  for (let ph = 0; ph < T; ph += 0.005) {
+    let s = 0;
+    for (const e of events) {
+      const d = ((e.t - ph) / T - Math.round((e.t - ph) / T)) * T;
+      s += e.w * Math.exp(-(d * d) / (2 * 0.035 * 0.035));
+    }
+    if (s > fit) {
+      fit = s;
+      phase = ph;
+    }
+  }
+  // Refine: fit t = phase + k * T/2 to the starts that sit on the half-beat grid.
+  for (let pass = 0; pass < 3; pass++) {
+    const pts = [];
+    for (const e of events) {
+      const k = Math.round(((e.t - phase) / T) * 2);
+      if (Math.abs(e.t - phase - (k * T) / 2) < 0.07) pts.push([k, e.t, e.w]);
+    }
+    if (pts.length < 4) break;
+    let sw = 0, sk = 0, st = 0, skk = 0, skt = 0;
+    for (const [k, t, w] of pts) {
+      sw += w;
+      sk += w * k;
+      st += w * t;
+      skk += w * k * k;
+      skt += w * k * t;
+    }
+    const den = sw * skk - sk * sk;
+    if (Math.abs(den) < 1e-9) break;
+    const half = (sw * skt - sk * st) / den;
+    if (!(half > 0.1 && half < 0.65)) break;
+    T = half * 2;
+    phase = (st - half * sk) / sw;
+  }
+  return { bpm: 60 / T, phase: ((phase % T) + T) % T };
+}
+
 /* ---------- Live pitch (for the listening indicator) ---------- */
 
 export function livePitch(buf, sampleRate) {

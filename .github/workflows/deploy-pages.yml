@@ -26,6 +26,9 @@ jobs:
       - name: Test ball game rules
         run: node --test ball-game/tests/*.test.mjs
 
+      - name: Test Tessera rules
+        run: node --test tessera/tests/*.test.mjs
+
       # - name: Test Hollowstead survival and multiplayer
       #   run: node --test hollowstead/tests/*.test.mjs
 
@@ -56,6 +59,8 @@ jobs:
           if [ -d count ]; then cp -r count _site/count; fi
           if [ -d links ]; then cp -r links _site/links; fi
           if [ -d hushlight ]; then cp -r hushlight _site/hushlight; fi
+          cp -r tessera _site/tessera
+          rm -rf _site/tessera/tests
           cp -r hollowstead _site/hollowstead
           rm -rf _site/hollowstead/tests
           cp -r ball-game _site/ball-game

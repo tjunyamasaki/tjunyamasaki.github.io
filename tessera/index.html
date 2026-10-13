@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1b1712">
+  <meta name="description" content="Tessera: lay tiles, claim towns, roads, abbeys and meadows, and watch your kingdom come to life in 3D. A tile-laying game for 1 to 5 players with bots.">
+  <title>Tessera · A living kingdom of tiles</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="app" aria-label="Tessera game">
+    <canvas id="stage" tabindex="0" aria-label="The kingdom. Drag to move the view, right-drag or two fingers to turn and tilt, scroll or pinch to zoom."></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <header class="masthead">
+      <a class="back" href="/links/" aria-label="Back to games">↖ <span>Games</span></a>
+      <div class="brand">Tessera<span>A LIVING KINGDOM OF TILES</span></div>
+    </header>
+
+    <nav class="tools" aria-label="View and settings">
+      <div class="view-group" role="group" aria-label="Camera">
+        <button id="turn-left" class="tool" aria-label="Turn view left" title="Turn view (Q)">⟲</button>
+        <button id="view" class="tool wide" title="Change view (V)"><span class="tool-k">View</span> <b id="view-label">Tabletop</b></button>
+        <button id="turn-right" class="tool" aria-label="Turn view right" title="Turn view (E)">⟳</button>
+      </div>
+      <button id="time" class="tool wide" title="Time of day (T)"><span class="tool-k">Sky</span> <b id="time-label">Day</b></button>
+      <button id="sound" class="tool" aria-pressed="true" aria-label="Sound on" title="Sound (M)">♪</button>
+      <button id="menu-open" class="tool" aria-label="Menu" title="Menu (Esc)">☰</button>
+    </nav>
+
+    <aside id="players" class="players" aria-label="Players and scores" hidden></aside>
+    <ol id="feed" class="feed" aria-live="polite"></ol>
+
+    <section id="turnbar" class="turnbar" hidden aria-label="Your turn">
+      <div class="card-wrap">
+        <canvas id="card" width="168" height="168" aria-label="Tile to place"></canvas>
+        <span id="left" class="left" title="Tiles left in the bag">71</span>
+      </div>
+      <div class="prompt">
+        <p id="who" class="who"></p>
+        <p id="hint" class="hint"></p>
+        <p id="tile-name" class="tile-name"></p>
+      </div>
+      <div class="actions">
+        <button id="rot-left" class="round" aria-label="Turn tile anticlockwise" title="Turn tile (Shift+R)">↺</button>
+        <button id="rot-right" class="round" aria-label="Turn tile clockwise" title="Turn tile (R or right-click)">↻</button>
+        <button id="confirm" class="primary" disabled>Place <span>✓</span></button>
+        <button id="skip" class="secondary" hidden>No follower</button>
+      </div>
+    </section>
+
+    <div id="toast" class="toast" role="status"></div>
+
+    <dialog id="setup" class="setup">
+      <p class="eyebrow">A TILE-LAYING GAME</p>
+      <h1>Lay the land.<br><em>Watch it live.</em></h1>
+      <p class="description">Draw a tile, fit it to the kingdom, and send your followers to claim towns, roads, abbeys and meadows. Every tile you lay grows walls, farms and forests, and fills with people and sheep.</p>
+      <div id="seats" class="seats"></div>
+      <button id="add-seat" class="text-button add">+ Add a player</button>
+      <div class="options">
+        <label class="check"><input type="checkbox" id="opt-meadows" checked> <span>Meadow farmers<small>Followers lying in fields score 3 per finished town at the end</small></span></label>
+        <label class="check"><input type="checkbox" id="opt-hints" checked> <span>Show open spots<small>Glowing frames show where the tile fits</small></span></label>
+        <label class="select">Bot pace<select id="opt-pace"><option value="1">Relaxed</option><option value="0.55" selected>Brisk</option><option value="0.2">Quick</option></select></label>
+      </div>
+      <div class="setup-actions">
+        <button id="start" class="primary">Begin a kingdom <span>↗</span></button>
+        <button id="resume" class="secondary" hidden>Continue saved game</button>
+      </div>
+      <p class="small">2–5 seats · mix people at this screen with bots</p>
+    </dialog>
+
+    <dialog id="menu" class="panel">
+      <p class="eyebrow">PAUSED</p>
+      <h2>How to play</h2>
+      <div class="rules">
+        <p><b>Lay a tile.</b><span>Every edge must match its neighbours: town to town, road to road, meadow to meadow. Tap a glowing spot, turn the tile with ↻ (or R, or right-click), then press Place.</span></p>
+        <p><b>Send a follower</b><span>onto the tile you just laid, if no one already holds that town, road, abbey or meadow. You have seven.</span></p>
+        <p><b>Finish features to score.</b><span>Town: 2 per tile and 2 per blue shield. Road: 1 per tile. Abbey: 9 once surrounded. Followers come home when their feature is finished. Most followers takes the points; ties share them.</span></p>
+        <p><b>At the end</b><span>unfinished towns score 1 per tile and shield, roads 1 per tile, abbeys 1 plus each neighbour, and meadow farmers 3 for each finished town their meadow touches.</span></p>
+        <p><b>Look around.</b><span>Drag to move · right-drag, Q/E or two fingers to turn and tilt · scroll or pinch to zoom · V changes the view · T changes the sky.</span></p>
+      </div>
+      <button id="menu-close" class="primary">Back to the kingdom <span>↗</span></button>
+      <button id="menu-new" class="text-button">Start a new game</button>
+    </dialog>
+
+    <dialog id="final" class="panel final">
+      <p class="eyebrow">THE LAST TILE IS LAID</p>
+      <h2 id="final-title">The kingdom is complete.</h2>
+      <table id="final-table" class="final-table"></table>
+      <button id="admire" class="primary">Admire the kingdom <span>↗</span></button>
+      <button id="again" class="text-button">Play again</button>
+    </dialog>
+
+    <div id="loading" class="loading" role="status"><span class="loading-mark">◆</span><p>Surveying the land…</p></div>
+    <section id="error" class="error" hidden role="alert"><h1>The land would not rise.</h1><p id="error-message">Tessera needs a browser with WebGL enabled.</p><button onclick="location.reload()">Try again</button><a href="/links/">Back to games</a></section>
+    <noscript><div class="error"><h1>Tessera needs JavaScript.</h1><a href="/links/">Back to games</a></div></noscript>
+  </main>
+  <script type="module">
+    import('./src/main.js').catch(error => {
+      console.error('Tessera could not start', error);
+      document.getElementById('loading').hidden = true;
+      document.getElementById('error').hidden = false;
+      document.getElementById('error-message').textContent = 'Tessera needs a browser with WebGL enabled. (' + (error && error.message || error) + ')';
+    });
+  </script>
+</body>
+</html>

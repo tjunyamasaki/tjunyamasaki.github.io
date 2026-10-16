@@ -1,56 +1,106 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Games</title>
-    <link rel="stylesheet" href="../css/style.css" />
-  </head>
-  <body>
-    <section class="page-home">
-      <div class="home-card">
-        <p class="kicker">Play</p>
-        <h1>Games</h1>
-        <p class="lede">Pick a table. Each app keeps its own path.</p>
-        <div class="page-tiles">
-          <a class="page-tile" href="/hollowstead/">
-            Hollowstead — Co-op Survival
-            <span class="page-tile-blurb">Gather by day. Build a home. Keep the fire alive through five haunted nights, alone or with up to three friends.</span>
-          </a>
-          <a class="page-tile" href="/ball-game/">
-            Bloom — Cell Arena
-            <span class="page-tile-blurb">Eat, split, and survive in a luminous arena. Play with friends or add bots.</span>
-          </a>
-          <a class="page-tile" href="/hushlight/">
-            Hushlight
-            <span class="page-tile-blurb">A floating night garden. Gather wandering lights and bring its sleeping shrines to life.</span>
-          </a>
-          <a class="page-tile" href="/table-tennis/">
-            Table tennis
-            <span class="page-tile-blurb">Round-robin scoreboard. Host edits; friends watch live.</span>
-          </a>
-          <a class="page-tile" href="/lobby/">
-            Card lobby
-            <span class="page-tile-blurb">Free play, President, and Flip Seven on a shared table.</span>
-          </a>
-          <a class="page-tile" href="/fodinha/">
-            Fodinha
-            <span class="page-tile-blurb">Bid your tricks. Miss, and you lose a life.</span>
-          </a>
-          <a class="page-tile" href="/presidente/">
-            Presidente
-            <span class="page-tile-blurb">Shed your hand. First out is Presidente.</span>
-          </a>
-          <a class="page-tile" href="/count/">
-            Count
-            <span class="page-tile-blurb">Watch the stage. Count what you saw. First correct or many winners.</span>
-          </a>
-          <a class="page-tile" href="/game-of-life/">
-            Game of Life
-            <span class="page-tile-blurb">Conway’s cellular automaton. Paint, stamp, and run.</span>
-          </a>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#8ecbff">
+  <meta name="description" content="A pocket terrarium where nine little games live. Poke the critters, toss them around, feed them crumbs, and open a game.">
+  <title>Games · the jar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="./style.css">
+  <script>document.documentElement.classList.add('js');</script>
+</head>
+<body data-night="0">
+  <main id="app">
+    <canvas id="jar" role="img" aria-label="A glass jar with nine little critters, one for each game. Tap a critter to meet it, drag to toss it, tap empty space to drop a crumb."></canvas>
+
+    <header class="top">
+      <div class="brand">
+        <h1>the jar</h1>
+        <p>nine little games live here</p>
+      </div>
+      <button id="sound" class="chip" aria-pressed="false" aria-label="Sound off"><span aria-hidden="true">♪</span> <span class="state">off</span></button>
+    </header>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <p id="hint" class="hint" hidden>tap a critter · drag to toss · tap empty space for a crumb</p>
+
+    <nav class="dock" aria-label="Jar controls">
+      <button id="open-list" class="dock-btn"><span class="ico" aria-hidden="true">☰</span><span>All games</span></button>
+      <button id="shake" class="dock-btn"><span class="ico" aria-hidden="true">〰</span><span>Shake</span></button>
+      <button id="tilt" class="dock-btn" hidden><span class="ico" aria-hidden="true">⤾</span><span>Tilt</span></button>
+      <button id="open-capsule" class="dock-btn accent"><span class="ico" aria-hidden="true">✦</span><span>Surprise me</span></button>
+    </nav>
+
+    <section id="sheet" class="sheet" aria-labelledby="sheet-name" hidden>
+      <button id="sheet-close" class="x" aria-label="Close">✕</button>
+      <div class="sheet-main">
+        <canvas id="portrait" class="portrait" aria-hidden="true"></canvas>
+        <div>
+          <p id="sheet-tag" class="eyebrow"></p>
+          <h2 id="sheet-name"></h2>
+          <p id="sheet-bio" class="bio"></p>
         </div>
       </div>
+      <p id="sheet-blurb" class="blurb"></p>
+      <p id="sheet-stats" class="stats"></p>
+      <a id="sheet-play" class="play" href="/links/">Play <span aria-hidden="true">→</span></a>
     </section>
-  </body>
+
+    <dialog id="list" class="modal" aria-labelledby="list-title">
+      <div class="modal-card">
+        <button class="x" data-close aria-label="Close">✕</button>
+        <h2 id="list-title">All games</h2>
+        <ul id="list-items" class="game-list"></ul>
+      </div>
+    </dialog>
+
+    <dialog id="capsule" class="modal capsule" aria-labelledby="capsule-title">
+      <div class="modal-card">
+        <button class="x" data-close aria-label="Close">✕</button>
+        <h2 id="capsule-title">Surprise me</h2>
+        <p id="capsule-sub" class="capsule-sub">Turn the crank. Something is in there.</p>
+        <div id="machine" class="machine">
+          <div class="dome"><div id="balls" class="balls"></div><span class="shine"></span></div>
+          <div class="base">
+            <button id="crank" class="crank" aria-label="Turn the crank"><span class="arm"></span><span class="knob"></span></button>
+            <span class="slot"></span>
+            <span class="plate">1 spin · free</span>
+          </div>
+          <div id="ball-drop" class="ball-drop" aria-hidden="true"><span class="half top"></span><span class="half bottom"></span></div>
+        </div>
+        <div id="prize" class="prize" hidden>
+          <p id="prize-rarity" class="rarity"></p>
+          <canvas id="prize-portrait" class="portrait big" aria-hidden="true"></canvas>
+          <h3 id="prize-name"></h3>
+          <p id="prize-blurb" class="blurb"></p>
+          <div class="prize-actions">
+            <a id="prize-play" class="play" href="/links/">Play <span aria-hidden="true">→</span></a>
+            <button id="again" class="ghost">Spin again</button>
+          </div>
+        </div>
+        <div id="confetti" class="confetti" aria-hidden="true"></div>
+      </div>
+    </dialog>
+  </main>
+
+  <nav class="fallback" aria-label="Games">
+    <h2>Games</h2>
+    <ul>
+      <li><a href="/hollowstead/">Hollowstead — co-op survival</a></li>
+      <li><a href="/ball-game/">Bloom — cell arena</a></li>
+      <li><a href="/hushlight/">Hushlight — night garden</a></li>
+      <li><a href="/table-tennis/">Table tennis — live scoreboard</a></li>
+      <li><a href="/lobby/">Card lobby — shared card table</a></li>
+      <li><a href="/fodinha/">Fodinha — trick bidding</a></li>
+      <li><a href="/presidente/">Presidente — shedding game</a></li>
+      <li><a href="/count/">Count — party counting</a></li>
+      <li><a href="/game-of-life/">Game of Life — cellular automaton</a></li>
+    </ul>
+  </nav>
+
+  <script type="module" src="./main.js"></script>
+</body>
 </html>

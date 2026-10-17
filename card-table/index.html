@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#0c1411" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Card Table</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main id="home" class="home">
+      <div class="home-card">
+        <a class="back" href="/links/">← Games</a>
+        <div class="home-fan" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <h1>Card Table</h1>
+        <p class="lede">A 3D table for any card game. No rules built in — draw, deal, flip, pass and play however your group plays.</p>
+        <label class="field">
+          <span>Your name</span>
+          <input id="name" type="text" maxlength="18" autocomplete="nickname" placeholder="e.g. Ana" enterkeyhint="go" />
+        </label>
+        <button id="create" type="button" class="btn primary wide big">Open a new table</button>
+        <div class="or"><span>or join one</span></div>
+        <div class="join">
+          <input id="code" type="text" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" aria-label="Table code" />
+          <button id="join" type="button" class="btn">Join</button>
+        </div>
+        <div id="resume" class="resume hidden"></div>
+        <p id="home-status" class="status" role="status"></p>
+        <p id="mode-note" class="mode-note"></p>
+      </div>
+    </main>
+
+    <section id="table" class="table hidden">
+      <canvas id="gl" aria-label="Card table"></canvas>
+      <div id="labels" class="labels"></div>
+      <header class="topbar">
+        <button id="btn-menu" type="button" class="icon-btn" aria-label="Table menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg></button>
+        <button id="btn-room" type="button" class="room-chip" aria-label="Invite players"></button>
+        <i id="conn" class="conn"></i>
+        <span class="grow"></span>
+        <button id="btn-emote" type="button" class="icon-btn" aria-label="Say something"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg></button>
+        <button id="btn-undo" type="button" class="icon-btn" aria-label="Undo"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg></button>
+        <button id="btn-log" type="button" class="icon-btn" aria-label="Table log"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg></button>
+      </header>
+      <div id="turn-banner" class="turn-banner hidden"></div>
+      <div id="toasts" class="toasts" aria-live="polite"></div>
+      <div id="hand-bar" class="hand-bar"></div>
+      <button id="btn-recenter" type="button" class="recenter hidden">Recenter</button>
+    </section>
+
+    <div id="scrim" class="scrim"></div>
+    <div id="sheet" class="sheet" aria-hidden="true" role="dialog">
+      <div class="sheet-grip"><i></i></div>
+      <div id="sheet-body" class="sheet-body"></div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

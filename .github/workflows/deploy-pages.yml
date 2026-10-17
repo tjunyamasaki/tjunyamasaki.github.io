@@ -29,6 +29,9 @@ jobs:
       # - name: Test Hollowstead survival and multiplayer
       #   run: node --test hollowstead/tests/*.test.mjs
 
+      - name: Test card table model
+        run: node --test card-table/tests/*.test.mjs
+
       - name: Test deployment versioning
         run: node --test .github/tests/*.test.mjs
 
@@ -55,6 +58,7 @@ jobs:
           if [ -d table-tennis ]; then cp -r table-tennis _site/table-tennis; fi
           if [ -d count ]; then cp -r count _site/count; fi
           if [ -d links ]; then cp -r links _site/links; fi
+          if [ -d card-table ]; then cp -r card-table _site/card-table; rm -rf _site/card-table/tests; fi
           if [ -d hushlight ]; then cp -r hushlight _site/hushlight; fi
           cp -r hollowstead _site/hollowstead
           rm -rf _site/hollowstead/tests

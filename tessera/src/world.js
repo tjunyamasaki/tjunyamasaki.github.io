@@ -67,8 +67,21 @@ function meepleGeometry() {
   s.quadraticCurveTo(-0.42, 0.22, -0.46, 0);
   const g = new T.ExtrudeGeometry(s, { depth: 0.3, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.05, bevelSegments: 2, curveSegments: 6 });
   g.translate(0, 0.05, -0.15);
-  g.scale(0.125, 0.125, 0.125);
+  // Followers stand a little taller than the houses so they read among towns and woods.
+  g.scale(0.18, 0.18, 0.18);
   g.computeVertexNormals();
+  return g;
+}
+
+/** A slightly fatter copy, drawn inside-out in a pale colour: an outline round each follower. */
+function outlineGeometry(geo) {
+  const g = geo.clone();
+  g.computeBoundingBox();
+  const c = new T.Vector3();
+  g.boundingBox.getCenter(c);
+  g.translate(-c.x, -c.y, -c.z);
+  g.scale(1.13, 1.07, 1.3);
+  g.translate(c.x, c.y, c.z);
   return g;
 }
 
@@ -236,6 +249,16 @@ export function createWorld(canvas, { onTap, onHover, onRightTap } = {}) {
     return topMats.get(type);
   };
   const meepleGeo = meepleGeometry();
+  const outlineGeo = outlineGeometry(meepleGeo);
+  const outlineMat = new T.MeshBasicMaterial({ color: '#fff6dc', side: T.BackSide, toneMapped: false });
+  const ringGeo = new T.RingGeometry(0.07, 0.098, 32).rotateX(-Math.PI / 2);
+  const ringEdgeGeo = new T.RingGeometry(0.098, 0.108, 32).rotateX(-Math.PI / 2);
+  const ringEdgeMat = new T.MeshBasicMaterial({ color: '#fff6dc', transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false });
+  const ringMats = new Map();
+  const ringMaterial = hex => {
+    if (!ringMats.has(hex)) ringMats.set(hex, new T.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }));
+    return ringMats.get(hex);
+  };
   const meepleMats = new Map();
   const meepleMaterial = (hex, ghost = false) => {
     const k = hex + ghost;
@@ -394,21 +417,37 @@ export function createWorld(canvas, { onTap, onHover, onRightTap } = {}) {
 
   function addFollower(f, hex, { animate = true } = {}) {
     const { x, z, lying } = followerPosition(f);
-    const m = new T.Mesh(meepleGeo, meepleMaterial(hex));
-    m.castShadow = true;
-    m.position.set(x, TOP + (lying ? 0.022 : 0), z);
-    if (lying) m.rotation.set(-Math.PI / 2, 0, (Math.random() - 0.5) * 0.8 + Math.PI);
-    else m.rotation.y = (Math.random() - 0.5) * 1.2;
+    // A follower is its figure, a pale outline round it, and a ring of its
+    // player's colour on the ground, so it can be found from any view.
+    const m = new T.Group();
+    const figure = new T.Group();
+    const body = new T.Mesh(meepleGeo, meepleMaterial(hex));
+    body.castShadow = true;
+    figure.add(new T.Mesh(outlineGeo, outlineMat), body);
+    figure.position.y = lying ? 0.032 : 0;
+    if (lying) figure.rotation.set(-Math.PI / 2, 0, (Math.random() - 0.5) * 0.8 + Math.PI);
+    else figure.rotation.y = (Math.random() - 0.5) * 1.2;
+    const ring = new T.Mesh(ringGeo, ringMaterial(hex));
+    const edge = new T.Mesh(ringEdgeGeo, ringEdgeMat);
+    ring.position.y = edge.position.y = 0.006;
+    ring.renderOrder = edge.renderOrder = 2;
+    const ringSize = lying ? 1.35 : 1.15;
+    ring.scale.setScalar(ringSize); edge.scale.setScalar(ringSize);
+    m.add(ring, edge, figure);
+    m.position.set(x, TOP, z);
     scene.add(m);
     followerMeshes.set(f, m);
     if (!animate) return Promise.resolve();
-    const base = m.position.y;
+    // The figure drops in; its ring opens out on the ground beneath it.
+    const base = figure.position.y;
     return tween(0.55, k => {
-      m.position.y = base + (1 - easeOutBounce(k)) * 0.9;
+      figure.position.y = base + (1 - easeOutBounce(k)) * 0.9;
       const sq = k > 0.35 && k < 0.6 ? 1 - Math.sin((k - 0.35) / 0.25 * Math.PI) * 0.25 : 1;
-      m.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
+      figure.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
+      const open = Math.max(0.001, easeOutBounce(Math.min(1, k * 1.4))) * ringSize;
+      ring.scale.setScalar(open); edge.scale.setScalar(open);
     }).then(() => {
-      m.scale.set(1, 1, 1);
+      figure.scale.set(1, 1, 1);
       burst(x, TOP + 0.02, z, { n: 14, colors: [hex, '#ffffff'], speed: 0.6, up: 0.6, gravity: 2, size: 0.014, life: 0.8, spread: 0.05 });
     });
   }
@@ -547,8 +586,8 @@ export function createWorld(canvas, { onTap, onHover, onRightTap } = {}) {
 
   const optionGroup = new T.Group();
   scene.add(optionGroup);
-  const discGeo = new T.CircleGeometry(0.06, 24).rotateX(-Math.PI / 2);
-  const hitGeo = new T.SphereGeometry(0.085, 8, 6);
+  const discGeo = new T.CircleGeometry(0.09, 24).rotateX(-Math.PI / 2);
+  const hitGeo = new T.SphereGeometry(0.11, 8, 6);
   const hitMat = new T.MeshBasicMaterial({ visible: false });
   function showOptions(options, tileIndex, hex) {
     optionGroup.clear();
@@ -560,9 +599,9 @@ export function createWorld(canvas, { onTap, onHover, onRightTap } = {}) {
       const disc = new T.Mesh(discGeo, new T.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false }));
       disc.position.y = 0.004;
       const ghostM = new T.Mesh(meepleGeo, meepleMaterial(hex, true));
-      if (o.type === 'field') { ghostM.rotation.set(-Math.PI / 2, 0, Math.PI); ghostM.position.y = 0.024; }
+      if (o.type === 'field') { ghostM.rotation.set(-Math.PI / 2, 0, Math.PI); ghostM.position.y = 0.034; }
       const hit = new T.Mesh(hitGeo, hitMat);
-      hit.position.y = 0.06;
+      hit.position.y = 0.08;
       hit.userData.option = o;
       g.add(disc, ghostM, hit);
       g.userData = { ghostM, disc, base: ghostM.position.y, ph: Math.random() * TAU };

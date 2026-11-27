@@ -4,6 +4,7 @@
 // clients only need the seed and the actions to rebuild the same kingdom.
 import { createGame as createEngine, restoreGame as restoreEngine, placeTile, placeFollower, followerOptions } from './game.mjs';
 import { chooseMove } from './ai.mjs';
+import { createRng, shuffle } from './rng.mjs';
 
 export const HOST_ID = 'host';
 export const MAX_SEATS = 5;
@@ -184,7 +185,9 @@ export function applyAction(game, pid, intent) {
   if (action === 'start' && game.phase === 'lobby') {
     if (game.seats.length < 2) return fail(game, pid, 'Seat at least two players or bots first.');
     const seed = Number.isInteger(intent.seed) ? intent.seed >>> 0 : (Math.random() * 2 ** 32) >>> 0;
-    game.game = { seed, meadows: game.meadows, players: enginePlayers(game) };
+    // A random turn order every game; the seats keep it for the lobby that follows.
+    shuffle(game.seats, createRng(seed ^ 0x9e3779b9));
+    game.game = { seed, meadows: game.meadows, even: true, players: enginePlayers(game) };
     game.actions = [];
     game.round++;
     game.phase = 'playing';

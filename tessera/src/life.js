@@ -169,7 +169,8 @@ export function growTile(tile, t0) {
   const b = new Builder();
   const dist = edgeDistance(type);
   const agents = { sheep: [], walkers: [], chimneys: [], mills: [], flags: new Map(), lamps: [], fireflies: [] };
-  const reserved = type.features.map(f => [f.anchor[0], f.anchor[1], f.type === 'field' ? 0.07 : 0.085]);
+  // Keep a clearing round each follower spot so houses and trees never hide a figure.
+  const reserved = type.features.map(f => [f.anchor[0], f.anchor[1], f.type === 'field' ? 0.12 : 0.115]);
   const free = (u, v, extra = 0) => reserved.every(([a, c, rad]) => Math.hypot(u - a, v - c) > rad + extra);
   const L = (u, v) => [u - 0.5, v - 0.5];
   const when = (u, v, base) => t0 + base + Math.hypot(u - 0.5, v - 0.5) * 0.9 + r(0, 0.22);
@@ -250,7 +251,7 @@ export function growTile(tile, t0) {
         const [u, v] = cellUV(i), [x, z] = L(u, v);
         b.add('hex', { x, z, sx: 0.021, sy: r(0.052, 0.064), ry: r(0, 1) }, pick(STONE), [x, 0, z], when(u, v, 0), 0, 0, r(-0.04, 0.04));
       }
-      const towers = spaced(boundary, 0.24, (i, u, v) => free(u, v, 0.01) && u > 0.06 && u < 0.94 && v > 0.06 && v < 0.94, 3);
+      const towers = spaced(boundary, 0.24, (i, u, v) => free(u, v, 0.04) && u > 0.06 && u < 0.94 && v > 0.06 && v < 0.94, 3);
       for (const [u, v] of towers) {
         const [x, z] = L(u, v), h = r(0.12, 0.17), birth = when(u, v, 0.05);
         b.add('cyl', { x, z, sx: 0.033, sy: h }, pick(STONE), [x, 0, z], birth);
@@ -269,7 +270,7 @@ export function growTile(tile, t0) {
         b.add('box', { x, y: 0.06, z: z + 0.043, sx: 0.016, sy: 0.022, sz: 0.004 }, '#3b2a1c', [x, 0, z], birth, 0, 1);
         flagSpot(fi, x + 0.025, 0.32, z - 0.02);
       }
-      const homes = spaced(list, 0.078, (i, u, v) => dist[i] >= 2.6 && free(u, v) && (!keep || Math.hypot(u - keep[0], v - keep[1]) > 0.1), Math.round(f.area * 150) + 1);
+      const homes = spaced(list, 0.078, (i, u, v) => dist[i] >= 2.6 && free(u, v, 0.03) && (!keep || Math.hypot(u - keep[0], v - keep[1]) > 0.1), Math.round(f.area * 150) + 1);
       for (const [u, v, i] of homes) {
         const tall = Math.min(1, dist[i] / 12);
         const w = r(0.045, 0.07), d = r(0.04, 0.055), h = r(0.035, 0.05) * (1 + tall * 0.9);

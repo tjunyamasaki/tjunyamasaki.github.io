@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TYPE_BY_ID, TILE_TYPES } from '../src/tiles.mjs';
-import { createGame, placeTile, placeFollower, followerOptions, legalPlacements, restoreGame, majority, projectedFinal, FOLLOWERS } from '../src/game.mjs';
+import { createGame, placeTile, placeFollower, followerOptions, legalPlacements, restoreGame, majority, projectedFinal, remaining, FOLLOWERS } from '../src/game.mjs';
 import { chooseMove } from '../src/ai.mjs';
 import { createRng } from '../src/rng.mjs';
 
@@ -145,4 +145,45 @@ test('every tile type can appear in a legal spot next to the start', () => {
     g.tile = t.index;
     assert.ok(legalPlacements(g).length > 0, t.id);
   }
+});
+
+test('an even game gives every player the same number of tiles', () => {
+  for (const n of [2, 3, 4, 5]) {
+    for (const seed of [1, 2, 3]) {
+      const g = createGame({ players: players(n), seed, even: true });
+      assert.equal(remaining(g) % n, 0, `${n} players: bag of ${remaining(g)}`);
+      assert.equal(g.setAside, 71 % n);
+      const rng = createRng(seed);
+      let guard = 0;
+      while (g.phase !== 'over' && guard++ < 100) {
+        const m = chooseMove(g, 'easy', rng);
+        placeTile(g, m.x, m.y, m.rot);
+        placeFollower(g, m.feature);
+      }
+      const laid = g.players.map(p => g.tiles.filter(t => t.player === p.id).length);
+      assert.equal(new Set(laid).size, 1, `${n} players, seed ${seed}: ${laid}`);
+      const copy = restoreGame({ players: players(n), seed, even: true }, g.actions);
+      assert.deepEqual(copy.players.map(p => p.score), g.players.map(p => p.score));
+    }
+  }
+});
+
+test('in an even game a tile that fits nowhere goes back under the bag', () => {
+  // Seed 106 with two easy bots reaches a tile that fits nowhere on turn 20.
+  const g = createGame({ players: players(2), seed: 106, even: true });
+  const rng = createRng(106);
+  let back = null;
+  while (!back && g.phase !== 'over') {
+    const m = chooseMove(g, 'easy', rng);
+    placeTile(g, m.x, m.y, m.rot);
+    const left = g.deck.length;
+    back = placeFollower(g, m.feature).find(e => e.kind === 'discard');
+    if (back) {
+      assert.equal(back.back, true);
+      assert.equal(g.deck[0], back.type, 'it waits at the bottom of the bag');
+      assert.equal(g.deck.length, left - 1, 'only the drawn tile left the bag');
+    }
+  }
+  assert.ok(back, 'the seed still reaches a tile that fits nowhere');
+  assert.equal(g.setAside, 1);
 });

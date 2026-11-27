@@ -18,7 +18,7 @@ Draw a tile, fit it to the kingdom, and send one of your seven followers to clai
   - An unfinished abbey scores 1 plus each neighbour.
   - Meadow farmers score 3 for every finished town their meadow touches.
 
-Up to five seats, each played by a person at this screen or by a bot (Easy, Steady or Cunning). The game saves after every turn, so you can close the page and continue later.
+Up to five seats, each played by a person at this screen or by a bot (Easy, Steady or Cunning). The turn order is drawn at random for each game. Everyone lays the same number of tiles: the few tiles that don't divide evenly stay in the box, and a tile that fits nowhere goes back under the bag. The game saves after every turn, so you can close the page and continue later.
 
 ## Playing online
 

@@ -330,7 +330,8 @@ async function playEvents(events) {
   const cols = colors();
   for (const e of events) {
     if (e.kind === 'discard') {
-      toast(`No place for the ${TILE_TYPES[e.type].name.toLowerCase()} — it is set aside.`, 2600);
+      const name = TILE_TYPES[e.type].name.toLowerCase();
+      toast(e.back ? `No place for the ${name} yet — it goes back under the bag.` : `No place for the ${name} — it is set aside.`, 2600);
       audio.discard();
       await world.wait(0.8);
     } else if (e.kind === 'score') {
@@ -385,7 +386,7 @@ function finish() {
 function save() {
   if (!g || g.phase === 'over' || room) return;
   store.set(SAVE_KEY, {
-    options: { players: g.players.map(({ name, color, kind, level }) => ({ name, color, kind, level })), seed: g.seed, meadows: g.meadows },
+    options: { players: g.players.map(({ name, color, kind, level }) => ({ name, color, kind, level })), seed: g.seed, meadows: g.meadows, even: g.even },
     actions: g.actions,
   });
 }
@@ -453,9 +454,16 @@ async function startGame(fromSave) {
     }
     rebuildWorld();
   } else {
-    g = createGame({ players: toPlayers(settings.seats), meadows: settings.meadows });
+    // Seats are dealt into a random turn order for every new game.
+    const players = toPlayers(settings.seats);
+    for (let i = players.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [players[i], players[j]] = [players[j], players[i]];
+    }
+    g = createGame({ players, meadows: settings.meadows, even: true });
     world.addTile(g.tiles[0], { animate: true, delay: 0.2 });
     save();
+    announceOrder();
   }
   shown = g.players.map(p => p.score);
   world.rig.setView(settings.view === 'cinematic' ? 'tabletop' : settings.view);
@@ -464,6 +472,16 @@ async function startGame(fromSave) {
   renderPlayers();
   if (!fromSave) await world.wait(1);
   beginTurn();
+}
+
+/** Say who plays first and how many tiles everyone will lay. */
+function announceOrder() {
+  feed(`Turn order: ${g.players.map(nameTag).join(' → ')}`, g.players[0].color);
+  if (g.even) {
+    const each = Math.round(remaining(g) / g.players.length);
+    feed(`${each} tiles each${g.setAside ? ` · ${g.setAside} left in the box so everyone gets the same number of turns` : ''}`);
+  }
+  toast(`${g.players[0].name} goes first`, 2600);
 }
 
 /** Put the whole current kingdom on the table at once (resume, late join, resync). */
@@ -610,6 +628,7 @@ async function startOnline(s) {
   } else {
     g = createGame(s.game);
     world.addTile(g.tiles[0], { animate: true, delay: 0.2 });
+    announceOrder();
   }
   shown = g.players.map(p => p.score);
   world.rig.setView(settings.view === 'cinematic' ? 'tabletop' : settings.view);

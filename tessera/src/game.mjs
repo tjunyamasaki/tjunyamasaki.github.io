@@ -9,9 +9,15 @@ const SLOT = 16;
 const cellKey = (x, y) => `${x},${y}`;
 const gid = (tile, feature) => tile * SLOT + feature;
 
-export function createGame({ players, seed = (Math.random() * 2 ** 32) >>> 0, meadows = true }) {
+/**
+ * `even`: every player lays the same number of tiles. The bag is trimmed to a
+ * multiple of the player count, and a tile that fits nowhere goes back under
+ * the bag instead of out of the game. (Off for games saved before it existed,
+ * so they replay exactly.)
+ */
+export function createGame({ players, seed = (Math.random() * 2 ** 32) >>> 0, meadows = true, even = false }) {
   const g = {
-    seed, meadows,
+    seed, meadows, even, setAside: 0,
     players: players.map((p, id) => ({
       name: p.name, color: p.color, kind: p.kind || 'human', level: p.level || 'normal',
       id, score: 0, followers: FOLLOWERS, tally: { city: 0, road: 0, monastery: 0, field: 0 },
@@ -20,6 +26,11 @@ export function createGame({ players, seed = (Math.random() * 2 ** 32) >>> 0, me
     board: new Map(), tiles: [], parent: new Map(), info: new Map(),
     current: 0, phase: 'tile', tile: -1, turn: 0, actions: [], last: -1,
   };
+  if (even) {
+    // The bag is already shuffled, so the bottom few are as good as any.
+    g.setAside = g.deck.length % g.players.length;
+    g.deck.splice(0, g.setAside);
+  }
   addTile(g, 0, 0, 0, TYPE_BY_ID[START_TILE].index, -1);
   g.openingEvents = [];
   draw(g, g.openingEvents);
@@ -181,14 +192,23 @@ export function placeFollower(g, feature) {
 }
 
 function draw(g, events) {
-  while (g.deck.length) {
+  // In an even game, tiles that fit nowhere go back under the bag; once every
+  // tile left has been tried and none fits, the game ends.
+  let tries = g.deck.length;
+  while (g.deck.length && tries-- > 0) {
     const t = g.deck.pop();
     if (legalPlacements(g, t).length) {
       g.tile = t; g.phase = 'tile';
       events.push({ kind: 'draw', type: t, player: g.current });
       return;
     }
-    events.push({ kind: 'discard', type: t });
+    if (g.even) g.deck.unshift(t);
+    else tries = g.deck.length;
+    events.push({ kind: 'discard', type: t, back: g.even });
+  }
+  if (g.even && g.deck.length) {
+    g.setAside += g.deck.length;
+    g.deck.length = 0;
   }
   g.tile = -1;
   finalScoring(g, events);

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1b1712">
-  <meta name="description" content="Tessera: lay tiles, claim towns, roads, abbeys and meadows, and watch your kingdom come to life in 3D. A tile-laying game for 1 to 5 players with bots.">
+  <meta name="description" content="Tessera: lay tiles, claim towns, roads, abbeys and meadows, and watch your kingdom come to life in 3D. A tile-laying game for 1 to 5 players with bots, at one screen or online.">
   <title>Tessera · A living kingdom of tiles</title>
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -68,6 +68,42 @@
         <button id="resume" class="secondary" hidden>Continue saved game</button>
       </div>
       <p class="small">2–5 seats · mix people at this screen with bots</p>
+      <section class="online" aria-labelledby="online-title">
+        <p id="online-title" class="eyebrow">PLAY ONLINE</p>
+        <p class="online-note">Each player on their own device. Host a table and share its code, or join a friend’s.</p>
+        <input id="net-name" class="net-input" maxlength="14" placeholder="Your name" aria-label="Your name at the table" autocomplete="nickname">
+        <div class="online-row">
+          <button id="net-host" class="secondary">Host a table</button>
+          <span class="online-or">or</span>
+          <input id="net-code" class="net-input code" maxlength="5" placeholder="CODE" aria-label="Table code" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <button id="net-join" class="secondary">Join</button>
+        </div>
+        <button id="net-resume" class="text-button left-text" hidden>Reopen your table</button>
+        <p id="net-status" class="small net-status" role="status"></p>
+      </section>
+    </dialog>
+
+    <dialog id="lobby" class="setup lobby" aria-labelledby="lobby-title">
+      <p class="eyebrow">AN ONLINE TABLE</p>
+      <h2 id="lobby-title">Table <span id="lobby-code" class="room-code">·····</span></h2>
+      <button id="lobby-link" class="text-button left-text" hidden>Copy the invite link ↗</button>
+      <div id="lobby-seats" class="seats"></div>
+      <div id="lobby-host" class="lobby-host" hidden>
+        <div class="add-bot">
+          <button id="lobby-add" class="text-button add">+ Add a bot</button>
+          <select id="lobby-level" aria-label="Level for the new bot"><option value="easy">Easy bot</option><option value="normal" selected>Steady bot</option><option value="hard">Cunning bot</option></select>
+        </div>
+        <div class="options">
+          <label class="check"><input type="checkbox" id="lobby-meadows" checked> <span>Meadow farmers<small>Followers lying in fields score 3 per finished town at the end</small></span></label>
+          <label class="select">Bot pace<select id="lobby-pace"><option value="1">Relaxed</option><option value="0.55">Brisk</option><option value="0.2">Quick</option></select></label>
+        </div>
+      </div>
+      <p id="lobby-status" class="small lobby-status" role="status"></p>
+      <div class="setup-actions">
+        <button id="lobby-start" class="primary" hidden>Begin the kingdom <span>↗</span></button>
+        <button id="lobby-rejoin" class="secondary" hidden>Rejoin</button>
+        <button id="lobby-leave" class="secondary">Leave the table</button>
+      </div>
     </dialog>
 
     <dialog id="menu" class="panel">

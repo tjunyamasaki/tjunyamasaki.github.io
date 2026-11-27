@@ -43,6 +43,10 @@ let options = [];
 let shown = [];
 let hovered = null;
 let demoToken = 0;
+// Online play: null at this screen, else { conn, state, round, noticeId, lost, code, name }.
+let room = null;
+let pumping = false;
+const HOST_SAVE_KEY = 'tessera.host.v1';
 
 const canvas = $('stage');
 const world = createWorld(canvas, {
@@ -50,7 +54,7 @@ const world = createWorld(canvas, {
   onHover: (x, y) => hover(x, y),
   onRightTap: () => { if (ui === 'place') rotate(1); },
 });
-window.tessera = { world, get game() { return g; } };
+window.tessera = { world, get game() { return g; }, get ui() { return ui; }, get room() { return room?.state || null; } };
 
 // ------------------------------------------------------------------ helpers
 const cellKey = (x, y) => `${x},${y}`;
@@ -97,8 +101,15 @@ function renderPlayers() {
     el.className = 'seat' + (i === g.current && g.phase !== 'over' ? ' current' : '');
     el.style.setProperty('--seat', p.color);
     const stock = Array.from({ length: 7 }, (_, k) => `<i class="${k < p.followers ? '' : 'out'}"></i>`).join('');
-    const tag = p.kind === 'human' ? '' : `<small>${KIND_LABEL[p.level]?.replace(' bot', '') || 'Bot'}</small>`;
-    const thinking = ui === 'bot' && i === g.current ? '<span class="thinking"> · thinking…</span>' : '';
+    const seat = room?.state?.seats?.[i];
+    let tag = p.kind === 'human' ? '' : `<small>${KIND_LABEL[p.level]?.replace(' bot', '') || 'Bot'}</small>`;
+    if (seat?.kind === 'human') {
+      if (seat.auto) tag = '<small>away · bot plays</small>';
+      else if (!seat.connected) tag = '<small class="away">away</small>';
+      else if (seat.pid === room.state.you) tag = '<small>you</small>';
+    }
+    const botThinking = room ? ui === 'remote' && seat && (seat.kind !== 'human' || seat.auto) : ui === 'bot';
+    const thinking = botThinking && i === g.current && g.phase !== 'over' ? '<span class="thinking"> · thinking…</span>' : '';
     el.innerHTML = `<span class="chip"></span><span class="name">${esc(p.name)}${tag}${thinking}</span><span class="score" data-seat="${i}">${shown[i] ?? p.score}</span><span class="stock" aria-label="${p.followers} followers left">${stock}</span>`;
     box.append(el);
   });
@@ -132,9 +143,10 @@ function setBar({ who, hint, mode }) {
   if (hint != null) $('hint').innerHTML = hint;
   $('rot-left').hidden = $('rot-right').hidden = mode !== 'place';
   $('confirm').hidden = mode !== 'place' && mode !== 'over';
-  $('skip').hidden = mode !== 'follower' && mode !== 'over';
+  $('skip').hidden = mode !== 'follower' && mode !== 'over' && mode !== 'away' && mode !== 'lost';
   $('confirm').innerHTML = mode === 'over' ? 'Results <span>↗</span>' : 'Place <span>✓</span>';
-  $('skip').textContent = mode === 'over' ? 'New game' : 'No follower';
+  const overLabel = !room ? 'New game' : room.state?.isHost ? 'Back to the table' : 'Leave the table';
+  $('skip').textContent = { over: overLabel, away: 'Let a bot play for now', lost: 'Rejoin' }[mode] || 'No follower';
   $('confirm').disabled = mode === 'place' && !pending;
   $('card').parentElement.hidden = mode === 'over';
   $('tile-name').hidden = mode === 'over';
@@ -148,18 +160,24 @@ async function beginTurn() {
   preferred = 0;
   hovered = null;
   byCell = new Map();
+  if (room) {
+    showCard(true);
+    if (!myTurn()) return waitRemote();
+    if (g.phase === 'follower') return followerStep();
+  }
   for (const m of legalPlacements(g)) {
     const k = cellKey(m.x, m.y);
     if (!byCell.has(k)) byCell.set(k, []);
     byCell.get(k).push(m.rot);
   }
-  showCard(true);
-  if (p.kind !== 'human') return botTurn();
+  if (!room) showCard(true);
+  if (p.kind !== 'human' && !room) return botTurn();
   ui = 'place';
   renderPlayers();
   if (settings.hints) world.showSlots([...byCell.keys()].map(k => k.split(',').map(Number)), p.color);
   const humans = g.players.filter(q => q.kind === 'human').length;
-  if (humans > 1) { toast(`${p.name}, your turn`); audio.turn(); }
+  if (room) { toast('Your turn'); audio.turn(); }
+  else if (humans > 1) { toast(`${p.name}, your turn`); audio.turn(); }
   setBar({ who: esc(p.name), hint: 'Tap a glowing spot to lay this tile.', mode: 'place' });
 }
 
@@ -238,7 +256,14 @@ async function confirmTile() {
   world.hideGhost();
   canvas.classList.remove('pointing');
   setBar({ hint: 'The land settles…', mode: 'wait' });
-  await layTile(x, y, rot);
+  const laid = layTile(x, y, rot);
+  // The tile is already on the local board, so the host's echo finds nothing new.
+  if (room) room.conn?.send('tile', { x, y, rot });
+  await laid;
+  followerStep();
+}
+
+function followerStep() {
   options = followerOptions(g);
   if (!options.length) {
     if (player().followers === 0) feed(`${nameTag(player())} has no followers left.`, player().color);
@@ -259,12 +284,13 @@ async function layTile(x, y, rot) {
 }
 
 /** Place (or skip) the follower. Players reach this only while choosing; turns call it internally. */
-async function commitFollower(feature, internal = false) {
+async function commitFollower(feature, internal = false, remote = false) {
   if (!internal && ui !== 'follower') return;
   ui = 'anim';
   world.hideOptions();
   const placer = g.current, tileIndex = g.last;
   const events = placeFollower(g, feature);
+  if (room && !remote) room.conn?.send('follower', { f: feature });
   if (feature != null) {
     const all = [...g.tiles[tileIndex].followers, ...events.flatMap(e => e.followers || [])];
     const f = all.find(x => x.tile === tileIndex && x.feature === feature && x.player === placer);
@@ -338,7 +364,8 @@ function finish() {
   world.hideSlots(); world.hideGhost(); world.hideOptions();
   shown = g.players.map(p => p.score);
   renderPlayers();
-  store.drop(SAVE_KEY);
+  if (!room) store.drop(SAVE_KEY);
+  $('again').textContent = !room ? 'Play again' : room.state?.isHost ? 'Back to the table' : 'Leave the table';
   const best = Math.max(...g.players.map(p => p.score));
   const champs = g.players.filter(p => p.score === best);
   const title = champs.length > 1 ? `A shared crown: ${champs.map(p => esc(p.name)).join(' & ')}` : `${esc(champs[0].name)} rules the kingdom!`;
@@ -356,7 +383,7 @@ function finish() {
 
 // ------------------------------------------------------------------ setup
 function save() {
-  if (!g || g.phase === 'over') return;
+  if (!g || g.phase === 'over' || room) return;
   store.set(SAVE_KEY, {
     options: { players: g.players.map(({ name, color, kind, level }) => ({ name, color, kind, level })), seed: g.seed, meadows: g.meadows },
     actions: g.actions,
@@ -424,11 +451,7 @@ async function startGame(fromSave) {
       store.drop(SAVE_KEY);
       return showSetup();
     }
-    for (const t of g.tiles) world.addTile(t, { animate: false });
-    for (const t of g.tiles) for (const f of t.followers) world.addFollower(f, g.players[f.player].color, { animate: false });
-    for (const [root, info] of g.info) {
-      if (info.type === 'city' && info.done) world.flagTown(regionsOf(root, [...info.tiles]), (info.winners || []).map(w => g.players[w].color));
-    }
+    rebuildWorld();
   } else {
     g = createGame({ players: toPlayers(settings.seats), meadows: settings.meadows });
     world.addTile(g.tiles[0], { animate: true, delay: 0.2 });
@@ -443,6 +466,16 @@ async function startGame(fromSave) {
   beginTurn();
 }
 
+/** Put the whole current kingdom on the table at once (resume, late join, resync). */
+function rebuildWorld() {
+  world.reset();
+  for (const t of g.tiles) world.addTile(t, { animate: false });
+  for (const t of g.tiles) for (const f of t.followers) world.addFollower(f, g.players[f.player].color, { animate: false });
+  for (const [root, info] of g.info) {
+    if (info.type === 'city' && info.done) world.flagTown(regionsOf(root, [...info.tiles]), (info.winners || []).map(w => g.players[w].color));
+  }
+}
+
 function showSetup() {
   ui = 'title';
   g = null;
@@ -450,7 +483,9 @@ function showSetup() {
   renderPlayers();
   renderSeats();
   $('resume').hidden = !store.get(SAVE_KEY, null);
+  const invited = renderOnlineSetup();
   $('setup').show();
+  if (invited) requestAnimationFrame(() => { $('net-status').scrollIntoView({ block: 'end' }); if (!$('net-name').value) $('net-name').focus({ preventScroll: true }); });
   demo();
 }
 
@@ -480,6 +515,351 @@ async function demo() {
     world.flagTown(regions, (info.winners || []).map(w => COLORS[w]), 0.5);
   }
 }
+
+// ------------------------------------------------------------------ online
+// Every browser at an online table (the host's included) follows the host's
+// action list: its own moves are laid at once and sent; everyone else's are
+// replayed here, with the same animations, as they arrive.
+const seatAt = i => room?.state?.seats?.[i];
+function myTurn() {
+  const seat = seatAt(g.current);
+  return Boolean(seat && seat.kind === 'human' && !seat.auto && seat.pid === room.state.you);
+}
+const sameAction = (a, b) => a.a === b.a && (a.a === 'tile' ? a.x === b.x && a.y === b.y && a.rot === b.rot : (a.f ?? null) === (b.f ?? null));
+const isPrefix = (a, b) => a.length <= b.length && a.every((x, i) => sameAction(x, b[i]));
+
+function waitRemote() {
+  if (room.lost) return showLost();
+  ui = 'remote';
+  world.hideSlots();
+  world.hideGhost();
+  renderPlayers();
+  const seat = seatAt(g.current);
+  const p = player();
+  let hint, mode = 'bot';
+  if (!seat || seat.kind !== 'human') hint = 'Thinking…';
+  else if (seat.auto) hint = 'Away. A bot is playing for them.';
+  else if (!seat.connected) {
+    hint = 'has left the table. Waiting for them to come back…';
+    if (room.state.isHost) { hint += ' Or let a bot play their turns.'; mode = 'away'; }
+  } else hint = g.phase === 'follower' ? 'Deciding where to send a follower…' : 'Choosing where to lay this tile…';
+  setBar({ who: esc(p.name), hint, mode });
+  pump();
+}
+
+function showLost() {
+  ui = 'lost';
+  world.hideSlots(); world.hideGhost(); world.hideOptions();
+  setBar({ who: 'Lost touch with the table', hint: 'The host’s connection dropped. Rejoin once they are back.', mode: 'lost' });
+}
+
+/** Replay the host's actions that this board has not seen yet, one at a time. */
+async function pump() {
+  if (!room || pumping || !g) return;
+  pumping = true;
+  try {
+    while (room?.state && g && room.round === room.state.round && ui === 'remote') {
+      const theirs = room.state.actions, mine = g.actions;
+      if (mine.length >= theirs.length) {
+        if (!isPrefix(theirs, mine)) resync();
+        break;
+      }
+      if (!isPrefix(mine, theirs)) { resync(); break; }
+      const a = theirs[mine.length];
+      if (a.a === 'tile') {
+        ui = 'anim';
+        world.hideSlots(); world.hideGhost();
+        await layTile(a.x, a.y, a.rot);
+        renderPlayers();
+        if (room && g.phase === 'follower') waitRemote();
+      } else {
+        await commitFollower(a.f ?? null, true, true);
+      }
+    }
+  } catch (err) {
+    console.warn('Tessera: could not follow the host, rebuilding the board', err);
+    resync();
+  } finally {
+    pumping = false;
+  }
+}
+
+/** Throw away the local board and rebuild it from the host's record. */
+function resync() {
+  const s = room?.state;
+  if (!s?.game) return;
+  g = restoreGame(s.game, s.actions);
+  world.hideSlots(); world.hideGhost(); world.hideOptions();
+  rebuildWorld();
+  shown = g.players.map(q => q.score);
+  renderPlayers();
+  ui = 'anim';
+  setTimeout(beginTurn, 0);
+}
+
+async function startOnline(s) {
+  demoToken++;
+  for (const id of ['setup', 'lobby', 'final', 'menu']) if ($(id).open) $(id).close();
+  world.reset();
+  world.hideSlots(); world.hideGhost(); world.hideOptions();
+  room.round = s.round;
+  ui = 'anim';
+  if (s.actions.length) {
+    g = restoreGame(s.game, s.actions);
+    rebuildWorld();
+  } else {
+    g = createGame(s.game);
+    world.addTile(g.tiles[0], { animate: true, delay: 0.2 });
+  }
+  shown = g.players.map(p => p.score);
+  world.rig.setView(settings.view === 'cinematic' ? 'tabletop' : settings.view);
+  const last = g.tiles[g.last >= 0 ? g.last : 0];
+  world.rig.focus(last.x, last.y, innerWidth < innerHeight ? 9 : 5.5);
+  updateViewLabel();
+  renderPlayers();
+  if (settings.sound) toggleSound(true);
+  if (!s.actions.length) await world.wait(1);
+  if (room?.round === s.round && g) beginTurn();
+}
+
+function onNetState(s) {
+  if (!room || !s) return;
+  const before = room.state;
+  room.state = s;
+  room.lost = false;
+  if (s.notice && s.notice.id !== room.noticeId) {
+    room.noticeId = s.notice.id;
+    toast(s.notice.text, 2800);
+    // The host turned down a move this board already made: take the host's word.
+    if (g && s.game && g.actions.length > s.actions.length) resync();
+  }
+  if (s.phase === 'lobby') {
+    if (!s.isHost && !s.seats.some(x => x.pid === s.you)) {
+      toast('The host gave your seat away.', 3200);
+      leaveRoom().then(showSetup);
+      return;
+    }
+    if (ui !== 'lobby') enterLobby();
+    renderLobby();
+    return;
+  }
+  if (!s.game) return;
+  if (!g || room.round !== s.round) { startOnline(s); return; }
+  renderPlayers();
+  if (ui === 'remote') {
+    // Refresh "away" notes and host buttons without disturbing a replay in progress.
+    if (!pumping) waitRemote();
+  } else if (ui === 'lost') beginTurn();
+  else if (ui === 'place' && before && !myTurn()) resync();
+}
+
+function onNetStatus({ text, error }) {
+  if (!room) return;
+  if (text === 'host gone') {
+    room.lost = true;
+    if (ui === 'lobby') renderLobby();
+    else if (g && ui !== 'over') showLost();
+    else toast('Lost touch with the host.', 3000);
+    return;
+  }
+  if (error) {
+    if (!room.state) {
+      // Turned away before sitting down (full table, game already running…).
+      const r = room;
+      room = null;
+      r.conn?.leave().catch(() => {});
+      if ($('lobby').open) $('lobby').close();
+      showSetup();
+      setNetStatus(text, true);
+    } else toast(text, 3000);
+  }
+}
+
+function enterLobby() {
+  ui = 'lobby';
+  g = null;
+  for (const id of ['setup', 'final', 'menu']) if ($(id).open) $(id).close();
+  $('turnbar').hidden = true;
+  renderPlayers();
+  if (!$('lobby').open) $('lobby').show();
+  demo();
+}
+
+function renderLobby() {
+  const s = room?.state;
+  $('lobby-code').textContent = room?.code || '·····';
+  $('lobby-link').hidden = !room?.code;
+  const box = $('lobby-seats');
+  box.innerHTML = '';
+  if (!s) {
+    $('lobby-status').textContent = room?.lost ? 'Could not reach the table.' : 'Knocking on the door…';
+    $('lobby-host').hidden = true;
+    $('lobby-start').hidden = true;
+    $('lobby-rejoin').hidden = !room?.lost;
+    return;
+  }
+  s.seats.forEach((seat, i) => {
+    const row = document.createElement('div');
+    row.className = 'seat-row';
+    row.style.setProperty('--seat', seat.color);
+    const mine = seat.kind === 'human' && seat.pid === s.you;
+    const tag = seat.kind === 'human'
+      ? `<span class="tag">${[seat.pid === 'host' ? 'Host' : 'Person', mine ? 'you' : '', seat.connected ? '' : 'away'].filter(Boolean).join(' · ')}</span>`
+      : s.isHost
+        ? `<select aria-label="Bot level for ${esc(seat.name)}">${['easy', 'normal', 'hard'].map(k => `<option value="${k}" ${seat.kind === k ? 'selected' : ''}>${KIND_LABEL[k]}</option>`).join('')}</select>`
+        : `<span class="tag">${KIND_LABEL[seat.kind]}</span>`;
+    const removable = s.isHost && seat.pid !== 'host';
+    row.innerHTML = `<button class="swatch" ${mine ? '' : 'disabled'} aria-label="${mine ? 'Change your colour' : `${esc(seat.name)}’s colour`}" title="${mine ? 'Change colour' : ''}"></button>
+      <span class="seat-name">${esc(seat.name)}</span>${tag}
+      <button class="remove" ${removable ? '' : 'hidden'} aria-label="Remove ${esc(seat.name)}">×</button>`;
+    if (mine) row.querySelector('.swatch').onclick = () => room.conn?.send('color');
+    const level = row.querySelector('select');
+    if (level) level.onchange = e => room.conn?.send('botLevel', { seat: i, level: e.target.value });
+    if (removable) row.querySelector('.remove').onclick = () => room.conn?.send('removeSeat', { seat: i });
+    box.append(row);
+  });
+  $('lobby-host').hidden = !s.isHost;
+  $('lobby-start').hidden = !s.isHost;
+  $('lobby-start').disabled = s.seats.length < 2;
+  $('lobby-add').disabled = s.seats.length >= 5;
+  $('lobby-meadows').checked = s.meadows;
+  $('lobby-pace').value = String(s.pace);
+  $('lobby-rejoin').hidden = !room.lost;
+  const people = s.seats.filter(x => x.kind === 'human').length;
+  $('lobby-status').textContent = room.lost
+    ? 'Lost touch with the host.'
+    : s.isHost
+      ? (s.seats.length < 2 ? 'Share the code, or add a bot, to fill a second seat.' : `${s.seats.length} seats · ${people} ${people === 1 ? 'person' : 'people'}. Begin when everyone is here.`)
+      : `Waiting for the host to begin · ${s.meadows ? 'meadow farmers on' : 'no meadow farmers'}`;
+}
+
+function setNetStatus(text, error = false) {
+  $('net-status').textContent = text || '';
+  $('net-status').classList.toggle('bad', error);
+}
+
+function renderOnlineSetup() {
+  const saved = store.get(HOST_SAVE_KEY, null);
+  $('net-resume').hidden = !saved?.roomCode;
+  if (saved?.roomCode) $('net-resume').textContent = `Reopen your table ${saved.roomCode}`;
+  $('net-name').value = settings.netName || '';
+  const code = new URLSearchParams(location.search).get('room');
+  if (code && !$('net-code').value) {
+    $('net-code').value = code.toUpperCase().slice(0, 5);
+    setNetStatus(`You’re invited to table ${$('net-code').value}. Write your name and press Join.`);
+  }
+  return Boolean(code);
+}
+
+function netName() {
+  const name = $('net-name').value.trim();
+  if (!name) { setNetStatus('Write your name first.', true); $('net-name').focus(); return null; }
+  settings.netName = name;
+  saveSettings();
+  return name;
+}
+
+async function loadNet() {
+  try {
+    return await import('./net.js');
+  } catch (err) {
+    console.warn('Tessera: online play unavailable', err);
+    setNetStatus('Online play is not available on this copy of the site.', true);
+    return null;
+  }
+}
+
+async function openTable({ role, code, resume = false }) {
+  const name = netName();
+  if (!name) return;
+  if (role === 'guest' && !/^[A-Z0-9]{5}$/.test(code)) { setNetStatus('Table codes are five letters and numbers.', true); return; }
+  if (settings.sound) toggleSound(true);
+  setNetStatus(role === 'host' ? 'Opening a table…' : 'Looking for the table…');
+  const net = await loadNet();
+  if (!net) return;
+  const me = { conn: null, state: null, round: -1, noticeId: 0, lost: false, code: role === 'guest' ? code : '', name, role };
+  room = me;
+  try {
+    const opts = { name, onState: s => { if (room === me) onNetState(s); }, onStatus: st => { if (room === me) onNetStatus(st); } };
+    me.conn = role === 'host' ? await net.host({ ...opts, resume }) : await net.join({ ...opts, code });
+  } catch (err) {
+    if (room === me) room = null;
+    setNetStatus(err.message || String(err), true);
+    return;
+  }
+  if (room !== me) { me.conn.leave().catch(() => {}); return; }
+  me.code = me.conn.code;
+  setNetStatus('');
+  const url = new URL(location.href);
+  url.searchParams.set('room', me.code);
+  history.replaceState(null, '', url);
+  if (ui !== 'lobby' && !g) enterLobby();
+  renderLobby();
+}
+
+async function leaveRoom() {
+  const r = room;
+  room = null;
+  pumping = false;
+  if (r?.conn) await r.conn.leave().catch(err => console.warn('leave', err));
+  const url = new URL(location.href);
+  url.searchParams.delete('room');
+  history.replaceState(null, '', url);
+  if ($('lobby').open) $('lobby').close();
+}
+
+async function rejoin() {
+  if (!room || room.role !== 'guest' || room.rejoining) return;
+  const old = room;
+  old.rejoining = true;
+  const keep = { g, round: old.round };
+  await old.conn?.leave().catch(() => {});
+  old.conn = null;
+  room = null;
+  $('net-name').value = old.name;
+  await openTable({ role: 'guest', code: old.code });
+  if (!room) {
+    // Still no host: stay at the table so the player can try again.
+    room = old;
+    old.rejoining = false;
+    toast($('net-status').textContent || 'Could not reach the table.', 3200);
+    if (keep.g && ui !== 'over') showLost(); else renderLobby();
+    return;
+  }
+  // Carry on from the same board; onNetState picks the game up from 'lost'
+  // once the host answers, and the host's record decides what is missing.
+  if (keep.g && !room.state) {
+    g = keep.g;
+    room.round = keep.round;
+    ui = 'lost';
+    setBar({ who: 'Rejoining…', hint: 'Catching up with the table.', mode: 'wait' });
+  }
+}
+
+function playAgain() {
+  if (!room) return showSetup();
+  if (room.state?.isHost) room.conn?.send('lobby');
+  else leaveRoom().then(showSetup);
+}
+
+$('net-host').onclick = () => openTable({ role: 'host' });
+$('net-resume').onclick = () => openTable({ role: 'host', resume: true });
+$('net-join').onclick = () => openTable({ role: 'guest', code: $('net-code').value.trim().toUpperCase() });
+$('net-code').addEventListener('keydown', e => { if (e.key === 'Enter') $('net-join').click(); });
+$('net-code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
+$('lobby-add').onclick = () => room?.conn?.send('addBot', { level: $('lobby-level').value });
+$('lobby-meadows').onchange = e => room?.conn?.send('options', { meadows: e.target.checked });
+$('lobby-pace').onchange = e => room?.conn?.send('options', { pace: Number(e.target.value) });
+$('lobby-start').onclick = () => room?.conn?.send('start');
+$('lobby-rejoin').onclick = () => rejoin();
+$('lobby-leave').onclick = async () => { await leaveRoom(); showSetup(); };
+$('lobby-link').onclick = async () => {
+  const link = `${location.origin}${location.pathname}?room=${room?.code}`;
+  try {
+    if (navigator.share && matchMedia('(pointer: coarse)').matches) await navigator.share({ title: 'Tessera', text: `Join my Tessera table: ${room?.code}`, url: link });
+    else { await navigator.clipboard.writeText(link); toast('Invite link copied.'); }
+  } catch { toast(link, 5000); }
+};
 
 // ------------------------------------------------------------------ controls
 function updateViewLabel() {
@@ -523,14 +903,20 @@ $('sound').onclick = () => toggleSound();
 $('rot-left').onclick = () => rotate(-1);
 $('rot-right').onclick = () => rotate(1);
 $('confirm').onclick = () => { if (ui === 'over') $('final').showModal(); else confirmTile(); };
-$('skip').onclick = () => { if (ui === 'over') { $('final').close(); showSetup(); } else if (ui === 'follower') commitFollower(null); };
+$('skip').onclick = () => {
+  if (ui === 'over') { $('final').close(); playAgain(); }
+  else if (ui === 'follower') commitFollower(null);
+  else if (ui === 'lost') rejoin();
+  else if (ui === 'remote' && room?.state?.isHost) room.conn?.send('auto', { seat: g.current, on: true });
+};
 $('start').onclick = () => { if (settings.sound) toggleSound(true); startGame(null); };
 $('resume').onclick = () => { if (settings.sound) toggleSound(true); startGame(store.get(SAVE_KEY, null)); };
 $('menu-open').onclick = () => $('menu').showModal();
 $('menu-close').onclick = () => $('menu').close();
-$('menu-new').onclick = () => { $('menu').close(); showSetup(); };
+$('menu-new').onclick = async () => { $('menu').close(); if (room) await leaveRoom(); showSetup(); };
 $('admire').onclick = () => { $('final').close(); world.rig.setView('cinematic'); updateViewLabel(); };
-$('again').onclick = () => { $('final').close(); showSetup(); };
+$('again').onclick = () => { $('final').close(); playAgain(); };
+$('menu-open').addEventListener('click', () => { $('menu-new').textContent = room ? 'Leave the table' : 'Start a new game'; });
 
 addEventListener('keydown', e => {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
@@ -547,7 +933,7 @@ addEventListener('keydown', e => {
   else if (k === 'f' && g) { const t = g.tiles[g.last >= 0 ? g.last : 0]; world.rig.focus(t.x, t.y); }
   else if (k === 'escape') {
     if (ui === 'place' && pending) { pending = null; world.hideGhost(); hovered = null; setBar({ hint: 'Tap a glowing spot to lay this tile.', mode: 'place' }); }
-    else if (ui !== 'title') $('menu').showModal();
+    else if (ui !== 'title' && ui !== 'lobby') $('menu').showModal();
   }
 });
 world.onFrame(() => {

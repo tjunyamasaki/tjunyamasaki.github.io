@@ -20,6 +20,15 @@ Draw a tile, fit it to the kingdom, and send one of your seven followers to clai
 
 Up to five seats, each played by a person at this screen or by a bot (Easy, Steady or Cunning). The game saves after every turn, so you can close the page and continue later.
 
+## Playing online
+
+Each player can use their own device.
+
+- **Host a table.** Write your name and press **Host a table**. Share the five-letter code, or the invite link, with your friends. Add bots to fill empty seats, then press **Begin the kingdom**.
+- **Join a table.** Open the invite link, or type the code, write your name and press **Join**.
+- **If someone drops out,** their seat waits for them. Reloading the page and joining again puts them back in their seat. The host can also let a bot play for them until they return.
+- **If the host reloads,** they can press **Reopen your table** to carry on with the same code. Everyone else presses **Rejoin**.
+
 ## Looking around
 
 - Drag to move.
@@ -35,6 +44,8 @@ Plain ES modules, no build step.
 
 - `src/tiles.mjs`: the 72-tile land. Each tile's towns, roads and abbey are described once. Meadows, ports, edges and follower spots are derived by rasterising those shapes, so the rules and the painted artwork can never disagree.
 - `src/game.mjs`: the deterministic rules engine (union-find over features, scoring, final scoring). A seed and the action list replay a saved game exactly.
+- `src/room.mjs`: the online table. The host's browser keeps the seats, the seed and the action list, checks each move with the rules engine and runs the bots. Everyone else rebuilds the same kingdom from the seed and the actions.
+- `src/net.js`: connects `room.mjs` to the site's shared WebRTC star (`js/starGameHost.js`, `js/guest.js`). Firebase carries only the handshake. Moves go over WebRTC data channels.
 - `src/ai.mjs`: the bots. They simulate every placement and follower choice, then value each player's likely final score.
 - `src/world.js`, `src/life.js`, `src/camera.js`, `src/art.js`: the Three.js stage, the growing life on each tile, the orbit camera, and the procedural tile faces.
 - `tests/`: `node --test tessera/tests/*.test.mjs`
